@@ -1,7 +1,8 @@
 import React from 'react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAppContext } from '../context/AppContext';
-import { TrendingUp, DollarSign, Package, AlertTriangle, FileText } from 'lucide-react';
+import { TrendingUp, DollarSign, Package, AlertTriangle, FileText, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
@@ -39,6 +40,33 @@ export default function Analytics() {
   // 4. Các mặt hàng cạn kho (Dưới 20)
   const lowStockItems = items.filter(i => i.stock < 20).sort((a,b) => a.stock - b.stock).slice(0, 5);
 
+  const handleExportExcel = () => {
+    const ws1Data = deptData.map((d, index) => ({
+      'STT': index + 1,
+      'Phòng Ban': d.name,
+      'Tổng Chi Phí Cấp Phát (VNĐ)': d.value
+    }));
+    const ws1 = XLSX.utils.json_to_sheet(ws1Data);
+    ws1['!cols'] = [{wch: 5}, {wch: 30}, {wch: 30}];
+
+    const ws2Data = lowStockItems.map((item, index) => ({
+      'STT': index + 1,
+      'Mã VPP': item.mvpp,
+      'Tên Hàng': item.name,
+      'Loại': item.itemType,
+      'Định Mức': item.quota,
+      'Tồn Thực Tế': item.stock
+    }));
+    const ws2 = XLSX.utils.json_to_sheet(ws2Data);
+    ws2['!cols'] = [{wch: 5}, {wch: 15}, {wch: 30}, {wch: 15}, {wch: 15}, {wch: 15}];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws1, "Chi_Phi_Phong_Ban");
+    XLSX.utils.book_append_sheet(wb, ws2, "Canh_Bao_Ton_Kho");
+    
+    XLSX.writeFile(wb, `Bao_Cao_Nhanh_VPP_${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] p-4 md:p-8 bg-slate-50 relative overflow-y-auto w-full">
         <div className="flex justify-between items-center mb-8 shrink-0">
@@ -46,8 +74,8 @@ export default function Analytics() {
                <h2 className="text-2xl font-black text-slate-800 tracking-tight">Dashboard Phân Tích (Analytics)</h2>
                <p className="text-slate-500 font-medium text-sm mt-1">Lãnh đạo Giám sát toàn cảnh sức khoẻ tồn kho và Phân bổ chi phí thời gian thực.</p>
             </div>
-            <button className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl shadow-[0_4px_10px_rgba(0,0,0,0.03)] hover:bg-slate-50 transition flex items-center cursor-pointer">
-                <FileText className="w-5 h-5 mr-2 text-indigo-500"/> Xuất PDF Biểu Đồ
+            <button onClick={handleExportExcel} className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl shadow-[0_4px_10px_rgba(0,0,0,0.03)] hover:bg-slate-50 transition flex items-center cursor-pointer">
+                <Download className="w-5 h-5 mr-2 text-indigo-500"/> Xuất Excel Tổng Hợp
             </button>
         </div>
 

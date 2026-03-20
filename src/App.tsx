@@ -8,6 +8,8 @@ import InventoryReport from './pages/InventoryReport';
 import Analytics from './pages/Analytics';
 import PurchaseOrders from './pages/PurchaseOrders';
 import GuestRequest from './pages/GuestRequest';
+import Users from './pages/Users';
+import Items from './pages/Items'; // Added this import
 import api from './lib/api';
 
 function Landing() {
@@ -111,6 +113,8 @@ function App() {
             <Route path="/inventory-report" element={<InventoryReport />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/purchase-orders" element={<PurchaseOrders />} />
+            <Route path="/users" element={<Users />} /> 
+            <Route path="/items" element={<Items />} />
           </Route>
         </Routes>
       </BrowserRouter>

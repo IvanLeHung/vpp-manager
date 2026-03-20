@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, CheckCircle, XCircle, Printer, Eye, Trash2, FileText, Search, AlertCircle, Save, Send, AlertTriangle } from 'lucide-react';
+import { Plus, CheckCircle, XCircle, Printer, Eye, Trash2, FileText, Search, AlertCircle, Save, Send, AlertTriangle, Download } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import api from '../lib/api';
 import type { VPPRequest, VPPItem } from '../context/AppContext';
+import * as XLSX from 'xlsx';
 
 export default function Requests() {
   const { currentUser, requests, items, refreshData } = useAppContext();
@@ -125,6 +126,25 @@ export default function Requests() {
     if (status === 'PARTIALLY_ISSUED' || status === 'PARTIALLY_APPROVED') return 'bg-teal-100 text-teal-700';
     if (status === 'RETURNED') return 'bg-orange-100 text-orange-700';
     return 'bg-amber-100 text-amber-700 border-amber-200';
+  };
+
+  const handleExportExcel = () => {
+    const exportData = requests.map((req, index) => ({
+       'STT': index + 1,
+       'Mã Phiếu': req.id,
+       'Thời gian lập': new Date(req.createdAt).toLocaleString('vi-VN'),
+       'Người đề xuất': req.requester?.fullName || '',
+       'Bộ phận': req.department,
+       'Loại Phiếu': req.requestType,
+       'Mức ưu tiên': req.priority,
+       'Lý do': req.purpose,
+       'Trạng thái': req.status
+    }));
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    ws['!cols'] = [ {wch: 5}, {wch: 15}, {wch: 20}, {wch: 25}, {wch: 20}, {wch: 15}, {wch: 15}, {wch: 40}, {wch: 20} ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Danh_Sach_Phieu");
+    XLSX.writeFile(wb, `Danh_Sach_Phieu_VPP_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
   if (viewMode === 'CREATE') {
@@ -432,11 +452,18 @@ export default function Requests() {
            <h2 className="text-2xl font-bold text-slate-800">Cổng Yêu cầu Cấp phát VPP</h2>
            <p className="text-slate-500 font-medium text-sm mt-1">Quản lý và xét duyệt các chứng từ nội bộ.</p>
         </div>
-        <button 
-           onClick={() => setViewMode('CREATE')}
-           className="flex items-center px-5 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition font-bold shadow-lg shadow-indigo-500/30 cursor-pointer">
-           <Plus className="w-5 h-5 mr-2"/> Tạo Đề Xuất Trực Tuyến
-        </button>
+        <div className="flex gap-3">
+            <button 
+               onClick={handleExportExcel}
+               className="flex items-center px-4 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition font-bold shadow-sm cursor-pointer">
+               <Download className="w-5 h-5 mr-2"/> Tải Excel
+            </button>
+            <button 
+               onClick={() => setViewMode('CREATE')}
+               className="flex items-center px-5 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition font-bold shadow-lg shadow-indigo-500/30 cursor-pointer">
+               <Plus className="w-5 h-5 mr-2"/> Tạo Đề Xuất
+            </button>
+        </div>
       </div>
 
        {/* Detailed Logic cho ActiveRequest Modal và Grid View... Tối giản render để tập trung Specs UI mới */}

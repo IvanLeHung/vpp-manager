@@ -1,18 +1,51 @@
-import React, { useState, useRef } from 'react';
-import { Package, Search, Plus, Filter, Download, Upload, Droplets, LayoutDashboard, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Package, Search, Plus, Download, Droplets, LayoutDashboard, FileText, ArrowDownToLine, Settings2, XCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { useAppContext } from '../context/AppContext';
+import api from '../lib/api';
 
 const TAX_RATE = 0.08;
 
 export default function Dashboard() {
-  const { items, setItems } = useAppContext();
+  const [stocks, setStocks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentInventoryTab, setCurrentInventoryTab] = useState('VPP'); // 'VPP' | 'VE_SINH'
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const displayedItems = items.filter(item => {
-    const isVS = item.category.toLowerCase().includes('vệ sinh') || item.category.toLowerCase().includes('hóa phẩm');
-    return currentInventoryTab === 'VPP' ? !isVS : isVS;
+  // Modal State
+  const [showModal, setShowModal] = useState(false);
+  const [modalMode, setModalMode] = useState<'RECEIVE' | 'ADJUST'>('RECEIVE');
+  const [selectedStock, setSelectedStock] = useState<any>(null);
+  const [qtyInput, setQtyInput] = useState<number | ''>('');
+  const [reasonInput, setReasonInput] = useState('');
+
+  const fetchStocks = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get('/inventory/stocks');
+      setStocks(res.data);
+    } catch (error) {
+      console.error('Failed to fetch stocks', error);
+      alert('Không thể tải dữ liệu kho.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStocks();
+  }, []);
+
+  const displayedStocks = stocks.filter(stock => {
+    const item = stock.item;
+    const isVS = item.category.toLowerCase().includes('vệ sinh') || item.category.toLowerCase().includes('hóa phẩm') || item.itemType === 'VE_SINH' || item.itemType === 'VS';
+    const matchesTab = currentInventoryTab === 'VPP' ? !isVS : isVS;
+    if (!matchesTab) return false;
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      return item.name.toLowerCase().includes(q) || item.mvpp.toLowerCase().includes(q);
+    }
+    return true;
   });
 
   const formatCurrency = (value: number) => {
@@ -20,87 +53,77 @@ export default function Dashboard() {
   };
 
   const handleExport = () => {
-    const exportData = displayedItems.map((item, index) => {
-      const giaVAT = Math.round(item.price + (item.price * TAX_RATE));
+    const exportData = displayedStocks.map((stock, index) => {
+      const item = stock.item;
+      const price = Number(item.price);
+      const giaVAT = Math.round(price + (price * TAX_RATE));
       return {
         'STT': index + 1,
         'MVPP': item.mvpp,
         'SP': item.name,
         'Nhóm': item.category,
         'ĐVT': item.unit,
-        'Tồn kho': item.stock,
-        'Giá': item.price,
+        'Tồn kho (TT)': stock.quantityOnHand,
+        'Giá': price,
         'Thuế': '8%',
         'Giá VAT': giaVAT
       };
     });
     
     const worksheet = XLSX.utils.json_to_sheet(exportData);
-    
-    worksheet['!cols'] = [
-      { wch: 5 }, { wch: 15 }, { wch: 35 }, { wch: 15 }, { wch: 10 }, { wch: 10 }, { wch: 15 }, { wch: 10 }, { wch: 15 }
-    ];
-
+    worksheet['!cols'] = [ { wch: 5 }, { wch: 15 }, { wch: 35 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 15 } ];
     const workbook = XLSX.utils.book_new();
-    const sheetName = currentInventoryTab === 'VPP' ? 'Danh_Muc_VPP' : 'Danh_Muc_Ve_Sinh';
+    const sheetName = currentInventoryTab === 'VPP' ? 'TonKho_VPP' : 'TonKho_Ve_Sinh';
     XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
     XLSX.writeFile(workbook, `${sheetName}.xlsx`);
   };
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const data = new Uint8Array(event.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const json: any[] = XLSX.utils.sheet_to_json(worksheet);
-        
-        const newItems = json.map((row, index) => {
-          const rawPrice = row['Giá'] ? String(row['Giá']).replace(/\D/g, '') : '0';
-          const priceValue = parseInt(rawPrice) || 0;
-
-          return {
-            id: `TMP_${Date.now()}_${index}`,
-            mvpp: row['MVPP'] || `${currentInventoryTab}_NEW_${Date.now() + index}`,
-            name: row['SP'] || 'Sản phẩm chưa có tên',
-            category: row['Nhóm'] || 'Khác',
-            unit: row['ĐVT'] || 'Cái',
-            stock: parseInt(row['Tồn kho']) || 0,
-            quota: parseInt(row['Định mức (Quota)']) || 100,
-            price: priceValue,
-            itemType: currentInventoryTab
-          };
-        });
-        
-        if (newItems.length > 0) {
-          setItems(prev => {
-            const otherTypeItems = prev.filter(i => i.itemType !== currentInventoryTab);
-            return [...otherTypeItems, ...newItems];
-          });
-          const tabName = currentInventoryTab === 'VPP' ? 'Văn phòng phẩm' : 'Đồ vệ sinh';
-          alert(`Đã nhập và đè thành công ${newItems.length} mặt hàng vào kho [${tabName}]!`);
-        } else {
-           alert('Cấu trúc file Excel chưa đúng (Cần: MVPP, SP, Nhóm, ĐVT, Giá, ...).');
-        }
-      } catch (error) {
-        console.error(error);
-        alert('File Excel lỗi định dạng.');
-      }
-    };
-    reader.readAsArrayBuffer(file);
-    
-    if (fileInputRef.current) fileInputRef.current.value = '';
+  const openModal = (mode: 'RECEIVE' | 'ADJUST', stockItem: any) => {
+    setModalMode(mode);
+    setSelectedStock(stockItem);
+    setQtyInput(mode === 'ADJUST' ? stockItem.quantityOnHand : '');
+    setReasonInput('');
+    setShowModal(true);
   };
 
-  const totalStock = displayedItems.length;
-  const inStock = displayedItems.filter(i => i.stock > 15).length;
-  const outOfStockOrLow = displayedItems.filter(i => i.stock <= 15).length;
+  const handleSubmitModal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!qtyInput || Number(qtyInput) < 0) return alert('Số lượng không hợp lệ');
+
+    try {
+      if (modalMode === 'RECEIVE') {
+        if (!reasonInput) return alert('Lý do/Nguồn gốc nhập là bắt buộc');
+        await api.post('/inventory/receive', {
+          itemId: selectedStock.item.id,
+          qty: Number(qtyInput),
+          reason: reasonInput,
+          refType: 'TRUC_TIEP'
+        });
+      } else {
+        if (!reasonInput) return alert('Vui lòng giải trình lý do điều chỉnh');
+        await api.post('/inventory/adjust', {
+          itemId: selectedStock.item.id,
+          newQty: Number(qtyInput),
+          reason: reasonInput
+        });
+      }
+      setShowModal(false);
+      fetchStocks(); // reload stock limits
+    } catch (err: any) {
+      alert('Lỗi lưu trữ: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const totalStockTypes = displayedStocks.length;
+  let totalPhysicalItems = 0;
+  let inStockTypes = 0;
+  let outOfStockOrLow = 0;
+
+  displayedStocks.forEach(s => {
+     totalPhysicalItems += s.quantityOnHand;
+     if (s.quantityOnHand > 15) inStockTypes++;
+     else outOfStockOrLow++;
+  });
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative">
@@ -109,13 +132,13 @@ export default function Dashboard() {
           <button 
             onClick={() => setCurrentInventoryTab('VPP')}
             className={`pb-4 flex items-center font-bold text-sm transition-colors relative cursor-pointer ${currentInventoryTab === 'VPP' ? 'text-blue-700' : 'text-slate-400 hover:text-slate-700'}`}>
-            <Package className="w-4 h-4 mr-2"/> Cấu hình Danh mục Văn phòng phẩm
+            <Package className="w-4 h-4 mr-2"/> Quản lý Tồn kho VPP
             {currentInventoryTab === 'VPP' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600 rounded-t-full shadow-[0_-2px_8px_rgba(37,99,235,0.4)]"></div>}
           </button>
           <button 
             onClick={() => setCurrentInventoryTab('VE_SINH')}
             className={`pb-4 flex items-center font-bold text-sm transition-colors relative cursor-pointer ${currentInventoryTab === 'VE_SINH' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-700'}`}>
-            <Droplets className="w-4 h-4 mr-2"/> Cấu hình Danh mục Đồ vệ sinh
+            <Droplets className="w-4 h-4 mr-2"/> Quản lý Tồn kho Tạp hóa / Vệ sinh
             {currentInventoryTab === 'VE_SINH' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full shadow-[0_-2px_8px_rgba(16,185,129,0.4)]"></div>}
           </button>
       </div>
@@ -129,8 +152,8 @@ export default function Dashboard() {
                   <Package className="w-6 h-6"/>
               </div>
               <div>
-                  <p className="text-sm text-slate-500 font-medium">Tổng đầu mục SP</p>
-                  <p className="text-3xl font-bold text-slate-800">{totalStock}</p>
+                  <p className="text-sm text-slate-500 font-medium">Tổng đầu mục SP / TS Lượng Tồn</p>
+                  <p className="text-3xl font-bold text-slate-800">{totalStockTypes} <span className="text-sm text-slate-400 font-normal">/ {totalPhysicalItems} món</span></p>
               </div>
             </div>
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center hover:shadow-md transition-shadow">
@@ -138,8 +161,8 @@ export default function Dashboard() {
                   <LayoutDashboard className="w-6 h-6"/>
               </div>
               <div>
-                  <p className="text-sm text-slate-500 font-medium">Còn hàng tốt</p>
-                  <p className="text-3xl font-bold text-slate-800">{inStock}</p>
+                  <p className="text-sm text-slate-500 font-medium">Sẵn sàng cấp phát (&gt;15)</p>
+                  <p className="text-3xl font-bold text-slate-800">{inStockTypes}</p>
               </div>
             </div>
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center hover:shadow-md transition-shadow">
@@ -147,8 +170,8 @@ export default function Dashboard() {
                   <FileText className="w-6 h-6"/>
               </div>
               <div>
-                  <p className="text-sm text-slate-500 font-medium">Sắp / Hết hàng</p>
-                  <p className="text-3xl font-bold text-slate-800">{outOfStockOrLow}</p>
+                  <p className="text-sm text-slate-500 font-medium">Cảnh báo tồn kho (&le;15)</p>
+                  <p className="text-3xl font-bold text-rose-600">{outOfStockOrLow}</p>
               </div>
             </div>
         </div>
@@ -159,7 +182,9 @@ export default function Dashboard() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input 
               type="text" 
-              placeholder={`Tìm kiếm mã SP, tên SP...`}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={`Tra cứu VPP theo mã / Tên...`}
               className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm transition-all"
             />
           </div>
@@ -167,24 +192,7 @@ export default function Dashboard() {
             <button 
               onClick={handleExport}
               className="flex items-center justify-center px-4 py-2 bg-white border border-emerald-300 text-emerald-700 hover:text-emerald-800 rounded-xl hover:bg-emerald-50 max-sm:w-full border-2 transition-all shadow-sm font-semibold cursor-pointer">
-              <Download className="w-4 h-4 mr-2" /> Tải về Template Excel
-            </button>
-            
-            <input 
-                type="file" 
-                accept=".xlsx, .xls" 
-                ref={fileInputRef} 
-                onChange={handleImport} 
-                className="hidden" 
-            />
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center justify-center px-4 py-2 bg-white border border-blue-300 text-blue-700 hover:text-blue-800 rounded-xl hover:bg-blue-50 max-sm:w-full border-2 transition-all shadow-sm font-semibold cursor-pointer">
-              <Upload className="w-4 h-4 mr-2" /> Import vào Database
-            </button>
-            
-            <button className={`flex items-center justify-center px-5 py-2 text-white rounded-xl transition-all shadow-md font-semibold cursor-pointer max-sm:w-full ${currentInventoryTab === 'VPP' ? 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-500/30' : 'bg-emerald-600 hover:bg-emerald-700 hover:shadow-emerald-500/30'}`}>
-              <Plus className="w-4 h-4 mr-2" /> Tạo mã SP mới
+              <Download className="w-4 h-4 mr-2" /> Trích xuất Kho hiện tại
             </button>
           </div>
         </div>
@@ -194,45 +202,57 @@ export default function Dashboard() {
           <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-bold">
-                <th className="px-4 py-4 text-center">STT</th>
                 <th className="px-5 py-4">MVPP</th>
                 <th className="px-6 py-4">SP (Sản Phẩm)</th>
                 <th className="px-5 py-4">Nhóm</th>
                 <th className="px-4 py-4">ĐVT</th>
-                <th className="px-4 py-4 text-right">Giá Trị Cũ</th>
-                <th className="px-4 py-4 text-center">Thuế VAT</th>
-                <th className="px-4 py-4 text-right">Tổng thanh toán</th>
-                <th className="px-5 py-4 text-right">Thao tác</th>
+                <th className="px-4 py-4 text-center">Tồn kho TT</th>
+                <th className="px-4 py-4 text-center">Tạm giữ</th>
+                <th className="px-4 py-4 text-right">Đơn giá</th>
+                <th className="px-5 py-4 text-center">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {displayedItems.length > 0 ? displayedItems.map((item, index) => {
-                const giaVAT = Math.round(item.price + (item.price * TAX_RATE));
+              {loading ? (
+                 <tr><td colSpan={8} className="p-8 text-center text-slate-400 font-bold animate-pulse">Đang nạp dữ liệu từ kho...</td></tr>
+              ) : displayedStocks.length > 0 ? displayedStocks.map((stock) => {
+                const item = stock.item;
+                const isLow = stock.quantityOnHand <= 15;
                 return (
-                  <tr key={item.mvpp} className="hover:bg-blue-50/50 transition-colors group">
-                    <td className="px-4 py-4 text-center font-medium text-slate-400">{index + 1}</td>
+                  <tr key={stock.id} className="hover:bg-blue-50/50 transition-colors group">
                     <td className={`px-5 py-4 font-bold ${currentInventoryTab === 'VPP' ? 'text-blue-700' : 'text-emerald-700'}`}>{item.mvpp}</td>
                     <td className="px-6 py-4 font-bold text-slate-800">{item.name}</td>
                     <td className="px-5 py-4 text-slate-600 text-sm font-medium">
                       <span className="bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">{item.category}</span>
                     </td>
-                    <td className="px-4 py-4 text-slate-600 font-medium">{item.unit}</td>
-                    <td className="px-4 py-4 text-right text-slate-500 font-medium">{formatCurrency(item.price)}</td>
+                    <td className="px-4 py-4 text-slate-500 font-medium">{item.unit}</td>
                     <td className="px-4 py-4 text-center">
-                      <span className="px-2 py-1 text-xs font-bold rounded bg-slate-100 text-slate-500">8%</span>
+                        <span className={`px-3 py-1 text-sm font-black rounded-full ${isLow ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {stock.quantityOnHand}
+                        </span>
                     </td>
-                    <td className="px-4 py-4 text-right font-bold text-amber-600">{formatCurrency(giaVAT)}</td>
-                    <td className="px-5 py-4 text-right">
-                      <button className="text-blue-600 font-bold text-sm hover:text-blue-800 opacity-80 hover:opacity-100 transition-all cursor-pointer">Chi tiết</button>
+                    <td className="px-4 py-4 text-center text-amber-500 font-bold">{stock.quantityReserved}</td>
+                    <td className="px-4 py-4 text-right text-slate-500 font-medium">{formatCurrency(Number(item.price))}</td>
+                    <td className="px-5 py-4 text-center space-x-2">
+                      <button 
+                        onClick={() => openModal('RECEIVE', stock)}
+                        className="px-2.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white rounded-lg transition-colors font-bold text-xs" title="Ghi sổ Biên bản nhập kho">
+                         <ArrowDownToLine className="w-4 h-4 inline mr-1" /> Nhập kho
+                      </button>
+                      <button 
+                        onClick={() => openModal('ADJUST', stock)}
+                        className="px-2.5 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-500 hover:text-white rounded-lg transition-colors font-bold text-xs" title="Ghi sổ kiểm kê kho">
+                         <Settings2 className="w-4 h-4 inline mr-1" /> Điều chỉnh
+                      </button>
                     </td>
                   </tr>
                 );
               }) : (
                 <tr>
-                  <td colSpan={9} className="px-6 py-16 text-center text-slate-400 font-medium">
+                  <td colSpan={8} className="px-6 py-16 text-center text-slate-400 font-medium">
                     <div className="flex flex-col items-center justify-center gap-3">
                         {currentInventoryTab === 'VPP' ? <Package className="w-16 h-16 opacity-30" /> : <Droplets className="w-16 h-16 opacity-30" />}
-                        <span>Không tìm thấy mặt hàng nào trong CSDL! Nạp dữ liệu Excel lên.</span>
+                        <span>Kho trống, không tìm thấy vật tư.</span>
                     </div>
                   </td>
                 </tr>
@@ -241,6 +261,66 @@ export default function Dashboard() {
           </table>
         </div>
       </div>
+
+      {showModal && selectedStock && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col transform transition-all">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h2 className={`text-lg font-bold flex items-center ${modalMode === 'RECEIVE' ? 'text-blue-700' : 'text-amber-600'}`}>
+                {modalMode === 'RECEIVE' ? <ArrowDownToLine className="w-5 h-5 mr-2" /> : <Settings2 className="w-5 h-5 mr-2" />}
+                {modalMode === 'RECEIVE' ? 'Phiếu Nhập Kho' : 'Kiểm Kê Kho'}
+              </h2>
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600"><XCircle className="w-6 h-6" /></button>
+            </div>
+            
+            <form onSubmit={handleSubmitModal} className="p-6">
+              <div className="mb-4">
+                 <p className="text-xs font-bold text-slate-400 uppercase">Mặt Hàng</p>
+                 <p className="font-bold text-slate-800 text-base">{selectedStock.item.name} ({selectedStock.item.mvpp})</p>
+                 <p className="text-sm text-slate-500 mt-1">Tồn hiện tại: <span className="font-bold text-emerald-600">{selectedStock.quantityOnHand}</span> {selectedStock.item.unit}</p>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-bold text-slate-700 mb-1">
+                   {modalMode === 'RECEIVE' ? 'Số lượng NHẬP THÊM *' : 'SỐ LƯỢNG THỰC TẾ tại kho *'}
+                </label>
+                <input 
+                  type="number" 
+                  autoFocus
+                  required
+                  min={0}
+                  step={1}
+                  value={qtyInput} 
+                  onChange={e => setQtyInput(e.target.value ? Number(e.target.value) : '')} 
+                  className="w-full px-4 py-3 border border-slate-200 bg-slate-50 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-bold text-xl text-center" 
+                />
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-bold text-slate-700 mb-1">
+                   {modalMode === 'RECEIVE' ? 'Nguồn gốc/Lý do nhập *' : 'Biên bản/Lý do thay đổi *'}
+                </label>
+                <input 
+                  type="text" 
+                  required
+                  value={reasonInput} 
+                  onChange={e => setReasonInput(e.target.value)} 
+                  placeholder={modalMode === 'RECEIVE' ? 'Ví dụ: NCC chuyển hàng T5...' : 'Ví dụ: Hư hỏng, mất mát, kiểm kê thừa...'}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" 
+                />
+              </div>
+
+              <div className="flex gap-3">
+                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3 font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition">Hủy</button>
+                 <button type="submit" className={`flex-1 py-3 font-bold text-white rounded-xl transition shadow-md ${modalMode === 'RECEIVE' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-amber-500 hover:bg-amber-600'}`}>
+                    Lưu sổ kho
+                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
