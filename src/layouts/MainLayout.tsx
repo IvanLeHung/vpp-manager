@@ -1,7 +1,6 @@
-import React from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Package, LayoutDashboard, Settings, LogOut, FileText, ClipboardList, Users, ShieldAlert, ShoppingCart } from 'lucide-react';
-import { useAppContext, MOCK_USERS } from '../context/AppContext';
+import { Package, LayoutDashboard, LogOut, FileText, ClipboardList, ShieldAlert, ShoppingCart } from 'lucide-react';
+import { useAppContext } from '../context/AppContext';
 
 export default function MainLayout() {
   const navigate = useNavigate();
@@ -69,15 +68,11 @@ export default function MainLayout() {
                {currentUser.role === 'ADMIN' && <span className="ml-4 bg-rose-100 text-rose-700 font-bold text-xs px-2 py-1 rounded flex items-center"><ShieldAlert className="w-3 h-3 mr-1"/> Quyền Admin</span>}
             </div>
             <div className="flex items-center gap-4">
-              <div className="flex items-center bg-slate-100 border border-slate-200 rounded-full pr-1 pl-4 py-1">
+              <div className="flex items-center bg-slate-100 border border-slate-200 rounded-full px-4 py-1.5 shadow-sm">
                  <span className="text-xs font-bold text-slate-500 mr-2 uppercase tracking-wide">Tài khoản:</span>
-                 <select 
-                   className="bg-white border text-center border-slate-200 rounded-full px-3 py-1.5 text-sm font-bold text-indigo-700 outline-none shadow-sm cursor-pointer hover:bg-indigo-50 transition"
-                   value={currentUser.id}
-                   onChange={e => setCurrentUser(MOCK_USERS.find(u => u.id === e.target.value)!)}
-                 >
-                   {MOCK_USERS.map(u => <option key={u.id} value={u.id}>{u.name} [{u.role}]</option>)}
-                 </select>
+                 <span className="text-sm font-bold text-indigo-700">
+                   {currentUser?.fullName || currentUser?.username} [{currentUser?.role}]
+                 </span>
               </div>
               <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold border border-indigo-200 shadow-sm">
                 {currentUser.avatar}
