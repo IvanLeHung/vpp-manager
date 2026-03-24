@@ -1,3 +1,4 @@
+import React from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Package, LayoutDashboard, LogOut, FileText, ClipboardList, ShieldAlert, ShoppingCart, Users as UsersIcon, Database } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -5,7 +6,7 @@ import { useAppContext } from '../context/AppContext';
 export default function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser, setCurrentUser } = useAppContext();
+  const { currentUser } = useAppContext();
 
   const getActiveClass = (path: string) => {
     return location.pathname === path 
@@ -30,7 +31,12 @@ export default function MainLayout() {
           )}
           {currentUser.role === 'ADMIN' && (
             <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/purchase-orders')}`} onClick={() => navigate('/purchase-orders')}>
-              <ShoppingCart className="w-5 h-5 mr-3" /> Mua Sắm & Nhập Kho
+              <ShoppingCart className="w-5 h-5 mr-3" /> Mua Sắm (PR/PO)
+            </button>
+          )}
+          {(currentUser.role === 'ADMIN' || currentUser.role === 'WAREHOUSE') && (
+            <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/receipts')}`} onClick={() => navigate('/receipts')}>
+              <Package className="w-5 h-5 mr-3" /> Kiểm & Nhập Kho
             </button>
           )}
           <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/requests')}`} onClick={() => navigate('/requests')}>

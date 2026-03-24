@@ -6,7 +6,8 @@ import Dashboard from './pages/Dashboard';
 import Requests from './pages/Requests';
 import InventoryReport from './pages/InventoryReport';
 import Analytics from './pages/Analytics';
-import PurchaseOrders from './pages/PurchaseOrders';
+import Purchases from './pages/purchases/Purchases';
+import Receipts from './pages/purchases/Receipts';
 import GuestRequest from './pages/GuestRequest';
 import Users from './pages/Users';
 import Items from './pages/Items'; // Added this import
@@ -112,7 +113,8 @@ function App() {
             <Route path="/requests" element={<Requests />} />
             <Route path="/inventory-report" element={<InventoryReport />} />
             <Route path="/analytics" element={<Analytics />} />
-            <Route path="/purchase-orders" element={<PurchaseOrders />} />
+            <Route path="/purchase-orders" element={<Purchases />} />
+            <Route path="/receipts" element={<Receipts />} />
             <Route path="/users" element={<Users />} /> 
             <Route path="/items" element={<Items />} />
           </Route>

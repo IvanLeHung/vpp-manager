@@ -46,6 +46,10 @@ export type VPPRequest = {
   purpose: string;
   status: string;
   createdAt: string;
+  neededByDate?: string | null;
+  managerApprovedAt?: string | null;
+  adminApprovedAt?: string | null;
+  handoverAt?: string | null;
   lines: RequestLine[];
   rejectReason?: string;
   returnReason?: string;
