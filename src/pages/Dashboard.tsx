@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Search, Plus, Download, Droplets, LayoutDashboard, FileText, ArrowDownToLine, Settings2, XCircle } from 'lucide-react';
+import { Package, Search, Download, Droplets, LayoutDashboard, FileText, ArrowDownToLine, Settings2, XCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../lib/api';
 
 const TAX_RATE = 0.08;
 
 export default function Dashboard() {
+  const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+  const addToast = (msg: string, type: 'success' | 'error' = 'success') => { setToast({message: msg, type}); setTimeout(() => setToast(null), 3000); };
   const [stocks, setStocks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentInventoryTab, setCurrentInventoryTab] = useState('VPP'); // 'VPP' | 'VE_SINH'
@@ -25,7 +27,7 @@ export default function Dashboard() {
       setStocks(res.data);
     } catch (error) {
       console.error('Failed to fetch stocks', error);
-      alert('Không thể tải dữ liệu kho.');
+      addToast?.('Không thể tải dữ liệu kho.', 'error');
     } finally {
       setLoading(false);
     }
@@ -88,29 +90,42 @@ export default function Dashboard() {
 
   const handleSubmitModal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!qtyInput || Number(qtyInput) < 0) return alert('Số lượng không hợp lệ');
+    if (qtyInput === '' || Number(qtyInput) < 0) {
+      addToast?.('Số lượng không hợp lệ', 'error');
+      return;
+    }
 
     try {
       if (modalMode === 'RECEIVE') {
-        if (!reasonInput) return alert('Lý do/Nguồn gốc nhập là bắt buộc');
+        if (!reasonInput) {
+           addToast?.('Lý do/Nguồn gốc nhập là bắt buộc', 'error');
+           return;
+        }
         await api.post('/inventory/receive', {
           itemId: selectedStock.item.id,
           qty: Number(qtyInput),
           reason: reasonInput,
           refType: 'TRUC_TIEP'
         });
+        addToast?.('Nhập kho thành công!');
       } else {
-        if (!reasonInput) return alert('Vui lòng giải trình lý do điều chỉnh');
+        if (!reasonInput) {
+           addToast?.('Vui lòng giải trình lý do điều chỉnh', 'error');
+           return;
+        }
         await api.post('/inventory/adjust', {
           itemId: selectedStock.item.id,
           newQty: Number(qtyInput),
           reason: reasonInput
         });
+        addToast?.('Điều chỉnh kho thành công!');
       }
       setShowModal(false);
       fetchStocks(); // reload stock limits
     } catch (err: any) {
-      alert('Lỗi lưu trữ: ' + (err.response?.data?.error || err.message));
+      const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Lỗi hệ thống';
+      addToast(`Thao tác thất bại: ${msg}`, 'error');
+      console.error('adjust stock error:', err?.response?.data || err);
     }
   };
 
@@ -127,6 +142,11 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative">
+      {toast && (
+        <div className={`fixed bottom-4 right-4 px-6 py-3 rounded-xl text-white font-bold shadow-2xl z-50 ${toast.type === 'error' ? 'bg-rose-500' : 'bg-emerald-500'} animate-fade-in`}>
+          {toast.message}
+        </div>
+      )}
       {/* Tabs Group Local to Dashboard */}
       <div className="bg-white px-8 pt-4 flex gap-8 border-b border-slate-200 shrink-0 sticky top-0 z-10 w-full shadow-sm">
           <button 
