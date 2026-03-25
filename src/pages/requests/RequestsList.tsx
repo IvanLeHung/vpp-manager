@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Plus, Download, Search, FileText, CheckCircle, Clock, XCircle, ChevronLeft, ChevronRight, Eye, CheckSquare, StopCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { VPPRequest, User } from '../../context/AppContext';
@@ -85,7 +85,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
       // Logic SLA cơ bản: nếu quá SLA hours mà chưa sang APPROVED
       if (['COMPLETED', 'REJECTED', 'CANCELLED', 'READY_TO_ISSUE', 'WAITING_HANDOVER'].includes(req.status)) return null;
       const hoursElapsed = (new Date().getTime() - new Date(req.createdAt).getTime()) / (1000 * 60 * 60);
-      const isOverdue = hoursElapsed > (req.prioritySlaHours || 24);
+      const isOverdue = hoursElapsed > ((req as any).prioritySlaHours || 24);
       return isOverdue ? 'Khẩn / Quá Hạn' : 'Trong hạn';
   };
 
@@ -163,9 +163,11 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
            <p className="text-slate-500 font-medium text-sm mt-1">Quản lý duyệt luồng đa cấp, cấp phát và giao nhận.</p>
         </div>
         <div className="flex gap-3">
-            <button onClick={handleExportExcel} className="flex items-center px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition font-bold shadow-sm">
-               <Download className="w-5 h-5 mr-2 text-slate-400"/> Tải Excel
-            </button>
+            {currentUser.role !== 'EMPLOYEE' && (
+              <button onClick={handleExportExcel} className="flex items-center px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition font-bold shadow-sm">
+                 <Download className="w-5 h-5 mr-2 text-slate-400"/> Tải Excel
+              </button>
+            )}
             <button onClick={() => { setActiveRequest(null); setViewMode('CREATE'); }} className="flex items-center px-5 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition font-bold shadow-lg shadow-indigo-500/30">
                <Plus className="w-5 h-5 mr-2"/> Tạo Đề Xuất
             </button>

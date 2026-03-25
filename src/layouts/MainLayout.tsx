@@ -1,4 +1,3 @@
-import React from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Package, LayoutDashboard, LogOut, FileText, ClipboardList, ShieldAlert, ShoppingCart, Users as UsersIcon, Database } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -24,17 +23,17 @@ export default function MainLayout() {
         </div>
         
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-          {currentUser.role === 'ADMIN' && (
+          {currentUser?.role === 'ADMIN' && (
             <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/dashboard')}`} onClick={() => navigate('/dashboard')}>
               <Package className="w-5 h-5 mr-3" /> Quản lý Kho Tổng
             </button>
           )}
-          {currentUser.role === 'ADMIN' && (
+          {currentUser?.role === 'ADMIN' && (
             <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/purchase-orders')}`} onClick={() => navigate('/purchase-orders')}>
               <ShoppingCart className="w-5 h-5 mr-3" /> Mua Sắm (PR/PO)
             </button>
           )}
-          {(currentUser.role === 'ADMIN' || currentUser.role === 'WAREHOUSE') && (
+          {(currentUser?.role === 'ADMIN' || currentUser?.role === 'WAREHOUSE') && (
             <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/receipts')}`} onClick={() => navigate('/receipts')}>
               <Package className="w-5 h-5 mr-3" /> Kiểm & Nhập Kho
             </button>
@@ -42,7 +41,7 @@ export default function MainLayout() {
           <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/requests')}`} onClick={() => navigate('/requests')}>
             <ClipboardList className="w-5 h-5 mr-3" /> Yêu Cầu Cấp Phát
           </button>
-          {currentUser.role === 'ADMIN' && (
+          {currentUser?.role === 'ADMIN' && (
             <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/inventory-report')}`} onClick={() => navigate('/inventory-report')}>
               <FileText className="w-5 h-5 mr-3" /> Lịch sử Xuất Nhập
             </button>
@@ -50,19 +49,19 @@ export default function MainLayout() {
           
           <div className="pt-6 pb-2 px-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Hệ thống</div>
           
-          {currentUser.role === 'ADMIN' && (
+          {(currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER') && (
             <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/users')}`} onClick={() => navigate('/users')}>
               <UsersIcon className="w-5 h-5 mr-3" /> Quản lý Nhân sự
             </button>
           )}
 
-          {currentUser.role === 'ADMIN' && (
+          {currentUser?.role === 'ADMIN' && (
             <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/items')}`} onClick={() => navigate('/items')}>
               <Database className="w-5 h-5 mr-3" /> Danh mục Hàng hoá
             </button>
           )}
           
-          {(currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER') && (
+          {(currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER') && (
             <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/analytics')}`} onClick={() => navigate('/analytics')}>
               <LayoutDashboard className="w-5 h-5 mr-3" /> Báo cáo thống kê
             </button>
@@ -83,7 +82,7 @@ export default function MainLayout() {
           <div className="h-16 flex items-center justify-between px-6 md:px-8">
             <div className="flex items-center">
                <h1 className="text-xl font-bold text-slate-800 tracking-tight hidden md:block">Hệ thống Quản Trị VPP nội bộ</h1>
-               {currentUser.role === 'ADMIN' && <span className="ml-4 bg-rose-100 text-rose-700 font-bold text-xs px-2 py-1 rounded flex items-center"><ShieldAlert className="w-3 h-3 mr-1"/> Quyền Admin</span>}
+               {currentUser?.role === 'ADMIN' && <span className="ml-4 bg-rose-100 text-rose-700 font-bold text-xs px-2 py-1 rounded flex items-center"><ShieldAlert className="w-3 h-3 mr-1"/> Quyền Admin</span>}
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center bg-slate-100 border border-slate-200 rounded-full px-4 py-1.5 shadow-sm">
@@ -92,8 +91,8 @@ export default function MainLayout() {
                    {currentUser?.fullName || currentUser?.username} [{currentUser?.role}]
                  </span>
               </div>
-              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold border border-indigo-200 shadow-sm">
-                {currentUser.avatar}
+              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold border border-indigo-200 shadow-sm text-lg uppercase">
+                {currentUser?.fullName ? currentUser?.fullName.charAt(0) : currentUser?.username.charAt(0)}
               </div>
             </div>
           </div>

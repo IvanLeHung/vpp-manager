@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Users as UsersIcon, Plus, Edit2, Key, ShieldAlert, CheckCircle2, XCircle } from 'lucide-react';
 import api from '../lib/api';
+import { useAppContext } from '../context/AppContext';
 
 type UserData = {
   id: string;
@@ -13,6 +14,7 @@ type UserData = {
 };
 
 export default function Users() {
+  const { currentUser } = useAppContext();
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -22,6 +24,8 @@ export default function Users() {
     username: '', password: '', fullName: '', department: '', role: 'EMPLOYEE', isActive: true
   });
   const [passwordForm, setPasswordForm] = useState({ newPassword: '' });
+
+  if (!currentUser) return null;
 
   const fetchUsers = async () => {
     try {
@@ -84,6 +88,18 @@ export default function Users() {
     }
   };
 
+  if (currentUser.role === 'EMPLOYEE' || currentUser.role === 'WAREHOUSE') {
+    return (
+      <div className="p-8 flex items-center justify-center h-full">
+        <div className="text-center max-w-md">
+          <ShieldAlert className="w-16 h-16 text-rose-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Không có quyền truy cập</h2>
+          <p className="text-slate-500 border border-slate-200 bg-slate-50 p-4 rounded-xl">Vai trò hiện tại của bạn không được cấp quyền quản lý nhân sự.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto w-full h-full flex flex-col">
       <div className="flex justify-between items-center mb-6">
@@ -92,19 +108,21 @@ export default function Users() {
             <UsersIcon className="w-7 h-7 mr-3 text-indigo-600" />
             Quản lý Nhân viên
           </h1>
-          <p className="text-sm text-slate-500 mt-1">Quản lý tài khoản và phân quyền truy cập hệ thống</p>
+          <p className="text-sm text-slate-500 mt-1">{currentUser.role === 'ADMIN' ? 'Quản lý tài khoản và phân quyền truy cập toàn hệ thống' : 'Quản lý thông tin nhân sự trong bộ phận của bạn'}</p>
         </div>
-        <button 
-          onClick={() => {
-            setEditingUser(null);
-            setFormData({ username: '', password: '', fullName: '', department: '', role: 'EMPLOYEE', isActive: true });
-            setShowModal(true);
-          }}
-          className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition shadow-sm"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Thêm nhân viên
-        </button>
+        {currentUser.role === 'ADMIN' && (
+          <button 
+            onClick={() => {
+              setEditingUser(null);
+              setFormData({ username: '', password: '', fullName: '', department: '', role: 'EMPLOYEE', isActive: true });
+              setShowModal(true);
+            }}
+            className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition shadow-sm"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Thêm nhân viên
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex-1 flex flex-col">
@@ -142,25 +160,33 @@ export default function Users() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <button onClick={() => toggleStatus(user)} className={`inline-flex items-center justify-center p-1.5 rounded-full transition ${user.isActive ? 'text-emerald-500 hover:bg-emerald-50' : 'text-slate-400 hover:bg-slate-100'}`} title={user.isActive ? "Đang hoạt động" : "Đã bị khoá"}>
-                        {user.isActive ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
-                      </button>
+                      {currentUser.role === 'ADMIN' ? (
+                        <button onClick={() => toggleStatus(user)} className={`inline-flex items-center justify-center p-1.5 rounded-full transition ${user.isActive ? 'text-emerald-500 hover:bg-emerald-50' : 'text-slate-400 hover:bg-slate-100'}`} title={user.isActive ? "Đang hoạt động (Click để Khoá)" : "Đã bị khoá (Click để Mở)"}>
+                          {user.isActive ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
+                        </button>
+                      ) : (
+                        <span className={`inline-flex items-center justify-center p-1.5 rounded-full ${user.isActive ? 'text-emerald-500' : 'text-slate-400'}`} title={user.isActive ? "Đang hoạt động" : "Đã bị khoá"}>
+                          {user.isActive ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
                        <button onClick={() => {
                           setEditingUser(user);
                           setFormData({ ...formData, ...user });
                           setShowModal(true);
-                       }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Sửa thông tin">
+                       }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Sửa thông tin hoặc Khóa tài khoản">
                          <Edit2 className="w-4 h-4" />
                        </button>
-                       <button onClick={() => {
-                          setEditingUser(user);
-                          setPasswordForm({ newPassword: '' });
-                          setShowPasswordModal(true);
-                       }} className="p-1.5 text-amber-600 hover:bg-amber-50 rounded" title="Đổi mật khẩu">
-                         <Key className="w-4 h-4" />
-                       </button>
+                       {currentUser.role === 'ADMIN' && (
+                         <button onClick={() => {
+                            setEditingUser(user);
+                            setPasswordForm({ newPassword: '' });
+                            setShowPasswordModal(true);
+                         }} className="p-1.5 text-amber-600 hover:bg-amber-50 rounded" title="Đổi mật khẩu">
+                           <Key className="w-4 h-4" />
+                         </button>
+                       )}
                     </td>
                   </tr>
                 ))
@@ -201,13 +227,19 @@ export default function Users() {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Vai trò hệ thống</label>
-                <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value as any})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+                <select disabled={currentUser.role !== 'ADMIN'} value={formData.role} onChange={e => setFormData({...formData, role: e.target.value as any})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-bold text-slate-700 disabled:opacity-60 disabled:bg-slate-50 disabled:cursor-not-allowed">
                   <option value="EMPLOYEE">Nhân viên (EMPLOYEE)</option>
                   <option value="MANAGER">Trưởng phòng (MANAGER)</option>
                   <option value="WAREHOUSE">Thủ kho (WAREHOUSE)</option>
                   <option value="ADMIN">Quản trị viên (ADMIN)</option>
                 </select>
               </div>
+              {editingUser && currentUser.role === 'ADMIN' && (
+              <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                 <input type="checkbox" id="isActive" checked={formData.isActive} onChange={e => setFormData({...formData, isActive: e.target.checked})} className="w-5 h-5 text-indigo-600 rounded" />
+                 <label htmlFor="isActive" className={`font-bold ${formData.isActive ? 'text-emerald-600' : 'text-rose-600'}`}>{formData.isActive ? 'Tài khoản Đang Hoạt Động (Click để Vô hiệu hóa)' : 'Tài khoản Bị Vô Hiệu Hóa (Click để Kích hoạt)'}</label>
+              </div>
+              )}
               
               <div className="pt-4 flex gap-3">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-2.5 font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition">Huỷ</button>

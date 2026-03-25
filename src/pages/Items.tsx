@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
   Package, Plus, Search, History, Download, Upload, RefreshCw, MoreHorizontal,
-  CheckSquare, Square, XCircle, Edit2, Copy, Trash2, ShieldBan, ShieldCheck,
+  CheckSquare, Square, XCircle, Edit2, Copy, ShieldBan, ShieldCheck,
   ChevronDown, ChevronLeft, ChevronRight, AlertTriangle, TrendingUp,
   ArrowDownToLine, ArrowUpFromLine, Eye, X
 } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer } from 'recharts';
 import api from '../lib/api';
 import * as XLSX from 'xlsx';
+import { useAppContext } from '../context/AppContext';
 
 // ── Types ──
 type ItemData = {
@@ -63,6 +64,12 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
 }
 
 export default function Items() {
+  const { currentUser } = useAppContext();
+  const role = currentUser?.role || 'EMPLOYEE';
+  const isEmployee = role === 'EMPLOYEE';
+  const isAdmin = role === 'ADMIN';
+  const isWarehouse = role === 'WAREHOUSE';
+
   const [items, setItems] = useState<ItemData[]>([]);
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<SummaryData | null>(null);
@@ -233,23 +240,35 @@ export default function Items() {
           <p className="text-sm text-slate-500 mt-1 font-medium">Quản lý định mức, thông tin VPP / Vệ sinh</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 md:gap-3 bg-white p-2 rounded-2xl shadow-sm border border-slate-200">
-          <button className="flex items-center px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 rounded-xl transition" onClick={() => addToast('Chức năng Lịch sử đang phát triển...', 'info')}>
-            <History className="w-4 h-4 md:mr-2" /><span className="hidden md:inline">Lịch sử</span>
-          </button>
-          <div className="w-px h-6 bg-slate-200 mx-1" />
-          <button onClick={handleExport} className="flex items-center px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-50 rounded-xl transition">
-            <Download className="w-4 h-4 md:mr-2" /><span className="hidden md:inline">Export Excel</span>
-          </button>
-          <button className="flex items-center px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 rounded-xl transition" onClick={() => addToast('Tính năng Import Excel sẽ được mở sớm.', 'info')}>
-            <Upload className="w-4 h-4 md:mr-2" /><span className="hidden md:inline">Import Excel</span>
-          </button>
-          <div className="w-px h-6 bg-slate-200 mx-1" />
+          {!isEmployee && (
+            <button className="flex items-center px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 rounded-xl transition" onClick={() => addToast('Chức năng Lịch sử đang phát triển...', 'info')}>
+              <History className="w-4 h-4 md:mr-2" /><span className="hidden md:inline">Lịch sử</span>
+            </button>
+          )}
+          {!isEmployee && <div className="w-px h-6 bg-slate-200 mx-1" />}
+          
+          {!isEmployee && (
+            <button onClick={handleExport} className="flex items-center px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-50 rounded-xl transition">
+              <Download className="w-4 h-4 md:mr-2" /><span className="hidden md:inline">Export Excel</span>
+            </button>
+          )}
+          {isAdmin && (
+            <button className="flex items-center px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 rounded-xl transition" onClick={() => addToast('Tính năng Import Excel sẽ được mở sớm.', 'info')}>
+              <Upload className="w-4 h-4 md:mr-2" /><span className="hidden md:inline">Import Excel</span>
+            </button>
+          )}
+          
+          {!isEmployee && <div className="w-px h-6 bg-slate-200 mx-1" />}
+          
           <button onClick={() => { fetchItems(); fetchSummary(); }} className="flex items-center px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 rounded-xl transition" title="Làm mới">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-indigo-600' : ''}`} />
           </button>
-          <button onClick={openAdd} className="flex items-center px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 hover:shadow-lg hover:shadow-indigo-500/30 transition transform hover:-translate-y-0.5 ml-2">
-            <Plus className="w-5 h-5 mr-2" /> Thêm hàng hóa mới
-          </button>
+          
+          {isAdmin && (
+            <button onClick={openAdd} className="flex items-center px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 hover:shadow-lg hover:shadow-indigo-500/30 transition transform hover:-translate-y-0.5 ml-2">
+              <Plus className="w-5 h-5 mr-2" /> Thêm hàng hóa mới
+            </button>
+          )}
         </div>
       </div>
 
@@ -263,7 +282,7 @@ export default function Items() {
               { label: 'Sẵn sàng cấp', value: summary.activeItems, icon: ShieldCheck, color: 'emerald' },
               { label: 'Sắp hết', value: summary.lowStock, icon: AlertTriangle, color: 'amber' },
               { label: 'Hết hàng', value: summary.outOfStock, icon: XCircle, color: 'rose' },
-              { label: 'Giá trị tồn', value: summary.totalStockValue.toLocaleString('vi-VN') + 'đ', icon: TrendingUp, color: 'cyan' },
+              ...(isEmployee ? [] : [{ label: 'Giá trị tồn', value: summary.totalStockValue.toLocaleString('vi-VN') + 'đ', icon: TrendingUp, color: 'cyan' }]),
             ].map((c, i) => {
               const Icon = c.icon;
               return (
@@ -314,7 +333,7 @@ export default function Items() {
       )}
 
       {/* Bulk Action Bar */}
-      {selectedIds.size > 0 && (
+      {selectedIds.size > 0 && isAdmin && (
         <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-4 z-50">
           <span className="font-bold border-r border-slate-600 pr-4">{selectedIds.size} mục được chọn</span>
           <button onClick={() => handleBulkStatusChange(true)} className="text-sm font-bold flex items-center hover:text-emerald-400 transition"><ShieldCheck className="w-4 h-4 mr-1" />Kích hoạt</button>
@@ -372,14 +391,20 @@ export default function Items() {
               <h2 className="text-xl font-bold text-slate-800 mb-2">Kho hiện chưa có vật tư</h2>
               <p className="text-slate-500 mb-8 font-medium">Bạn có thể thêm mới từng vật tư hoặc import danh sách từ Excel để bắt đầu quản lý tồn kho.</p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <button onClick={openAdd} className="flex items-center justify-center px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 transition transform hover:-translate-y-0.5">
-                  <Plus className="w-5 h-5 mr-2" /> Thêm vật tư
-                </button>
-                <button className="flex items-center justify-center px-6 py-3 bg-white text-blue-700 border-2 border-blue-200 rounded-xl font-bold hover:bg-blue-50 transition" onClick={() => addToast('Tính năng Import Excel sẽ được mở sớm.', 'info')}>
-                  <Upload className="w-5 h-5 mr-2" /> Import Excel
-                </button>
+                {isAdmin && (
+                  <button onClick={openAdd} className="flex items-center justify-center px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 transition transform hover:-translate-y-0.5">
+                    <Plus className="w-5 h-5 mr-2" /> Thêm vật tư
+                  </button>
+                )}
+                {isAdmin && (
+                  <button className="flex items-center justify-center px-6 py-3 bg-white text-blue-700 border-2 border-blue-200 rounded-xl font-bold hover:bg-blue-50 transition" onClick={() => addToast('Tính năng Import Excel sẽ được mở sớm.', 'info')}>
+                    <Upload className="w-5 h-5 mr-2" /> Import Excel
+                  </button>
+                )}
               </div>
-              <button className="mt-4 text-sm text-indigo-600 hover:underline font-medium" onClick={() => addToast('File mẫu sẽ được cung cấp sớm.', 'info')}>↓ Tải file mẫu import Excel</button>
+              {isAdmin && (
+                <button className="mt-4 text-sm text-indigo-600 hover:underline font-medium" onClick={() => addToast('File mẫu sẽ được cung cấp sớm.', 'info')}>↓ Tải file mẫu import Excel</button>
+              )}
             </div>
           </div>
         ) : (
@@ -389,15 +414,17 @@ export default function Items() {
                 <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-20 shadow-sm">
                   <tr className="text-xs uppercase font-black text-slate-500 tracking-wider">
                     <th className="p-4 w-12 text-center">
-                      <button onClick={toggleAll} className="text-slate-400 hover:text-indigo-600 transition">
-                        {paginatedItems.length > 0 && selectedIds.size === paginatedItems.length ? <CheckSquare className="w-5 h-5 text-indigo-600" /> : <Square className="w-5 h-5" />}
-                      </button>
+                      {isAdmin && (
+                        <button onClick={toggleAll} className="text-slate-400 hover:text-indigo-600 transition">
+                          {paginatedItems.length > 0 && selectedIds.size === paginatedItems.length ? <CheckSquare className="w-5 h-5 text-indigo-600" /> : <Square className="w-5 h-5" />}
+                        </button>
+                      )}
                     </th>
-                    <th className="p-4">Mã VT</th>
+                    <th className="p-4">M Mã VT</th>
                     <th className="p-4">Tên hàng hóa</th>
                     <th className="p-4">Phân loại</th>
                     <th className="p-4 text-center">ĐVT</th>
-                    <th className="p-4 text-right">Đơn giá</th>
+                    {!isEmployee && <th className="p-4 text-right">Đơn giá</th>}
                     <th className="p-4 text-right">Định mức</th>
                     <th className="p-4 text-center">Trạng thái</th>
                     <th className="p-4 text-center">Tồn Kho</th>
@@ -417,9 +444,11 @@ export default function Items() {
                     return (
                       <tr key={item.id} className={`hover:bg-indigo-50/30 transition-colors group ${!item.isActive ? 'bg-slate-50/50 opacity-75' : ''} ${isSelected ? 'bg-indigo-50/50' : ''}`}>
                         <td className="p-4 text-center">
-                          <button onClick={() => toggleSelect(item.id)} className="text-slate-300 hover:text-indigo-600 focus:outline-none">
-                            {isSelected ? <CheckSquare className="w-5 h-5 text-indigo-600" /> : <Square className="w-5 h-5" />}
-                          </button>
+                          {isAdmin && (
+                            <button onClick={() => toggleSelect(item.id)} className="text-slate-300 hover:text-indigo-600 focus:outline-none">
+                              {isSelected ? <CheckSquare className="w-5 h-5 text-indigo-600" /> : <Square className="w-5 h-5" />}
+                            </button>
+                          )}
                         </td>
                         <td className="p-4 font-black tracking-wide text-slate-600">{item.mvpp}</td>
                         <td className="p-4 font-bold text-slate-800">
@@ -428,7 +457,7 @@ export default function Items() {
                         </td>
                         <td className="p-4 text-slate-600 font-medium">{item.category}</td>
                         <td className="p-4 text-center text-slate-500 font-medium">{item.unit}</td>
-                        <td className="p-4 text-right font-bold text-amber-700">{item.price.toLocaleString('vi-VN')} đ</td>
+                        {!isEmployee && <td className="p-4 text-right font-bold text-amber-700">{item.price.toLocaleString('vi-VN')} đ</td>}
                         <td className="p-4 text-right font-black text-slate-700">{item.quota}</td>
                         <td className="p-4 text-center">
                           <span className={`px-2.5 py-1 text-[10px] uppercase tracking-wider font-black rounded-full ${item.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'}`}>
@@ -449,18 +478,32 @@ export default function Items() {
                           {activeMenuId === item.id && (
                             <div className="absolute right-8 top-10 w-52 bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.1)] border border-slate-100 py-2 z-50" onClick={(e) => e.stopPropagation()}>
                               <button onClick={() => { addToast('Tính năng đang phát triển', 'info'); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-slate-700 flex items-center"><Eye className="w-4 h-4 mr-2" /> Xem chi tiết</button>
-                              <button onClick={() => { setEditingItem(item); setFormData({ ...item }); setShowItemForm(true); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-blue-700 flex items-center"><Edit2 className="w-4 h-4 mr-2" /> Chỉnh sửa</button>
-                              <button onClick={() => { setEditingItem(null); setFormData({ ...item, mvpp: `${item.mvpp}_COPY` }); setShowItemForm(true); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-indigo-700 flex items-center"><Copy className="w-4 h-4 mr-2" /> Nhân bản</button>
-                              <div className="h-px bg-slate-100 my-1" />
-                              <button onClick={() => { addToast('Tính năng đang phát triển', 'info'); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-cyan-700 flex items-center"><ArrowDownToLine className="w-4 h-4 mr-2" /> Nhập kho</button>
-                              <button onClick={() => { addToast('Tính năng đang phát triển', 'info'); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-orange-600 flex items-center"><ArrowUpFromLine className="w-4 h-4 mr-2" /> Xuất kho</button>
-                              <div className="h-px bg-slate-100 my-1" />
-                              <button onClick={() => { setStatusModal({ isOpen: true, item, targetStatus: !item.isActive, reason: '' }); setActiveMenuId(null); }} className={`w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold flex items-center ${item.isActive ? 'text-amber-600' : 'text-emerald-600'}`}>
-                                {item.isActive ? <><ShieldBan className="w-4 h-4 mr-2" /> Ngừng cấp</> : <><ShieldCheck className="w-4 h-4 mr-2" /> Cấp phát lại</>}
-                              </button>
-                              <button onClick={() => { addToast('Tính năng đang phát triển', 'info'); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-slate-500 flex items-center"><History className="w-4 h-4 mr-2" /> Xem lịch sử</button>
-                              <div className="h-px bg-slate-100 my-1" />
-                              <button onClick={() => { addToast('Tính năng đang phát triển', 'info'); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-rose-50 text-sm font-bold text-rose-600 flex items-center"><Trash2 className="w-4 h-4 mr-2" /> Xóa mềm</button>
+                              
+                              {isAdmin && (
+                                <>
+                                  <button onClick={() => { setEditingItem(item); setFormData({ ...item }); setShowItemForm(true); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-blue-700 flex items-center"><Edit2 className="w-4 h-4 mr-2" /> Chỉnh sửa</button>
+                                  <button onClick={() => { setEditingItem(null); setFormData({ ...item, mvpp: `${item.mvpp}_COPY` }); setShowItemForm(true); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-indigo-700 flex items-center"><Copy className="w-4 h-4 mr-2" /> Nhân bản</button>
+                                  <div className="h-px bg-slate-100 my-1" />
+                                </>
+                              )}
+
+                              {(isAdmin || isWarehouse) && (
+                                <>
+                                  <button onClick={() => { addToast('Tính năng đang phát triển', 'info'); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-cyan-700 flex items-center"><ArrowDownToLine className="w-4 h-4 mr-2" /> Nhập kho</button>
+                                  <button onClick={() => { addToast('Tính năng đang phát triển', 'info'); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-orange-600 flex items-center"><ArrowUpFromLine className="w-4 h-4 mr-2" /> Xuất kho</button>
+                                  <div className="h-px bg-slate-100 my-1" />
+                                </>
+                              )}
+
+                              {isAdmin && (
+                                <button onClick={() => { setStatusModal({ isOpen: true, item, targetStatus: !item.isActive, reason: '' }); setActiveMenuId(null); }} className={`w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold flex items-center ${item.isActive ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                  {item.isActive ? <><ShieldBan className="w-4 h-4 mr-2" /> Ngừng cấp</> : <><ShieldCheck className="w-4 h-4 mr-2" /> Cấp phát lại</>}
+                                </button>
+                              )}
+
+                              {!isEmployee && (
+                                <button onClick={() => { addToast('Tính năng đang phát triển', 'info'); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-slate-500 flex items-center"><History className="w-4 h-4 mr-2" /> Xem lịch sử</button>
+                              )}
                             </div>
                           )}
                         </td>
@@ -532,6 +575,18 @@ export default function Items() {
                   <label className="block text-sm font-bold text-slate-700 mb-2">Định mức tồn kho *</label>
                   <input required type="number" min="0" value={formData.quota} onChange={e => setFormData({ ...formData, quota: Number(e.target.value) })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none bg-white shadow-sm" />
                 </div>
+              </div>
+              <div className="mb-6">
+                <label className="flex items-center cursor-pointer select-none">
+                  <div className="relative">
+                    <input type="checkbox" className="sr-only" checked={formData.isActive} onChange={e => setFormData({ ...formData, isActive: e.target.checked })} />
+                    <div className={`block w-14 h-8 rounded-full transition-colors duration-300 ease-in-out ${formData.isActive ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
+                    <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-300 ease-in-out ${formData.isActive ? 'transform translate-x-6' : ''}`}></div>
+                  </div>
+                  <div className="ml-4 font-bold text-sm">
+                    {formData.isActive ? <span className="text-emerald-600">Trạng thái: Đang cấp phát</span> : <span className="text-slate-500">Trạng thái: Ngừng cấp phát</span>}
+                  </div>
+                </label>
               </div>
               <div className="pt-4 flex gap-4 mt-8 border-t border-slate-200 pt-6">
                 <button type="button" onClick={() => setShowItemForm(false)} className="flex-1 py-3.5 font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl transition shadow-sm">Huỷ bỏ</button>

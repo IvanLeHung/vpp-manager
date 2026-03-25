@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, Download, Calendar, Search, Filter, History, ArrowDownToLine, ArrowUpFromLine, Settings2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Download, Calendar, Search, History, ArrowDownToLine, ArrowUpFromLine, Settings2 } from 'lucide-react';
 import api from '../lib/api';
 import * as XLSX from 'xlsx';
 
+import { useAppContext } from '../context/AppContext';
+
 export default function InventoryReport() {
+   const { currentUser } = useAppContext();
    const [movements, setMovements] = useState<any[]>([]);
    const [loading, setLoading] = useState(true);
    const [searchTerm, setSearchTerm] = useState('');
@@ -46,6 +49,7 @@ export default function InventoryReport() {
          'SL Thay đổi': d.qty,
          'Tồn trước': d.beforeQty,
          'Tồn sau': d.afterQty,
+         'Phòng ban': d.createdBy?.department || '',
          'Người thao tác': d.createdBy?.fullName || d.createdBy?.username,
          'Lý do / Tham chiếu': d.reason || d.refId || ''
       }));
@@ -64,12 +68,13 @@ export default function InventoryReport() {
    };
 
    const getTypeLabel = (type: string) => {
-      if (type === 'RECEIVE') return <span className="text-blue-700 bg-blue-50 px-2 py-1 rounded font-bold text-xs">NHẬP KHO</span>;
-      if (type === 'ISSUE') return <span className="text-rose-700 bg-rose-50 px-2 py-1 rounded font-bold text-xs">XUẤT KHO</span>;
-      if (type === 'ADJUSTMENT') return <span className="text-amber-700 bg-amber-50 px-2 py-1 rounded font-bold text-xs">ĐIỀU CHÍNH</span>;
-      if (type === 'RESERVE') return <span className="text-purple-700 bg-purple-50 px-2 py-1 rounded font-bold text-xs">TẠM GIỮ</span>;
-      if (type === 'UNRESERVE') return <span className="text-slate-700 bg-slate-100 px-2 py-1 rounded font-bold text-xs">HỦY GIỮ</span>;
-      return <span className="text-slate-500 bg-slate-100 px-2 py-1 rounded font-bold text-xs">{type}</span>;
+      if (type === 'RECEIVE') return <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded font-black text-[10px] uppercase shadow-sm tracking-wider">NHẬP KHO</span>;
+      if (type === 'ISSUE') return <span className="text-rose-700 bg-rose-50 border border-rose-200 px-2 py-1 rounded font-black text-[10px] uppercase shadow-sm tracking-wider">XUẤT KHO</span>;
+      if (type === 'ADJUSTMENT') return <span className="text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded font-black text-[10px] uppercase shadow-sm tracking-wider">ĐIỀU CHÍNH</span>;
+      if (type === 'RESERVE') return <span className="text-purple-700 bg-purple-50 border border-purple-200 px-2 py-1 rounded font-black text-[10px] uppercase shadow-sm tracking-wider">TẠM GIỮ</span>;
+      if (type === 'UNRESERVE') return <span className="text-slate-700 bg-slate-100 border border-slate-200 px-2 py-1 rounded font-black text-[10px] uppercase shadow-sm tracking-wider">HỦY GIỮ</span>;
+      if (type === 'RETURN') return <span className="text-orange-700 bg-orange-50 border border-orange-200 px-2 py-1 rounded font-black text-[10px] uppercase shadow-sm tracking-wider">TRẢ HÀNG</span>;
+      return <span className="text-slate-500 bg-slate-100 border border-slate-200 px-2 py-1 rounded font-black text-[10px] uppercase shadow-sm tracking-wider">{type}</span>;
    };
 
    return (
@@ -82,11 +87,13 @@ export default function InventoryReport() {
             </div>
             
             <div className="flex gap-3">
+               {currentUser?.role !== 'EMPLOYEE' && (
                <button 
                   onClick={handleExportExcel}
                   className="flex items-center px-5 py-2.5 bg-white border border-indigo-200 text-indigo-700 rounded-xl hover:bg-indigo-50 transition font-bold shadow-sm">
                   <Download className="w-5 h-5 mr-2"/> Xuất Excel Lịch sử
                </button>
+               )}
             </div>
          </div>
 
@@ -161,7 +168,10 @@ export default function InventoryReport() {
                               </td>
                               <td className="p-4 text-right font-medium text-slate-400">{m.beforeQty}</td>
                               <td className="p-4 text-right font-black text-emerald-600">{m.afterQty}</td>
-                              <td className="p-4 font-bold text-slate-600 text-sm">{m.createdBy?.fullName || m.createdBy?.username}</td>
+                              <td className="p-4 font-bold text-slate-600 text-sm">
+                                  {m.createdBy?.fullName || m.createdBy?.username}
+                                  {m.createdBy?.department && <span className="block text-[10px] font-black text-slate-400 mt-0.5 tracking-widest uppercase">{m.createdBy.department}</span>}
+                              </td>
                               <td className="p-4 text-slate-500 font-medium text-sm">
                                  {m.refId && <span className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-xs mr-2 font-mono text-slate-600">{m.refType}:{m.refId}</span>}
                                  {m.reason}

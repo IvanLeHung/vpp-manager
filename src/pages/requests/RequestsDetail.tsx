@@ -227,7 +227,7 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                       )}
 
                       {/* --- TẠO MUA SẮM (AUTO PO) --- */}
-                      {(currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER') && 
+                      {currentUser.role === 'ADMIN' && 
                        ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED'].includes(data.status) &&
                        data.lines.some((l:any) => l.qtyRequested > (l.qtyApproved ?? 0)) &&
                        (!data.revisionReason?.includes('Đã tạo PO')) && (
