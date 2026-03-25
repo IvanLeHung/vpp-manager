@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { api } from '../../lib/api';
+﻿import React, { useState, useEffect } from 'react';
+import api from '../../lib/api';
 import { 
   Search, Filter, Calendar, Package, 
   CheckCircle, Clock, XCircle, ChevronRight, AlertTriangle
@@ -185,3 +185,4 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
 };
 
 export default ReceiptsList;
+

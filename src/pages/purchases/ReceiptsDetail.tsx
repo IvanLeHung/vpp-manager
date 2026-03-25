@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { api } from '../../lib/api';
-import { useApp } from '../../context/AppContext';
+﻿import React, { useState, useEffect } from 'react';
+import api from '../../lib/api';
+import { useAppContext as useApp } from '../../context/AppContext';
 import {
   ArrowLeft, CheckSquare, XCircle, CheckCircle, Package, AlertTriangle, Save
 } from 'lucide-react';
@@ -209,3 +209,4 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, onBack }) =>
 };
 
 export default ReceiptsDetail;
+

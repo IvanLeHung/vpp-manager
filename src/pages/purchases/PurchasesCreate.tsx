@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { api } from '../../lib/api';
-import { useApp } from '../../context/AppContext';
+﻿import React, { useState, useEffect } from 'react';
+import api from '../../lib/api';
+import { useAppContext as useApp } from '../../context/AppContext';
 import { 
   ArrowLeft, Search, Plus, Trash2, Calendar, Target,
   FileText, ShoppingCart, Info, AlertTriangle, Save
@@ -259,3 +259,4 @@ const PurchasesCreate: React.FC<PurchasesCreateProps> = ({ onBack, poId, onSucce
 };
 
 export default PurchasesCreate;
+

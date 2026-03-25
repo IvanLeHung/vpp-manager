@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { api } from '../../lib/api';
+﻿import React, { useState, useEffect } from 'react';
+import api from '../../lib/api';
 import { 
   Search, Plus, Filter, Calendar, DollarSign,
   ShoppingCart, Package, CheckCircle, Clock, XCircle, ChevronRight, Truck, Info
@@ -222,3 +222,4 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 };
 
 export default PurchasesList;
+

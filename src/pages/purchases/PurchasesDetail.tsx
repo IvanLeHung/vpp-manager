@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { api } from '../../lib/api';
-import { useApp } from '../../context/AppContext';
+﻿import React, { useState, useEffect } from 'react';
+import api from '../../lib/api';
+import { useAppContext as useApp } from '../../context/AppContext';
 import { 
   ArrowLeft, CheckSquare, XCircle, CheckCircle, Clock, 
   ShoppingCart, Send, Box, MessageSquare, Printer, MapPin, Search
@@ -326,3 +326,4 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, onEdit 
 };
 
 export default PurchasesDetail;
+
