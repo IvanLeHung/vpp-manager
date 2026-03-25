@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users as UsersIcon, Plus, Edit2, Key, Shield, ShieldAlert, CheckCircle2, XCircle, Trash2 } from 'lucide-react';
+import { Users as UsersIcon, Plus, Edit2, Key, ShieldAlert, CheckCircle2, XCircle } from 'lucide-react';
 import api from '../lib/api';
 
 type UserData = {

@@ -3,7 +3,7 @@ import {
   Package, Plus, Search, History, Download, Upload, RefreshCw, MoreHorizontal,
   CheckSquare, Square, XCircle, Edit2, Copy, Trash2, ShieldBan, ShieldCheck,
   ChevronDown, ChevronLeft, ChevronRight, AlertTriangle, TrendingUp,
-  ArrowDownToLine, ArrowUpFromLine, Eye, SlidersHorizontal, X
+  ArrowDownToLine, ArrowUpFromLine, Eye, X
 } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer } from 'recharts';
 import api from '../lib/api';
@@ -305,7 +305,7 @@ export default function Items() {
                   <Pie data={summary.categoryBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={45} innerRadius={20} strokeWidth={2}>
                     {summary.categoryBreakdown.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                   </Pie>
-                  <ReTooltip formatter={(v: number, n: string) => [`${v} mục`, n]} />
+                  <ReTooltip formatter={(v: any, n: any) => [`${v} mục`, n]} />
                 </PieChart>
               </ResponsiveContainer>
             ) : <p className="text-xs text-slate-400">Chưa có dữ liệu</p>}
@@ -448,19 +448,19 @@ export default function Items() {
                           </button>
                           {activeMenuId === item.id && (
                             <div className="absolute right-8 top-10 w-52 bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.1)] border border-slate-100 py-2 z-50" onClick={(e) => e.stopPropagation()}>
-                              <button className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-slate-700 flex items-center"><Eye className="w-4 h-4 mr-2" /> Xem chi tiết</button>
+                              <button onClick={() => { addToast('Tính năng đang phát triển', 'info'); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-slate-700 flex items-center"><Eye className="w-4 h-4 mr-2" /> Xem chi tiết</button>
                               <button onClick={() => { setEditingItem(item); setFormData({ ...item }); setShowItemForm(true); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-blue-700 flex items-center"><Edit2 className="w-4 h-4 mr-2" /> Chỉnh sửa</button>
                               <button onClick={() => { setEditingItem(null); setFormData({ ...item, mvpp: `${item.mvpp}_COPY` }); setShowItemForm(true); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-indigo-700 flex items-center"><Copy className="w-4 h-4 mr-2" /> Nhân bản</button>
                               <div className="h-px bg-slate-100 my-1" />
-                              <button className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-cyan-700 flex items-center"><ArrowDownToLine className="w-4 h-4 mr-2" /> Nhập kho</button>
-                              <button className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-orange-600 flex items-center"><ArrowUpFromLine className="w-4 h-4 mr-2" /> Xuất kho</button>
+                              <button onClick={() => { addToast('Tính năng đang phát triển', 'info'); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-cyan-700 flex items-center"><ArrowDownToLine className="w-4 h-4 mr-2" /> Nhập kho</button>
+                              <button onClick={() => { addToast('Tính năng đang phát triển', 'info'); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-orange-600 flex items-center"><ArrowUpFromLine className="w-4 h-4 mr-2" /> Xuất kho</button>
                               <div className="h-px bg-slate-100 my-1" />
                               <button onClick={() => { setStatusModal({ isOpen: true, item, targetStatus: !item.isActive, reason: '' }); setActiveMenuId(null); }} className={`w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold flex items-center ${item.isActive ? 'text-amber-600' : 'text-emerald-600'}`}>
                                 {item.isActive ? <><ShieldBan className="w-4 h-4 mr-2" /> Ngừng cấp</> : <><ShieldCheck className="w-4 h-4 mr-2" /> Cấp phát lại</>}
                               </button>
-                              <button className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-slate-500 flex items-center"><History className="w-4 h-4 mr-2" /> Xem lịch sử</button>
+                              <button onClick={() => { addToast('Tính năng đang phát triển', 'info'); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-slate-500 flex items-center"><History className="w-4 h-4 mr-2" /> Xem lịch sử</button>
                               <div className="h-px bg-slate-100 my-1" />
-                              <button className="w-full text-left px-4 py-2 hover:bg-rose-50 text-sm font-bold text-rose-600 flex items-center"><Trash2 className="w-4 h-4 mr-2" /> Xóa mềm</button>
+                              <button onClick={() => { addToast('Tính năng đang phát triển', 'info'); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-rose-50 text-sm font-bold text-rose-600 flex items-center"><Trash2 className="w-4 h-4 mr-2" /> Xóa mềm</button>
                             </div>
                           )}
                         </td>
