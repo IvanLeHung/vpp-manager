@@ -24,6 +24,8 @@ type DepartmentData = {
   _count?: { users: number };
 };
 
+type Toast = { id: number; message: string; type: 'success' | 'error' | 'warning' };
+
 export default function Users() {
   const { currentUser } = useAppContext();
   const [activeTab, setActiveTab] = useState<'users' | 'departments'>('users');
@@ -48,6 +50,20 @@ export default function Users() {
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ newPassword: '' });
+
+  // Toast System
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const addToast = (message: string, type: Toast['type'] = 'success') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+  };
+  const dismissToast = (id: number) => setToasts(prev => prev.filter(t => t.id !== id));
+
+  const getErrorMessage = (error: any, fallback: string) => {
+    if (!error.response) return 'Lỗi kết nối Server (Có thể backend chưa chạy)';
+    return error.response?.data?.error || fallback;
+  };
 
   if (!currentUser) return null;
 
@@ -99,15 +115,19 @@ export default function Users() {
           role: userFormData.role,
           isActive: userFormData.isActive
         });
-        alert('Cập nhật thành công');
+        addToast('Cập nhật người dùng thành công');
       } else {
-        await api.post('/users', userFormData);
-        alert('Tạo tài khoản thành công');
+        await api.post('/users', {
+          ...userFormData,
+          departmentId: userFormData.departmentId || null,
+          managerId: userFormData.managerId || null
+        });
+        addToast('Tạo tài khoản thành công');
       }
       setShowModal(false);
       fetchUsers();
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Có lỗi xảy ra');
+      addToast(getErrorMessage(error, 'Không thể lưu tài khoản'), 'error');
     }
   };
 
@@ -116,15 +136,15 @@ export default function Users() {
     try {
       if (editingDept) {
         await api.put(`/departments/${editingDept.id}`, deptFormData);
-        alert('Cập nhật thành công');
+        addToast('Cập nhật phòng ban thành công');
       } else {
         await api.post('/departments', deptFormData);
-        alert('Thêm phòng ban thành công');
+        addToast('Thêm phòng ban thành công');
       }
       setShowDeptModal(false);
       fetchDepartments();
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Có lỗi xảy ra');
+      addToast(getErrorMessage(error, 'Không thể lưu phòng ban'), 'error');
     }
   };
 
@@ -132,9 +152,10 @@ export default function Users() {
     if (!confirm(`Bạn muốn ${dept.isActive ? 'khoá' : 'mở khoá'} phòng ban ${dept.name}?`)) return;
     try {
       await api.patch(`/departments/${dept.id}/status`, { isActive: !dept.isActive });
+      addToast(`Đã ${dept.isActive ? 'khoá' : 'mờ khoá'} phòng ban`);
       fetchDepartments();
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Có lỗi xảy ra');
+      addToast(getErrorMessage(error, 'Thao tác thất bại'), 'error');
     }
   };
 
@@ -143,10 +164,10 @@ export default function Users() {
     try {
       if (!editingUser) return;
       await api.patch(`/users/${editingUser.id}/password`, passwordForm);
-      alert('Đổi mật khẩu thành công');
+      addToast('Đổi mật khẩu thành công');
       setShowPasswordModal(false);
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Có lỗi xảy ra');
+      addToast(getErrorMessage(error, 'Không thể đổi mật khẩu'), 'error');
     }
   };
 
@@ -154,9 +175,10 @@ export default function Users() {
     if (!confirm(`Bạn muốn ${user.isActive ? 'khoá' : 'mở khoá'} tài khoản ${user.username}?`)) return;
     try {
       await api.put(`/users/${user.id}`, { isActive: !user.isActive });
+      addToast(`Đã ${user.isActive ? 'khoá' : 'mở khoá'} tài khoản`);
       fetchUsers();
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Có lỗi xảy ra');
+      addToast(getErrorMessage(error, 'Thao tác thất bại'), 'error');
     }
   };
 
@@ -173,7 +195,16 @@ export default function Users() {
   }
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto w-full h-full flex flex-col">
+    <div className="p-6 md:p-8 max-w-7xl mx-auto w-full h-full flex flex-col relative overflow-hidden">
+      {/* Toast System */}
+      <div className="fixed bottom-6 right-6 z-[200] flex flex-col gap-2">
+        {toasts.map(t => (
+          <div key={t.id} className={`flex items-center gap-3 px-5 py-3 rounded-xl shadow-lg text-white text-sm font-bold animate-in slide-in-from-right-5 ${t.type === 'success' ? 'bg-emerald-600' : t.type === 'error' ? 'bg-rose-600' : 'bg-amber-600'}`}>
+            <span>{t.message}</span>
+            <button onClick={() => dismissToast(t.id)} className="opacity-70 hover:opacity-100"><XCircle className="w-4 h-4" /></button>
+          </div>
+        ))}
+      </div>
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-8">
           <div>
