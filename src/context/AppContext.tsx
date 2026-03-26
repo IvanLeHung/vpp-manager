@@ -6,11 +6,11 @@ export type UserRole = 'EMPLOYEE' | 'MANAGER' | 'ADMIN' | 'WAREHOUSE';
 export type User = {
   id: string;
   userId: string;
-  name: string;
   fullName: string;
   username: string;
   role: UserRole;
-  department: string;
+  departmentId: string | null;
+  managerId: string | null;
 };
 
 export type VPPItem = {
@@ -45,6 +45,8 @@ export type VPPRequest = {
   priority: string;
   purpose: string;
   status: string;
+  currentApproverId: string | null;
+  currentApprover?: { fullName: string };
   createdAt: string;
   neededByDate?: string | null;
   managerApprovedAt?: string | null;

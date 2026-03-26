@@ -38,14 +38,14 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   const filteredRequests = useMemo(() => {
     let filtered = requests;
     if (currentUser.role === 'MANAGER') {
-        filtered = filtered.filter(req => req.department === currentUser.department);
+        filtered = filtered.filter(req => req.status === 'PENDING_MANAGER' && req.currentApproverId === currentUser.id);
     } else if (currentUser.role === 'EMPLOYEE') {
-        filtered = filtered.filter(req => req.requesterId === currentUser.userId || req.requester?.fullName === currentUser.name);
+        filtered = filtered.filter(req => req.requesterId === currentUser.id);
     }
     
     if (statusFilter !== 'ALL') {
         if (statusFilter === 'MY_ACTION') {
-            if (currentUser.role === 'MANAGER') filtered = filtered.filter(r => r.status === 'PENDING_MANAGER');
+            if (currentUser.role === 'MANAGER') filtered = filtered.filter(r => r.status === 'PENDING_MANAGER' && r.currentApproverId === currentUser.id);
             else if (currentUser.role === 'ADMIN') filtered = filtered.filter(r => r.status === 'PENDING_ADMIN');
             else if (currentUser.role === 'WAREHOUSE') filtered = filtered.filter(r => r.status === 'READY_TO_ISSUE');
             else filtered = filtered.filter(r => r.status === 'WAITING_HANDOVER'); // For Employee
@@ -99,7 +99,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   };
 
   const isApprovable = (req: VPPRequest) => {
-    if (currentUser.role === 'MANAGER' && req.status === 'PENDING_MANAGER') return true;
+    if (currentUser.role === 'MANAGER' && req.status === 'PENDING_MANAGER' && req.currentApproverId === currentUser.id) return true;
     if (currentUser.role === 'ADMIN' && (req.status === 'PENDING_MANAGER' || req.status === 'PENDING_ADMIN')) return true;
     return false;
   };
@@ -257,7 +257,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                         )}
                         <th className={`p-4 ${(currentUser.role !== 'MANAGER' && currentUser.role !== 'ADMIN') ? 'pl-6' : ''}`}>Mã YC</th>
                         <th className="p-4">Ngày tạo / SLA</th>
-                        <th className="p-4">Thông tin</th>
+                        <th className="p-4">Thông tin / Người duyệt</th>
                         <th className="p-4">Mục đích (Rút gọn)</th>
                         <th className="p-4 text-center">Trạng thái flow</th>
                         <th className="p-4 text-right pr-6">Thao tác</th>
@@ -294,7 +294,17 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                                 </td>
                                 <td className="p-4">
                                     <p className="font-bold text-slate-800 text-sm">{req.requester?.fullName}</p>
-                                    <p className="text-xs font-semibold text-slate-500 mt-0.5">{req.department}</p>
+                                    <div className="flex items-center gap-1 mt-0.5">
+                                      <p className="text-xs font-semibold text-slate-500">{req.department}</p>
+                                      {req.status === 'PENDING_MANAGER' && (
+                                        <>
+                                          <span className="text-[10px] text-slate-300">|</span>
+                                          <p className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1 rounded flex items-center">
+                                            <Clock className="w-2.5 h-2.5 mr-0.5"/> {req.currentApprover?.fullName || 'Chờ gán'}
+                                          </p>
+                                        </>
+                                      )}
+                                    </div>
                                 </td>
                                 <td className="p-4">
                                     <p className="text-slate-600 font-medium text-sm truncate max-w-[200px]" title={req.purpose}>{req.purpose || <span className="italic text-slate-400">Không có lý do</span>}</p>

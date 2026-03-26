@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { XCircle, Printer, CheckCircle, RefreshCw, ArrowLeft, Archive, CheckSquare, Trash2, StopCircle, AlertTriangle, ShoppingCart } from 'lucide-react';
 import api from '../../lib/api';
 import type { User } from '../../context/AppContext';
@@ -85,7 +85,7 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
     );
   }
 
-  const isManagerApprover = currentUser.role === 'MANAGER' && data.status === 'PENDING_MANAGER';
+  const isManagerApprover = currentUser.role === 'MANAGER' && data.status === 'PENDING_MANAGER' && data.currentApproverId === currentUser.id;
   const isAdminApprover = currentUser.role === 'ADMIN' && (data.status === 'PENDING_ADMIN' || data.status === 'PENDING_MANAGER');
   const isApprover = isManagerApprover || isAdminApprover;
 
@@ -127,7 +127,14 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                       <div>
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Người Đề Xuất</p>
                           <p className="text-lg font-bold text-slate-800">{data.requester?.fullName}</p>
-                          <p className="text-sm font-semibold text-indigo-600 mt-1">{data.department}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <p className="text-sm font-semibold text-indigo-600">{data.department}</p>
+                            {data.status === 'PENDING_MANAGER' && (
+                                <p className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                    Đang chờ: {data.currentApprover?.fullName || 'Manager'}
+                                </p>
+                            )}
+                          </div>
                       </div>
                       <div>
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Lý do & Mục đích</p>
