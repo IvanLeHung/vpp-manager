@@ -61,8 +61,11 @@ export default function Users() {
   const dismissToast = (id: number) => setToasts(prev => prev.filter(t => t.id !== id));
 
   const getErrorMessage = (error: any, fallback: string) => {
-    if (!error.response) return 'Lỗi kết nối Server (Có thể backend chưa chạy)';
-    return error.response?.data?.error || fallback;
+    console.error('Error details:', error);
+    if (!error.response) return 'Lỗi kết nối Server (Có thể backend chưa chạy hoặc bị chặn CORS)';
+    const data = error.response.data;
+    if (typeof data === 'string') return `Lỗi Server (${error.response.status}): ${data.slice(0, 50)}...`;
+    return data.error || data.message || fallback;
   };
 
   if (!currentUser) return null;
@@ -127,6 +130,7 @@ export default function Users() {
       setShowModal(false);
       fetchUsers();
     } catch (error: any) {
+      console.error('Error saving user:', error); // Added console.error
       addToast(getErrorMessage(error, 'Không thể lưu tài khoản'), 'error');
     }
   };
