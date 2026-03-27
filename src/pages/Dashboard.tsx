@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Package, Search, Download, Droplets, LayoutDashboard, FileText, ArrowDownToLine, Settings2, XCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../lib/api';
+import { useAppContext } from '../context/AppContext';
 
 const TAX_RATE = 0.08;
 
 export default function Dashboard() {
+  const { currentUser } = useAppContext();
+  const canWriteInventory = currentUser?.role === 'WAREHOUSE' || currentUser?.role === 'ADMIN';
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const addToast = (msg: string, type: 'success' | 'error' = 'success') => { setToast({message: msg, type}); setTimeout(() => setToast(null), 3000); };
   const [stocks, setStocks] = useState<any[]>([]);
@@ -254,16 +257,22 @@ export default function Dashboard() {
                     <td className="px-4 py-4 text-center text-amber-500 font-bold">{stock.quantityReserved}</td>
                     <td className="px-4 py-4 text-right text-slate-500 font-medium">{formatCurrency(Number(item.price))}</td>
                     <td className="px-5 py-4 text-center space-x-2">
-                      <button 
-                        onClick={() => openModal('RECEIVE', stock)}
-                        className="px-2.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white rounded-lg transition-colors font-bold text-xs" title="Ghi sổ Biên bản nhập kho">
-                         <ArrowDownToLine className="w-4 h-4 inline mr-1" /> Nhập kho
-                      </button>
-                      <button 
-                        onClick={() => openModal('ADJUST', stock)}
-                        className="px-2.5 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-500 hover:text-white rounded-lg transition-colors font-bold text-xs" title="Ghi sổ kiểm kê kho">
-                         <Settings2 className="w-4 h-4 inline mr-1" /> Điều chỉnh
-                      </button>
+                      {canWriteInventory ? (
+                        <>
+                          <button
+                            onClick={() => openModal('RECEIVE', stock)}
+                            className="px-2.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white rounded-lg transition-colors font-bold text-xs" title="Ghi sổ Biên bản nhập kho">
+                            <ArrowDownToLine className="w-4 h-4 inline mr-1" /> Nhập kho
+                          </button>
+                          <button
+                            onClick={() => openModal('ADJUST', stock)}
+                            className="px-2.5 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-500 hover:text-white rounded-lg transition-colors font-bold text-xs" title="Ghi sổ kiểm kê kho">
+                            <Settings2 className="w-4 h-4 inline mr-1" /> Điều chỉnh
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-xs text-slate-400 font-medium italic">Xem</span>
+                      )}
                     </td>
                   </tr>
                 );

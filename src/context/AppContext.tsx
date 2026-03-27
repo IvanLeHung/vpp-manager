@@ -44,9 +44,19 @@ export type VPPRequest = {
   requestType: string;
   priority: string;
   purpose: string;
-  status: string;
+  status:
+    | 'DRAFT' | 'PENDING_MANAGER' | 'PENDING_ADMIN' | 'RETURNED'
+    | 'PARTIALLY_APPROVED' | 'APPROVED'
+    | 'READY_TO_PICK' | 'PICKING' | 'READY_TO_HANDOVER'
+    | 'PARTIALLY_FULFILLED' | 'OUT_OF_STOCK' | 'NEEDS_PROCUREMENT'
+    | 'COMPLETED' | 'REJECTED' | 'CANCELLED'
+    // legacy
+    | 'READY_TO_ISSUE' | 'PARTIALLY_ISSUED' | 'WAITING_HANDOVER' | 'BACKORDER'
+    | string;
   currentApproverId: string | null;
+  currentHandlerRole?: string | null;
   currentApprover?: { fullName: string };
+  warehouseNote?: string | null;
   createdAt: string;
   submittedAt?: string | null;
   neededByDate?: string | null;
