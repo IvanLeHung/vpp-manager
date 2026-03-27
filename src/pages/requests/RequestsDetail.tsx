@@ -261,7 +261,27 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                           <button onClick={printDocument} className="w-full py-2.5 bg-white text-slate-800 hover:bg-slate-100 flex items-center justify-center rounded-xl font-bold transition shadow-sm"><Printer className="w-4 h-4 mr-2"/> In Lệnh Xuất Kho</button>
                       )}
                   </div>
+                  {/* Context message when current user has no available action */}
+                  {!isOwnerDraft && !isOwnerPending && !isApprover && !isWarehouse && !isHandover && !canCancel && (() => {
+                    let msg = 'Bạn không có quyền thao tác trên phiếu này ở trạng thái hiện tại';
+                    if (data.status === 'PENDING_MANAGER') {
+                      if (currentUser.userId === data.requesterId) msg = 'Bạn không thể tự phê duyệt phiếu của chính mình';
+                      else if (currentUser.role === 'MANAGER' && data.currentApproverId !== currentUser.id) msg = 'Phiếu đang chờ một Quản lý khác xử lý';
+                      else msg = 'Phiếu đang chờ Quản lý trực tiếp phê duyệt';
+                    } else if (data.status === 'PENDING_ADMIN') {
+                      msg = 'Phiếu đang chờ Admin phê duyệt';
+                    } else if (['COMPLETED', 'REJECTED', 'CANCELLED', 'CLOSED'].includes(data.status)) {
+                      msg = `Phiếu đã ${data.status === 'COMPLETED' ? 'hoàn thành' : data.status === 'REJECTED' ? 'bị từ chối' : 'bị hủy/đóng'}`;
+                    }
+                    return (
+                      <div className="rounded-xl bg-slate-700/50 border border-slate-600 p-4 text-center mt-2">
+                        <StopCircle className="w-6 h-6 text-slate-400 mx-auto mb-2" />
+                        <p className="text-xs font-bold text-slate-300 leading-relaxed">{msg}</p>
+                      </div>
+                    );
+                  })()}
               </div>
+
 
               {/* Box 4: Approval Timeline */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col flex-1 min-h-[300px]">

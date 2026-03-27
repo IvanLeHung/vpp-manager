@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Plus, XCircle, Save, Send, Search, Trash2, AlertTriangle, AlertCircle } from 'lucide-react';
 import api from '../../lib/api';
 import { useAppContext } from '../../context/AppContext';
@@ -13,8 +13,11 @@ interface Props {
 }
 
 export default function RequestsCreate({ setViewMode, refreshData, showToast, activeRequest }: Props) {
-  const { items } = useAppContext();
+  const { items, currentUser } = useAppContext();
   
+  // Pre-flight: EMPLOYEE without direct manager cannot submit
+  const cannotSubmit = currentUser?.role === 'EMPLOYEE' && !currentUser.managerId;
+
   const [reqType, setReqType] = useState('Định kỳ');
   const [priority, setPriority] = useState('Thường');
   const [purpose, setPurpose] = useState('');
@@ -126,11 +129,26 @@ export default function RequestsCreate({ setViewMode, refreshData, showToast, ac
                 <button disabled={isSubmitting} onClick={() => submitForm('DRAFT')} className="flex items-center px-4 py-2 border-2 border-slate-300 text-slate-700 bg-white hover:bg-slate-50 rounded-xl font-bold transition shadow-sm disabled:opacity-50">
                     <Save className="w-4 h-4 mr-2 text-slate-500"/> Lưu Nháp
                 </button>
-                <button disabled={isSubmitting} onClick={() => submitForm('PENDING')} className="flex items-center px-5 py-2 border-2 border-indigo-700 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl font-bold transition shadow-md shadow-indigo-500/30 disabled:opacity-50">
+                <button
+                  disabled={isSubmitting || cannotSubmit}
+                  onClick={() => submitForm('PENDING')}
+                  title={cannotSubmit ? 'Chưa được gán Quản lý trực tiếp' : ''}
+                  className="flex items-center px-5 py-2 border-2 border-indigo-700 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl font-bold transition shadow-md shadow-indigo-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                     <Send className="w-4 h-4 mr-2"/> Gửi Trình Duyệt
                 </button>
             </div>
         </div>
+
+        {/* Warning: EMPLOYEE without assigned manager */}
+        {cannotSubmit && (
+          <div className="flex items-center gap-3 px-4 md:px-8 py-3 bg-amber-50 border-b border-amber-200 shrink-0">
+            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+            <p className="text-sm font-bold text-amber-700">
+              Tài khoản của bạn chưa được gán Quản lý trực tiếp. Vui lòng liên hệ Admin để cập nhật trước khi gửi phiếu.
+            </p>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col gap-6 w-full max-w-6xl mx-auto">
             {/* ZONE 1: THÔNG TIN ĐẦU PHIẾU */}

@@ -37,32 +37,44 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
 
   const filteredRequests = useMemo(() => {
     let filtered = requests;
-    if (currentUser.role === 'MANAGER') {
-        filtered = filtered.filter(req => req.status === 'PENDING_MANAGER' && req.currentApproverId === currentUser.id);
-    } else if (currentUser.role === 'EMPLOYEE') {
-        filtered = filtered.filter(req => req.requesterId === currentUser.id);
+
+    // EMPLOYEE sees only their own requests (backend scopes by requesterId, but frontend guards too)
+    if (currentUser.role === 'EMPLOYEE') {
+      filtered = filtered.filter(req => req.requesterId === currentUser.userId);
     }
-    
+    // MANAGER & ADMIN: backend already scopes correctly — no additional base filter needed
+    // MY_ACTION tab handles the "needs my approval" view
+
     if (statusFilter !== 'ALL') {
-        if (statusFilter === 'MY_ACTION') {
-            if (currentUser.role === 'MANAGER') filtered = filtered.filter(r => r.status === 'PENDING_MANAGER' && r.currentApproverId === currentUser.id);
-            else if (currentUser.role === 'ADMIN') filtered = filtered.filter(r => r.status === 'PENDING_ADMIN');
-            else if (currentUser.role === 'WAREHOUSE') filtered = filtered.filter(r => r.status === 'READY_TO_ISSUE');
-            else filtered = filtered.filter(r => r.status === 'WAITING_HANDOVER'); // For Employee
+      if (statusFilter === 'MY_ACTION') {
+        if (currentUser.role === 'MANAGER') {
+          filtered = filtered.filter(r => r.status === 'PENDING_MANAGER' && r.currentApproverId === currentUser.userId);
+        } else if (currentUser.role === 'ADMIN') {
+          filtered = filtered.filter(r => r.status === 'PENDING_ADMIN' || r.status === 'PENDING_MANAGER');
+        } else if (currentUser.role === 'WAREHOUSE') {
+          filtered = filtered.filter(r => r.status === 'READY_TO_ISSUE');
+        } else {
+          // EMPLOYEE: items waiting for their handover confirmation
+          filtered = filtered.filter(r => r.status === 'WAITING_HANDOVER' && r.requesterId === currentUser.userId);
         }
-        else if (statusFilter === 'COMPLETED') filtered = filtered.filter(r => r.status === 'COMPLETED');
-        else filtered = filtered.filter(r => r.status === statusFilter);
+      } else if (statusFilter === 'COMPLETED') {
+        filtered = filtered.filter(r => r.status === 'COMPLETED');
+      } else {
+        filtered = filtered.filter(r => r.status === statusFilter);
+      }
     }
+
     if (searchTerm) {
       const lower = searchTerm.toLowerCase();
-      filtered = filtered.filter(r => 
-        r.id.toLowerCase().includes(lower) || 
+      filtered = filtered.filter(r =>
+        r.id.toLowerCase().includes(lower) ||
         r.requester?.fullName.toLowerCase().includes(lower) ||
         r.purpose?.toLowerCase().includes(lower)
       );
     }
-    return filtered.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [requests, statusFilter, searchTerm, currentUser]);
+
 
   // Handle row selection changes when data changes
   useEffect(() => {
@@ -70,13 +82,21 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   }, [statusFilter, searchTerm, currentPage]);
 
   const stats = useMemo(() => {
+    const myActionCount = currentUser.role === 'MANAGER'
+      ? requests.filter(r => r.status === 'PENDING_MANAGER' && r.currentApproverId === currentUser.userId).length
+      : currentUser.role === 'ADMIN'
+      ? requests.filter(r => r.status === 'PENDING_ADMIN' || r.status === 'PENDING_MANAGER').length
+      : currentUser.role === 'WAREHOUSE'
+      ? requests.filter(r => r.status === 'READY_TO_ISSUE').length
+      : requests.filter(r => r.status === 'WAITING_HANDOVER' && r.requesterId === currentUser.userId).length;
     return {
       total: requests.length,
       pending: requests.filter(r => r.status.startsWith('PENDING')).length,
       approved: requests.filter(r => r.status === 'APPROVED' || r.status === 'READY_TO_ISSUE').length,
-      rejected: requests.filter(r => r.status === 'REJECTED').length
-    }
-  }, [requests]);
+      rejected: requests.filter(r => r.status === 'REJECTED').length,
+      myAction: myActionCount,
+    };
+  }, [requests, currentUser]);
 
   const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
   const currentData = filteredRequests.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -99,7 +119,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   };
 
   const isApprovable = (req: VPPRequest) => {
-    if (currentUser.role === 'MANAGER' && req.status === 'PENDING_MANAGER' && req.currentApproverId === currentUser.id) return true;
+    if (currentUser.role === 'MANAGER' && req.status === 'PENDING_MANAGER' && req.currentApproverId === currentUser.userId) return true;
     if (currentUser.role === 'ADMIN' && (req.status === 'PENDING_MANAGER' || req.status === 'PENDING_ADMIN')) return true;
     return false;
   };
@@ -212,9 +232,16 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         <div className="p-4 border-b border-slate-200 bg-slate-50/50 flex flex-col xl:flex-row gap-4 justify-between items-center print:hidden">
             <div className="flex flex-wrap gap-2 overflow-x-auto w-full xl:w-auto">
                <button onClick={() => setStatusFilter('ALL')} className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap transition ${statusFilter==='ALL'?'bg-indigo-600 text-white shadow-md':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>Tất cả</button>
-               <button onClick={() => setStatusFilter('MY_ACTION')} className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap transition flex items-center relative ${statusFilter==='MY_ACTION'?'bg-amber-500 text-white shadow-md':'bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100'}`}>
-                   Cần tôi xử lý <span className="absolute -top-1 -right-1 w-3 h-3 bg-rose-500 rounded-full animate-ping"></span><span className="absolute -top-1 -right-1 w-3 h-3 bg-rose-500 rounded-full"></span>
+               <button onClick={() => setStatusFilter('MY_ACTION')} className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap transition flex items-center gap-2 relative ${statusFilter==='MY_ACTION'?'bg-amber-500 text-white shadow-md':'bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100'}`}>
+                   Cần tôi xử lý
+                   {stats.myAction > 0 && (
+                     <span className={`inline-flex items-center justify-center rounded-full text-[10px] font-black min-w-[18px] h-[18px] px-1 ${statusFilter === 'MY_ACTION' ? 'bg-white text-amber-600' : 'bg-rose-500 text-white'}`}>
+                       {stats.myAction}
+                     </span>
+                   )}
+                   {stats.myAction > 0 && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full animate-ping"></span>}
                </button>
+
                <button onClick={() => setStatusFilter('WAITING_HANDOVER')} className={`px-4 py-2 rounded-lg text-sm font-bold transition ${statusFilter==='WAITING_HANDOVER'?'bg-slate-700 text-white shadow-md':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>Chờ lấy hàng</button>
                <button onClick={() => setStatusFilter('COMPLETED')} className={`px-4 py-2 rounded-lg font-bold text-sm transition ${statusFilter==='COMPLETED'?'bg-emerald-600 text-white shadow-md':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>Đã hoàn tất</button>
                <button onClick={() => setStatusFilter('DRAFT')} className={`px-4 py-2 rounded-lg font-bold text-sm transition ${statusFilter==='DRAFT'?'bg-slate-700 text-white shadow-md':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>Lưu nháp</button>

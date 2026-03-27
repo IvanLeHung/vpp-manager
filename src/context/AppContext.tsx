@@ -39,8 +39,8 @@ export type RequestLine = {
 export type VPPRequest = {
   id: string;
   requesterId: string;
-  requester: { fullName: string, department: string };
-  department: string;
+  requester: { fullName: string; department: { name: string } | null };
+  department: string;           // snapshot field on Request model
   requestType: string;
   priority: string;
   purpose: string;
@@ -48,6 +48,7 @@ export type VPPRequest = {
   currentApproverId: string | null;
   currentApprover?: { fullName: string };
   createdAt: string;
+  submittedAt?: string | null;
   neededByDate?: string | null;
   managerApprovedAt?: string | null;
   adminApprovedAt?: string | null;
@@ -56,6 +57,7 @@ export type VPPRequest = {
   rejectReason?: string;
   returnReason?: string;
   cancelReason?: string;
+  revisionReason?: string;
 };
 
 interface AppContextType {
@@ -110,9 +112,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Refresh current user's profile from DB on every app load
+  // This ensures stale JWT data (outdated managerId/departmentId) is always overwritten
+  const refreshCurrentUser = async () => {
+    const token = localStorage.getItem('vpp_token');
+    if (!token) return;
+    try {
+      const res = await api.get('/auth/me');
+      const freshUser = {
+        id: res.data.id,
+        userId: res.data.id,
+        fullName: res.data.fullName,
+        username: res.data.username,
+        role: res.data.role,
+        departmentId: res.data.departmentId ?? null,
+        managerId: res.data.managerId ?? null,
+      };
+      setCurrentUser(freshUser);
+      localStorage.setItem('vpp_user', JSON.stringify(freshUser));
+      console.log('[AppContext] User profile refreshed from DB:', freshUser.username, 'managerId:', freshUser.managerId);
+    } catch (err) {
+      console.warn('[AppContext] Could not refresh user profile (token may be expired):', err);
+    }
+  };
+
+  useEffect(() => {
+    // On mount: always sync user profile from DB to handle admin updates to managerId/departmentId
+    refreshCurrentUser();
+  }, []);
+
   useEffect(() => {
     refreshData();
   }, [currentUser]);
+
 
   const logout = () => {
     localStorage.removeItem('vpp_token');
