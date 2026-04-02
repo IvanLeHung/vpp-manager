@@ -1,0 +1,220 @@
+import { useState, useEffect } from 'react';
+import { Package, Search, Download, Droplets, LayoutDashboard, FileText } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import api from '../lib/api';
+
+const TAX_RATE = 0.08;
+
+export default function Dashboard() {
+  const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+  const addToast = (msg: string, type: 'success' | 'error' = 'success') => { setToast({message: msg, type}); setTimeout(() => setToast(null), 3000); };
+  const [stocks, setStocks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentInventoryTab, setCurrentInventoryTab] = useState('VPP'); // 'VPP' | 'VE_SINH'
+  const [searchQuery, setSearchQuery] = useState('');
+
+
+  const fetchStocks = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get('/inventory/stocks');
+      setStocks(res.data);
+    } catch (error) {
+      console.error('Failed to fetch stocks', error);
+      addToast?.('Không thể tải dữ liệu kho.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStocks();
+  }, []);
+
+  const displayedStocks = stocks.filter(stock => {
+    const item = stock.item;
+    const isVS = item.category.toLowerCase().includes('vệ sinh') || item.category.toLowerCase().includes('hóa phẩm') || item.itemType === 'VE_SINH' || item.itemType === 'VS';
+    const matchesTab = currentInventoryTab === 'VPP' ? !isVS : isVS;
+    if (!matchesTab) return false;
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      return item.name.toLowerCase().includes(q) || item.mvpp.toLowerCase().includes(q);
+    }
+    return true;
+  });
+
+  const formatCurrency = (value: number) => {
+    return value.toLocaleString('vi-VN') + ' đ';
+  };
+
+  const handleExport = () => {
+    const exportData = displayedStocks.map((stock, index) => {
+      const item = stock.item;
+      const price = Number(item.price);
+      const giaVAT = Math.round(price + (price * TAX_RATE));
+      return {
+        'STT': index + 1,
+        'MVPP': item.mvpp,
+        'SP': item.name,
+        'Nhóm': item.category,
+        'ĐVT': item.unit,
+        'Tồn kho (TT)': stock.quantityOnHand,
+        'Giá': price,
+        'Thuế': '8%',
+        'Giá VAT': giaVAT
+      };
+    });
+    
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    worksheet['!cols'] = [ { wch: 5 }, { wch: 15 }, { wch: 35 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 15 } ];
+    const workbook = XLSX.utils.book_new();
+    const sheetName = currentInventoryTab === 'VPP' ? 'TonKho_VPP' : 'TonKho_Ve_Sinh';
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    XLSX.writeFile(workbook, `${sheetName}.xlsx`);
+  };
+
+
+  const totalStockTypes = displayedStocks.length;
+  let totalPhysicalItems = 0;
+  let inStockTypes = 0;
+  let outOfStockOrLow = 0;
+
+  displayedStocks.forEach(s => {
+     totalPhysicalItems += s.quantityOnHand;
+     if (s.quantityOnHand > 15) inStockTypes++;
+     else outOfStockOrLow++;
+  });
+
+  return (
+    <div className="flex flex-col h-full bg-slate-50 relative">
+      {toast && (
+        <div className={`fixed bottom-4 right-4 px-6 py-3 rounded-xl text-white font-bold shadow-2xl z-50 ${toast.type === 'error' ? 'bg-rose-500' : 'bg-emerald-500'} animate-fade-in`}>
+          {toast.message}
+        </div>
+      )}
+      {/* Tabs Group Local to Dashboard */}
+      <div className="bg-white px-8 pt-4 flex gap-8 border-b border-slate-200 shrink-0 sticky top-0 z-10 w-full shadow-sm">
+          <button 
+            onClick={() => setCurrentInventoryTab('VPP')}
+            className={`pb-4 flex items-center font-bold text-sm transition-colors relative cursor-pointer ${currentInventoryTab === 'VPP' ? 'text-blue-700' : 'text-slate-400 hover:text-slate-700'}`}>
+            <Package className="w-4 h-4 mr-2"/> Quản lý Tồn kho VPP
+            {currentInventoryTab === 'VPP' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600 rounded-t-full shadow-[0_-2px_8px_rgba(37,99,235,0.4)]"></div>}
+          </button>
+          <button 
+            onClick={() => setCurrentInventoryTab('VE_SINH')}
+            className={`pb-4 flex items-center font-bold text-sm transition-colors relative cursor-pointer ${currentInventoryTab === 'VE_SINH' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-700'}`}>
+            <Droplets className="w-4 h-4 mr-2"/> Quản lý Tồn kho Tạp hóa / Vệ sinh
+            {currentInventoryTab === 'VE_SINH' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full shadow-[0_-2px_8px_rgba(16,185,129,0.4)]"></div>}
+          </button>
+      </div>
+
+      {/* Internal Content Area */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 relative">
+        {/* Metrics Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center hover:shadow-md transition-shadow">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center mr-4 shadow-inner ${currentInventoryTab === 'VPP' ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                  <Package className="w-6 h-6"/>
+              </div>
+              <div>
+                  <p className="text-sm text-slate-500 font-medium">Tổng đầu mục SP / TS Lượng Tồn</p>
+                  <p className="text-3xl font-bold text-slate-800">{totalStockTypes} <span className="text-sm text-slate-400 font-normal">/ {totalPhysicalItems} món</span></p>
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center hover:shadow-md transition-shadow">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center mr-4 shadow-inner ${currentInventoryTab === 'VPP' ? 'bg-indigo-100 text-indigo-600' : 'bg-teal-100 text-teal-600'}`}>
+                  <LayoutDashboard className="w-6 h-6"/>
+              </div>
+              <div>
+                  <p className="text-sm text-slate-500 font-medium">Sẵn sàng cấp phát (&gt;15)</p>
+                  <p className="text-3xl font-bold text-slate-800">{inStockTypes}</p>
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center hover:shadow-md transition-shadow">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center mr-4 shadow-inner ${currentInventoryTab === 'VPP' ? 'bg-rose-100 text-rose-600' : 'bg-orange-100 text-orange-600'}`}>
+                  <FileText className="w-6 h-6"/>
+              </div>
+              <div>
+                  <p className="text-sm text-slate-500 font-medium">Cảnh báo tồn kho (&le;15)</p>
+                  <p className="text-3xl font-bold text-rose-600">{outOfStockOrLow}</p>
+              </div>
+            </div>
+        </div>
+
+        {/* Action Bar */}
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 sticky top-0 bg-slate-50 py-2 z-10 w-full">
+          <div className="relative w-full xl:w-96">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <input 
+              type="text" 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={`Tra cứu VPP theo mã / Tên...`}
+              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm transition-all"
+            />
+          </div>
+          <div className="flex gap-2 w-full xl:w-auto flex-wrap">
+            <button 
+              onClick={handleExport}
+              className="flex items-center justify-center px-4 py-2 bg-white border border-emerald-300 text-emerald-700 hover:text-emerald-800 rounded-xl hover:bg-emerald-50 max-sm:w-full border-2 transition-all shadow-sm font-semibold cursor-pointer">
+              <Download className="w-4 h-4 mr-2" /> Trích xuất Kho hiện tại
+            </button>
+          </div>
+        </div>
+
+        {/* Table Area */}
+        <div className="bg-white rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.02)] border border-slate-100 overflow-x-auto relative z-0">
+          <table className="w-full text-left border-collapse whitespace-nowrap min-w-max">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-bold">
+                <th className="px-5 py-4">MVPP</th>
+                <th className="px-6 py-4">SP (Sản Phẩm)</th>
+                <th className="px-5 py-4">Nhóm</th>
+                <th className="px-4 py-4">ĐVT</th>
+                <th className="px-4 py-4 text-center">Tồn kho TT</th>
+                <th className="px-4 py-4 text-right">Đơn giá</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                 <tr><td colSpan={6} className="p-8 text-center text-slate-400 font-bold animate-pulse">Đang nạp dữ liệu từ kho...</td></tr>
+              ) : displayedStocks.length > 0 ? displayedStocks.map((stock) => {
+                const item = stock.item;
+                const isLow = stock.quantityOnHand <= 15;
+                return (
+                  <tr key={stock.id} className="hover:bg-blue-50/50 transition-colors group">
+                    <td className={`px-5 py-4 font-bold ${currentInventoryTab === 'VPP' ? 'text-blue-700' : 'text-emerald-700'}`}>{item.mvpp}</td>
+                    <td className="px-6 py-4 font-bold text-slate-800">{item.name}</td>
+                    <td className="px-5 py-4 text-slate-600 text-sm font-medium">
+                      <span className="bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">{item.category}</span>
+                    </td>
+                    <td className="px-4 py-4 text-slate-500 font-medium">{item.unit}</td>
+                    <td className="px-4 py-4 text-center">
+                        <span className={`px-3 py-1 text-sm font-black rounded-full ${isLow ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {stock.quantityOnHand}
+                        </span>
+                    </td>
+                    <td className="px-4 py-4 text-right text-slate-500 font-medium">{formatCurrency(Number(item.price))}</td>
+                  </tr>
+                );
+              }) : (
+                <tr>
+                  <td colSpan={6} className="px-6 py-16 text-center text-slate-400 font-medium">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                        {currentInventoryTab === 'VPP' ? <Package className="w-16 h-16 opacity-30" /> : <Droplets className="w-16 h-16 opacity-30" />}
+                        <span>Kho trống, không tìm thấy vật tư.</span>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+
+
+    </div>
+  );
+}
