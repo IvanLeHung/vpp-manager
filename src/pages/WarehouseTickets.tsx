@@ -60,7 +60,7 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
   );
 }
 
-export default function WarehouseTickets() {
+export default function WarehouseTickets({ warehouseCode = 'MAIN', basePath = '/warehouse-tickets' }: { warehouseCode?: string; basePath?: string }) {
   const navigate = useNavigate();
   const { currentUser, items } = useAppContext();
   const role = currentUser?.role || 'EMPLOYEE';
@@ -101,6 +101,7 @@ export default function WarehouseTickets() {
       if (statusFilter !== 'ALL') params.status = statusFilter;
       if (typeFilter !== 'ALL') params.ticketType = typeFilter;
       if (searchQuery) params.q = searchQuery;
+      if (warehouseCode && warehouseCode !== 'MAIN') params.warehouseCode = warehouseCode;
       const res = await api.get('/warehouse-tickets', { params });
       setTickets(res.data.data);
       setSummary(res.data.summary);
@@ -144,6 +145,7 @@ export default function WarehouseTickets() {
         ticketType: createType,
         reason: createReason,
         note: createNote || null,
+        warehouseCode: warehouseCode,
         lines: validLines.map(l => ({ itemId: l.itemId, qty: createType === 'ISSUE' ? -Math.abs(l.qty) : l.qty, note: l.note || null })),
       });
       addToast(isAdmin ? 'Phiếu đã tạo và thực thi thành công!' : 'Phiếu đã tạo thành công, bạn có thể gửi duyệt.');
@@ -186,8 +188,12 @@ export default function WarehouseTickets() {
     }
   };
 
-  // Available items for the item picker
-  const availableItems = items.filter(i => i.itemType === 'VPP' || i.itemType === 'VE_SINH');
+  const availableItems = items.filter(i => {
+    if (warehouseCode === 'VE_SINH') {
+      return i.itemType === 'VE_SINH' || i.category.toLowerCase().includes('vệ sinh');
+    }
+    return i.itemType === 'VPP';
+  });
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] p-4 md:p-8 bg-slate-50 relative overflow-hidden">
@@ -197,9 +203,9 @@ export default function WarehouseTickets() {
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6 gap-4 shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center">
-            <ClipboardList className="w-7 h-7 mr-3 text-indigo-600" /> Phiếu kho
+            <ClipboardList className="w-7 h-7 mr-3 text-indigo-600" /> {warehouseCode === 'VE_SINH' ? 'Phiếu kho Đồ vệ sinh' : 'Phiếu kho'}
           </h1>
-          <p className="text-sm text-slate-500 mt-1 font-medium">Quản lý phiếu nhập / xuất / điều chỉnh kho — quy trình 2 lớp phê duyệt</p>
+          <p className="text-sm text-slate-500 mt-1 font-medium">Quản lý phiếu nhập / xuất / điều chỉnh {warehouseCode === 'VE_SINH' ? 'vệ sinh' : 'văn phòng phẩm'}</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={fetchTickets} className="p-2.5 text-slate-500 hover:bg-slate-100 rounded-xl transition" title="Làm mới">
@@ -292,7 +298,7 @@ export default function WarehouseTickets() {
                 const TypeIcon = tc.icon;
                 const StatusIcon = sc.icon;
                 return (
-                  <tr key={t.id} className="hover:bg-indigo-50/30 transition-colors group cursor-pointer" onClick={() => navigate(`/warehouse-tickets/${t.id}`)}>
+                  <tr key={t.id} className="hover:bg-indigo-50/30 transition-colors group cursor-pointer" onClick={() => navigate(`${basePath}/${t.id}`)}>
                     <td className="p-4 text-center text-xs text-slate-400 font-bold">{(safePage - 1) * PAGE_SIZE + idx + 1}</td>
                     <td className="p-4 font-black text-indigo-700 tracking-wide">{t.ticketCode}</td>
                     <td className="p-4 text-center">
@@ -315,7 +321,7 @@ export default function WarehouseTickets() {
                     <td className="p-4 text-sm text-slate-600 font-medium">{t.approvedBy?.fullName || '—'}</td>
                     <td className="p-4 text-right pr-6">
                       <div className="flex items-center gap-1 justify-end" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => navigate(`/warehouse-tickets/${t.id}`)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Xem chi tiết">
+                        <button onClick={() => navigate(`${basePath}/${t.id}`)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Xem chi tiết">
                           <Eye className="w-4 h-4" />
                         </button>
                         {/* WAREHOUSE: submit draft */}

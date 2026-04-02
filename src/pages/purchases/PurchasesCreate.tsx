@@ -13,7 +13,9 @@ interface PurchasesCreateProps {
 }
 
 const PurchasesCreate: React.FC<PurchasesCreateProps> = ({ onBack, poId, onSuccess }) => {
-  const { showToast, currentUser } = useApp();
+  const { currentUser } = useApp();
+  const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'warning' | 'info'} | null>(null);
+  const showToast = (msg: string, type: 'success' | 'error' | 'warning' | 'info' = 'success') => { setToast({message: msg, type}); setTimeout(() => setToast(null), 3000); };
   const [initLoading, setInitLoading] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -178,6 +180,11 @@ const PurchasesCreate: React.FC<PurchasesCreateProps> = ({ onBack, poId, onSucce
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative">
+      {toast && (
+        <div className={`fixed bottom-4 right-4 px-6 py-3 rounded-xl text-white font-bold shadow-2xl z-50 ${toast.type === 'error' ? 'bg-rose-500' : toast.type === 'warning' ? 'bg-amber-500' : toast.type === 'info' ? 'bg-blue-500' : 'bg-emerald-500'} animate-fade-in`}>
+          {toast.message}
+        </div>
+      )}
       {/* HEADER */}
       <div className="h-20 bg-white border-b border-slate-200 flex justify-between items-center px-6 md:px-10 shrink-0 z-20 shadow-sm print:hidden">
           <div className="flex items-center gap-4 md:gap-6">

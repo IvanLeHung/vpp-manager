@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Package, LayoutDashboard, LogOut, FileText, ClipboardList, ShieldAlert, ShoppingCart, Users as UsersIcon, Database, ClipboardCheck } from 'lucide-react';
+import { Package, LayoutDashboard, LogOut, FileText, ClipboardList, ShieldAlert, ShoppingCart, Users as UsersIcon, Database, ClipboardCheck, Droplets, TrendingDown } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
 export default function MainLayout() {
@@ -52,6 +52,31 @@ export default function MainLayout() {
             </button>
           )}
           
+          {(currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER') && (
+            <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/analytics')}`} onClick={() => navigate('/analytics')}>
+              <LayoutDashboard className="w-5 h-5 mr-3" /> Báo cáo thống kê
+            </button>
+          )}
+
+          {/* JANITORIAL WAREHOUSE GROUP */}
+          <div className="pt-6 pb-2 px-2 text-[11px] font-black text-rose-500 uppercase tracking-wider">Tạp hóa / Vệ sinh</div>
+          
+          {(currentUser?.role === 'ADMIN' || currentUser?.role === 'WAREHOUSE') && (
+            <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/janitorial-warehouse')}`} onClick={() => navigate('/janitorial-warehouse')}>
+              <Droplets className="w-5 h-5 mr-3" /> Tồn kho Vệ sinh
+            </button>
+          )}
+          {(currentUser?.role === 'ADMIN' || currentUser?.role === 'WAREHOUSE') && (
+            <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/janitorial-tickets')}`} onClick={() => navigate('/janitorial-tickets')}>
+              <ClipboardCheck className="w-5 h-5 mr-3" /> Phiếu kho Vệ sinh
+            </button>
+          )}
+          {(currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER') && (
+            <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/janitorial-reports')}`} onClick={() => navigate('/janitorial-reports')}>
+              <TrendingDown className="w-5 h-5 mr-3" /> Báo cáo Tiêu hao
+            </button>
+          )}
+          
           <div className="pt-6 pb-2 px-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Hệ thống</div>
           
           {(currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER') && (
@@ -61,14 +86,8 @@ export default function MainLayout() {
           )}
 
           {currentUser?.role === 'ADMIN' && (
-            <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/items')}`} onClick={() => navigate('/items')}>
+            <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-cursor-pointer ${getActiveClass('/items')}`} onClick={() => navigate('/items')}>
               <Database className="w-5 h-5 mr-3" /> Danh mục Hàng hoá
-            </button>
-          )}
-          
-          {(currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER') && (
-            <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/analytics')}`} onClick={() => navigate('/analytics')}>
-              <LayoutDashboard className="w-5 h-5 mr-3" /> Báo cáo thống kê
             </button>
           )}
         </nav>

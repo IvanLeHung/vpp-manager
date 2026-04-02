@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx';
 
 import { useAppContext } from '../context/AppContext';
 
-export default function InventoryReport() {
+export default function InventoryReport({ warehouseCode = 'MAIN' }: { warehouseCode?: string }) {
    const { currentUser } = useAppContext();
    const [movements, setMovements] = useState<any[]>([]);
    const [loading, setLoading] = useState(true);
@@ -15,7 +15,7 @@ export default function InventoryReport() {
    const fetchMovements = async () => {
       try {
          setLoading(true);
-         const typeQuery = filterType !== 'ALL' ? `?type=${filterType}` : '';
+         const typeQuery = filterType !== 'ALL' ? `?type=${filterType}&warehouseCode=${warehouseCode}` : `?warehouseCode=${warehouseCode}`;
          const res = await api.get(`/inventory/movements${typeQuery}`);
          setMovements(res.data);
       } catch (err) {
@@ -49,7 +49,7 @@ export default function InventoryReport() {
          'SL Thay đổi': d.qty,
          'Tồn trước': d.beforeQty,
          'Tồn sau': d.afterQty,
-         'Phòng ban': d.createdBy?.department || '',
+         'Phòng ban': d.createdBy?.department?.name || (typeof d.createdBy?.department === 'string' ? d.createdBy.department : ''),
          'Người thao tác': d.createdBy?.fullName || d.createdBy?.username,
          'Lý do / Tham chiếu': d.reason || d.refId || ''
       }));
@@ -82,8 +82,8 @@ export default function InventoryReport() {
          {/* Head Area */}
          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 shrink-0">
             <div>
-               <h2 className="text-2xl font-bold text-slate-800 flex items-center"><History className="w-6 h-6 mr-3 text-indigo-600"/> Lịch sử Biến động Kho</h2>
-               <p className="text-slate-500 font-medium text-sm mt-1">Ghi nhận chi tiết mọi hoạt động nhập, xuất, kiểm kê tại kho tổng.</p>
+               <h2 className="text-2xl font-bold text-slate-800 flex items-center"><History className="w-6 h-6 mr-3 text-indigo-600"/> {warehouseCode === 'VE_SINH' ? 'Lịch sử Biến động Vệ sinh' : 'Lịch sử Biến động Kho'}</h2>
+               <p className="text-slate-500 font-medium text-sm mt-1">Ghi nhận chi tiết mọi hoạt động nhập, xuất, kiểm kê tại kho {warehouseCode === 'VE_SINH' ? 'Đồ vệ sinh' : 'tổng'}.</p>
             </div>
             
             <div className="flex gap-3">
@@ -170,7 +170,7 @@ export default function InventoryReport() {
                               <td className="p-4 text-right font-black text-emerald-600">{m.afterQty}</td>
                               <td className="p-4 font-bold text-slate-600 text-sm">
                                   {m.createdBy?.fullName || m.createdBy?.username}
-                                  {m.createdBy?.department && <span className="block text-[10px] font-black text-slate-400 mt-0.5 tracking-widest uppercase">{m.createdBy.department}</span>}
+                                  {m.createdBy?.department && <span className="block text-[10px] font-black text-slate-400 mt-0.5 tracking-widest uppercase">{typeof m.createdBy.department === 'string' ? m.createdBy.department : m.createdBy.department.name}</span>}
                               </td>
                               <td className="p-4 text-slate-500 font-medium text-sm">
                                  {m.refId && <span className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-xs mr-2 font-mono text-slate-600">{m.refType}:{m.refId}</span>}

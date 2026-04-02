@@ -13,6 +13,8 @@ import Users from './pages/Users';
 import Items from './pages/Items';
 import WarehouseTickets from './pages/WarehouseTickets';
 import WarehouseTicketDetail from './pages/WarehouseTicketDetail';
+import JanitorialWarehouse from './pages/janitorial/JanitorialWarehouse';
+import JanitorialReports from './pages/janitorial/JanitorialReports';
 import api from './lib/api';
 
 function Landing() {
@@ -121,6 +123,12 @@ function App() {
             <Route path="/items" element={<Items />} />
             <Route path="/warehouse-tickets" element={<WarehouseTickets />} />
             <Route path="/warehouse-tickets/:id" element={<WarehouseTicketDetail />} />
+            
+            {/* Janitorial Warehouse Routes */}
+            <Route path="/janitorial-warehouse" element={<JanitorialWarehouse />} />
+            <Route path="/janitorial-reports" element={<JanitorialReports />} />
+            <Route path="/janitorial-tickets" element={<WarehouseTickets warehouseCode="VE_SINH" basePath="/janitorial-tickets" />} />
+            <Route path="/janitorial-tickets/:id" element={<WarehouseTicketDetail basePath="/janitorial-tickets" />} />
           </Route>
         </Routes>
       </BrowserRouter>

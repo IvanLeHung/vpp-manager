@@ -52,7 +52,7 @@ const AUDIT_LABELS: Record<string, string> = {
   REJECT: 'Từ chối', EXECUTE: 'Thực thi', CANCEL: 'Hủy phiếu', AUTO_EXECUTE: 'Tự động thực thi',
 };
 
-export default function WarehouseTicketDetail() {
+export default function WarehouseTicketDetail({ basePath = '/warehouse-tickets' }: { basePath?: string }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const { currentUser } = useAppContext();
@@ -185,7 +185,7 @@ export default function WarehouseTicketDetail() {
         <div className="text-center">
           <XCircle className="w-12 h-12 text-rose-300 mx-auto mb-4" />
           <p className="text-slate-500 font-bold mb-4">Không tìm thấy phiếu kho.</p>
-          <button onClick={() => navigate('/warehouse-tickets')} className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition">
+          <button onClick={() => navigate(basePath)} className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition">
             <ArrowLeft className="w-4 h-4 mr-2 inline" /> Quay lại
           </button>
         </div>
@@ -214,7 +214,7 @@ export default function WarehouseTicketDetail() {
       {/* Back + Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/warehouse-tickets')} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-white rounded-xl transition border border-transparent hover:border-slate-200">
+          <button onClick={() => navigate(basePath)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-white rounded-xl transition border border-transparent hover:border-slate-200">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
