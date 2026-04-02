@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Package, LayoutDashboard, LogOut, FileText, ClipboardList, ShieldAlert, ShoppingCart, Users as UsersIcon, Database } from 'lucide-react';
+import { Package, LayoutDashboard, LogOut, FileText, ClipboardList, ShieldAlert, ShoppingCart, Users as UsersIcon, Database, ClipboardCheck } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
 export default function MainLayout() {
@@ -36,6 +36,11 @@ export default function MainLayout() {
           {(currentUser?.role === 'ADMIN' || currentUser?.role === 'WAREHOUSE') && (
             <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/receipts')}`} onClick={() => navigate('/receipts')}>
               <Package className="w-5 h-5 mr-3" /> Kiểm & Nhập Kho
+            </button>
+          )}
+          {(currentUser?.role === 'ADMIN' || currentUser?.role === 'WAREHOUSE') && (
+            <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/warehouse-tickets')}`} onClick={() => navigate('/warehouse-tickets')}>
+              <ClipboardCheck className="w-5 h-5 mr-3" /> Phiếu kho
             </button>
           )}
           <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/requests')}`} onClick={() => navigate('/requests')}>

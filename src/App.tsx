@@ -10,7 +10,9 @@ import Purchases from './pages/purchases/Purchases';
 import Receipts from './pages/purchases/Receipts';
 import GuestRequest from './pages/GuestRequest';
 import Users from './pages/Users';
-import Items from './pages/Items'; // Added this import
+import Items from './pages/Items';
+import WarehouseTickets from './pages/WarehouseTickets';
+import WarehouseTicketDetail from './pages/WarehouseTicketDetail';
 import api from './lib/api';
 
 function Landing() {
@@ -117,6 +119,8 @@ function App() {
             <Route path="/receipts" element={<Receipts />} />
             <Route path="/users" element={<Users />} /> 
             <Route path="/items" element={<Items />} />
+            <Route path="/warehouse-tickets" element={<WarehouseTickets />} />
+            <Route path="/warehouse-tickets/:id" element={<WarehouseTicketDetail />} />
           </Route>
         </Routes>
       </BrowserRouter>
