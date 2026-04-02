@@ -154,14 +154,22 @@ export default function InventoryReport({ warehouseCode = 'MAIN' }: { warehouseC
                         filteredMovements.map((m, idx) => (
                            <tr key={m.id} className="hover:bg-slate-50 transition-colors">
                               <td className="p-4 text-center font-bold text-slate-300 border-r border-slate-50 text-xs">#{filteredMovements.length - idx}</td>
-                              <td className="p-4 font-bold text-slate-600 text-sm">{new Date(m.createdAt).toLocaleString('vi-VN')}</td>
+                              <td className="p-4 font-bold text-slate-600 text-sm">
+                                 {m.createdAt ? new Date(m.createdAt).toLocaleString('vi-VN') : '---'}
+                              </td>
                               <td className="p-4 text-center flex items-center justify-center">
                                  {getTypeIcon(m.movementType)}
                                  {getTypeLabel(m.movementType)}
                               </td>
                               <td className="p-4 font-bold text-slate-800">
-                                 <span className="text-blue-600 mr-2">{m.item?.mvpp}</span>
-                                 {m.item?.name}
+                                 {m.item ? (
+                                    <>
+                                       <span className="text-blue-600 mr-2">{m.item.mvpp}</span>
+                                       {m.item.name}
+                                    </>
+                                 ) : (
+                                    <span className="text-slate-400 italic">Sản phẩm đã bị xóa hoặc không còn tồn tại</span>
+                                 )}
                               </td>
                               <td className={`p-4 text-right font-black text-lg ${m.qty > 0 ? 'text-blue-600' : m.qty < 0 ? 'text-rose-600' : 'text-slate-600'}`}>
                                  {m.qty > 0 ? `+${m.qty}` : m.qty}
@@ -169,11 +177,19 @@ export default function InventoryReport({ warehouseCode = 'MAIN' }: { warehouseC
                               <td className="p-4 text-right font-medium text-slate-400">{m.beforeQty}</td>
                               <td className="p-4 text-right font-black text-emerald-600">{m.afterQty}</td>
                               <td className="p-4 font-bold text-slate-600 text-sm">
-                                  {m.createdBy?.fullName || m.createdBy?.username}
-                                  {m.createdBy?.department && <span className="block text-[10px] font-black text-slate-400 mt-0.5 tracking-widest uppercase">{typeof m.createdBy.department === 'string' ? m.createdBy.department : m.createdBy.department.name}</span>}
+                                  {m.createdBy?.fullName || m.createdBy?.username || <span className="text-slate-400 italic">Hệ thống</span>}
+                                  {m.createdBy?.department && (
+                                    <span className="block text-[10px] font-black text-slate-400 mt-0.5 tracking-widest uppercase truncate max-w-[150px]">
+                                       {typeof m.createdBy.department === 'string' ? m.createdBy.department : (m.createdBy.department.name || '')}
+                                    </span>
+                                  )}
                               </td>
                               <td className="p-4 text-slate-500 font-medium text-sm">
-                                 {m.refId && <span className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-xs mr-2 font-mono text-slate-600">{m.refType}:{m.refId}</span>}
+                                 {m.refId && (
+                                    <span className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-xs mr-2 font-mono text-slate-600">
+                                       {m.refType || 'REF'}:{m.refId}
+                                    </span>
+                                 )}
                                  {m.reason}
                               </td>
                            </tr>

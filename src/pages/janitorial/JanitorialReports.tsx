@@ -29,11 +29,13 @@ export default function JanitorialReports() {
     fetchData();
   }, []);
 
-  const chartData = consumption.map(c => ({
-    name: c.item.name,
-    Tiêu_Hao: c.totalQtyConsumed,
-    Ngưỡng: c.item.standardConsumption || 0
-  })).slice(0, 10); // Display Top 10
+  const chartData = consumption
+    .filter(c => c.item) // Ensure item exists
+    .map(c => ({
+      name: c.item.name,
+      Tiêu_Hao: c.totalQtyConsumed,
+      Ngưỡng: c.item.standardConsumption || 0
+    })).slice(0, 10); // Display Top 10
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative">

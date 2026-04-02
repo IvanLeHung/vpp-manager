@@ -11,6 +11,7 @@ import * as XLSX from 'xlsx';
 import { useAppContext } from '../context/AppContext';
 import ImportExcelModal from './items/ImportExcelModal';
 import ItemHistoryModal from './items/ItemHistoryModal';
+import ImportHistoryModal from './items/ImportHistoryModal';
 
 // ── Types ──
 type ItemData = {
@@ -95,6 +96,7 @@ export default function Items() {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [statusModal, setStatusModal] = useState<{ isOpen: boolean; item: ItemData | null; reason: string; targetStatus: boolean }>({ isOpen: false, item: null, reason: '', targetStatus: false });
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showImportHistoryModal, setShowImportHistoryModal] = useState(false);
   const [historyModalConfig, setHistoryModalConfig] = useState<{ isOpen: boolean; itemId?: string; itemMvpp?: string }>({ isOpen: false });
 
   // Toast
@@ -257,9 +259,20 @@ export default function Items() {
             </button>
           )}
           {isAdmin && (
-            <button className="flex items-center px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 rounded-xl transition" onClick={() => setShowImportModal(true)}>
-              <Upload className="w-4 h-4 md:mr-2" /><span className="hidden md:inline">Import Excel</span>
-            </button>
+            <>
+              <button 
+                onClick={() => setShowImportHistoryModal(true)} 
+                className="flex items-center px-3 py-2 text-sm font-bold text-amber-700 hover:bg-amber-50 rounded-xl transition"
+              >
+                <History className="w-4 h-4 md:mr-2" /><span className="hidden md:inline">Lịch sử Import Excel</span>
+              </button>
+              <button 
+                onClick={() => setShowImportModal(true)} 
+                className="flex items-center px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 rounded-xl transition"
+              >
+                <Upload className="w-4 h-4 md:mr-2" /><span className="hidden md:inline">Import Excel</span>
+              </button>
+            </>
           )}
           
           {!isEmployee && <div className="w-px h-6 bg-slate-200 mx-1" />}
@@ -626,15 +639,20 @@ export default function Items() {
         isOpen={showImportModal} 
         onClose={() => setShowImportModal(false)}
         onSuccess={() => { setShowImportModal(false); fetchItems(); fetchSummary(); }}
-        existingItems={items}
       />
 
-      {/* HISTORY MODAL */}
+      {/* HISTORY MODAL (Auditing changes to individual items) */}
       <ItemHistoryModal
         isOpen={historyModalConfig.isOpen}
         onClose={() => setHistoryModalConfig({ isOpen: false })}
         itemId={historyModalConfig.itemId}
         itemMvpp={historyModalConfig.itemMvpp}
+      />
+
+      {/* IMPORT BATCH HISTORY MODAL */}
+      <ImportHistoryModal
+        isOpen={showImportHistoryModal}
+        onClose={() => setShowImportHistoryModal(false)}
       />
     </div>
   );

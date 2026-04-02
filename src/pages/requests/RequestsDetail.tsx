@@ -85,9 +85,12 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
     );
   }
 
-  const isManagerApprover = currentUser.role === 'MANAGER' && data.status === 'PENDING_MANAGER';
+  const isManagerApprover = currentUser.role === 'MANAGER' && data.status === 'PENDING_MANAGER' && data.currentApproverId === currentUser.userId;
   const isAdminApprover = currentUser.role === 'ADMIN' && (data.status === 'PENDING_ADMIN' || data.status === 'PENDING_MANAGER');
   const isApprover = isManagerApprover || isAdminApprover;
+
+  const isUserInChain = data.approvalSteps?.some((s: any) => s.approverId === currentUser.userId);
+  const isFutureApprover = isUserInChain && data.status === 'PENDING_MANAGER' && data.currentApproverId !== currentUser.userId;
 
   const isWarehouse = (currentUser.role === 'WAREHOUSE' || currentUser.role === 'ADMIN') && ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED'].includes(data.status);
   const isOwnerDraft = currentUser.userId === data.requesterId && (data.status === 'DRAFT' || data.status === 'RETURNED');
@@ -253,8 +256,54 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                       {(data.status === 'APPROVED' || data.status === 'READY_TO_ISSUE' || data.status === 'WAITING_HANDOVER' || data.status === 'COMPLETED') && (
                           <button onClick={printDocument} className="w-full py-2.5 bg-white text-slate-800 hover:bg-slate-100 flex items-center justify-center rounded-xl font-bold transition shadow-sm"><Printer className="w-4 h-4 mr-2"/> In Lệnh Xuất Kho</button>
                       )}
+
+                      {isFutureApprover && (
+                          <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/50 rounded-xl">
+                              <p className="text-xs font-bold text-amber-500 flex items-center">
+                                  <AlertTriangle className="w-4 h-4 mr-2"/> Chờ phê duyệt cấp dưới
+                              </p>
+                              <p className="text-[10px] text-amber-200/70 mt-1">Bạn có tên trong danh sách duyệt nhưng hiện tại chưa đến lượt của bạn.</p>
+                          </div>
+                      )}
                   </div>
               </div>
+
+              {/* Box 3.5: Approval Steps (New) */}
+              {data.approvalSteps && data.approvalSteps.length > 0 && (
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col">
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Tuyến Duyệt Cấu Hình</h3>
+                  <div className="space-y-4">
+                    {data.approvalSteps.map((step: any) => (
+                      <div key={step.id} className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                          step.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-600' :
+                          step.status === 'REJECTED' ? 'bg-rose-100 text-rose-600' :
+                          step.stepNo === data.currentApprovalStep && data.status === 'PENDING_MANAGER' ? 'bg-amber-100 text-amber-600 animate-pulse' :
+                          'bg-slate-100 text-slate-400'
+                        }`}>
+                          {step.stepNo}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-bold truncate ${step.status === 'APPROVED' ? 'text-slate-800' : 'text-slate-500'}`}>
+                            {step.approver?.fullName || 'N/A'}
+                          </p>
+                          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{step.status}</p>
+                        </div>
+                        {step.status === 'APPROVED' && <CheckCircle className="w-4 h-4 text-emerald-500" />}
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-3 opacity-60">
+                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${data.status === 'PENDING_ADMIN' ? 'bg-amber-100 text-amber-600 animate-pulse' : data.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                            {data.approvalSteps.length + 1}
+                         </div>
+                         <div className="flex-1">
+                            <p className="text-sm font-bold text-slate-500">Hành chính (Duyệt cuối)</p>
+                            <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Final Approval</p>
+                         </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Box 4: Approval Timeline */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col flex-1 min-h-[300px]">
