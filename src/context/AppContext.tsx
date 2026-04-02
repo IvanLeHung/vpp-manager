@@ -45,6 +45,7 @@ export type VPPRequest = {
   priority: string;
   purpose: string;
   status: string;
+  currentApproverId?: string | null;
   createdAt: string;
   neededByDate?: string | null;
   managerApprovedAt?: string | null;

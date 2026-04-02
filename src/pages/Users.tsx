@@ -57,6 +57,7 @@ export default function Users() {
   const [loading, setLoading] = useState(true);
 
   // State for Users
+  const [userViewMode, setUserViewMode] = useState<'ALL' | 'MY_DIRECTS'>('ALL');
   const [users, setUsers] = useState<UserData[]>([]);
   const [managers, setManagers] = useState<{id: string, fullName: string, username: string}[]>([]);
   const [showUserModal, setShowUserModal] = useState(false);
@@ -85,8 +86,9 @@ export default function Users() {
   const fetchData = async () => {
     try {
       setLoading(true);
+      const userEndpoint = (currentUser.role === 'MANAGER' && userViewMode === 'MY_DIRECTS') ? '/users/my-employees' : '/users';
       const [usersRes, deptsRes, managersRes] = await Promise.all([
-        api.get('/users'),
+        api.get(userEndpoint),
         api.get('/departments'),
         api.get('/users/managers')
       ]);
@@ -102,7 +104,7 @@ export default function Users() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [activeTab, userViewMode]);
 
   // Filtered Departments
   const filteredDepartments = departments.filter(dept => {
@@ -234,13 +236,34 @@ export default function Users() {
         {activeTab === 'users' ? (
           /* ─── USERS TAB (LEGACY STYLE POLISHED) ─── */
           <div className="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-100 flex-1 flex flex-col overflow-hidden">
-             <div className="p-6 md:p-8 border-b border-slate-50 flex justify-between items-center bg-white/50 backdrop-blur-md sticky top-0 z-10">
+              <div className="p-6 md:p-8 border-b border-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/50 backdrop-blur-md sticky top-0 z-10">
               <div>
                 <h3 className="text-lg font-black text-slate-800 flex items-center tracking-tight">
                    Nhân viên <span className="ml-3 px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] rounded-full uppercase tracking-widest">{users.length}</span>
                 </h3>
-                <p className="text-xs text-slate-400 font-medium mt-0.5">Danh sách toàn bộ nhân viên và cán bộ quản lý</p>
+                <p className="text-xs text-slate-400 font-medium mt-0.5">
+                   {userViewMode === 'ALL' ? 'Danh sách toàn bộ nhân viên hệ thống' : 'Danh sách nhân viên do bạn quản lý trực tiếp'}
+                </p>
               </div>
+
+              {/* Sub-tabs for Users (Manager Only) */}
+              {currentUser.role === 'MANAGER' && (
+                <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  <button 
+                    onClick={() => setUserViewMode('ALL')}
+                    className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${userViewMode === 'ALL' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
+                  >
+                    TẤT CẢ
+                  </button>
+                  <button 
+                    onClick={() => setUserViewMode('MY_DIRECTS')}
+                    className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${userViewMode === 'MY_DIRECTS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
+                  >
+                    TÔI QUẢN LÝ
+                  </button>
+                </div>
+              )}
+
               {currentUser.role === 'ADMIN' && (
                 <button onClick={() => { setEditingUser(null); setUserFormData({ username: '', password: '', fullName: '', departmentId: '', role: 'EMPLOYEE', isActive: true, managerId: '' }); setShowUserModal(true); }} className="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 transition shadow-xl shadow-indigo-100 flex items-center transform active:scale-95 text-xs uppercase tracking-wider">
                   <Plus className="w-4 h-4 mr-2" /> Thêm Nhân viên

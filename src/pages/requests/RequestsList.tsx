@@ -43,10 +43,11 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     
     if (statusFilter !== 'ALL') {
         if (statusFilter === 'MY_ACTION') {
-            if (currentUser.role === 'MANAGER') filtered = filtered.filter(r => r.currentApproverId === currentUser.userId);
-            else if (currentUser.role === 'ADMIN') filtered = filtered.filter(r => r.status === 'PENDING_ADMIN' || r.status === 'PENDING_MANAGER');
+            if (currentUser.role === 'MANAGER' || currentUser.role === 'ADMIN') {
+                filtered = filtered.filter(r => r.currentApproverId === currentUser.userId);
+            }
             else if (currentUser.role === 'WAREHOUSE') filtered = filtered.filter(r => r.status === 'READY_TO_ISSUE');
-            else filtered = filtered.filter(r => r.status === 'WAITING_HANDOVER'); // For Employee
+            else filtered = filtered.filter(r => r.status === 'WAITING_HANDOVER'); // For Employee (Self-receipt)
         }
         else if (statusFilter === 'COMPLETED') filtered = filtered.filter(r => r.status === 'COMPLETED');
         else filtered = filtered.filter(r => r.status === statusFilter);

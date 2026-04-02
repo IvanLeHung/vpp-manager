@@ -85,12 +85,10 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
     );
   }
 
-  const isManagerApprover = currentUser.role === 'MANAGER' && data.status === 'PENDING_MANAGER' && data.currentApproverId === currentUser.userId;
-  const isAdminApprover = currentUser.role === 'ADMIN' && (data.status === 'PENDING_ADMIN' || data.status === 'PENDING_MANAGER');
-  const isApprover = isManagerApprover || isAdminApprover;
+  const isApprover = data.currentApproverId === currentUser.userId;
+  const isManagerInChain = currentUser.role === 'MANAGER' && data.approvalSteps?.some((s: any) => s.approverId === currentUser.userId);
+  const isFutureApprover = isManagerInChain && data.status === 'PENDING_MANAGER' && data.currentApproverId !== currentUser.userId;
 
-  const isUserInChain = data.approvalSteps?.some((s: any) => s.approverId === currentUser.userId);
-  const isFutureApprover = isUserInChain && data.status === 'PENDING_MANAGER' && data.currentApproverId !== currentUser.userId;
 
   const isWarehouse = (currentUser.role === 'WAREHOUSE' || currentUser.role === 'ADMIN') && ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED'].includes(data.status);
   const isOwnerDraft = currentUser.userId === data.requesterId && (data.status === 'DRAFT' || data.status === 'RETURNED');
@@ -140,6 +138,25 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                           <div className="md:col-span-2 bg-rose-50 border border-rose-200 rounded-xl p-4 mt-2">
                               <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-1">Lý do {data.status}</p>
                               <p className="font-bold text-rose-700">{data.rejectReason || data.returnReason || data.cancelReason}</p>
+                          </div>
+                      )}
+                      {/* Hierarchical Warning Alert */}
+                      {!isApprover && currentUser.role === 'MANAGER' && data.requester?.managerId === currentUser.userId && data.status === 'PENDING_ADMIN' && (
+                          <div className="md:col-span-2 bg-indigo-50 border border-indigo-200 rounded-xl p-4 mt-2 flex items-center gap-3">
+                              <CheckCircle className="w-5 h-5 text-indigo-500" />
+                              <div>
+                                  <p className="text-xs font-black text-indigo-700 uppercase tracking-widest">Bạn đã duyệt phiếu này</p>
+                                  <p className="text-[10px] text-indigo-600 font-medium italic">Đang chờ bộ phận Hành chính (Admin) phê duyệt cấp cuối.</p>
+                              </div>
+                          </div>
+                      )}
+                      {!isApprover && currentUser.role === 'MANAGER' && data.currentApproverId !== currentUser.userId && data.status === 'PENDING_MANAGER' && (
+                          <div className="md:col-span-2 bg-amber-50 border border-amber-200 rounded-xl p-4 mt-2 flex items-center gap-3">
+                              <AlertTriangle className="w-5 h-5 text-amber-500" />
+                              <div>
+                                  <p className="text-xs font-black text-amber-700 uppercase tracking-widest">Phiếu chưa đến lượt bạn duyệt hoặc không thuộc quyền xử lý</p>
+                                  <p className="text-[10px] text-amber-600 font-medium italic">Chỉ quản lý được chỉ định trong luồng mới có thể thực hiện thao tác duyệt lúc này.</p>
+                              </div>
                           </div>
                       )}
                   </div>
