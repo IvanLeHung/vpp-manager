@@ -85,17 +85,21 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
     );
   }
 
-  const isApprover = (data.status === 'PENDING_MANAGER' && data.currentApproverId === (currentUser.id || currentUser.userId)) || 
+  const userId = currentUser.id || currentUser.userId;
+  const isApprover = (data.status === 'PENDING_MANAGER' && data.currentApproverId === userId) || 
                      (data.status === 'PENDING_ADMIN' && currentUser.role === 'ADMIN');
-  const isManagerInChain = currentUser.role === 'MANAGER' && data.approvalSteps?.some((s: any) => s.approverId === (currentUser.id || currentUser.userId));
-  const isFutureApprover = isManagerInChain && data.status === 'PENDING_MANAGER' && data.currentApproverId !== (currentUser.id || currentUser.userId);
+  const isManagerInChain = currentUser.role === 'MANAGER' && data.approvalSteps?.some((s: any) => s.approverId === userId);
+  const isFutureApprover = isManagerInChain && data.status === 'PENDING_MANAGER' && data.currentApproverId !== userId;
 
 
   const isWarehouse = (currentUser.role === 'WAREHOUSE' || currentUser.role === 'ADMIN') && ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED'].includes(data.status);
   const isOwnerDraft = (currentUser.id || currentUser.userId) === data.requesterId && (data.status === 'DRAFT' || data.status === 'RETURNED');
   const isOwnerPending = (currentUser.id || currentUser.userId) === data.requesterId && (data.status === 'PENDING_MANAGER' || data.status === 'PENDING_ADMIN');
   const canCancel = ['DRAFT', 'PENDING_MANAGER', 'PENDING_ADMIN', 'RETURNED', 'APPROVED', 'READY_TO_ISSUE'].includes(data.status) && (currentUser.role !== 'EMPLOYEE' || (currentUser.id || currentUser.userId) === data.requesterId);
-  const isHandover = ((currentUser.id || currentUser.userId) === data.requesterId || currentUser.role === 'ADMIN') && data.status === 'WAITING_HANDOVER';
+  const isHandover = (userId === data.requesterId || currentUser.role === 'ADMIN') && data.status === 'WAITING_HANDOVER';
+  const canCreatePO = currentUser.role === 'ADMIN' && 
+                      ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED'].includes(data.status) &&
+                      data.lines.some((l:any) => l.qtyRequested > (l.qtyApproved ?? 0));
 
   return (
     <div className="flex flex-col h-full bg-slate-100 overflow-hidden relative print:bg-white print:overflow-auto">
@@ -245,11 +249,11 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
               </div>
 
               {/* Card 2: Thao Tác (Action) */}
-              {(isApprover || isOwnerDraft || isWarehouse || isOwnerPending || canCancel || isHandover || isFutureApprover || (currentUser.role==='ADMIN' && ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED'].includes(data.status) && data.lines.some((l:any) => l.qtyRequested > (l.qtyApproved ?? 0)))) && (
+              {(isApprover || isOwnerDraft || isWarehouse || isOwnerPending || canCancel || isHandover || isFutureApprover || canCreatePO) && (
                <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgb(0,0,0,0.05)] border border-slate-200 p-6 relative overflow-hidden">
-                   {(isApprover || isWarehouse) && <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>}
-                   <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Thao tác xử lý</h3>
-                   <div className="flex flex-col gap-3 relative z-10">
+                    {(isApprover || isWarehouse) && <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 z-20"></div>}
+                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 relative z-10">Thao tác xử lý</h3>
+                    <div className="flex flex-col gap-4 relative z-10">
                        
                        {/* --- INFO CHO NGƯỜI DUYỆT TƯƠNG LAI --- */}
                        {isFutureApprover && (
@@ -271,8 +275,8 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
 
                        {/* --- THAO TÁC CỦA QUẢN LÝ / ADMIN DUYỆT --- */}
                        {isApprover && (
-                           <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 flex flex-col gap-3">
-                              <p className="text-[11px] font-black text-indigo-800 text-center uppercase tracking-wider mb-1">Bạn đang là người duyệt hiện tại</p>
+                           <div className="p-5 bg-indigo-50 rounded-2xl border-2 border-indigo-100 flex flex-col gap-4 shadow-inner">
+                              <p className="text-[11px] font-black text-indigo-800 text-center uppercase tracking-[0.2em] mb-2">Bạn là người duyệt hiện tại</p>
                               <button onClick={() => setShowApproveModal(true)} className="w-full py-3.5 bg-indigo-600 text-white rounded-xl font-black hover:bg-indigo-700 transition shadow-lg shadow-indigo-500/30 flex items-center justify-center transform hover:scale-[1.02] border border-indigo-500">
                                   <CheckSquare className="w-5 h-5 mr-2"/> PHÊ DUYỆT NGAY
                               </button>
@@ -332,7 +336,7 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
               {data.approvalSteps && data.approvalSteps.length > 0 && (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col relative overflow-hidden">
                   <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-5">Tuyến Phê Duyệt</h3>
-                  <div className="space-y-4 relative before:absolute before:inset-0 before:left-4 before:h-full before:w-[2px] before:bg-slate-100">
+                  <div className="space-y-4 relative before:absolute before:left-4 before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-100">
                     {data.approvalSteps.map((step: any) => {
                        const isCurrent = step.status === 'PENDING' && step.stepNo === data.currentApprovalStep && data.status === 'PENDING_MANAGER';
                        const isDone = step.status === 'APPROVED';
