@@ -55,12 +55,18 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
       case 'PARTIALLY_ISSUED': return 'Cấp phát một phần';
       case 'PARTIALLY_APPROVED': return 'Duyệt một phần';
       case 'RETURNED': return 'Trả lại';
-      case 'WAITING_HANDOVER': return 'Chờ bàn giao';
+      case 'READY_TO_PICK': return 'Sẵn sàng soạn hàng';
+      case 'PICKING': return 'Đang soạn hàng (Kho)';
+      case 'READY_TO_HANDOVER': return 'Sẵn sàng bàn giao';
+      case 'WAITING_HANDOVER': return 'Chờ xác nhận nhận hàng';
       case 'READY_TO_ISSUE': return 'Sẵn sàng cấp phát';
       case 'PENDING_MANAGER': return 'Chờ Quản lý duyệt';
       case 'PENDING_ADMIN': return 'Chờ Hành chính duyệt';
       case 'COMPLETED': return 'Hoàn tất';
       case 'CANCELLED': return 'Đã hủy';
+      case 'PARTIALLY_FULFILLED': return 'Cấp phát một phần';
+      case 'OUT_OF_STOCK': return 'Hết hàng (Chờ mua)';
+      case 'NEEDS_PROCUREMENT': return 'Chờ thu mua';
       default: return status.replace(/_/g, ' ');
     }
   };
@@ -73,7 +79,11 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
       case 'PARTIALLY_ISSUED': case 'PARTIALLY_APPROVED': return 'bg-teal-500 text-white shadow-teal-500/30';
       case 'RETURNED': return 'bg-orange-500 text-white shadow-orange-500/30';
       case 'WAITING_HANDOVER': return 'bg-blue-500 text-white shadow-blue-500/30';
+      case 'READY_TO_HANDOVER': return 'bg-indigo-600 text-white shadow-indigo-600/30 ring-4 ring-indigo-100';
+      case 'READY_TO_PICK': return 'bg-cyan-500 text-white shadow-cyan-500/30';
+      case 'PICKING': return 'bg-blue-600 text-white shadow-blue-600/30 animate-pulse';
       case 'PENDING_MANAGER': case 'PENDING_ADMIN': return 'bg-amber-500 text-white shadow-amber-500/30';
+      case 'OUT_OF_STOCK': case 'NEEDS_PROCUREMENT': return 'bg-rose-600 text-white shadow-rose-600/30';
       default: return 'bg-slate-500 text-white cursor-help';
     }
   };
@@ -99,16 +109,16 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
     );
   }
 
-  const userId = currentUser.id || currentUser.userId;
+  const userId = currentUser.userId || currentUser.id;
   const isApprover = (data.status === 'PENDING_MANAGER' && data.currentApproverId === userId) || 
                      (data.status === 'PENDING_ADMIN' && currentUser.role === 'ADMIN');
   const isManagerInChain = currentUser.role === 'MANAGER' && data.approvalSteps?.some((s: any) => s.approverId === userId);
   const isFutureApprover = isManagerInChain && data.status === 'PENDING_MANAGER' && data.currentApproverId !== userId;
 
 
-  const isWarehouse = (currentUser.role === 'WAREHOUSE' || currentUser.role === 'ADMIN') && ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED'].includes(data.status);
-  const isOwnerDraft = (currentUser.id || currentUser.userId) === data.requesterId && (data.status === 'DRAFT' || data.status === 'RETURNED');
-  const isOwnerPending = (currentUser.id || currentUser.userId) === data.requesterId && (data.status === 'PENDING_MANAGER' || data.status === 'PENDING_ADMIN');
+  const isWarehouse = (currentUser.role === 'WAREHOUSE' || currentUser.role === 'ADMIN') && ['APPROVED', 'READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED'].includes(data.status);
+  const isOwnerDraft = userId === data.requesterId && (data.status === 'DRAFT' || data.status === 'RETURNED');
+  const isOwnerPending = userId === data.requesterId && (data.status === 'PENDING_MANAGER' || data.status === 'PENDING_ADMIN');
   const isHandover = (userId === data.requesterId || currentUser.role === 'ADMIN') && data.status === 'WAITING_HANDOVER';
 
   return (
@@ -327,9 +337,45 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                                 <RefreshCw className="w-5 h-5 mr-2"/> TIẾP TỤC CHỈNH SỬA
                             </button>
                         ) : isWarehouse ? (
-                             <button onClick={() => setShowIssueModal(true)} className="w-full py-4 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 transition shadow-xl shadow-blue-500/30 flex items-center justify-center border-b-4 border-blue-800">
-                                 <Archive className="w-5 h-5 mr-2"/> XUẤT KHO THỰC TẾ
-                             </button>
+                            <div className="flex flex-col gap-3">
+                                {data.status === 'APPROVED' && (
+                                    <button onClick={() => handleAction('/warehouse/accept', {}, 'Kho đã tiếp nhận phiếu')} className="w-full py-4 bg-teal-600 text-white rounded-xl font-black hover:bg-teal-700 transition shadow-xl shadow-teal-500/30 flex items-center justify-center border-b-4 border-teal-800">
+                                        <CheckCircle className="w-5 h-5 mr-2"/> TIẾP NHẬN PHIẾU
+                                    </button>
+                                )}
+                                {data.status === 'READY_TO_PICK' && (
+                                    <button onClick={() => handleAction('/warehouse/start_picking', {}, 'Bắt đầu soạn hàng')} className="w-full py-4 bg-cyan-600 text-white rounded-xl font-black hover:bg-cyan-700 transition shadow-xl shadow-cyan-500/30 flex items-center justify-center border-b-4 border-cyan-800 text-sm">
+                                        <Zap className="w-5 h-5 mr-2"/> BẮT ĐẦU SOẠN HÀNG
+                                    </button>
+                                )}
+                                {data.status === 'PICKING' && (
+                                     <button onClick={() => setShowIssueModal(true)} className="w-full py-4 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 transition shadow-xl shadow-blue-500/30 flex items-center justify-center border-b-4 border-blue-800">
+                                         <Archive className="w-5 h-5 mr-2"/> XUẤT KHO & HOÀN TẤT
+                                     </button>
+                                )}
+                                {data.status === 'READY_TO_HANDOVER' && (
+                                    <button onClick={() => handleAction('/warehouse/handover', {}, 'Đã xác nhận bàn giao cho người nhận')} className="w-full py-4 bg-indigo-600 text-white rounded-xl font-black hover:bg-indigo-700 transition shadow-xl shadow-indigo-500/30 flex items-center justify-center border-b-4 border-indigo-800">
+                                        <Clock className="w-5 h-5 mr-2"/> XÁC NHẬN BÀN GIAO
+                                    </button>
+                                )}
+                                {(data.status === 'READY_TO_ISSUE' || data.status === 'PARTIALLY_ISSUED') && (
+                                     <button onClick={() => setShowIssueModal(true)} className="w-full py-4 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 transition shadow-xl shadow-blue-500/30 flex items-center justify-center border-b-4 border-blue-800">
+                                         <Archive className="w-5 h-5 mr-2"/> XUẤT KHO THỰC TẾ
+                                     </button>
+                                )}
+                                {['OUT_OF_STOCK', 'NEEDS_PROCUREMENT', 'PARTIALLY_FULFILLED'].includes(data.status) && (
+                                    <button onClick={() => handleAction('/warehouse/send-to-procurement', {note: 'Thiếu hàng thực tế, chuyển thu mua'}, 'Đã chuyển yêu cầu mua sắm bổ sung')} className="w-full py-4 bg-orange-600 text-white rounded-xl font-black hover:bg-orange-700 transition shadow-xl shadow-orange-500/30 flex items-center justify-center border-b-4 border-orange-800 text-sm">
+                                        <ArrowLeft className="w-5 h-5 mr-2 -rotate-90"/> CHUYỂN MUA SẮM (THIẾU HÀNG)
+                                    </button>
+                                )}
+                                {/* Fallback for other warehouse states */}
+                                {['APPROVED', 'READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED'].indexOf(data.status) === -1 && (
+                                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase">Hiện đang ở bước:</p>
+                                        <p className="text-xs font-bold text-slate-600 mt-1">{getStatusLabel(data.status)}</p>
+                                    </div>
+                                )}
+                            </div>
                         ) : isOwnerPending ? (
                             <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl flex flex-col gap-3">
                                 <p className="text-xs font-bold text-indigo-700 text-center">Phiếu đã gửi, đang chờ phê duyệt</p>
@@ -343,8 +389,11 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                             <div className="p-6 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center text-center gap-3">
                                 <Archive className="w-10 h-10 text-slate-300"/>
                                 <div>
-                                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Phiếu đang được xử lý</p>
-                                    <p className="text-[10px] text-slate-400 font-medium mt-1">Vui lòng quay lại sau khi có cập nhật mới.</p>
+                                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Hiện tại: {getStatusLabel(data.status)}</p>
+                                    <p className="text-[10px] text-slate-400 font-medium mt-1">
+                                        {data.status.startsWith('PENDING') ? 'Đang chờ cấp có thẩm quyền phê duyệt.' : 'Phiếu đang trong quy trình xử lý tự động.'}
+                                        <br/>Vui lòng quay lại sau.
+                                    </p>
                                 </div>
                             </div>
                         )}
@@ -400,23 +449,50 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                       </div>
                     )})}
                     
-                    {/* Final Step Agent */}
+                    {/* Final Step Agent: Admin */}
                     <div className="relative flex gap-4 items-start">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 shrink-0 z-20 transition-all ${
                           data.status === 'PENDING_ADMIN' ? 'bg-amber-500 border-amber-500 text-white ring-4 ring-amber-50 shadow-xl' :
-                          ['APPROVED','READY_TO_ISSUE','PARTIALLY_ISSUED','WAITING_HANDOVER','COMPLETED'].includes(data.status) ? 'bg-emerald-500 border-emerald-500 text-white ring-4 ring-emerald-50' :
+                          ['APPROVED','READY_TO_PICK','PICKING','READY_TO_HANDOVER','WAITING_HANDOVER','COMPLETED','PARTIALLY_ISSUED'].includes(data.status) ? 'bg-emerald-500 border-emerald-500 text-white ring-4 ring-emerald-50' :
                           'bg-white border-slate-200 text-slate-400'
                         }`}>
-                           {['APPROVED', 'READY_TO_ISSUE', 'WAITING_HANDOVER', 'COMPLETED', 'PARTIALLY_ISSUED'].includes(data.status) ? <CheckCircle className="w-4 h-4"/> : <ShieldCheck className="w-4 h-4"/>}
+                           {['APPROVED', 'READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER', 'COMPLETED', 'PARTIALLY_ISSUED'].includes(data.status) ? <CheckCircle className="w-4 h-4"/> : <ShieldCheck className="w-4 h-4"/>}
                         </div>
                         <div className="flex-1 min-w-0 pt-1">
                            <div className="flex items-center justify-between mb-0.5">
-                               <p className={`text-sm font-black truncate ${data.status === 'PENDING_ADMIN' ? 'text-amber-900' : ['APPROVED','READY_TO_ISSUE','WAITING_HANDOVER','COMPLETED'].includes(data.status) ? 'text-slate-800' : 'text-slate-500'}`}>Bộ phận Hành chính</p>
-                               {data.status === 'PENDING_ADMIN' && <span className="text-[9px] bg-amber-600 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-tighter animate-pulse border border-amber-700">Duyệt cuối</span>}
+                               <p className={`text-sm font-black truncate ${data.status === 'PENDING_ADMIN' ? 'text-amber-900 shadow-sm' : ['APPROVED','READY_TO_PICK','PICKING','READY_TO_HANDOVER','WAITING_HANDOVER','COMPLETED'].includes(data.status) ? 'text-slate-800' : 'text-slate-500'}`}>Hành chính & Duyệt cuối</p>
+                               {data.status === 'PENDING_ADMIN' && <span className="text-[9px] bg-amber-600 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-tighter animate-pulse border border-amber-700">Đang chờ</span>}
                            </div>
-                           <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest opacity-80">Xác nhận cấp phát & điều phối kho</p>
+                           <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest opacity-80">Kiểm duyệt định mức & Điều phối</p>
                         </div>
                     </div>
+
+                    {/* Warehouse fulfillment phase (Appears after Admin Approval) */}
+                    {['APPROVED', 'READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER', 'COMPLETED', 'PARTIALLY_ISSUED'].includes(data.status) && (
+                        <div className="relative flex gap-4 items-start">
+                            <div className="absolute -left-[17px] -top-8 w-[2px] h-8 bg-emerald-500"></div>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 shrink-0 z-20 transition-all ${
+                              ['READY_TO_PICK','PICKING','READY_TO_HANDOVER','WAITING_HANDOVER'].includes(data.status) ? 'bg-blue-500 border-blue-500 text-white ring-4 ring-blue-50 shadow-xl' :
+                              data.status === 'COMPLETED' ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg' :
+                              'bg-white border-slate-200 text-slate-400'
+                            }`}>
+                               {data.status === 'COMPLETED' ? <CheckCircle className="w-4 h-4"/> : <Archive className="w-4 h-4"/>}
+                            </div>
+                            <div className="flex-1 min-w-0 pt-1">
+                               <div className="flex items-center justify-between mb-0.5">
+                                   <p className={`text-sm font-black truncate ${['READY_TO_PICK','PICKING','READY_TO_HANDOVER','WAITING_HANDOVER'].includes(data.status) ? 'text-blue-900' : data.status === 'COMPLETED' ? 'text-slate-800' : 'text-slate-500'}`}>Kho vận & Bàn giao</p>
+                                   {['READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER'].includes(data.status) && <span className="text-[9px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-tighter animate-pulse border border-blue-700">Đang xử lý</span>}
+                               </div>
+                               <p className="text-[10px] text-slate-500 font-bold">
+                                   {data.status === 'APPROVED' ? 'Chờ kho tiếp nhận...' :
+                                    data.status === 'READY_TO_PICK' ? 'Đã tiếp nhận, chờ soạn hàng' :
+                                    data.status === 'PICKING' ? 'Đang soạn hàng thực tế...' :
+                                    ['READY_TO_HANDOVER', 'WAITING_HANDOVER'].includes(data.status) ? 'Đã soạn xong, chờ bàn giao' :
+                                    'Đã hoàn tất bàn giao'}
+                               </p>
+                            </div>
+                        </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -444,7 +520,25 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                       {data.approvalHistories?.map((audit:any) => {
                           const actionColor = audit.action==='APPROVED'?'text-emerald-700':audit.action.includes('ISSUED')?'text-blue-700':audit.action==='COMPLETED'?'text-indigo-700':audit.action==='REJECTED'||audit.action==='CANCELLED'?'text-rose-700':'text-amber-700';
                           const dotColor = audit.action==='APPROVED'?'bg-emerald-500':audit.action.includes('ISSUED')?'bg-blue-500':audit.action==='COMPLETED'?'bg-indigo-500':audit.action==='REJECTED'||audit.action==='CANCELLED'?'bg-rose-500':'bg-amber-500';
-                          const actLabel = audit.action === 'APPROVED' ? 'Phê Duyệt' : audit.action.includes('ISSUED') ? 'Xuất kho' : audit.action === 'COMPLETED' ? 'Hoàn Tất' : audit.action === 'REJECTED' ? 'Từ chối' : audit.action === 'RETURNED' ? 'Trả lại' : audit.action;
+                          const actionLabelMap: any = {
+                             'SUBMITTED': 'Gửi Đề Xuất',
+                             'APPROVED': 'Phê Duyệt',
+                             'REJECTED': 'Từ Chối',
+                             'RETURNED': 'Trả Lại / Yêu Cầu Sửa',
+                             'CANCELLED': 'Hủy Phiếu',
+                             'ISSUED': 'Xuất Kho',
+                             'PARTIALLY_ISSUED': 'Xuất Kho Một Phần',
+                             'READY_TO_HANDOVER': 'Sẵn Sàng Bàn Giao',
+                             'COMPLETED': 'Hoàn Tất',
+                             'WITHDRAWN': 'Thu Hồi / Rút Phiếu',
+                             'MODIFIED': 'Chỉnh Sửa',
+                             'CONFIRMED': 'Xác Nhận Nhận Hàng',
+                             'WAREHOUSE_ACCEPT': 'Kho Tiếp Nhận Phiếu',
+                             'PICKING_STARTED': 'Bắt Đầu Soạn Hàng',
+                             'PICKING_COMPLETED': 'Đã Soạn Hàng Xong',
+                             'HANDOVER_CONFIRMED': 'Kho Đã Bàn Giao'
+                          };
+                          const actLabel = actionLabelMap[audit.action] || audit.action;
                           
                           return (
                           <div key={audit.id} className="relative group">
@@ -459,7 +553,11 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                                     <span className="text-[10px] font-bold text-slate-400">{new Date(audit.createdAt).toLocaleString('vi-VN', {hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit'})}</span>
                                  </div>
                                  {audit.reason && (
-                                     <div className={`p-4 rounded-2xl border-l-4 italic shadow-sm bg-slate-50 border-white/50 border-l-${audit.action==='APPROVED'?'emerald':audit.action==='REJECTED'?'rose':'amber'}-500`}>
+                                     <div className={`p-4 rounded-2xl border-l-4 italic shadow-sm bg-slate-50 border-white/50 ${
+                                         audit.action === 'APPROVED' ? 'border-l-emerald-500' : 
+                                         audit.action === 'REJECTED' || audit.action === 'CANCELLED' ? 'border-l-rose-500' : 
+                                         'border-l-amber-500'
+                                     }`}>
                                          <p className="text-xs leading-relaxed font-medium text-slate-600 opacity-90">“{audit.reason}”</p>
                                      </div>
                                  )}
@@ -616,7 +714,8 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                           const hasErr = data.lines.some((l:any) => (issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? (l.qtyApproved ?? l.qtyRequested)) > (l.item.stocks?.[0]?.quantityOnHand || 0));
                           if (hasErr) return showToast('Không thể xuất dòng có số lượng Giao vượt số Tồn kho. Vui lòng nhận đúng hoặc ít hơn tồn kho hiện hữu.', 'error');
                           
-                          handleAction('/issue', { lineIssues: issues }, 'ĐÃ XUẤT KHO THÀNH CÔNG VÀ TRỪ TỒN!');
+                          const endpoint = data.status === 'PICKING' ? '/warehouse/complete_picking' : '/issue';
+                          handleAction(endpoint, { lineIssues: issues }, 'ĐÃ XUẤT KHO THÀNH CÔNG VÀ TRỪ TỒN!');
                           setShowIssueModal(false);
                       }} className="px-8 py-2.5 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-500/30 flex items-center"><Archive className="w-5 h-5 mr-2"/> XUẤT KHO & CHUẨN BỊ BÀN GIAO</button>
                   </div>
