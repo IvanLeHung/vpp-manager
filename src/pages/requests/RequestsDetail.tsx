@@ -85,50 +85,16 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
     );
   }
 
-  // Strict approver check based on currentApproverId (step-based)
-  const isManagerApprover = currentUser.role === 'MANAGER' &&
-    data.status === 'PENDING_MANAGER' &&
-    data.currentApproverId === currentUser.userId;
-  const isAdminApprover = currentUser.role === 'ADMIN' && data.status === 'PENDING_ADMIN';
-  const isApprover = isManagerApprover || isAdminApprover;
+  const isApprover = data.currentApproverId === currentUser.userId;
+  const isManagerInChain = currentUser.role === 'MANAGER' && data.approvalSteps?.some((s: any) => s.approverId === currentUser.userId);
+  const isFutureApprover = isManagerInChain && data.status === 'PENDING_MANAGER' && data.currentApproverId !== currentUser.userId;
 
-  // Helper to get step status label
-  const getStepStatusInfo = (step: any) => {
-    if (step.status === 'APPROVED') return { label: 'Đã duyệt', color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', dot: 'bg-emerald-500' };
-    if (step.status === 'REJECTED') return { label: 'Đã từ chối', color: 'text-rose-600', bg: 'bg-rose-50 border-rose-200', dot: 'bg-rose-500' };
-    if (step.status === 'RETURNED') return { label: 'Đã trả lại', color: 'text-orange-600', bg: 'bg-orange-50 border-orange-200', dot: 'bg-orange-500' };
-    if (step.stepNo === data.currentApprovalStep && step.status === 'PENDING') return { label: 'Đang chờ', color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200', dot: 'bg-amber-500' };
-    return { label: 'Chưa tới lượt', color: 'text-slate-400', bg: 'bg-slate-50 border-slate-200', dot: 'bg-slate-300' };
-  };
 
-  const getStepTypeLabel = (stepType: string) => {
-    const map: Record<string, string> = { MANAGER_L1: 'Quản lý cấp 1', MANAGER_L2: 'Quản lý cấp 2', ADMIN: 'Hành chính', WAREHOUSE: 'Thủ kho' };
-    return map[stepType] ?? stepType;
-  };
-
-  // Warehouse roles — only participate after APPROVED
-  const isWarehouseRole = currentUser.role === 'WAREHOUSE' || currentUser.role === 'ADMIN';
-  const WAREHOUSE_ACTIVE_STATUSES = ['APPROVED', 'READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER',
-    'PARTIALLY_FULFILLED', 'OUT_OF_STOCK', 'NEEDS_PROCUREMENT'];
-  const isPendingBusinessApproval = ['PENDING_MANAGER', 'PENDING_ADMIN'].includes(data.status);
-
-  // WAREHOUSE core action conditions
-  const canAccept = isWarehouseRole && data.status === 'APPROVED';
-  const canStartPicking = isWarehouseRole && data.status === 'READY_TO_PICK';
-  const canCompletePicking = isWarehouseRole && data.status === 'PICKING';
-  const canHandover = isWarehouseRole && data.status === 'READY_TO_HANDOVER';
-  const canHandleException = isWarehouseRole && ['READY_TO_PICK', 'PICKING', 'APPROVED'].includes(data.status);
-  const canSendToProcurement = isWarehouseRole && ['OUT_OF_STOCK', 'NEEDS_PROCUREMENT', 'PARTIALLY_FULFILLED'].includes(data.status);
-
-  const isWarehouse = isWarehouseRole && WAREHOUSE_ACTIVE_STATUSES.includes(data.status);
-
-  // Old issue-style for backward compat (now disabled, kept for display only)
-  const isOldIssuable = isWarehouseRole && ['READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED'].includes(data.status);
-
+  const isWarehouse = (currentUser.role === 'WAREHOUSE' || currentUser.role === 'ADMIN') && ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED'].includes(data.status);
   const isOwnerDraft = currentUser.userId === data.requesterId && (data.status === 'DRAFT' || data.status === 'RETURNED');
   const isOwnerPending = currentUser.userId === data.requesterId && (data.status === 'PENDING_MANAGER' || data.status === 'PENDING_ADMIN');
   const canCancel = ['DRAFT', 'PENDING_MANAGER', 'PENDING_ADMIN', 'RETURNED', 'APPROVED', 'READY_TO_ISSUE'].includes(data.status) && (currentUser.role !== 'EMPLOYEE' || currentUser.userId === data.requesterId);
-  const isHandover = (currentUser.userId === data.requesterId || currentUser.role === 'ADMIN') && (data.status === 'WAITING_HANDOVER' || data.status === 'READY_TO_HANDOVER');
+  const isHandover = (currentUser.userId === data.requesterId || currentUser.role === 'ADMIN') && data.status === 'WAITING_HANDOVER';
 
   return (
     <div className="flex flex-col h-full bg-slate-100 overflow-hidden relative print:bg-white print:overflow-auto">
@@ -162,14 +128,7 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                       <div>
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Người Đề Xuất</p>
                           <p className="text-lg font-bold text-slate-800">{data.requester?.fullName}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <p className="text-sm font-semibold text-indigo-600">{data.department}</p>
-                            {data.status === 'PENDING_MANAGER' && (
-                                <p className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                                    Đang chờ: {data.currentApprover?.fullName || 'Manager'}
-                                </p>
-                            )}
-                          </div>
+                          <p className="text-sm font-semibold text-indigo-600 mt-1">{data.department}</p>
                       </div>
                       <div>
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Lý do & Mục đích</p>
@@ -179,6 +138,25 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                           <div className="md:col-span-2 bg-rose-50 border border-rose-200 rounded-xl p-4 mt-2">
                               <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-1">Lý do {data.status}</p>
                               <p className="font-bold text-rose-700">{data.rejectReason || data.returnReason || data.cancelReason}</p>
+                          </div>
+                      )}
+                      {/* Hierarchical Warning Alert */}
+                      {!isApprover && currentUser.role === 'MANAGER' && data.requester?.managerId === currentUser.userId && data.status === 'PENDING_ADMIN' && (
+                          <div className="md:col-span-2 bg-indigo-50 border border-indigo-200 rounded-xl p-4 mt-2 flex items-center gap-3">
+                              <CheckCircle className="w-5 h-5 text-indigo-500" />
+                              <div>
+                                  <p className="text-xs font-black text-indigo-700 uppercase tracking-widest">Bạn đã duyệt phiếu này</p>
+                                  <p className="text-[10px] text-indigo-600 font-medium italic">Đang chờ bộ phận Hành chính (Admin) phê duyệt cấp cuối.</p>
+                              </div>
+                          </div>
+                      )}
+                      {!isApprover && currentUser.role === 'MANAGER' && data.currentApproverId !== currentUser.userId && data.status === 'PENDING_MANAGER' && (
+                          <div className="md:col-span-2 bg-amber-50 border border-amber-200 rounded-xl p-4 mt-2 flex items-center gap-3">
+                              <AlertTriangle className="w-5 h-5 text-amber-500" />
+                              <div>
+                                  <p className="text-xs font-black text-amber-700 uppercase tracking-widest">Phiếu chưa đến lượt bạn duyệt hoặc không thuộc quyền xử lý</p>
+                                  <p className="text-[10px] text-amber-600 font-medium italic">Chỉ quản lý được chỉ định trong luồng mới có thể thực hiện thao tác duyệt lúc này.</p>
+                              </div>
                           </div>
                       )}
                   </div>
@@ -243,8 +221,8 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                   <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500 rounded-full blur-[80px] opacity-20 transform translate-x-1/2 -translate-y-1/2"></div>
                   <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-2 animate-pulse"></div>Thao tác Role: {currentUser.role}</h3>
                   <div className="flex flex-col gap-3 relative z-10">
-
-                      {/* ── EMPLOYEE: chỉnh sửa / rút hồ sơ ── */}
+                      
+                      {/* --- THAO TÁC CỦA NGƯỜI LẬP --- */}
                       {isOwnerDraft && (
                           <button onClick={() => setViewMode('CREATE')} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-500/30">Tiếp Tục Chỉnh Sửa</button>
                       )}
@@ -252,9 +230,8 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                            <button onClick={() => handleAction('/withdraw', {reason:'Xin rút lại để sửa'}, 'Đã rút phiếu thành công')} className="w-full py-3 bg-slate-700 text-white rounded-xl font-bold hover:bg-slate-600 transition border border-slate-600">Thu hồi sửa đổi</button>
                       )}
 
-                      {/* ── MANAGER / ADMIN: business approval ── */}
-                      {/* WAREHOUSE không bao giờ thấy khối này */}
-                      {currentUser.role !== 'WAREHOUSE' && isApprover && (
+                      {/* --- THAO TÁC CỦA QUẢN LÝ --- */}
+                      {isApprover && (
                           <>
                              <button onClick={() => setShowApproveModal(true)} className="w-full py-3.5 bg-emerald-500 text-white rounded-xl font-black hover:bg-emerald-600 transition shadow-lg shadow-emerald-500/30 flex items-center justify-center transform hover:scale-[1.02]"><CheckSquare className="w-5 h-5 mr-2"/> {(currentUser.role === 'MANAGER' && data.status === 'PENDING_MANAGER') ? 'DUYỆT CẤP 1 (TRƯỞNG BP)' : 'PHÊ DUYỆT CẤP 2 (Admin)' }</button>
                              <div className="flex gap-3">
@@ -264,106 +241,13 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                           </>
                       )}
 
-                      {/* ── WAREHOUSE: phiếu đang chờ duyệt business → chỉ thông báo ── */}
-                      {currentUser.role === 'WAREHOUSE' && isPendingBusinessApproval && (
-                        <div className="rounded-xl bg-amber-900/30 border border-amber-600/40 p-4 text-center">
-                          <StopCircle className="w-6 h-6 text-amber-400 mx-auto mb-2" />
-                          <p className="text-xs font-bold text-amber-300 leading-relaxed">Phiếu chưa đến bước xử lý kho</p>
-                          <p className="text-[10px] text-slate-400 mt-1">Đang chờ duyệt {data.status === 'PENDING_MANAGER' ? 'Trưởng bộ phận' : 'Hành chính'}</p>
-                        </div>
+                      {/* --- THAO TÁC CỦA KHO --- */}
+                      {isWarehouse && (
+                           <button onClick={() => setShowIssueModal(true)} className="w-full py-4 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 transition shadow-lg shadow-blue-500/40 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-blue-500"><Archive className="w-6 h-6 mr-2"/> XUẤT KHO THỰC TẾ</button>
                       )}
 
-                      {/* ─── WAREHOUSE ACTIONS BY STATUS ──────────────────── */}
-
-                      {/* APPROVED → Tiếp nhận */}
-                      {canAccept && (
-                        <>
-                          <button onClick={() => handleAction('/warehouse/accept', {}, 'Đã tiếp nhận phiếu!')} className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 transition shadow-lg shadow-blue-500/40 flex items-center justify-center transform hover:scale-[1.02] border border-blue-500">
-                            <Archive className="w-5 h-5 mr-2"/> TIẾP NHẬN PHIẾU
-                          </button>
-                          <button onClick={() => handleAction('/warehouse/reserve', {}, 'Đã giữ hàng!')} className="w-full py-2.5 bg-sky-700 text-white rounded-xl font-bold hover:bg-sky-600 transition flex items-center justify-center border border-sky-600">
-                            🔒 Kiểm tra & Giữ hàng
-                          </button>
-                        </>
-                      )}
-
-                      {/* READY_TO_PICK → Bắt đầu lấy / Exception */}
-                      {canStartPicking && !canAccept && (
-                        <>
-                          <button onClick={() => handleAction('/warehouse/start_picking', {}, 'Đã bắt đầu lấy hàng!')} className="w-full py-3.5 bg-violet-600 text-white rounded-xl font-black hover:bg-violet-700 transition shadow-lg shadow-violet-500/40 flex items-center justify-center transform hover:scale-[1.02]">
-                            📦 BẮT ĐẦU LẤY HÀNG
-                          </button>
-                          {canHandleException && (
-                            <div className="flex gap-2">
-                              <button onClick={() => {
-                                const note = prompt('Ghi chú thiếu hàng:');
-                                if (note) handleAction('/warehouse/exception', { exceptionType: 'OUT_OF_STOCK', note }, 'Đã báo thiếu hàng');
-                              }} className="flex-1 py-2 bg-slate-800 text-rose-400 hover:bg-rose-700 hover:text-white border border-rose-500/40 rounded-xl font-bold text-sm transition">Báo Thiếu</button>
-                              <button onClick={() => {
-                                const note = prompt('Ghi chú cấp một phần:');
-                                if (note) handleAction('/warehouse/exception', { exceptionType: 'PARTIALLY_FULFILLED', note }, 'Đã ghi nhận cấp một phần');
-                              }} className="flex-1 py-2 bg-slate-800 text-teal-400 hover:bg-teal-700 hover:text-white border border-teal-500/40 rounded-xl font-bold text-sm transition">Cấp Một Phần</button>
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      {/* PICKING → Hoàn tất / Update qty / Thay thế */}
-                      {data.status === 'PICKING' && isWarehouseRole && (
-                        <>
-                          <button onClick={() => setShowIssueModal(true)} className="w-full py-4 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 transition shadow-lg shadow-blue-500/40 flex items-center justify-center transform hover:scale-[1.02] border border-blue-500">
-                            <Archive className="w-6 h-6 mr-2"/> HOÀN TẤT CHUẨN BỊ HÀNG
-                          </button>
-                          <p className="text-[10px] text-slate-400 text-center">Nhập số lượng thực cấp, xác nhận → chuyển READY_TO_HANDOVER</p>
-                        </>
-                      )}
-
-                      {/* READY_TO_HANDOVER → Xác nhận bàn giao */}
-                      {canHandover && (
-                        <button onClick={() => {
-                          if (window.confirm('Xác nhận đã bàn giao hàng cho người nhận?')) {
-                            handleAction('/warehouse/handover', {}, 'Đã bàn giao! Phiếu hoàn tất.');
-                          }
-                        }} className="w-full py-4 bg-emerald-500 text-white rounded-xl font-black hover:bg-emerald-600 transition shadow-lg shadow-emerald-500/40 flex items-center justify-center transform hover:scale-[1.02]">
-                          <CheckCircle className="w-6 h-6 mr-2"/> XÁC NHẬN BÀN GIAO
-                        </button>
-                      )}
-
-                      {/* Exception statuses → Chuyển mua / Báo admin */}
-                      {canSendToProcurement && (
-                        <>
-                          <button onClick={() => {
-                            if (window.confirm('Tạo Đơn mua sắm (PO) cho các mặt hàng còn thiếu?')) {
-                              handleAction('/warehouse/send-to-procurement', {}, 'Đã chuyển sang thu mua!');
-                            }
-                          }} className="w-full py-3.5 bg-amber-500 text-white rounded-xl font-black hover:bg-amber-600 transition shadow-lg shadow-amber-500/40 flex items-center justify-center">
-                            <ShoppingCart className="w-5 h-5 mr-2"/> CHUYỂN MUA HÀNG
-                          </button>
-                          {data.warehouseNote && (
-                            <div className="bg-slate-700/50 rounded-xl p-3 border border-slate-600">
-                              <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Ghi chú kho</p>
-                              <p className="text-xs text-slate-300">{data.warehouseNote}</p>
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      {/* Old-style issue for backward compat (READY_TO_ISSUE) */}
-                      {isOldIssuable && currentUser.role === 'ADMIN' && (
-                           <button onClick={() => setShowIssueModal(true)} className="w-full py-4 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 transition shadow-lg shadow-blue-500/40 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-blue-500"><Archive className="w-6 h-6 mr-2"/> XUẤT KHO (LEGACY)</button>
-                      )}
-
-                      {/* ── EMPLOYEE: xác nhận nhận hàng (WAITING_HANDOVER legacy) ── */}
-                      {isHandover && currentUser.role !== 'WAREHOUSE' && (
-                          <button onClick={() => {
-                              if(window.confirm('Xác nhận bạn đã nhận đủ vật tư từ kho theo đúng số lượng thực giao?')) {
-                                  handleAction('/confirm_receipt', {}, 'Bàn giao thành công. Phiếu đã được đóng!');
-                              }
-                          }} className="w-full py-4 bg-indigo-500 text-white rounded-xl font-black hover:bg-indigo-600 transition shadow-lg shadow-indigo-500/40 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-indigo-500"><CheckCircle className="w-6 h-6 mr-2"/> XÁC NHẬN ĐÃ NHẬN HÀNG</button>
-                      )}
-
-                      {/* ── ADMIN: Auto PO ── */}
-                      {currentUser.role === 'ADMIN' &&
+                      {/* --- TẠO MUA SẮM (AUTO PO) --- */}
+                      {currentUser.role === 'ADMIN' && 
                        ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED'].includes(data.status) &&
                        data.lines.some((l:any) => l.qtyRequested > (l.qtyApproved ?? 0)) &&
                        (!data.revisionReason?.includes('Đã tạo PO')) && (
@@ -374,72 +258,72 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                            }} className="w-full py-3.5 bg-amber-500 text-white rounded-xl font-black hover:bg-amber-600 transition shadow-lg shadow-amber-500/40 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-amber-500"><ShoppingCart className="w-5 h-5 mr-2"/> TẠO ĐƠN MUA SẮM (BACKORDER)</button>
                       )}
 
-                      <hr className="border-slate-700 my-2" />
+                      {/* --- XÁC NHẬN BÀN GIAO --- */}
+                      {isHandover && (
+                          <button onClick={() => {
+                              if(window.confirm('Xác nhận bạn đã nhận đủ vật tư từ kho theo đúng số lượng thực giao?')) {
+                                  handleAction('/confirm_receipt', {}, 'Bàn giao thành công. Phiếu đã được đóng!');
+                              }
+                          }} className="w-full py-4 bg-indigo-500 text-white rounded-xl font-black hover:bg-indigo-600 transition shadow-lg shadow-indigo-500/40 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-indigo-500"><CheckCircle className="w-6 h-6 mr-2"/> XÁC NHẬN ĐÃ NHẬN HÀNG</button>
+                      )}
 
+                      <hr className="border-slate-700 my-2" />
+                      
                       {canCancel && <button onClick={() => handleAction('/cancel', {reason: prompt('Nhập lý do hủy phiếu:')}, 'Đã Hủy phiếu')} className="w-full py-2.5 bg-transparent text-slate-400 hover:text-rose-500 flex items-center justify-center rounded-xl font-bold transition"><Trash2 className="w-4 h-4 mr-2"/> Hủy Bỏ Phiếu Này</button>}
-                      {(data.status === 'APPROVED' || data.status === 'READY_TO_ISSUE' || data.status === 'READY_TO_HANDOVER' || data.status === 'WAITING_HANDOVER' || data.status === 'COMPLETED') && (
+                      {(data.status === 'APPROVED' || data.status === 'READY_TO_ISSUE' || data.status === 'WAITING_HANDOVER' || data.status === 'COMPLETED') && (
                           <button onClick={printDocument} className="w-full py-2.5 bg-white text-slate-800 hover:bg-slate-100 flex items-center justify-center rounded-xl font-bold transition shadow-sm"><Printer className="w-4 h-4 mr-2"/> In Lệnh Xuất Kho</button>
                       )}
-                  </div>
 
-                  {/* No-action message */}
-                  {!isOwnerDraft && !isOwnerPending && !(currentUser.role !== 'WAREHOUSE' && isApprover) && !isWarehouse && !canAccept && !canStartPicking && !canCompletePicking && !canHandover && !canSendToProcurement && !isHandover && !canCancel && !isPendingBusinessApproval && (() => {
-                    let msg = 'Bạn không có quyền thao tác trên phiếu này ở trạng thái hiện tại';
-                    if (['COMPLETED', 'REJECTED', 'CANCELLED', 'CLOSED'].includes(data.status)) {
-                      msg = `Phiếu đã ${data.status === 'COMPLETED' ? 'hoàn thành' : data.status === 'REJECTED' ? 'bị từ chối' : 'bị hủy/đóng'}`;
-                    }
-                    return (
-                      <div className="rounded-xl bg-slate-700/50 border border-slate-600 p-4 text-center mt-2">
-                        <StopCircle className="w-6 h-6 text-slate-400 mx-auto mb-2" />
-                        <p className="text-xs font-bold text-slate-300 leading-relaxed">{msg}</p>
-                      </div>
-                    );
-                  })()}
+                      {isFutureApprover && (
+                          <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/50 rounded-xl">
+                              <p className="text-xs font-bold text-amber-500 flex items-center">
+                                  <AlertTriangle className="w-4 h-4 mr-2"/> Chờ phê duyệt cấp dưới
+                              </p>
+                              <p className="text-[10px] text-amber-200/70 mt-1">Bạn có tên trong danh sách duyệt nhưng hiện tại chưa đến lượt của bạn.</p>
+                          </div>
+                      )}
+                  </div>
               </div>
 
-
-              {/* Box 4: Tuyến duyệt cấu hình (Approval Steps) */}
+              {/* Box 3.5: Approval Steps (New) */}
               {data.approvalSteps && data.approvalSteps.length > 0 && (
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-indigo-500"></span> Tuyến duyệt cấu hình
-                  </h3>
-                  <div className="flex flex-col gap-2">
-                    {data.approvalSteps.map((step: any) => {
-                      const info = getStepStatusInfo(step);
-                      const isCurrent = step.stepNo === data.currentApprovalStep && step.status === 'PENDING';
-                      return (
-                        <div key={step.id} className={`flex items-start gap-3 p-3 rounded-xl border ${info.bg} ${isCurrent ? 'ring-2 ring-amber-300 shadow-sm' : ''}`}>
-                          <div className={`w-2.5 h-2.5 rounded-full mt-1 shrink-0 ${info.dot} ${isCurrent ? 'animate-pulse' : ''}`}></div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-center">
-                              <p className="text-xs font-bold text-slate-700">
-                                Bước {step.stepNo} — {step.approver?.fullName || getStepTypeLabel(step.stepType)}
-                              </p>
-                              <span className={`text-[10px] font-black px-2 py-0.5 rounded border ${info.bg} ${info.color}`}>
-                                {info.label}
-                              </span>
-                            </div>
-                            <p className="text-[10px] text-slate-400 mt-0.5">{getStepTypeLabel(step.stepType)}</p>
-                            {step.actedAt && <p className="text-[10px] text-slate-400">{new Date(step.actedAt).toLocaleString('vi-VN')}</p>}
-                            {step.note && <p className="text-[10px] text-slate-500 italic mt-1">Ghi chú: {step.note}</p>}
-                          </div>
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col">
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Tuyến Duyệt Cấu Hình</h3>
+                  <div className="space-y-4">
+                    {data.approvalSteps.map((step: any) => (
+                      <div key={step.id} className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                          step.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-600' :
+                          step.status === 'REJECTED' ? 'bg-rose-100 text-rose-600' :
+                          step.stepNo === data.currentApprovalStep && data.status === 'PENDING_MANAGER' ? 'bg-amber-100 text-amber-600 animate-pulse' :
+                          'bg-slate-100 text-slate-400'
+                        }`}>
+                          {step.stepNo}
                         </div>
-                      );
-                    })}
-                  </div>
-                  {/* If user is in chain but not current step, show message */}
-                  {data.approvalSteps.some((s: any) => s.approverId === currentUser.userId) &&
-                   !isApprover && !['COMPLETED','REJECTED','CANCELLED','RETURNED'].includes(data.status) && (
-                    <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-xl">
-                      <p className="text-xs font-bold text-blue-600">ℹ️ Phiếu chưa đến lượt bạn duyệt.</p>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-bold truncate ${step.status === 'APPROVED' ? 'text-slate-800' : 'text-slate-500'}`}>
+                            {step.approver?.fullName || 'N/A'}
+                          </p>
+                          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{step.status}</p>
+                        </div>
+                        {step.status === 'APPROVED' && <CheckCircle className="w-4 h-4 text-emerald-500" />}
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-3 opacity-60">
+                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${data.status === 'PENDING_ADMIN' ? 'bg-amber-100 text-amber-600 animate-pulse' : data.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                            {data.approvalSteps.length + 1}
+                         </div>
+                         <div className="flex-1">
+                            <p className="text-sm font-bold text-slate-500">Hành chính (Duyệt cuối)</p>
+                            <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Final Approval</p>
+                         </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
 
-              {/* Box 5: Audit History */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col">
+              {/* Box 4: Approval Timeline */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col flex-1 min-h-[300px]">
                   <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Lịch sử Xử lý (Audit Trail)</h3>
                   <div className="relative pl-3 border-l-2 border-slate-100 space-y-6 flex-1">
                       <div className="relative">
@@ -449,10 +333,10 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                       </div>
                       {data.approvalHistories?.map((audit:any) => (
                           <div key={audit.id} className="relative">
-                              <div className={`absolute -left-[18px] top-1 w-3 h-3 rounded-full ring-4 ring-white ${audit.action==='APPROVED'?'bg-emerald-500':audit.action==='ISSUED'||audit.action==='PARTIALLY_ISSUED'?'bg-blue-500':audit.action==='COMPLETED'||audit.action==='HANDOVER_CONFIRMED'?'bg-indigo-500':audit.action==='REJECTED'||audit.action==='CANCELLED'?'bg-rose-500':'bg-amber-500'}`}></div>
-                              <p className="text-xs font-bold text-slate-800">{audit.action === 'APPROVED' ? 'Phê Duyệt' : audit.action === 'SUBMITTED' ? 'Gửi duyệt' : audit.action.includes('ISSUED') ? 'Kho đã Xuất' : audit.action === 'COMPLETED' || audit.action === 'HANDOVER_CONFIRMED' ? 'Hoàn Tất / Bàn giao' : audit.action === 'REJECTED' ? 'Từ chối' : audit.action === 'RETURNED' ? 'Trả lại' : audit.action}</p>
+                              <div className={`absolute -left-[18px] top-1 w-3 h-3 rounded-full ring-4 ring-white ${audit.action==='APPROVED'?'bg-emerald-500':audit.action==='ISSUED'||audit.action==='PARTIALLY_ISSUED'?'bg-blue-500':audit.action==='COMPLETED'?'bg-indigo-500':audit.action==='REJECTED'||audit.action==='CANCELLED'?'bg-rose-500':'bg-amber-500'}`}></div>
+                              <p className="text-xs font-bold text-slate-800">{audit.action === 'APPROVED' ? 'Phê Duyệt' : audit.action.includes('ISSUED') ? 'Kho đã Xuất' : audit.action === 'COMPLETED' ? 'Nhận Hàng (Hoàn Tất)' : audit.action === 'REJECTED' ? 'Từ chối' : audit.action}</p>
                               <p className="text-[10px] font-semibold text-slate-500 mt-0.5">{new Date(audit.createdAt).toLocaleString('vi-VN')} • {audit.approver?.fullName}</p>
-                              {audit.reason && <p className="text-[10px] font-bold text-slate-600 bg-slate-50 p-1.5 rounded mt-1 border border-slate-100">{audit.reason}</p>}
+                              {audit.reason && <p className="text-[10px] font-bold text-rose-600 bg-rose-50 p-1.5 rounded mt-1">Ghi chú: {audit.reason}</p>}
                           </div>
                       ))}
                       {data.status === 'COMPLETED' && (
@@ -601,7 +485,7 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                           const hasErr = data.lines.some((l:any) => (issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? (l.qtyApproved ?? l.qtyRequested)) > (l.item.stocks?.[0]?.quantityOnHand || 0));
                           if (hasErr) return showToast('Không thể xuất dòng có số lượng Giao vượt số Tồn kho. Vui lòng nhận đúng hoặc ít hơn tồn kho hiện hữu.', 'error');
                           
-                          handleAction('/warehouse/complete_picking', { lineIssues: issues }, 'ĐÃ XUẤT KHO THÀNH CÔNG VÀ TRỪ TỒN!');
+                          handleAction('/issue', { lineIssues: issues }, 'ĐÃ XUẤT KHO THÀNH CÔNG VÀ TRỪ TỒN!');
                           setShowIssueModal(false);
                       }} className="px-8 py-2.5 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-500/30 flex items-center"><Archive className="w-5 h-5 mr-2"/> XUẤT KHO & CHUẨN BỊ BÀN GIAO</button>
                   </div>

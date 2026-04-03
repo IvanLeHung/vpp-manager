@@ -1,14 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Package, Search, Download, Droplets, LayoutDashboard, FileText, ArrowDownToLine, Settings2, XCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Package, Search, Download, Droplets, LayoutDashboard, FileText } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../lib/api';
-import { useAppContext } from '../context/AppContext';
 
 const TAX_RATE = 0.08;
 
 export default function Dashboard() {
-  const { currentUser } = useAppContext();
-  const canWriteInventory = currentUser?.role === 'WAREHOUSE' || currentUser?.role === 'ADMIN';
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const addToast = (msg: string, type: 'success' | 'error' = 'success') => { setToast({message: msg, type}); setTimeout(() => setToast(null), 3000); };
   const [stocks, setStocks] = useState<any[]>([]);
@@ -16,12 +13,6 @@ export default function Dashboard() {
   const [currentInventoryTab, setCurrentInventoryTab] = useState('VPP'); // 'VPP' | 'VE_SINH'
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Modal State
-  const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState<'RECEIVE' | 'ADJUST'>('RECEIVE');
-  const [selectedStock, setSelectedStock] = useState<any>(null);
-  const [qtyInput, setQtyInput] = useState<number | ''>('');
-  const [reasonInput, setReasonInput] = useState('');
 
   const fetchStocks = async () => {
     try {
@@ -83,54 +74,6 @@ export default function Dashboard() {
     XLSX.writeFile(workbook, `${sheetName}.xlsx`);
   };
 
-  const openModal = (mode: 'RECEIVE' | 'ADJUST', stockItem: any) => {
-    setModalMode(mode);
-    setSelectedStock(stockItem);
-    setQtyInput(mode === 'ADJUST' ? stockItem.quantityOnHand : '');
-    setReasonInput('');
-    setShowModal(true);
-  };
-
-  const handleSubmitModal = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (qtyInput === '' || Number(qtyInput) < 0) {
-      addToast?.('Số lượng không hợp lệ', 'error');
-      return;
-    }
-
-    try {
-      if (modalMode === 'RECEIVE') {
-        if (!reasonInput) {
-           addToast?.('Lý do/Nguồn gốc nhập là bắt buộc', 'error');
-           return;
-        }
-        await api.post('/inventory/receive', {
-          itemId: selectedStock.item.id,
-          qty: Number(qtyInput),
-          reason: reasonInput,
-          refType: 'TRUC_TIEP'
-        });
-        addToast?.('Nhập kho thành công!');
-      } else {
-        if (!reasonInput) {
-           addToast?.('Vui lòng giải trình lý do điều chỉnh', 'error');
-           return;
-        }
-        await api.post('/inventory/adjust', {
-          itemId: selectedStock.item.id,
-          newQty: Number(qtyInput),
-          reason: reasonInput
-        });
-        addToast?.('Điều chỉnh kho thành công!');
-      }
-      setShowModal(false);
-      fetchStocks(); // reload stock limits
-    } catch (err: any) {
-      const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Lỗi hệ thống';
-      addToast(`Thao tác thất bại: ${msg}`, 'error');
-      console.error('adjust stock error:', err?.response?.data || err);
-    }
-  };
 
   const totalStockTypes = displayedStocks.length;
   let totalPhysicalItems = 0;
@@ -230,14 +173,12 @@ export default function Dashboard() {
                 <th className="px-5 py-4">Nhóm</th>
                 <th className="px-4 py-4">ĐVT</th>
                 <th className="px-4 py-4 text-center">Tồn kho TT</th>
-                <th className="px-4 py-4 text-center">Tạm giữ</th>
                 <th className="px-4 py-4 text-right">Đơn giá</th>
-                <th className="px-5 py-4 text-center">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
-                 <tr><td colSpan={8} className="p-8 text-center text-slate-400 font-bold animate-pulse">Đang nạp dữ liệu từ kho...</td></tr>
+                 <tr><td colSpan={6} className="p-8 text-center text-slate-400 font-bold animate-pulse">Đang nạp dữ liệu từ kho...</td></tr>
               ) : displayedStocks.length > 0 ? displayedStocks.map((stock) => {
                 const item = stock.item;
                 const isLow = stock.quantityOnHand <= 15;
@@ -254,31 +195,12 @@ export default function Dashboard() {
                             {stock.quantityOnHand}
                         </span>
                     </td>
-                    <td className="px-4 py-4 text-center text-amber-500 font-bold">{stock.quantityReserved}</td>
                     <td className="px-4 py-4 text-right text-slate-500 font-medium">{formatCurrency(Number(item.price))}</td>
-                    <td className="px-5 py-4 text-center space-x-2">
-                      {canWriteInventory ? (
-                        <>
-                          <button
-                            onClick={() => openModal('RECEIVE', stock)}
-                            className="px-2.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white rounded-lg transition-colors font-bold text-xs" title="Ghi sổ Biên bản nhập kho">
-                            <ArrowDownToLine className="w-4 h-4 inline mr-1" /> Nhập kho
-                          </button>
-                          <button
-                            onClick={() => openModal('ADJUST', stock)}
-                            className="px-2.5 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-500 hover:text-white rounded-lg transition-colors font-bold text-xs" title="Ghi sổ kiểm kê kho">
-                            <Settings2 className="w-4 h-4 inline mr-1" /> Điều chỉnh
-                          </button>
-                        </>
-                      ) : (
-                        <span className="text-xs text-slate-400 font-medium italic">Xem</span>
-                      )}
-                    </td>
                   </tr>
                 );
               }) : (
                 <tr>
-                  <td colSpan={8} className="px-6 py-16 text-center text-slate-400 font-medium">
+                  <td colSpan={6} className="px-6 py-16 text-center text-slate-400 font-medium">
                     <div className="flex flex-col items-center justify-center gap-3">
                         {currentInventoryTab === 'VPP' ? <Package className="w-16 h-16 opacity-30" /> : <Droplets className="w-16 h-16 opacity-30" />}
                         <span>Kho trống, không tìm thấy vật tư.</span>
@@ -291,64 +213,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {showModal && selectedStock && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col transform transition-all">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h2 className={`text-lg font-bold flex items-center ${modalMode === 'RECEIVE' ? 'text-blue-700' : 'text-amber-600'}`}>
-                {modalMode === 'RECEIVE' ? <ArrowDownToLine className="w-5 h-5 mr-2" /> : <Settings2 className="w-5 h-5 mr-2" />}
-                {modalMode === 'RECEIVE' ? 'Phiếu Nhập Kho' : 'Kiểm Kê Kho'}
-              </h2>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600"><XCircle className="w-6 h-6" /></button>
-            </div>
-            
-            <form onSubmit={handleSubmitModal} className="p-6">
-              <div className="mb-4">
-                 <p className="text-xs font-bold text-slate-400 uppercase">Mặt Hàng</p>
-                 <p className="font-bold text-slate-800 text-base">{selectedStock.item.name} ({selectedStock.item.mvpp})</p>
-                 <p className="text-sm text-slate-500 mt-1">Tồn hiện tại: <span className="font-bold text-emerald-600">{selectedStock.quantityOnHand}</span> {selectedStock.item.unit}</p>
-              </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-bold text-slate-700 mb-1">
-                   {modalMode === 'RECEIVE' ? 'Số lượng NHẬP THÊM *' : 'SỐ LƯỢNG THỰC TẾ tại kho *'}
-                </label>
-                <input 
-                  type="number" 
-                  autoFocus
-                  required
-                  min={0}
-                  step={1}
-                  value={qtyInput} 
-                  onChange={e => setQtyInput(e.target.value ? Number(e.target.value) : '')} 
-                  className="w-full px-4 py-3 border border-slate-200 bg-slate-50 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-bold text-xl text-center" 
-                />
-              </div>
-
-              <div className="mb-6">
-                <label className="block text-sm font-bold text-slate-700 mb-1">
-                   {modalMode === 'RECEIVE' ? 'Nguồn gốc/Lý do nhập *' : 'Biên bản/Lý do thay đổi *'}
-                </label>
-                <input 
-                  type="text" 
-                  required
-                  value={reasonInput} 
-                  onChange={e => setReasonInput(e.target.value)} 
-                  placeholder={modalMode === 'RECEIVE' ? 'Ví dụ: NCC chuyển hàng T5...' : 'Ví dụ: Hư hỏng, mất mát, kiểm kê thừa...'}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" 
-                />
-              </div>
-
-              <div className="flex gap-3">
-                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3 font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition">Hủy</button>
-                 <button type="submit" className={`flex-1 py-3 font-bold text-white rounded-xl transition shadow-md ${modalMode === 'RECEIVE' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-amber-500 hover:bg-amber-600'}`}>
-                    Lưu sổ kho
-                 </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
     </div>
   );

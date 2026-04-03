@@ -9,6 +9,9 @@ import { PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer } from '
 import api from '../lib/api';
 import * as XLSX from 'xlsx';
 import { useAppContext } from '../context/AppContext';
+import ImportExcelModal from './items/ImportExcelModal';
+import ItemHistoryModal from './items/ItemHistoryModal';
+import ImportHistoryModal from './items/ImportHistoryModal';
 
 // ── Types ──
 type ItemData = {
@@ -92,6 +95,9 @@ export default function Items() {
   const [formData, setFormData] = useState({ mvpp: '', name: '', category: '', unit: '', price: 0, quota: 100, itemType: 'VPP', isActive: true });
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [statusModal, setStatusModal] = useState<{ isOpen: boolean; item: ItemData | null; reason: string; targetStatus: boolean }>({ isOpen: false, item: null, reason: '', targetStatus: false });
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showImportHistoryModal, setShowImportHistoryModal] = useState(false);
+  const [historyModalConfig, setHistoryModalConfig] = useState<{ isOpen: boolean; itemId?: string; itemMvpp?: string }>({ isOpen: false });
 
   // Toast
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -241,8 +247,8 @@ export default function Items() {
         </div>
         <div className="flex flex-wrap items-center gap-2 md:gap-3 bg-white p-2 rounded-2xl shadow-sm border border-slate-200">
           {!isEmployee && (
-            <button className="flex items-center px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 rounded-xl transition" onClick={() => addToast('Chức năng Lịch sử đang phát triển...', 'info')}>
-              <History className="w-4 h-4 md:mr-2" /><span className="hidden md:inline">Lịch sử</span>
+            <button className="flex items-center px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 rounded-xl transition" onClick={() => setHistoryModalConfig({ isOpen: true, itemId: '', itemMvpp: '' })}>
+              <History className="w-4 h-4 md:mr-2" /><span className="hidden md:inline">Lịch sử thay đổi</span>
             </button>
           )}
           {!isEmployee && <div className="w-px h-6 bg-slate-200 mx-1" />}
@@ -253,9 +259,20 @@ export default function Items() {
             </button>
           )}
           {isAdmin && (
-            <button className="flex items-center px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 rounded-xl transition" onClick={() => addToast('Tính năng Import Excel sẽ được mở sớm.', 'info')}>
-              <Upload className="w-4 h-4 md:mr-2" /><span className="hidden md:inline">Import Excel</span>
-            </button>
+            <>
+              <button 
+                onClick={() => setShowImportHistoryModal(true)} 
+                className="flex items-center px-3 py-2 text-sm font-bold text-amber-700 hover:bg-amber-50 rounded-xl transition"
+              >
+                <History className="w-4 h-4 md:mr-2" /><span className="hidden md:inline">Lịch sử Import Excel</span>
+              </button>
+              <button 
+                onClick={() => setShowImportModal(true)} 
+                className="flex items-center px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 rounded-xl transition"
+              >
+                <Upload className="w-4 h-4 md:mr-2" /><span className="hidden md:inline">Import Excel</span>
+              </button>
+            </>
           )}
           
           {!isEmployee && <div className="w-px h-6 bg-slate-200 mx-1" />}
@@ -397,14 +414,11 @@ export default function Items() {
                   </button>
                 )}
                 {isAdmin && (
-                  <button className="flex items-center justify-center px-6 py-3 bg-white text-blue-700 border-2 border-blue-200 rounded-xl font-bold hover:bg-blue-50 transition" onClick={() => addToast('Tính năng Import Excel sẽ được mở sớm.', 'info')}>
+                  <button className="flex items-center justify-center px-6 py-3 bg-white text-blue-700 border-2 border-blue-200 rounded-xl font-bold hover:bg-blue-50 transition" onClick={() => setShowImportModal(true)}>
                     <Upload className="w-5 h-5 mr-2" /> Import Excel
                   </button>
                 )}
               </div>
-              {isAdmin && (
-                <button className="mt-4 text-sm text-indigo-600 hover:underline font-medium" onClick={() => addToast('File mẫu sẽ được cung cấp sớm.', 'info')}>↓ Tải file mẫu import Excel</button>
-              )}
             </div>
           </div>
         ) : (
@@ -502,7 +516,7 @@ export default function Items() {
                               )}
 
                               {!isEmployee && (
-                                <button onClick={() => { addToast('Tính năng đang phát triển', 'info'); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-slate-500 flex items-center"><History className="w-4 h-4 mr-2" /> Xem lịch sử</button>
+                                <button onClick={() => { setHistoryModalConfig({ isOpen: true, itemId: item.id, itemMvpp: item.mvpp }); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-bold text-slate-500 flex items-center"><History className="w-4 h-4 mr-2" /> Xem lịch sử</button>
                               )}
                             </div>
                           )}
@@ -619,6 +633,27 @@ export default function Items() {
           </div>
         </div>
       )}
+
+      {/* IMPORT EXCEL MODAL */}
+      <ImportExcelModal 
+        isOpen={showImportModal} 
+        onClose={() => setShowImportModal(false)}
+        onSuccess={() => { setShowImportModal(false); fetchItems(); fetchSummary(); }}
+      />
+
+      {/* HISTORY MODAL (Auditing changes to individual items) */}
+      <ItemHistoryModal
+        isOpen={historyModalConfig.isOpen}
+        onClose={() => setHistoryModalConfig({ isOpen: false })}
+        itemId={historyModalConfig.itemId}
+        itemMvpp={historyModalConfig.itemMvpp}
+      />
+
+      {/* IMPORT BATCH HISTORY MODAL */}
+      <ImportHistoryModal
+        isOpen={showImportHistoryModal}
+        onClose={() => setShowImportHistoryModal(false)}
+      />
     </div>
   );
 }
