@@ -180,7 +180,7 @@ export default function Analytics() {
                     <h3 className="font-extrabold text-slate-800 text-base mb-6 flex items-center">
                         Xu Hướng Giao Dịch Kho (30 Ngày Qua)
                     </h3>
-                    <div className="flex-1 w-full min-h-[300px]">
+                    <div className="flex-1 w-full h-[350px]">
                         {analytical.trendData?.length ? (
                           <ResponsiveContainer width="100%" height="100%">
                               <AreaChart data={analytical.trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -214,7 +214,7 @@ export default function Analytics() {
                     <h3 className="font-extrabold text-slate-800 text-base mb-6 text-center" title="Phân loại theo Giá trị tiêu thụ">
                        Cơ Cấu Vật Tư Theo ABC
                     </h3>
-                    <div className="flex-1 min-h-[250px] w-full">
+                    <div className="flex-1 h-[300px] w-full">
                         {analytical.abcAnalysis ? (
                           <ResponsiveContainer width="100%" height="100%">
                               <PieChart>

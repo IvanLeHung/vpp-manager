@@ -175,7 +175,7 @@ export default function RequestsDetail({
   const isApprover =
     !!userId &&
     (
-      (data.status === 'PENDING_MANAGER' && data.currentApproverId === userId) ||
+      (data.status === 'PENDING_MANAGER' && (data.currentApproverId === userId || currentUser.role === 'ADMIN')) ||
       (data.status === 'PENDING_ADMIN' && currentUser.role === 'ADMIN')
     );
 
@@ -421,13 +421,6 @@ export default function RequestsDetail({
                   <button
                     disabled={loading}
                     onClick={() => setShowApproveModal(true)}
-                    style={{
-                      display: 'flex',
-                      visibility: 'visible',
-                      opacity: 1,
-                      position: 'relative',
-                      zIndex: 9999,
-                    }}
                     className="w-full min-h-[56px] py-4 bg-indigo-600 text-white rounded-2xl font-black text-base hover:bg-indigo-700 transition shadow-xl shadow-indigo-500/20 flex items-center justify-center border-b-4 border-indigo-800"
                   >
                     <CheckCircle className="w-5 h-5 mr-2" /> PHÊ DUYỆT
