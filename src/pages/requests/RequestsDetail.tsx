@@ -1,5 +1,18 @@
 import { useState, useEffect } from 'react';
-import { XCircle, CheckCircle, RefreshCw, ArrowLeft, Archive, StopCircle, AlertTriangle, CornerUpLeft, Clock, ShieldCheck, User as UserIcon, Zap } from 'lucide-react';
+import {
+  XCircle,
+  CheckCircle,
+  RefreshCw,
+  ArrowLeft,
+  Archive,
+  StopCircle,
+  AlertTriangle,
+  CornerUpLeft,
+  Clock,
+  ShieldCheck,
+  User as UserIcon,
+  Zap,
+} from 'lucide-react';
 import api from '../../lib/api';
 import type { User } from '../../context/AppContext';
 import type { ViewMode } from '../Requests';
@@ -12,19 +25,22 @@ interface Props {
   currentUser: User;
 }
 
-export default function RequestsDetail({ requestId, setViewMode, refreshData, showToast, currentUser }: Props) {
+export default function RequestsDetail({
+  requestId,
+  setViewMode,
+  refreshData,
+  showToast,
+  currentUser,
+}: Props) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Modals state
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showIssueModal, setShowIssueModal] = useState(false);
 
-  // Custom approvals
   const [approvals, setApprovals] = useState<{ lineId: string; qtyApproved: number }[]>([]);
-  // Custom issues
   const [issues, setIssues] = useState<{ lineId: string; qtyDelivered: number }[]>([]);
 
   const fetchDetail = async () => {
@@ -32,9 +48,18 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
       setLoading(true);
       const res = await api.get(`/requests/${requestId}`);
       setData(res.data);
-      // Init modal states
-      setApprovals(res.data.lines.map((l: any) => ({ lineId: l.id, qtyApproved: l.qtyRequested })));
-      setIssues(res.data.lines.map((l: any) => ({ lineId: l.id, qtyDelivered: l.qtyApproved ?? l.qtyRequested })));
+      setApprovals(
+        res.data.lines.map((l: any) => ({
+          lineId: l.id,
+          qtyApproved: l.qtyRequested,
+        }))
+      );
+      setIssues(
+        res.data.lines.map((l: any) => ({
+          lineId: l.id,
+          qtyDelivered: l.qtyApproved ?? l.qtyRequested,
+        }))
+      );
     } catch (err: any) {
       showToast(err.response?.data?.error || 'Lỗi tải phiếu', 'error');
       setViewMode('LIST');
@@ -49,25 +74,44 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'APPROVED': return 'Đã duyệt';
-      case 'REJECTED': return 'Từ chối';
-      case 'DRAFT': return 'Bản nháp';
-      case 'PARTIALLY_ISSUED': return 'Cấp phát một phần';
-      case 'PARTIALLY_APPROVED': return 'Duyệt một phần';
-      case 'RETURNED': return 'Trả lại';
-      case 'READY_TO_PICK': return 'Sẵn sàng soạn hàng';
-      case 'PICKING': return 'Đang soạn hàng (Kho)';
-      case 'READY_TO_HANDOVER': return 'Sẵn sàng bàn giao';
-      case 'WAITING_HANDOVER': return 'Chờ xác nhận nhận hàng';
-      case 'READY_TO_ISSUE': return 'Sẵn sàng cấp phát';
-      case 'PENDING_MANAGER': return 'Chờ Quản lý duyệt';
-      case 'PENDING_ADMIN': return 'Chờ Hành chính duyệt';
-      case 'COMPLETED': return 'Hoàn tất';
-      case 'CANCELLED': return 'Đã hủy';
-      case 'PARTIALLY_FULFILLED': return 'Cấp phát một phần';
-      case 'OUT_OF_STOCK': return 'Hết hàng (Chờ mua)';
-      case 'NEEDS_PROCUREMENT': return 'Chờ thu mua';
-      default: return status.replace(/_/g, ' ');
+      case 'APPROVED':
+        return 'Đã duyệt';
+      case 'REJECTED':
+        return 'Từ chối';
+      case 'DRAFT':
+        return 'Bản nháp';
+      case 'PARTIALLY_ISSUED':
+        return 'Cấp phát một phần';
+      case 'PARTIALLY_APPROVED':
+        return 'Duyệt một phần';
+      case 'RETURNED':
+        return 'Trả lại';
+      case 'READY_TO_PICK':
+        return 'Sẵn sàng soạn hàng';
+      case 'PICKING':
+        return 'Đang soạn hàng (Kho)';
+      case 'READY_TO_HANDOVER':
+        return 'Sẵn sàng bàn giao';
+      case 'WAITING_HANDOVER':
+        return 'Chờ xác nhận nhận hàng';
+      case 'READY_TO_ISSUE':
+        return 'Sẵn sàng cấp phát';
+      case 'PENDING_MANAGER':
+        return 'Chờ Quản lý duyệt';
+      case 'PENDING_ADMIN':
+        return 'Chờ Hành chính duyệt';
+      case 'COMPLETED':
+        return 'Hoàn tất';
+      case 'CANCELLED':
+        return 'Đã hủy';
+      case 'PARTIALLY_FULFILLED':
+        return 'Cấp phát một phần';
+      case 'OUT_OF_STOCK':
+        return 'Hết hàng (Chờ mua)';
+      case 'NEEDS_PROCUREMENT':
+        return 'Chờ thu mua';
+      default:
+        return status.replace(/_/g, ' ');
     }
   };
 
@@ -160,7 +204,15 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
 
   const isWarehouse =
     (currentUser.role === 'WAREHOUSE' || currentUser.role === 'ADMIN') &&
-    ['APPROVED', 'READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED'].includes(data.status);
+    [
+      'APPROVED',
+      'READY_TO_PICK',
+      'PICKING',
+      'READY_TO_HANDOVER',
+      'READY_TO_ISSUE',
+      'PARTIALLY_ISSUED',
+      'PARTIALLY_APPROVED',
+    ].includes(data.status);
 
   const isOwnerDraft =
     userId === data.requesterId &&
@@ -173,22 +225,15 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
   const isHandover =
     (userId === data.requesterId || currentUser.role === 'ADMIN') &&
     data.status === 'WAITING_HANDOVER';
-console.log('REQUEST_DETAIL_DEBUG_V1', {
-  currentUser,
-  userId,
-  currentApproverId: data.currentApproverId,
-  currentHandlerRole: data.currentHandlerRole,
-  currentApprovalStep: data.currentApprovalStep,
-  currentStep,
-  isApprover,
-  status: data.status,
-});
+
   return (
     <div className="flex flex-col h-full bg-slate-100 overflow-hidden relative print:bg-white print:overflow-auto">
-      {/* HEADER BAR */}
       <div className="h-20 bg-white border-b border-slate-200 flex justify-between items-center px-6 md:px-10 shrink-0 z-20 shadow-sm print:hidden">
         <div className="flex items-center gap-6">
-          <button onClick={() => setViewMode('LIST')} className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition shadow-inner">
+          <button
+            onClick={() => setViewMode('LIST')}
+            className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition shadow-inner"
+          >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
@@ -213,9 +258,7 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col xl:flex-row gap-6 w-full max-w-[1400px] mx-auto print:p-0">
-        {/* LEFT COLUMN: Main Info & Lines */}
         <div className="flex-1 flex flex-col gap-6 min-w-0">
-          {/* Box 1: Info */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-2 h-full bg-indigo-500"></div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pl-4">
@@ -238,7 +281,6 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                 </div>
               )}
 
-              {/* Hierarchical Warning Alert */}
               {!isApprover && currentUser.role === 'MANAGER' && data.requester?.managerId === userId && data.status === 'PENDING_ADMIN' && (
                 <div className="md:col-span-2 bg-indigo-50 border border-indigo-200 rounded-xl p-4 mt-2 flex items-center gap-3">
                   <CheckCircle className="w-5 h-5 text-indigo-500" />
@@ -261,7 +303,6 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
             </div>
           </div>
 
-          {/* Box 2: Lines Grid */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden relative print:shadow-none print:border-none">
             <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
               <h3 className="text-[11px] font-black text-indigo-700 uppercase tracking-widest">Chi tiết Vật tư Xin Cấp</h3>
@@ -314,7 +355,9 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                         <td className="p-4 text-center bg-blue-50/30">
                           <span className="font-black text-lg text-blue-600">{l.qtyDelivered ?? 0}</span>
                           {l.qtyDelivered > 0 && l.qtyDelivered < (l.qtyApproved ?? l.qtyRequested) && (
-                            <p className="text-[10px] font-bold text-amber-600 mt-1">Nợ: {(l.qtyApproved ?? l.qtyRequested) - l.qtyDelivered}</p>
+                            <p className="text-[10px] font-bold text-amber-600 mt-1">
+                              Nợ: {(l.qtyApproved ?? l.qtyRequested) - l.qtyDelivered}
+                            </p>
                           )}
                         </td>
                         <td className="p-4 text-slate-600 text-sm font-medium">{l.note || '-'}</td>
@@ -327,9 +370,7 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Actions & History */}
         <div className="w-full xl:w-96 flex flex-col gap-6 shrink-0 print:hidden">
-          {/* Card 1: Trạng thái hiện tại */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Trạng thái hiện tại</h3>
             <div className="flex items-center justify-between mb-4">
@@ -346,18 +387,21 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
 
               <p className="text-[10px] font-bold text-slate-400 uppercase mb-1 mt-3">Bộ phận đang xử lý</p>
               <p className="text-sm font-bold text-indigo-700">
-                {
-                  data.status === 'PENDING_MANAGER' ? 'Quản lý (Cấp 1)' :
-                  data.status === 'PENDING_ADMIN' ? 'Hành chính (Duyệt cuối)' :
-                  ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED'].includes(data.status) ? 'Kho xuất hàng' :
-                  data.status === 'WAITING_HANDOVER' ? 'Chờ xác nhận bàn giao' :
-                  data.status === 'COMPLETED' ? 'Đã hoàn tất' : 'Đã đóng'
-                }
+                {data.status === 'PENDING_MANAGER'
+                  ? 'Quản lý (Cấp 1)'
+                  : data.status === 'PENDING_ADMIN'
+                    ? 'Hành chính (Duyệt cuối)'
+                    : ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED'].includes(data.status)
+                      ? 'Kho xuất hàng'
+                      : data.status === 'WAITING_HANDOVER'
+                        ? 'Chờ xác nhận bàn giao'
+                        : data.status === 'COMPLETED'
+                          ? 'Đã hoàn tất'
+                          : 'Đã đóng'}
               </p>
             </div>
           </div>
 
-          {/* Card 2: Thao Tác (Action) */}
           <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-slate-200 p-6 relative overflow-hidden">
             {(isApprover || isWarehouse) && (
               <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 z-20"></div>
@@ -365,17 +409,21 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 relative z-10 flex items-center">
               THAO TÁC XỬ LÝ
             </h3>
+
             <div className="flex flex-col gap-4 relative z-10">
-              {/* 1. APPROVER ACTIONS */}
               {isApprover ? (
                 <div className="p-0 bg-white flex flex-col gap-4">
                   <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 p-3 rounded-xl border border-emerald-100 mb-2">
                     <ShieldCheck className="w-5 h-5" />
-                    <p className="text-[11px] font-black uppercase tracking-wider">Bạn đang là người duyệt hiện tại</p>
+                    <p className="text-[11px] font-black uppercase tracking-wider">
+                      Bạn đang là người duyệt hiện tại
+                    </p>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Ghi chú xử lý (tùy chọn)</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      Ghi chú xử lý (tùy chọn)
+                    </label>
                     <textarea
                       value={rejectReason}
                       onChange={(e: any) => setRejectReason(e.target.value)}
@@ -387,7 +435,14 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                   <button
                     disabled={loading}
                     onClick={() => setShowApproveModal(true)}
-                    className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-base hover:bg-indigo-700 transition shadow-xl shadow-indigo-500/30 flex items-center justify-center transform active:scale-95 border-b-4 border-indigo-800"
+                    style={{
+                      display: 'flex',
+                      visibility: 'visible',
+                      opacity: 1,
+                      position: 'relative',
+                      zIndex: 9999,
+                    }}
+                    className="w-full min-h-[56px] py-4 bg-red-600 text-white rounded-2xl font-black text-base hover:bg-red-700 transition shadow-xl flex items-center justify-center border-4 border-yellow-300"
                   >
                     <CheckCircle className="w-5 h-5 mr-2" /> PHÊ DUYỆT
                   </button>
@@ -395,11 +450,18 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       disabled={loading}
-                      onClick={() => handleAction('/return', { reason: rejectReason || prompt('Lý do yêu cầu làm lại?') }, 'Đã trả lại')}
+                      onClick={() =>
+                        handleAction(
+                          '/return',
+                          { reason: rejectReason || prompt('Lý do yêu cầu làm lại?') },
+                          'Đã trả lại'
+                        )
+                      }
                       className="py-3 bg-white text-slate-700 hover:bg-slate-50 border-2 border-slate-200 rounded-xl font-bold transition flex justify-center items-center shadow-sm"
                     >
                       <CornerUpLeft className="w-4 h-4 mr-2" /> Trả Lại
                     </button>
+
                     <button
                       disabled={loading}
                       onClick={() => {
@@ -446,6 +508,7 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                       <CheckCircle className="w-5 h-5 mr-2" /> TIẾP NHẬN PHIẾU
                     </button>
                   )}
+
                   {data.status === 'READY_TO_PICK' && (
                     <button
                       onClick={() => handleAction('/warehouse/start_picking', {}, 'Bắt đầu soạn hàng')}
@@ -454,6 +517,7 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                       <Zap className="w-5 h-5 mr-2" /> BẮT ĐẦU SOẠN HÀNG
                     </button>
                   )}
+
                   {data.status === 'PICKING' && (
                     <button
                       onClick={() => setShowIssueModal(true)}
@@ -462,6 +526,7 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                       <Archive className="w-5 h-5 mr-2" /> XUẤT KHO & HOÀN TẤT
                     </button>
                   )}
+
                   {data.status === 'READY_TO_HANDOVER' && (
                     <button
                       onClick={() => handleAction('/warehouse/handover', {}, 'Đã xác nhận bàn giao cho người nhận')}
@@ -470,6 +535,7 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                       <Clock className="w-5 h-5 mr-2" /> XÁC NHẬN BÀN GIAO
                     </button>
                   )}
+
                   {(data.status === 'READY_TO_ISSUE' || data.status === 'PARTIALLY_ISSUED') && (
                     <button
                       onClick={() => setShowIssueModal(true)}
@@ -478,14 +544,22 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                       <Archive className="w-5 h-5 mr-2" /> XUẤT KHO THỰC TẾ
                     </button>
                   )}
+
                   {['OUT_OF_STOCK', 'NEEDS_PROCUREMENT', 'PARTIALLY_FULFILLED'].includes(data.status) && (
                     <button
-                      onClick={() => handleAction('/warehouse/send-to-procurement', { note: 'Thiếu hàng thực tế, chuyển thu mua' }, 'Đã chuyển yêu cầu mua sắm bổ sung')}
+                      onClick={() =>
+                        handleAction(
+                          '/warehouse/send-to-procurement',
+                          { note: 'Thiếu hàng thực tế, chuyển thu mua' },
+                          'Đã chuyển yêu cầu mua sắm bổ sung'
+                        )
+                      }
                       className="w-full py-4 bg-orange-600 text-white rounded-xl font-black hover:bg-orange-700 transition shadow-xl shadow-orange-500/30 flex items-center justify-center border-b-4 border-orange-800 text-sm"
                     >
                       <ArrowLeft className="w-5 h-5 mr-2 -rotate-90" /> CHUYỂN MUA SẮM (THIẾU HÀNG)
                     </button>
                   )}
+
                   {['APPROVED', 'READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED'].indexOf(data.status) === -1 && (
                     <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center">
                       <p className="text-[10px] font-black text-slate-400 uppercase">Hiện đang ở bước:</p>
@@ -506,7 +580,9 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
               ) : isHandover ? (
                 <button
                   onClick={() => {
-                    if (window.confirm('Xác nhận bạn đã nhận đủ vật tư?')) handleAction('/confirm_receipt', {}, 'Bàn giao thành công');
+                    if (window.confirm('Xác nhận bạn đã nhận đủ vật tư?')) {
+                      handleAction('/confirm_receipt', {}, 'Bàn giao thành công');
+                    }
                   }}
                   className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black hover:bg-emerald-700 transition shadow-xl shadow-emerald-500/30 flex items-center justify-center border-b-4 border-emerald-800"
                 >
@@ -516,10 +592,15 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                 <div className="p-6 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center text-center gap-3">
                   <Archive className="w-10 h-10 text-slate-300" />
                   <div>
-                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Hiện tại: {getStatusLabel(data.status)}</p>
+                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                      Hiện tại: {getStatusLabel(data.status)}
+                    </p>
                     <p className="text-[10px] text-slate-400 font-medium mt-1">
-                      {data.status.startsWith('PENDING') ? 'Đang chờ cấp có thẩm quyền phê duyệt.' : 'Phiếu đang trong quy trình xử lý tự động.'}
-                      <br />Vui lòng quay lại sau.
+                      {data.status.startsWith('PENDING')
+                        ? 'Đang chờ cấp có thẩm quyền phê duyệt.'
+                        : 'Phiếu đang trong quy trình xử lý tự động.'}
+                      <br />
+                      Vui lòng quay lại sau.
                     </p>
                   </div>
                 </div>
@@ -527,32 +608,42 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
             </div>
           </div>
 
-          {/* Card 3: Tuyến Phê Duyệt (Vertical Stepper) */}
           {data.approvalSteps && data.approvalSteps.length > 0 && (
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col relative overflow-hidden">
               <div className="absolute top-0 right-0 p-4 opacity-5">
                 <Zap className="w-16 h-16 text-indigo-500" />
               </div>
-              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 relative z-10">Tuyến Phê Duyệt</h3>
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 relative z-10">
+                Tuyến Phê Duyệt
+              </h3>
               <div className="space-y-0 relative z-10">
                 {data.approvalSteps.map((step: any, idx: number) => {
-                  const isCurrent = step.status === 'PENDING' && step.stepNo === data.currentApprovalStep && data.status === 'PENDING_MANAGER';
+                  const isCurrent =
+                    step.status === 'PENDING' &&
+                    step.stepNo === data.currentApprovalStep &&
+                    data.status === 'PENDING_MANAGER';
                   const isDone = step.status === 'APPROVED';
                   const isBypassed = step.status === 'SKIPPED';
 
                   return (
                     <div key={step.id} className="relative flex gap-4 pb-8 last:pb-0 items-start">
-                      {/* Connector Line */}
                       {idx < data.approvalSteps.length && (
-                        <div className={`absolute left-4 top-8 bottom-0 w-[2.5px] transition-all duration-700 ${isDone ? 'bg-emerald-500' : 'bg-slate-100'}`}></div>
+                        <div
+                          className={`absolute left-4 top-8 bottom-0 w-[2.5px] transition-all duration-700 ${
+                            isDone ? 'bg-emerald-500' : 'bg-slate-100'
+                          }`}
+                        ></div>
                       )}
 
                       <div
                         className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 shrink-0 z-20 transition-all duration-500 ${
-                          isDone ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-100' :
-                          isCurrent ? 'bg-white border-indigo-600 text-indigo-700 ring-4 ring-indigo-50 shadow-xl' :
-                          isBypassed ? 'bg-slate-100 border-slate-200 text-slate-400' :
-                          'bg-white border-slate-200 text-slate-400'
+                          isDone
+                            ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-100'
+                            : isCurrent
+                              ? 'bg-white border-indigo-600 text-indigo-700 ring-4 ring-indigo-50 shadow-xl'
+                              : isBypassed
+                                ? 'bg-slate-100 border-slate-200 text-slate-400'
+                                : 'bg-white border-slate-200 text-slate-400'
                         }`}
                       >
                         {isDone ? <CheckCircle className="w-4 h-4" /> : <span>{step.stepNo}</span>}
@@ -560,7 +651,15 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
 
                       <div className="flex-1 min-w-0 pt-1">
                         <div className="flex items-center justify-between mb-0.5">
-                          <p className={`text-sm font-black truncate ${isCurrent ? 'text-indigo-900 drop-shadow-sm' : isDone ? 'text-slate-800' : 'text-slate-500'}`}>
+                          <p
+                            className={`text-sm font-black truncate ${
+                              isCurrent
+                                ? 'text-indigo-900 drop-shadow-sm'
+                                : isDone
+                                  ? 'text-slate-800'
+                                  : 'text-slate-500'
+                            }`}
+                          >
                             {step.approver?.fullName || 'Chưa chỉ định'}
                           </p>
                           {isCurrent && (
@@ -574,29 +673,51 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                         </p>
                         {isDone && step.actedAt && (
                           <p className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 inline-flex items-center">
-                            <Clock className="w-3 h-3 mr-1" /> Đã duyệt {new Date(step.actedAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}
+                            <Clock className="w-3 h-3 mr-1" /> Đã duyệt{' '}
+                            {new Date(step.actedAt).toLocaleString('vi-VN', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              day: '2-digit',
+                              month: '2-digit',
+                            })}
                           </p>
                         )}
                       </div>
-                      {isCurrent && <div className="absolute left-4 top-4 w-5 h-5 bg-indigo-200 rounded-full animate-ping opacity-30"></div>}
+
+                      {isCurrent && (
+                        <div className="absolute left-4 top-4 w-5 h-5 bg-indigo-200 rounded-full animate-ping opacity-30"></div>
+                      )}
                     </div>
                   );
                 })}
 
-                {/* Final Step Agent: Admin */}
                 <div className="relative flex gap-4 items-start">
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 shrink-0 z-20 transition-all ${
-                      data.status === 'PENDING_ADMIN' ? 'bg-amber-500 border-amber-500 text-white ring-4 ring-amber-50 shadow-xl' :
-                      ['APPROVED', 'READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER', 'COMPLETED', 'PARTIALLY_ISSUED'].includes(data.status) ? 'bg-emerald-500 border-emerald-500 text-white ring-4 ring-emerald-50' :
-                      'bg-white border-slate-200 text-slate-400'
+                      data.status === 'PENDING_ADMIN'
+                        ? 'bg-amber-500 border-amber-500 text-white ring-4 ring-amber-50 shadow-xl'
+                        : ['APPROVED', 'READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER', 'COMPLETED', 'PARTIALLY_ISSUED'].includes(data.status)
+                          ? 'bg-emerald-500 border-emerald-500 text-white ring-4 ring-emerald-50'
+                          : 'bg-white border-slate-200 text-slate-400'
                     }`}
                   >
-                    {['APPROVED', 'READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER', 'COMPLETED', 'PARTIALLY_ISSUED'].includes(data.status) ? <CheckCircle className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
+                    {['APPROVED', 'READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER', 'COMPLETED', 'PARTIALLY_ISSUED'].includes(data.status) ? (
+                      <CheckCircle className="w-4 h-4" />
+                    ) : (
+                      <ShieldCheck className="w-4 h-4" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0 pt-1">
                     <div className="flex items-center justify-between mb-0.5">
-                      <p className={`text-sm font-black truncate ${data.status === 'PENDING_ADMIN' ? 'text-amber-900 shadow-sm' : ['APPROVED', 'READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER', 'COMPLETED'].includes(data.status) ? 'text-slate-800' : 'text-slate-500'}`}>
+                      <p
+                        className={`text-sm font-black truncate ${
+                          data.status === 'PENDING_ADMIN'
+                            ? 'text-amber-900 shadow-sm'
+                            : ['APPROVED', 'READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER', 'COMPLETED'].includes(data.status)
+                              ? 'text-slate-800'
+                              : 'text-slate-500'
+                        }`}
+                      >
                         Hành chính & Duyệt cuối
                       </p>
                       {data.status === 'PENDING_ADMIN' && (
@@ -605,26 +726,37 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                         </span>
                       )}
                     </div>
-                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest opacity-80">Kiểm duyệt định mức & Điều phối</p>
+                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest opacity-80">
+                      Kiểm duyệt định mức & Điều phối
+                    </p>
                   </div>
                 </div>
 
-                {/* Warehouse fulfillment phase */}
                 {['APPROVED', 'READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER', 'COMPLETED', 'PARTIALLY_ISSUED'].includes(data.status) && (
                   <div className="relative flex gap-4 items-start">
                     <div className="absolute -left-[17px] -top-8 w-[2px] h-8 bg-emerald-500"></div>
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 shrink-0 z-20 transition-all ${
-                        ['READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER'].includes(data.status) ? 'bg-blue-500 border-blue-500 text-white ring-4 ring-blue-50 shadow-xl' :
-                        data.status === 'COMPLETED' ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg' :
-                        'bg-white border-slate-200 text-slate-400'
+                        ['READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER'].includes(data.status)
+                          ? 'bg-blue-500 border-blue-500 text-white ring-4 ring-blue-50 shadow-xl'
+                          : data.status === 'COMPLETED'
+                            ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg'
+                            : 'bg-white border-slate-200 text-slate-400'
                       }`}
                     >
                       {data.status === 'COMPLETED' ? <CheckCircle className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
                     </div>
                     <div className="flex-1 min-w-0 pt-1">
                       <div className="flex items-center justify-between mb-0.5">
-                        <p className={`text-sm font-black truncate ${['READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER'].includes(data.status) ? 'text-blue-900' : data.status === 'COMPLETED' ? 'text-slate-800' : 'text-slate-500'}`}>
+                        <p
+                          className={`text-sm font-black truncate ${
+                            ['READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER'].includes(data.status)
+                              ? 'text-blue-900'
+                              : data.status === 'COMPLETED'
+                                ? 'text-slate-800'
+                                : 'text-slate-500'
+                          }`}
+                        >
                           Kho vận & Bàn giao
                         </p>
                         {['READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER'].includes(data.status) && (
@@ -634,11 +766,15 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                         )}
                       </div>
                       <p className="text-[10px] text-slate-500 font-bold">
-                        {data.status === 'APPROVED' ? 'Chờ kho tiếp nhận...' :
-                          data.status === 'READY_TO_PICK' ? 'Đã tiếp nhận, chờ soạn hàng' :
-                            data.status === 'PICKING' ? 'Đang soạn hàng thực tế...' :
-                              ['READY_TO_HANDOVER', 'WAITING_HANDOVER'].includes(data.status) ? 'Đã soạn xong, chờ bàn giao' :
-                                'Đã hoàn tất bàn giao'}
+                        {data.status === 'APPROVED'
+                          ? 'Chờ kho tiếp nhận...'
+                          : data.status === 'READY_TO_PICK'
+                            ? 'Đã tiếp nhận, chờ soạn hàng'
+                            : data.status === 'PICKING'
+                              ? 'Đang soạn hàng thực tế...'
+                              : ['READY_TO_HANDOVER', 'WAITING_HANDOVER'].includes(data.status)
+                                ? 'Đã soạn xong, chờ bàn giao'
+                                : 'Đã hoàn tất bàn giao'}
                       </p>
                     </div>
                   </div>
@@ -647,17 +783,22 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
             </div>
           )}
 
-          {/* Card 4: Nhật ký xử lý */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col flex-1 min-h-[400px]">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Nhật ký xử lý (Audit Trail)</h3>
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">
+              Nhật ký xử lý (Audit Trail)
+            </h3>
             <div className="relative pl-6 space-y-8 flex-1 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-100">
-              {/* START POINT */}
               <div className="relative group">
                 <div className="absolute -left-[23px] top-1 w-4 h-4 rounded-full bg-slate-200 ring-4 ring-white shadow-sm group-hover:scale-125 transition-transform"></div>
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center justify-between">
                     <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Tạo đề xuất</p>
-                    <span className="text-[10px] font-bold text-slate-400">{new Date(data.createdAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span className="text-[10px] font-bold text-slate-400">
+                      {new Date(data.createdAt).toLocaleString('vi-VN', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 mt-1 py-1.5 px-3 bg-slate-50 rounded-xl border border-slate-100 w-fit">
                     <UserIcon className="w-3.5 h-3.5 text-slate-400" />
@@ -668,18 +809,26 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
 
               {data.approvalHistories?.map((audit: any) => {
                 const actionColor =
-                  audit.action === 'APPROVED' ? 'text-emerald-700' :
-                  audit.action.includes('ISSUED') ? 'text-blue-700' :
-                  audit.action === 'COMPLETED' ? 'text-indigo-700' :
-                  audit.action === 'REJECTED' || audit.action === 'CANCELLED' ? 'text-rose-700' :
-                  'text-amber-700';
+                  audit.action === 'APPROVED'
+                    ? 'text-emerald-700'
+                    : audit.action.includes('ISSUED')
+                      ? 'text-blue-700'
+                      : audit.action === 'COMPLETED'
+                        ? 'text-indigo-700'
+                        : audit.action === 'REJECTED' || audit.action === 'CANCELLED'
+                          ? 'text-rose-700'
+                          : 'text-amber-700';
 
                 const dotColor =
-                  audit.action === 'APPROVED' ? 'bg-emerald-500' :
-                  audit.action.includes('ISSUED') ? 'bg-blue-500' :
-                  audit.action === 'COMPLETED' ? 'bg-indigo-500' :
-                  audit.action === 'REJECTED' || audit.action === 'CANCELLED' ? 'bg-rose-500' :
-                  'bg-amber-500';
+                  audit.action === 'APPROVED'
+                    ? 'bg-emerald-500'
+                    : audit.action.includes('ISSUED')
+                      ? 'bg-blue-500'
+                      : audit.action === 'COMPLETED'
+                        ? 'bg-indigo-500'
+                        : audit.action === 'REJECTED' || audit.action === 'CANCELLED'
+                          ? 'bg-rose-500'
+                          : 'bg-amber-500';
 
                 const actionLabelMap: any = {
                   SUBMITTED: 'Gửi Đề Xuất',
@@ -708,21 +857,36 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <p className={`text-[10px] font-black uppercase tracking-widest ${actionColor}`}>{actLabel}</p>
+                          <p className={`text-[10px] font-black uppercase tracking-widest ${actionColor}`}>
+                            {actLabel}
+                          </p>
                           <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
-                          <p className="text-xs font-black text-slate-700">{audit.approver?.fullName || 'Hệ thống'}</p>
+                          <p className="text-xs font-black text-slate-700">
+                            {audit.approver?.fullName || 'Hệ thống'}
+                          </p>
                         </div>
                         <span className="text-[10px] font-bold text-slate-400">
-                          {new Date(audit.createdAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}
+                          {new Date(audit.createdAt).toLocaleString('vi-VN', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            day: '2-digit',
+                            month: '2-digit',
+                          })}
                         </span>
                       </div>
                       {audit.reason && (
-                        <div className={`p-4 rounded-2xl border-l-4 italic shadow-sm bg-slate-50 border-white/50 ${
-                          audit.action === 'APPROVED' ? 'border-l-emerald-500' :
-                          audit.action === 'REJECTED' || audit.action === 'CANCELLED' ? 'border-l-rose-500' :
-                          'border-l-amber-500'
-                        }`}>
-                          <p className="text-xs leading-relaxed font-medium text-slate-600 opacity-90">“{audit.reason}”</p>
+                        <div
+                          className={`p-4 rounded-2xl border-l-4 italic shadow-sm bg-slate-50 border-white/50 ${
+                            audit.action === 'APPROVED'
+                              ? 'border-l-emerald-500'
+                              : audit.action === 'REJECTED' || audit.action === 'CANCELLED'
+                                ? 'border-l-rose-500'
+                                : 'border-l-amber-500'
+                          }`}
+                        >
+                          <p className="text-xs leading-relaxed font-medium text-slate-600 opacity-90">
+                            “{audit.reason}”
+                          </p>
                         </div>
                       )}
                     </div>
@@ -735,7 +899,9 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                   <div className="absolute -left-[23px] top-1 w-4 h-4 rounded-full bg-emerald-500 ring-8 ring-emerald-50 animate-pulse shadow-lg"></div>
                   <div className="bg-emerald-600 py-2.5 px-4 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-200">
                     <CheckCircle className="w-4 h-4 text-white mr-2" />
-                    <p className="text-[10px] font-black text-white uppercase tracking-[0.25em]">Quy trình hoàn tất</p>
+                    <p className="text-[10px] font-black text-white uppercase tracking-[0.25em]">
+                      Quy trình hoàn tất
+                    </p>
                   </div>
                 </div>
               )}
@@ -744,24 +910,30 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
         </div>
       </div>
 
-      {/* MODAL PHÊ DUYỆT */}
       {showApproveModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] animate-slide-up">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-emerald-500 text-white">
               <h3 className="text-xl font-black">
-                {data.status === 'PENDING_MANAGER' ? 'Trưởng BP Phê Duyệt Cấp 1' : 'Admin Phê Duyệt Cấp 2 (Điều chỉnh số lượng)'}
+                {data.status === 'PENDING_MANAGER'
+                  ? 'Trưởng BP Phê Duyệt Cấp 1'
+                  : 'Admin Phê Duyệt Cấp 2 (Điều chỉnh số lượng)'}
               </h3>
-              <button onClick={() => setShowApproveModal(false)} className="text-emerald-100 hover:text-white transition">
+              <button
+                onClick={() => setShowApproveModal(false)}
+                className="text-emerald-100 hover:text-white transition"
+              >
                 <XCircle className="w-7 h-7" />
               </button>
             </div>
+
             <div className="p-6 overflow-y-auto flex-1">
               {data.status === 'PENDING_ADMIN' && (
                 <p className="text-sm font-medium text-slate-600 mb-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                   Admin có thể điều chỉnh số lượng duyệt. Số lượng vượt Tồn Kho thực tế sẽ báo đỏ.
                 </p>
               )}
+
               {data.status === 'PENDING_MANAGER' && (
                 <p className="text-sm font-medium text-slate-600 mb-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                   Trưởng phòng phê duyệt chuyển đơn lên bộ phận Hành chính. Việc cấp phát kho sẽ do bộ phận Hành chính quyết định.
@@ -775,21 +947,28 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                     <th className="p-3 text-center">Tồn Hiện Tại</th>
                     <th className="p-3 text-center">KH Yêu cầu</th>
                     {data.status === 'PENDING_ADMIN' && (
-                      <th className="p-3 text-center bg-emerald-50 border-x-2 border-emerald-100">QUYẾT ĐỊNH DUYỆT CẤP</th>
+                      <th className="p-3 text-center bg-emerald-50 border-x-2 border-emerald-100">
+                        QUYẾT ĐỊNH DUYỆT CẤP
+                      </th>
                     )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {data.lines.map((l: any) => {
-                    const currentApprove = approvals.find((a: any) => a.lineId === l.id)?.qtyApproved ?? l.qtyRequested;
+                    const currentApprove =
+                      approvals.find((a: any) => a.lineId === l.id)?.qtyApproved ?? l.qtyRequested;
                     const currentStock = l.item.stocks?.[0]?.quantityOnHand || 0;
                     const overStock = currentApprove > currentStock;
 
                     return (
                       <tr key={l.id}>
-                        <td className="p-3 font-bold text-slate-700 text-sm whitespace-normal">{l.item.name}</td>
+                        <td className="p-3 font-bold text-slate-700 text-sm whitespace-normal">
+                          {l.item.name}
+                        </td>
                         <td className="p-3 text-center font-black text-slate-600">{currentStock}</td>
-                        <td className="p-3 text-center font-black text-indigo-700 bg-indigo-50 border border-transparent rounded">{l.qtyRequested}</td>
+                        <td className="p-3 text-center font-black text-indigo-700 bg-indigo-50 border border-transparent rounded">
+                          {l.qtyRequested}
+                        </td>
                         {data.status === 'PENDING_ADMIN' && (
                           <td className="p-3 border-x-2 border-emerald-100 bg-white">
                             <input
@@ -799,7 +978,9 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                               onChange={(e: any) =>
                                 setApprovals(
                                   approvals.map((a: any) =>
-                                    a.lineId === l.id ? { ...a, qtyApproved: parseInt(e.target.value) || 0 } : a
+                                    a.lineId === l.id
+                                      ? { ...a, qtyApproved: parseInt(e.target.value) || 0 }
+                                      : a
                                   )
                                 )
                               }
@@ -809,7 +990,11 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                                   : 'text-emerald-700 border-emerald-200 focus:border-emerald-400 focus:ring-emerald-100'
                               }`}
                             />
-                            {overStock && <p className="text-[9px] font-bold text-rose-500 text-center mt-1">Duyệt lố tồn!</p>}
+                            {overStock && (
+                              <p className="text-[9px] font-bold text-rose-500 text-center mt-1">
+                                Duyệt lố tồn!
+                              </p>
+                            )}
                           </td>
                         )}
                       </tr>
@@ -818,20 +1003,33 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                 </tbody>
               </table>
             </div>
+
             <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
-              <button onClick={() => setShowApproveModal(false)} className="px-6 py-2.5 font-bold text-slate-500 hover:bg-slate-200 rounded-xl transition">
+              <button
+                onClick={() => setShowApproveModal(false)}
+                className="px-6 py-2.5 font-bold text-slate-500 hover:bg-slate-200 rounded-xl transition"
+              >
                 Hủy Bỏ
               </button>
               <button
                 onClick={() => {
                   if (data.status === 'PENDING_ADMIN') {
                     const hasOverStock = data.lines.some(
-                      (l: any) => (approvals.find((a: any) => a.lineId === l.id)?.qtyApproved ?? l.qtyRequested) > (l.item.stocks?.[0]?.quantityOnHand || 0)
+                      (l: any) =>
+                        (approvals.find((a: any) => a.lineId === l.id)?.qtyApproved ?? l.qtyRequested) >
+                        (l.item.stocks?.[0]?.quantityOnHand || 0)
                     );
                     if (hasOverStock) {
-                      if (!window.confirm('Cảnh báo: Bạn đang duyệt Số lượng vượt quá Tồn Kho thực tế. Hệ thống sẽ báo nợ (Backorder) hoặc Kho không thể xuất dòng này. Vẫn tiếp tục?')) return;
+                      if (
+                        !window.confirm(
+                          'Cảnh báo: Bạn đang duyệt Số lượng vượt quá Tồn Kho thực tế. Hệ thống sẽ báo nợ (Backorder) hoặc Kho không thể xuất dòng này. Vẫn tiếp tục?'
+                        )
+                      ) {
+                        return;
+                      }
                     }
                   }
+
                   handleAction('/approve', { lineApprovals: approvals }, 'Đã duyệt thành công!');
                   setShowApproveModal(false);
                 }}
@@ -844,7 +1042,6 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
         </div>
       )}
 
-      {/* MODAL TỪ CHỐI */}
       {showRejectModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up">
@@ -853,7 +1050,9 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
               <h3 className="text-xl font-black">Từ chối Yêu Cầu</h3>
             </div>
             <div className="p-6">
-              <label className="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">Lý do từ chối (Bắt buộc)</label>
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">
+                Lý do từ chối (Bắt buộc)
+              </label>
               <textarea
                 autoFocus
                 value={rejectReason}
@@ -863,12 +1062,17 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
               />
             </div>
             <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-              <button onClick={() => setShowRejectModal(false)} className="px-5 py-2.5 font-bold text-slate-500 hover:bg-slate-200 rounded-xl transition">
+              <button
+                onClick={() => setShowRejectModal(false)}
+                className="px-5 py-2.5 font-bold text-slate-500 hover:bg-slate-200 rounded-xl transition"
+              >
                 Hủy
               </button>
               <button
                 onClick={() => {
-                  if (!rejectReason.trim()) return showToast('Bắt buộc nhập lý do!', 'error');
+                  if (!rejectReason.trim()) {
+                    return showToast('Bắt buộc nhập lý do!', 'error');
+                  }
                   handleAction('/reject', { reason: rejectReason }, 'Đã từ chối phiếu');
                   setShowRejectModal(false);
                 }}
@@ -881,39 +1085,52 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
         </div>
       )}
 
-      {/* MODAL XUẤT KHO */}
       {showIssueModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] animate-slide-up">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-blue-600 text-white">
               <h3 className="text-xl font-black">Bảng Kê Xuất Kho Thực Tế & Giao Hàng</h3>
-              <button onClick={() => setShowIssueModal(false)} className="text-blue-200 hover:text-white transition">
+              <button
+                onClick={() => setShowIssueModal(false)}
+                className="text-blue-200 hover:text-white transition"
+              >
                 <XCircle className="w-7 h-7" />
               </button>
             </div>
+
             <div className="p-6 overflow-y-auto flex-1">
               <p className="text-sm font-medium text-slate-600 mb-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                 Kho thực hiện kiểm hàng đưa cho người nhận. Nhập vào ô "THỰC GIAO" số lượng vật lý anh/chị xuất đi. Hệ thống sẽ ngay lập tức trừ Tồn Kho. Phiếu sẽ chuyển sang trạng thái <b>CHỜ BÀN GIAO</b>.
               </p>
+
               <table className="w-full text-left whitespace-nowrap">
                 <thead className="bg-slate-50 text-[10px] uppercase font-black text-slate-400">
                   <tr>
                     <th className="p-3">Hàng Hóa</th>
                     <th className="p-3 text-center">Tồn Hiện Kho</th>
                     <th className="p-3 text-center">Đã Duyệt Cấp</th>
-                    <th className="p-3 text-center bg-blue-50 border-x-2 border-blue-100">THỰC GIAO LÚC NÀY</th>
+                    <th className="p-3 text-center bg-blue-50 border-x-2 border-blue-100">
+                      THỰC GIAO LÚC NÀY
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {data.lines.map((l: any) => {
-                    const qtyDeliv = issues.find((a: any) => a.lineId === l.id)?.qtyDelivered ?? (l.qtyApproved ?? l.qtyRequested);
+                    const qtyDeliv =
+                      issues.find((a: any) => a.lineId === l.id)?.qtyDelivered ??
+                      (l.qtyApproved ?? l.qtyRequested);
                     const currentStock = l.item.stocks?.[0]?.quantityOnHand || 0;
                     const overStock = qtyDeliv > currentStock;
+
                     return (
                       <tr key={l.id}>
-                        <td className="p-3 font-bold text-slate-700 text-sm whitespace-normal">{l.item.name}</td>
+                        <td className="p-3 font-bold text-slate-700 text-sm whitespace-normal">
+                          {l.item.name}
+                        </td>
                         <td className="p-3 text-center font-black text-slate-600">{currentStock}</td>
-                        <td className="p-3 text-center font-black text-emerald-600">{l.qtyApproved ?? l.qtyRequested}</td>
+                        <td className="p-3 text-center font-black text-emerald-600">
+                          {l.qtyApproved ?? l.qtyRequested}
+                        </td>
                         <td className="p-3 border-x-2 border-blue-100 bg-white">
                           <input
                             type="number"
@@ -922,7 +1139,9 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                             onChange={(e: any) =>
                               setIssues(
                                 issues.map((a: any) =>
-                                  a.lineId === l.id ? { ...a, qtyDelivered: parseInt(e.target.value) || 0 } : a
+                                  a.lineId === l.id
+                                    ? { ...a, qtyDelivered: parseInt(e.target.value) || 0 }
+                                    : a
                                 )
                               )
                             }
@@ -944,19 +1163,40 @@ console.log('REQUEST_DETAIL_DEBUG_V1', {
                 </tbody>
               </table>
             </div>
+
             <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
-              <button onClick={() => setShowIssueModal(false)} className="px-6 py-2.5 font-bold text-slate-500 hover:bg-slate-200 rounded-xl transition">
+              <button
+                onClick={() => setShowIssueModal(false)}
+                className="px-6 py-2.5 font-bold text-slate-500 hover:bg-slate-200 rounded-xl transition"
+              >
                 Hủy Bỏ
               </button>
               <button
                 onClick={() => {
                   const hasErr = data.lines.some(
-                    (l: any) => (issues.find((a: any) => a.lineId === l.id)?.qtyDelivered ?? (l.qtyApproved ?? l.qtyRequested)) > (l.item.stocks?.[0]?.quantityOnHand || 0)
+                    (l: any) =>
+                      (issues.find((a: any) => a.lineId === l.id)?.qtyDelivered ??
+                        (l.qtyApproved ?? l.qtyRequested)) >
+                      (l.item.stocks?.[0]?.quantityOnHand || 0)
                   );
-                  if (hasErr) return showToast('Không thể xuất dòng có số lượng Giao vượt số Tồn kho. Vui lòng nhận đúng hoặc ít hơn tồn kho hiện hữu.', 'error');
 
-                  const endpoint = data.status === 'PICKING' ? '/warehouse/complete_picking' : '/issue';
-                  handleAction(endpoint, { lineIssues: issues }, 'ĐÃ XUẤT KHO THÀNH CÔNG VÀ TRỪ TỒN!');
+                  if (hasErr) {
+                    return showToast(
+                      'Không thể xuất dòng có số lượng Giao vượt số Tồn kho. Vui lòng nhận đúng hoặc ít hơn tồn kho hiện hữu.',
+                      'error'
+                    );
+                  }
+
+                  const endpoint =
+                    data.status === 'PICKING'
+                      ? '/warehouse/complete_picking'
+                      : '/issue';
+
+                  handleAction(
+                    endpoint,
+                    { lineIssues: issues },
+                    'ĐÃ XUẤT KHO THÀNH CÔNG VÀ TRỪ TỒN!'
+                  );
                   setShowIssueModal(false);
                 }}
                 className="px-8 py-2.5 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-500/30 flex items-center"
