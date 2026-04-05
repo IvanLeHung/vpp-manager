@@ -172,25 +172,11 @@ export default function RequestsDetail({
 
   const userId = currentUser?.userId || currentUser?.id;
 
-  const currentStep = data.approvalSteps?.find(
-    (s: any) => s.stepNo === data.currentApprovalStep
-  );
-
   const isApprover =
     !!userId &&
     (
-      (
-        data.status === 'PENDING_MANAGER' &&
-        data.currentApproverId === userId &&
-        data.currentHandlerRole === 'MANAGER' &&
-        currentStep?.approverId === userId &&
-        currentStep?.status === 'PENDING'
-      ) ||
-      (
-        data.status === 'PENDING_ADMIN' &&
-        currentUser.role === 'ADMIN' &&
-        (!data.currentHandlerRole || data.currentHandlerRole === 'ADMIN')
-      )
+      (data.status === 'PENDING_MANAGER' && data.currentApproverId === userId) ||
+      (data.status === 'PENDING_ADMIN' && currentUser.role === 'ADMIN')
     );
 
   const isManagerInChain =
@@ -442,7 +428,7 @@ export default function RequestsDetail({
                       position: 'relative',
                       zIndex: 9999,
                     }}
-                    className="w-full min-h-[56px] py-4 bg-red-600 text-white rounded-2xl font-black text-base hover:bg-red-700 transition shadow-xl flex items-center justify-center border-4 border-yellow-300"
+                    className="w-full min-h-[56px] py-4 bg-indigo-600 text-white rounded-2xl font-black text-base hover:bg-indigo-700 transition shadow-xl shadow-indigo-500/20 flex items-center justify-center border-b-4 border-indigo-800"
                   >
                     <CheckCircle className="w-5 h-5 mr-2" /> PHÊ DUYỆT
                   </button>
