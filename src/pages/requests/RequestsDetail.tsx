@@ -173,7 +173,16 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
   const isHandover =
     (userId === data.requesterId || currentUser.role === 'ADMIN') &&
     data.status === 'WAITING_HANDOVER';
-
+console.log('REQUEST_DETAIL_DEBUG_V1', {
+  currentUser,
+  userId,
+  currentApproverId: data.currentApproverId,
+  currentHandlerRole: data.currentHandlerRole,
+  currentApprovalStep: data.currentApprovalStep,
+  currentStep,
+  isApprover,
+  status: data.status,
+});
   return (
     <div className="flex flex-col h-full bg-slate-100 overflow-hidden relative print:bg-white print:overflow-auto">
       {/* HEADER BAR */}
