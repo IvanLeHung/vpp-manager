@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Plus, XCircle, Save, Send, Search, Trash2, AlertTriangle, AlertCircle } from 'lucide-react';
 import api from '../../lib/api';
 import { useAppContext } from '../../context/AppContext';

@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { 
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
-  AreaChart, Area, PieChart, Pie, Cell
+  AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar
 } from 'recharts';
 import { useAppContext } from '../context/AppContext';
 import { 
   TrendingUp, Download, Clock, ShoppingCart, CheckCircle, Inbox, RefreshCw, 
-  AlertTriangle, FileText, LayoutDashboard, ShieldAlert, Zap
+  AlertTriangle, FileText, LayoutDashboard, ShieldAlert, Zap, Package, Droplets
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../lib/api';
@@ -17,11 +17,12 @@ export default function Analytics() {
   const { currentUser } = useAppContext();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [activeWarehouse, setActiveWarehouse] = useState<'ALL' | 'VPP' | 'VE_SINH'>('ALL');
 
   const fetchDashboard = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/reports/dashboard');
+      const res = await api.get(`/reports/dashboard?warehouseCode=${activeWarehouse}`);
       setData(res.data);
     } catch (err) {
       console.error('Failed to load dashboard KPI', err);
@@ -32,23 +33,40 @@ export default function Analytics() {
 
   useEffect(() => {
     fetchDashboard();
-  }, []);
+  }, [activeWarehouse]);
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!data) return;
-    const wb = XLSX.utils.book_new();
-    
-    if (data.analytical?.trendData?.length) {
-      const ws = XLSX.utils.json_to_sheet(data.analytical.trendData);
-      XLSX.utils.book_append_sheet(wb, ws, "Xu_Huong_30_Ngay");
-    }
-    
-    if (data.predictive?.stockoutRisks?.length) {
-      const ws = XLSX.utils.json_to_sheet(data.predictive.stockoutRisks);
-      XLSX.utils.book_append_sheet(wb, ws, "Canh_Bao_Het_Hang");
-    }
+    setLoading(true);
+    try {
+        const wb = XLSX.utils.book_new();
+        
+        // Dashboard Trends
+        if (data.analytical?.trendData?.length) {
+            const ws = XLSX.utils.json_to_sheet(data.analytical.trendData);
+            XLSX.utils.book_append_sheet(wb, ws, "Xu_Huong_30_Ngay");
+        }
+        
+        // Department Usage
+        if (data.analytical?.departmentUsage?.length) {
+            const ws = XLSX.utils.json_to_sheet(data.analytical.departmentUsage);
+            XLSX.utils.book_append_sheet(wb, ws, "Chi_Phi_Phong_Ban");
+        }
 
-    XLSX.writeFile(wb, `Bao_Cao_KPI_${new Date().toISOString().slice(0,10)}.xlsx`);
+        // Full Stock Ledger (Audit Trail)
+        const ledgerRes = await api.get(`/reports/ledger?warehouseCode=${activeWarehouse}&days=30`);
+        if (ledgerRes.data && Array.isArray(ledgerRes.data)) {
+            const ws = XLSX.utils.json_to_sheet(ledgerRes.data);
+            XLSX.utils.book_append_sheet(wb, ws, "So_Kho_Chi_Tiet");
+        }
+
+        XLSX.writeFile(wb, `Bao_Cao_Tong_Hop_${activeWarehouse}_${new Date().toISOString().slice(0,10)}.xlsx`);
+    } catch (err) {
+        console.error("Export failed", err);
+        alert("Không thể xuất file Excel. Vui lòng thử lại.");
+    } finally {
+        setLoading(false);
+    }
   };
 
   if (loading || !data) {
@@ -74,14 +92,31 @@ export default function Analytics() {
     <div className="flex flex-col h-[calc(100vh-64px)] p-4 md:p-8 bg-slate-50 relative overflow-y-auto w-full">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 shrink-0 gap-4">
-            <div>
+            <div className="flex-1">
                <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center">
                   <LayoutDashboard className="w-6 h-6 mr-3 text-indigo-600" />
                   Đài Chỉ Huy (Dashboard)
                </h2>
-               <p className="text-slate-500 font-medium text-sm mt-1">
-                 {isEmployee ? 'Theo dõi Yêu cầu & Cấp phát cá nhân' : 'Giám sát Vận hành, Phân tích Hiệu suất & Dự báo Tương lai'}
-               </p>
+               <div className="flex gap-4 mt-2">
+                    {[
+                        { id: 'ALL', label: 'Tất cả Kho', icon: LayoutDashboard },
+                        { id: 'VPP', label: 'Kho VPP', icon: Package },
+                        { id: 'VE_SINH', label: 'Kho Vệ Sinh', icon: Droplets }
+                    ].map(w => (
+                        <button
+                            key={w.id}
+                            onClick={() => setActiveWarehouse(w.id as any)}
+                            className={`flex items-center px-4 py-1.5 rounded-full text-xs font-bold transition-all border ${
+                                activeWarehouse === w.id 
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-200' 
+                                : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300'
+                            }`}
+                        >
+                            <w.icon className="w-3 h-3 mr-1.5" />
+                            {w.label}
+                        </button>
+                    ))}
+               </div>
             </div>
             <div className="flex gap-3">
               <button onClick={fetchDashboard} className="px-4 py-2.5 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl shadow-sm hover:bg-slate-50 transition flex items-center">
@@ -180,7 +215,7 @@ export default function Analytics() {
                     <h3 className="font-extrabold text-slate-800 text-base mb-6 flex items-center">
                         Xu Hướng Giao Dịch Kho (30 Ngày Qua)
                     </h3>
-                    <div className="flex-1 w-full min-h-[300px]">
+                    <div className="flex-1 w-full h-[350px]">
                         {analytical.trendData?.length ? (
                           <ResponsiveContainer width="100%" height="100%">
                               <AreaChart data={analytical.trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -214,7 +249,7 @@ export default function Analytics() {
                     <h3 className="font-extrabold text-slate-800 text-base mb-6 text-center" title="Phân loại theo Giá trị tiêu thụ">
                        Cơ Cấu Vật Tư Theo ABC
                     </h3>
-                    <div className="flex-1 min-h-[250px] w-full">
+                    <div className="flex-1 h-[300px] w-full">
                         {analytical.abcAnalysis ? (
                           <ResponsiveContainer width="100%" height="100%">
                               <PieChart>
@@ -231,6 +266,31 @@ export default function Analytics() {
                               </PieChart>
                           </ResponsiveContainer>
                         ) : <div className="text-center text-slate-400 mt-10">Không có dữ liệu</div>}
+                    </div>
+                </div>
+
+                {/* Department Spending Chart */}
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col md:col-span-2">
+                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center">
+                        <TrendingUp className="w-4 h-4 mr-2 text-indigo-500" />
+                        Chi Phí Theo Phòng Ban (30 ngày)
+                    </h3>
+                    <div className="flex-1 h-[300px] w-full">
+                        {analytical.departmentUsage?.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={analytical.departmentUsage} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                    <XAxis dataKey="name" fontSize={10} fontWeight="bold" axisLine={false} tickLine={false} />
+                                    <YAxis fontSize={10} fontWeight="bold" axisLine={false} tickLine={false} tickFormatter={(val) => val.toLocaleString()} />
+                                    <RechartsTooltip formatter={(val: any) => val.toLocaleString() + ' đ'} contentStyle={{borderRadius: '12px', border:'none', boxShadow:'0 10px 15px rgba(0,0,0,0.1)'}} />
+                                    <Bar dataKey="value" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="flex items-center justify-center h-full text-slate-400 font-medium text-xs italic">
+                                Chưa có dữ liệu xuất kho.
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
