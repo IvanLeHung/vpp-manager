@@ -1,19 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
-  XCircle,
-  CheckCircle,
-  RefreshCw,
-  ArrowLeft,
-  Archive,
-  StopCircle,
-  AlertTriangle,
-  Clock,
-  ShieldCheck,
-  Shield,
-  Activity,
-  CornerUpLeft,
-  User as UserIcon,
-  Zap,
+  XCircle, CheckCircle, RefreshCw, ArrowLeft, Archive,
+  StopCircle, AlertTriangle, Clock, ShieldCheck, Shield,
+  Activity, CornerUpLeft, User as UserIcon, Zap, Send, FileText,
+  AlertCircle,
+  Save
 } from 'lucide-react';
 import api from '../../lib/api';
 import type { User } from '../../context/AppContext';
@@ -37,31 +28,47 @@ export default function RequestsDetail({
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const [rejectReason, setRejectReason] = useState('');
-  const [showRejectModal, setShowRejectModal] = useState(false);
+  // States handling logic
+  const [processNote, setProcessNote] = useState('');
+  const [lineActions, setLineActions] = useState<{lineId: string, approvedQty: number, decision: 'APPROVE'|'REJECT'|'DECREASE', reason: string}[]>([]);
+  const [nextAssigneeId, setNextAssigneeId] = useState<string>('');
+  
+  // Specific modale states
   const [showApproveModal, setShowApproveModal] = useState(false);
-  const [showIssueModal, setShowIssueModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [returnReason, setReturnReason] = useState('');
 
-  const [approvals, setApprovals] = useState<{ lineId: string; qtyApproved: number }[]>([]);
-  const [issues, setIssues] = useState<{ lineId: string; qtyDelivered: number }[]>([]);
+  const [usersToForward, setUsersToForward] = useState<any[]>([]);
 
   const fetchDetail = async () => {
     try {
       setLoading(true);
       const res = await api.get(`/requests/${requestId}`);
       setData(res.data);
-      setApprovals(
-        res.data.lines.map((l: any) => ({
-          lineId: l.id,
-          qtyApproved: l.qtyRequested,
-        }))
-      );
-      setIssues(
-        res.data.lines.map((l: any) => ({
-          lineId: l.id,
-          qtyDelivered: l.qtyApproved ?? l.qtyRequested,
-        }))
-      );
+      
+      // Initialize Line Actions from draft or default
+      const draft = res.data.processingDraft;
+      if (draft && draft.lineActions) {
+         setLineActions(draft.lineActions);
+         if (draft.note) setProcessNote(draft.note);
+      } else {
+         setLineActions(
+          res.data.lines.map((l: any) => ({
+             lineId: l.id,
+             approvedQty: l.qtyRequested,
+             decision: 'APPROVE' as const,
+             reason: ''
+          }))
+         );
+      }
+
+      // Pre-fetch managers for forward dropdown if allowed
+      if (res.data.permissions?.canApprove) {
+         fetchUsers();
+      }
+
     } catch (err: any) {
       showToast(err.response?.data?.error || 'Lỗi tải phiếu', 'error');
       setViewMode('LIST');
@@ -70,96 +77,38 @@ export default function RequestsDetail({
     }
   };
 
+  const fetchUsers = async () => {
+     try {
+       const uRes = await api.get('/users?limit=100');
+       setUsersToForward(uRes.data?.data?.filter((u:any) => u.isActive && ['ADMIN', 'MANAGER', 'WAREHOUSE'].includes(u.role)) || []);
+     } catch(e) { }
+  }
+
   useEffect(() => {
     fetchDetail();
   }, [requestId]);
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'APPROVED':
-        return 'Đã duyệt';
-      case 'REJECTED':
-        return 'Từ chối';
-      case 'DRAFT':
-        return 'Bản nháp';
-      case 'PARTIALLY_ISSUED':
-        return 'Cấp phát một phần';
-      case 'PARTIALLY_APPROVED':
-        return 'Duyệt một phần';
-      case 'RETURNED':
-        return 'Trả lại';
-      case 'READY_TO_PICK':
-        return 'Sẵn sàng soạn hàng';
-      case 'PICKING':
-        return 'Đang soạn hàng (Kho)';
-      case 'READY_TO_HANDOVER':
-        return 'Sẵn sàng bàn giao';
-      case 'WAITING_HANDOVER':
-        return 'Chờ xác nhận nhận hàng';
-      case 'READY_TO_ISSUE':
-        return 'Sẵn sàng cấp phát';
-      case 'PENDING_MANAGER':
-        return 'Chờ Quản lý duyệt';
-      case 'PENDING_ADMIN':
-        return 'Chờ Hành chính duyệt';
-      case 'COMPLETED':
-        return 'Hoàn tất';
-      case 'CANCELLED':
-        return 'Đã hủy';
-      case 'PARTIALLY_FULFILLED':
-        return 'Cấp phát một phần';
-      case 'OUT_OF_STOCK':
-        return 'Hết hàng (Chờ mua)';
-      case 'NEEDS_PROCUREMENT':
-        return 'Chờ thu mua';
-      default:
-        return status.replace(/_/g, ' ');
-    }
-  };
+  const updateLine = (lineId: string, key: string, value: any) => {
+     setLineActions(prev => prev.map(a => {
+        if (a.lineId === lineId) {
+            const updated = { ...a, [key]: value };
+            // Auto decision update based on qty if touching qty
+            if (key === 'approvedQty') {
+                const originalL = data.lines.find((l:any) => l.id === lineId);
+                if (value === 0) updated.decision = 'REJECT';
+                else if (value < originalL.qtyRequested) updated.decision = 'DECREASE';
+                else updated.decision = 'APPROVE';
+            }
+            return updated;
+        }
+        return a;
+     }));
+  }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'APPROVED':
-      case 'READY_TO_ISSUE':
-      case 'COMPLETED':
-        return 'bg-emerald-500 text-white shadow-emerald-500/30';
-      case 'REJECTED':
-      case 'CANCELLED':
-        return 'bg-rose-500 text-white shadow-rose-500/30';
-      case 'DRAFT':
-        return 'bg-slate-400 text-white shadow-slate-400/30';
-      case 'PARTIALLY_ISSUED':
-      case 'PARTIALLY_APPROVED':
-        return 'bg-teal-500 text-white shadow-teal-500/30';
-      case 'RETURNED':
-        return 'bg-orange-500 text-white shadow-orange-500/30';
-      case 'WAITING_HANDOVER':
-        return 'bg-blue-500 text-white shadow-blue-500/30';
-      case 'READY_TO_HANDOVER':
-        return 'bg-indigo-600 text-white shadow-indigo-600/30 ring-4 ring-indigo-100';
-      case 'READY_TO_PICK':
-        return 'bg-cyan-500 text-white shadow-cyan-500/30';
-      case 'PICKING':
-        return 'bg-blue-600 text-white shadow-blue-600/30 animate-pulse';
-      case 'PENDING_MANAGER':
-      case 'PENDING_ADMIN':
-        return 'bg-amber-500 text-white shadow-amber-500/30';
-      case 'OUT_OF_STOCK':
-      case 'NEEDS_PROCUREMENT':
-        return 'bg-rose-600 text-white shadow-rose-600/30';
-      default:
-        return 'bg-slate-500 text-white cursor-help';
-    }
-  };
-
-  const handleAction = async (actionPath: string, payload: any = {}, successMsg: string, method: 'POST' | 'DELETE' = 'POST') => {
+  const handleAction = async (actionPath: string, payload: any = {}, successMsg: string) => {
     try {
       setLoading(true);
-      if (method === 'DELETE') {
-        await api.delete(`/requests/${requestId}`);
-      } else {
-        await api.post(`/requests/${requestId}${actionPath}`, payload);
-      }
+      await api.post(`/requests/${requestId}${actionPath}`, payload);
       showToast(successMsg);
       await refreshData();
       setViewMode('LIST');
@@ -170,6 +119,29 @@ export default function RequestsDetail({
     }
   };
 
+  const handleSaveDraft = async () => {
+     try {
+       setLoading(true);
+       await api.patch(`/requests/${requestId}/processing-draft`, { note: processNote, lineActions });
+       showToast('Đã lưu nháp xử lý thành công');
+       fetchDetail();
+     } catch (err: any) {
+       showToast(err.response?.data?.error || 'Không thể lưu nháp', 'error');
+       setLoading(false);
+     }
+  }
+
+  const submitApprove = () => {
+     // Validate
+     const invalidLine = lineActions.find(a => (a.decision === 'DECREASE' || a.decision === 'REJECT') && !a.reason.trim());
+     if (invalidLine) {
+         return showToast('Vui lòng nhập lý do dòng cho các vật tư bị giảm số lượng hoặc từ chối', 'error');
+     }
+     
+     handleAction('/approve', { note: processNote, lineActions, nextAssigneeId: nextAssigneeId || undefined }, 'Đã duyệt phiếu thành công!');
+     setShowApproveModal(false);
+  }
+
   if (loading || !data) {
     return (
       <div className="flex flex-col h-full bg-slate-50 relative items-center justify-center">
@@ -179,873 +151,294 @@ export default function RequestsDetail({
     );
   }
 
-  const userId = currentUser?.id || currentUser?.userId;
-
-  // Quyền hạn từ Backend
-  const perms = data.permissions || {};
-  const isApprover = perms.canApprove;
-  const isAdminOverride = perms.isAdminOverride;
-
-  const isWarehouse =
-    (currentUser.role === 'WAREHOUSE' || currentUser.role === 'ADMIN') &&
-    [
-      'APPROVED',
-      'READY_TO_PICK',
-      'PICKING',
-      'READY_TO_HANDOVER',
-      'READY_TO_ISSUE',
-      'PARTIALLY_ISSUED',
-      'PARTIALLY_APPROVED',
-    ].includes(data.status);
-
-  // Future approver logic based on chain
-  const isFutureApprover = !perms.canApprove && (data.approvalSteps || []).some((s: any) => s.approverId === userId && s.status === 'WAITING');
-
+  const currentUserTurn = data.permissions?.isMyTurn;
+  // warnings from API
+  const apiWarnings = data.warnings || [];
+  
+  // Calculate specific warning derived
+  const outOfStockLines = data.lines.filter((l:any) => l.qtyRequested > (l.item.stocks?.[0]?.quantityOnHand || 0));
 
   return (
-    <div className="flex flex-col h-full bg-slate-100 overflow-hidden relative print:bg-white print:overflow-auto">
-      <div className="h-20 bg-white border-b border-slate-200 flex justify-between items-center px-6 md:px-10 shrink-0 z-20 shadow-sm print:hidden">
-        <div className="flex items-center gap-6">
-          <button
-            onClick={() => setViewMode('LIST')}
-            className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition shadow-inner"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center">
-              {data.id}
-              {data.priority === 'Khẩn cấp' && (
-                <span className="ml-3 text-[10px] bg-rose-500 text-white px-2 py-0.5 rounded uppercase tracking-wider animate-pulse shadow-sm shadow-rose-500/50">
-                  Khẩn cấp
-                </span>
-              )}
-            </h2>
-            <p className="text-sm font-semibold text-slate-500 mt-0.5">
-              {data.requestType} • Lập lúc {new Date(data.createdAt).toLocaleString('vi-VN')}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg ${getStatusColor(data.status)}`}>
-            {getStatusLabel(data.status)}
-          </span>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col xl:flex-row gap-6 w-full max-w-[1400px] mx-auto print:p-0">
-        <div className="flex-1 flex flex-col gap-6 min-w-0">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-2 h-full bg-indigo-500"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pl-4">
+    <div className="flex flex-col h-full bg-slate-100 overflow-hidden relative">
+      {/* FIXED TOP ACTION BAR */}
+      <div className="h-24 bg-white border-b border-slate-200 flex flex-col justify-center px-6 md:px-10 shrink-0 z-20 shadow-sm sticky top-0">
+        <div className="flex items-center justify-between">
+           <div className="flex items-center gap-4">
+              <button onClick={() => setViewMode('LIST')} className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition shadow-inner">
+                 <ArrowLeft className="w-5 h-5" />
+              </button>
               <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Người Đề Xuất</p>
-                <p className="text-lg font-bold text-slate-800">{data.requester?.fullName}</p>
-                <p className="text-sm font-semibold text-indigo-600 mt-1">{data.department}</p>
+                 <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-black text-slate-800 tracking-tight">{data.id}</h2>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-500">{data.status}</span>
+                 </div>
+                 <p className="text-xs font-bold text-slate-500 mt-1">
+                    Người tạo: {data.requester?.fullName} • {new Date(data.createdAt).toLocaleString('vi-VN')}
+                 </p>
               </div>
-              <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Lý do & Mục đích</p>
-                <p className="text-sm font-medium text-slate-700 bg-slate-50 p-4 rounded-xl border border-slate-100 italic">
-                  "{data.purpose || 'Không có ghi chú'}"
-                </p>
-              </div>
+           </div>
 
-              {['REJECTED', 'RETURNED', 'CANCELLED'].includes(data.status) && (
-                <div className="md:col-span-2 bg-rose-50 border border-rose-200 rounded-xl p-4 mt-2">
-                  <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-1">Lý do {data.status}</p>
-                  <p className="font-bold text-rose-700">{data.rejectReason || data.returnReason || data.cancelReason}</p>
-                </div>
-              )}
-
-              {!isApprover && currentUser.role === 'MANAGER' && data.requester?.managerId === userId && data.status === 'PENDING_ADMIN' && (
-                <div className="md:col-span-2 bg-indigo-50 border border-indigo-200 rounded-xl p-4 mt-2 flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-indigo-500" />
-                  <div>
-                    <p className="text-xs font-black text-indigo-700 uppercase tracking-widest">Bạn đã duyệt phiếu này</p>
-                    <p className="text-[10px] text-indigo-600 font-medium italic">Đang chờ bộ phận Hành chính (Admin) phê duyệt cấp cuối.</p>
-                  </div>
-                </div>
-              )}
-
-              {!isApprover && currentUser.role === 'MANAGER' && data.currentApproverId !== userId && data.status === 'PENDING_MANAGER' && (
-                <div className="md:col-span-2 bg-amber-50 border border-amber-200 rounded-xl p-4 mt-2 flex items-center gap-3">
-                  <AlertTriangle className="w-5 h-5 text-amber-500" />
-                  <div>
-                    <p className="text-xs font-black text-amber-700 uppercase tracking-widest">Phiếu chưa đến lượt bạn duyệt hoặc không thuộc quyền xử lý</p>
-                    <p className="text-[10px] text-amber-600 font-medium italic">Chỉ quản lý được chỉ định trong luồng mới có thể thực hiện thao tác duyệt lúc này.</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden relative print:shadow-none print:border-none">
-            <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-              <h3 className="text-[11px] font-black text-indigo-700 uppercase tracking-widest">Chi tiết Vật tư Xin Cấp</h3>
-              {data.lines.some((l: any) => l.qtyRequested > (l.item.stocks?.[0]?.quantityOnHand || 0)) && (
-                <span className="text-[10px] font-bold text-rose-600 bg-rose-100 px-3 py-1 rounded border border-rose-200 flex items-center print:hidden">
-                  <AlertTriangle className="w-3.5 h-3.5 mr-1" /> Cảnh báo thiếu Tồn Kho Hiện Tại
-                </span>
-              )}
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left whitespace-nowrap min-w-max">
-                <thead className="bg-white border-b border-slate-200">
-                  <tr className="text-[10px] uppercase font-black text-slate-400 tracking-widest">
-                    <th className="p-4 text-center w-12 border-r border-slate-100">STT</th>
-                    <th className="p-4">Vật tư / Hàng hóa</th>
-                    <th className="p-4 text-center border-x border-slate-100 bg-slate-50/50">SL Xin</th>
-                    <th className="p-4 text-center text-emerald-600 bg-emerald-50/30">SL Duyệt</th>
-                    <th className="p-4 text-center text-blue-600 bg-blue-50/30">Lấy thực</th>
-                    <th className="p-4">Ghi Chú</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {data.lines.map((l: any, idx: number) => {
-                    const currentStock = l.item.stocks?.[0]?.quantityOnHand || 0;
-                    const outOfStock = l.qtyRequested > currentStock;
-                    return (
-                      <tr
-                        key={l.id}
-                        className={`hover:bg-slate-50 transition border-l-4 ${outOfStock && data.status.startsWith('PENDING') ? 'border-l-rose-500 bg-rose-50/30' : 'border-l-transparent'}`}
-                      >
-                        <td className="p-4 text-center font-bold text-slate-400 border-r border-slate-100">{idx + 1}</td>
-                        <td className="p-4">
-                          <p className="font-bold text-slate-800 text-sm">{l.item.name}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-black tracking-widest">{l.item.mvpp}</span>
-                            {data.status.startsWith('PENDING') && (
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${outOfStock ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200'}`}>
-                                Tồn: {currentStock}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="p-4 text-center border-x border-slate-100 bg-slate-50/50">
-                          <span className="font-black text-lg text-indigo-700">{l.qtyRequested}</span>{' '}
-                          <span className="text-[10px] font-bold text-slate-400">{l.item.unit}</span>
-                        </td>
-                        <td className="p-4 text-center bg-emerald-50/30">
-                          <span className="font-black text-lg text-emerald-600">{l.qtyApproved ?? '-'}</span>
-                        </td>
-                        <td className="p-4 text-center bg-blue-50/30">
-                          <span className="font-black text-lg text-blue-600">{l.qtyDelivered ?? 0}</span>
-                          {l.qtyDelivered > 0 && l.qtyDelivered < (l.qtyApproved ?? l.qtyRequested) && (
-                            <p className="text-[10px] font-bold text-amber-600 mt-1">
-                              Nợ: {(l.qtyApproved ?? l.qtyRequested) - l.qtyDelivered}
-                            </p>
-                          )}
-                        </td>
-                        <td className="p-4 text-slate-600 text-sm font-medium">{l.note || '-'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <div className="w-full xl:w-96 flex flex-col gap-6 shrink-0 print:hidden">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Trạng thái hiện tại</h3>
-            <div className="flex items-center justify-between mb-4">
-              <span className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest shadow-sm ${getStatusColor(data.status)}`}>
-                {getStatusLabel(data.status)}
-              </span>
-              <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">
-                Trong hạn
-              </span>
-            </div>
-            <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 mt-2">
-              <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Mức độ ưu tiên</p>
-              <p className="text-sm font-black text-slate-800">{data.priority}</p>
-
-              <p className="text-[10px] font-bold text-slate-400 uppercase mb-1 mt-3">Bộ phận đang xử lý</p>
-              <p className="text-sm font-bold text-indigo-700">
-                {data.status === 'PENDING_MANAGER'
-                  ? 'Quản lý (Cấp 1)'
-                  : data.status === 'PENDING_ADMIN'
-                    ? 'Hành chính (Duyệt cuối)'
-                    : ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED'].includes(data.status)
-                      ? 'Kho xuất hàng'
-                      : data.status === 'WAITING_HANDOVER'
-                        ? 'Chờ xác nhận bàn giao'
-                        : data.status === 'COMPLETED'
-                          ? 'Đã hoàn tất'
-                          : 'Đã đóng'}
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-slate-200 p-6 relative overflow-hidden">
-            {(isApprover || isWarehouse) && (
-              <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 z-20"></div>
-            )}
-            {/* Giai đoạn duyệt (Approval Chain) */}
-            {(data.status === 'PENDING_MANAGER' || data.status === 'PENDING_ADMIN' || data.approvalSteps?.length > 0) && (
-              <div className="mb-8 border-b border-slate-100 pb-6">
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center">
-                  <Activity className="w-4 h-4 mr-2 text-indigo-500" /> QUY TRÌNH PHÊ DUYỆT
-                </h3>
-                <div className="space-y-4">
-                  {/* Step 1: Manager chain */}
-                  {data.approvalSteps?.map((step: any, idx: number) => {
-                    const isStepCurrent = data.status === 'PENDING_MANAGER' && data.currentApproverId === step.approverId;
-                    const isStepDone = step.status === 'APPROVED';
-                    
-                    return (
-                      <div key={idx} className="flex gap-4 items-start relative pb-2 last:pb-0">
-                        {idx < data.approvalSteps.length - 1 && (
-                          <div className={`absolute left-4 top-8 w-0.5 h-full ${isStepDone ? 'bg-emerald-200' : 'bg-slate-100'}`}></div>
-                        )}
-                        <div className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center z-10 transition-all ${
-                          isStepDone ? 'bg-emerald-500 text-white' : 
-                          isStepCurrent ? 'bg-amber-500 text-white ring-4 ring-amber-100 animate-pulse' :
-                          'bg-slate-100 text-slate-400'
-                        }`}>
-                          {isStepDone ? <CheckCircle className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-[10px] font-black uppercase tracking-tighter ${isStepCurrent ? 'text-amber-600' : 'text-slate-400'}`}>
-                            BƯỚC {step.stepOrder}: {step.stepType === 'MANAGER_L1' ? 'Quản lý trực tiếp' : 'Quản lý cấp cao'}
-                          </p>
-                          <p className={`text-xs font-black truncate ${isStepCurrent ? 'text-slate-900 bg-amber-50 rounded-lg px-2 py-1 -ml-2 inline-block' : 'text-slate-600'}`}>
-                            {step.approver?.fullName || 'N/A'}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Step 2: Admin approval */}
-                  <div className="flex gap-4 items-start relative">
-                    <div className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center z-10 ${
-                      data.status === 'APPROVED' || ['READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'COMPLETED'].includes(data.status) ? 'bg-indigo-500 text-white' :
-                      data.status === 'PENDING_ADMIN' ? 'bg-amber-500 text-white ring-4 ring-amber-100 animate-pulse' :
-                      'bg-slate-100 text-slate-400'
-                    }`}>
-                      {data.status === 'APPROVED' || ['READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'COMPLETED'].includes(data.status) ? <CheckCircle className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-[10px] font-black uppercase tracking-tighter ${data.status === 'PENDING_ADMIN' ? 'text-amber-600' : 'text-slate-400'}`}>
-                        Duyệt Cuối: Hành chính / Admin
-                      </p>
-                      <p className={`text-xs font-black ${data.status === 'PENDING_ADMIN' ? 'text-slate-900 bg-amber-50 rounded-lg px-2 py-1 -ml-2 inline-block' : 'text-slate-600'}`}>
-                        Phòng Hành chính - Quản trị
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 relative z-10 flex items-center">
-              THAO TÁC XỬ LÝ
-            </h3>
-
-            <div className="flex flex-col gap-4 relative z-10">
-              {isApprover ? (
-                <div className="p-0 bg-white flex flex-col gap-4">
-                  <div className={`flex items-center gap-2 p-3 rounded-xl border mb-2 ${isAdminOverride ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
-                    <ShieldCheck className="w-5 h-5" />
-                    <div>
-                      <p className="text-[11px] font-black uppercase tracking-wider">
-                        {isAdminOverride ? 'Bạn đang duyệt thay (Admin Override)' : 'Bạn đang là người duyệt hiện tại'}
-                      </p>
-                      {isAdminOverride && <p className="text-[9px] font-bold opacity-80 italic tracking-tight">Thao tác này sẽ ghi log Admin duyệt thay Quản lý.</p>}
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                      Ghi chú xử lý (tùy chọn)
-                    </label>
-                    <textarea
-                      value={rejectReason}
-                      onChange={(e: any) => setRejectReason(e.target.value)}
-                      className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-medium outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 focus:bg-white transition min-h-[100px] shadow-inner"
-                      placeholder="Nhập lý do duyệt/từ chối hoặc hướng dẫn..."
-                    />
-                  </div>
-
-                  <button
-                    disabled={loading}
-                    onClick={() => setShowApproveModal(true)}
-                    className="w-full min-h-[56px] py-4 bg-indigo-600 text-white rounded-2xl font-black text-base hover:bg-indigo-700 transition shadow-xl shadow-indigo-500/20 flex items-center justify-center border-b-4 border-indigo-800"
-                  >
-                    <CheckCircle className="w-5 h-5 mr-2" /> PHÊ DUYỆT
-                  </button>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      disabled={loading}
-                      onClick={() =>
-                        handleAction(
-                          '/return',
-                          { reason: rejectReason || prompt('Lý do yêu cầu làm lại?') },
-                          'Đã trả lại'
-                        )
-                      }
-                      className="py-3 bg-white text-amber-600 hover:bg-amber-50 border-2 border-amber-200 rounded-xl font-bold transition flex justify-center items-center shadow-sm"
-                    >
-                      <CornerUpLeft className="w-4 h-4 mr-2" /> Trả Lại
-                    </button>
-
-                    <button
-                      disabled={loading}
-                      onClick={() => {
-                        if (!rejectReason.trim()) {
-                           const reason = prompt('Lý do từ chối?');
-                           if (reason) handleAction('/reject', { reason }, 'Đã từ chối');
-                        } else {
-                          handleAction('/reject', { reason: rejectReason }, 'Đã từ chối');
-                        }
-                      }}
-                      className="py-3 bg-white text-rose-500 hover:bg-rose-50 border-2 border-rose-100 rounded-xl font-bold transition flex justify-center items-center shadow-sm"
-                    >
-                      <XCircle className="w-4 h-4 mr-2" /> Từ Chối
-                    </button>
-                  </div>
-                </div>
-              ) : isFutureApprover ? (
-                <div className="p-5 bg-amber-50 border-2 border-amber-100 rounded-2xl flex flex-col gap-3">
-                  <div className="flex items-center gap-2 text-amber-700">
+           <div className="flex items-center gap-3">
+              {!currentUserTurn ? (
+                 <div className="px-4 py-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl flex items-center gap-3">
                     <Clock className="w-5 h-5 animate-pulse" />
-                    <p className="text-xs font-black uppercase tracking-wider">Phiếu chưa đến lượt bạn xử lý</p>
-                  </div>
-                  <div className="p-3 bg-white/60 rounded-xl border border-amber-200/50">
-                    <p className="text-[10px] text-amber-600 font-bold uppercase tracking-tight mb-1">Hiện đang chờ:</p>
-                    <p className="text-xs text-amber-900 font-black flex items-center">
-                      <Zap className="w-3 h-3 mr-1.5" />
-                      {data.status === 'PENDING_MANAGER' ? 'Quản lý (Bước hiện tại)' : 'Hành chính (Duyệt cuối)'}
-                    </p>
-                  </div>
-                </div>
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider">Chưa đến lượt xử lý của bạn</p>
+                        <p className="text-xs font-bold mt-0.5">Xin vui lòng chờ</p>
+                    </div>
+                 </div>
               ) : (
-                <div className="p-6 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center text-center gap-4">
-                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm">
-                    <Archive className="w-6 h-6 text-slate-300" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest leading-relaxed">
-                      Hiện tại: {getStatusLabel(data.status)}
-                    </p>
-                    <p className="text-[10px] text-slate-400 font-bold mt-2 leading-relaxed px-4">
-                      {data.status === 'PENDING_MANAGER' 
-                        ? `Đang chờ ${data.currentApproverId === userId ? 'bạn' : 'Quản lý'} phê duyệt.`
-                        : data.status === 'PENDING_ADMIN'
-                        ? 'Đang chờ Admin phê duyệt định mức.'
-                        : 'Phiếu đang trong quy trình xử lý.'}
-                      <br />
-                      <span className="italic mt-1 block">Vui lòng quay lại sau khi phiếu đến lượt bạn xử lý.</span>
-                    </p>
-                  </div>
-                </div>
+                 <>
+                    <button onClick={handleSaveDraft} className="px-4 py-2.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl font-bold flex items-center transition">
+                       <Save className="w-4 h-4 mr-2" /> Lưu Nháp
+                    </button>
+                    <button onClick={() => setShowReturnModal(true)} className="px-4 py-2.5 bg-amber-100 text-amber-700 hover:bg-amber-200 rounded-xl font-bold flex items-center transition">
+                       <CornerUpLeft className="w-4 h-4 mr-2" /> Yêu Cầu Bổ Sung
+                    </button>
+                    <button onClick={() => setShowRejectModal(true)} className="px-4 py-2.5 bg-rose-100 text-rose-700 hover:bg-rose-200 rounded-xl font-bold flex items-center transition">
+                       <XCircle className="w-4 h-4 mr-2" /> Từ Chối
+                    </button>
+                    <button onClick={() => setShowApproveModal(true)} className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-black flex items-center shadow-lg hover:bg-indigo-700 transition">
+                       <CheckCircle className="w-5 h-5 mr-2" /> PHÊ DUYỆT
+                    </button>
+                 </>
               )}
-
-              {perms.canWithdraw && (
-                <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl flex flex-col gap-3 mt-4">
-                  <p className="text-xs font-bold text-indigo-700 text-center">Phiếu đã gửi, đang chờ phê duyệt</p>
-                  <button
-                    onClick={() => handleAction('/withdraw', { reason: 'Xin rút lại để sửa' }, 'Đã rút phiếu thành công')}
-                    className="w-full py-2.5 bg-white text-slate-600 border border-slate-200 rounded-xl font-bold hover:bg-slate-50 transition text-sm"
-                  >
-                    Thu hồi phiếu
-                  </button>
-                </div>
-              )}
-
-              {perms.canCancel && (
-                <div className="flex flex-col gap-3 mt-4 pt-4 border-t border-slate-100">
-                  <button
-                    disabled={loading}
-                    onClick={() => {
-                      const reason = prompt('Lý do hủy yêu cầu?');
-                      if (reason) {
-                        handleAction('/cancel', { reason }, 'Đã hủy yêu cầu thành công');
-                      }
-                    }}
-                    className="w-full py-3 bg-white text-rose-500 border-2 border-rose-100 rounded-xl font-bold hover:bg-rose-50 transition flex justify-center items-center"
-                  >
-                    <XCircle className="w-4 h-4 mr-2" /> HỦY YÊU CẦU
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {data.approvalSteps && data.approvalSteps.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 opacity-5">
-                <Zap className="w-16 h-16 text-indigo-500" />
-              </div>
-              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 relative z-10">
-                Tuyến Phê Duyệt
-              </h3>
-              <div className="space-y-0 relative z-10">
-                {data.approvalSteps.map((step: any, idx: number) => {
-                  const isCurrent =
-                    step.status === 'PENDING' &&
-                    step.stepOrder === data.currentApprovalStep &&
-                    data.status === 'PENDING_MANAGER';
-                  const isDone = step.status === 'APPROVED';
-                  const isBypassed = step.status === 'SKIPPED';
-                  const isWaiting = step.status === 'WAITING';
-
-                  return (
-                    <div key={step.id} className="relative flex gap-4 pb-8 last:pb-0 items-start">
-                      {idx < data.approvalSteps.length && (
-                        <div
-                          className={`absolute left-4 top-8 bottom-0 w-[2.5px] transition-all duration-700 ${
-                            isDone ? 'bg-emerald-500' : 'bg-slate-100'
-                          }`}
-                        ></div>
-                      )}
-
-                      <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 shrink-0 z-20 transition-all duration-500 ${
-                          isDone
-                            ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-100'
-                            : isCurrent
-                              ? 'bg-white border-indigo-600 text-indigo-700 ring-4 ring-indigo-50 shadow-xl'
-                              : isBypassed || isWaiting
-                                ? 'bg-slate-50 border-slate-200 text-slate-300'
-                                : 'bg-white border-slate-200 text-slate-400'
-                        }`}
-                      >
-                        {isDone ? <CheckCircle className="w-4 h-4" /> : <span>{step.stepNo}</span>}
-                      </div>
-
-                      <div className="flex-1 min-w-0 pt-1">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <p
-                            className={`text-sm font-black truncate ${
-                              isCurrent
-                                ? 'text-indigo-900 drop-shadow-sm'
-                                : isDone
-                                  ? 'text-slate-800'
-                                  : 'text-slate-500'
-                            }`}
-                          >
-                            {step.approver?.fullName || 'Chưa chỉ định'}
-                          </p>
-                          {isCurrent && (
-                            <span className="text-[9px] bg-indigo-600 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-tighter animate-pulse border border-indigo-700 shadow-sm shadow-indigo-200">
-                              Đang xử lý
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1.5 opacity-80">
-                          {step.stepNo === 1 ? 'Quản lý trực tiếp' : `Quản lý cấp ${step.stepNo}`}
-                        </p>
-                        {isDone && step.actedAt && (
-                          <p className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 inline-flex items-center">
-                            <Clock className="w-3 h-3 mr-1" /> Đã duyệt{' '}
-                            {new Date(step.actedAt).toLocaleString('vi-VN', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              day: '2-digit',
-                              month: '2-digit',
-                            })}
-                          </p>
-                        )}
-                      </div>
-
-                      {isCurrent && (
-                        <div className="absolute left-4 top-4 w-5 h-5 bg-indigo-200 rounded-full animate-ping opacity-30"></div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                <div className="relative flex gap-4 items-start">
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 shrink-0 z-20 transition-all ${
-                      data.status === 'PENDING_ADMIN'
-                        ? 'bg-amber-500 border-amber-500 text-white ring-4 ring-amber-50 shadow-xl'
-                        : ['APPROVED', 'READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER', 'COMPLETED', 'PARTIALLY_ISSUED'].includes(data.status)
-                          ? 'bg-emerald-500 border-emerald-500 text-white ring-4 ring-emerald-50'
-                          : 'bg-white border-slate-200 text-slate-400'
-                    }`}
-                  >
-                    {['APPROVED', 'READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER', 'COMPLETED', 'PARTIALLY_ISSUED'].includes(data.status) ? (
-                      <CheckCircle className="w-4 h-4" />
-                    ) : (
-                      <ShieldCheck className="w-4 h-4" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0 pt-1">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <p
-                        className={`text-sm font-black truncate ${
-                          data.status === 'PENDING_ADMIN'
-                            ? 'text-amber-900 shadow-sm'
-                            : ['APPROVED', 'READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER', 'COMPLETED'].includes(data.status)
-                              ? 'text-slate-800'
-                              : 'text-slate-500'
-                        }`}
-                      >
-                        Hành chính & Duyệt cuối
-                      </p>
-                      {data.status === 'PENDING_ADMIN' && (
-                        <span className="text-[9px] bg-amber-600 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-tighter animate-pulse border border-amber-700">
-                          Đang chờ
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest opacity-80">
-                      Kiểm duyệt định mức & Điều phối
-                    </p>
-                  </div>
-                </div>
-
-                {['APPROVED', 'READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER', 'COMPLETED', 'PARTIALLY_ISSUED'].includes(data.status) && (
-                  <div className="relative flex gap-4 items-start">
-                    <div className="absolute -left-[17px] -top-8 w-[2px] h-8 bg-emerald-500"></div>
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 shrink-0 z-20 transition-all ${
-                        ['READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER'].includes(data.status)
-                          ? 'bg-blue-500 border-blue-500 text-white ring-4 ring-blue-50 shadow-xl'
-                          : data.status === 'COMPLETED'
-                            ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg'
-                            : 'bg-white border-slate-200 text-slate-400'
-                      }`}
-                    >
-                      {data.status === 'COMPLETED' ? <CheckCircle className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
-                    </div>
-                    <div className="flex-1 min-w-0 pt-1">
-                      <div className="flex items-center justify-between mb-0.5">
-                        <p
-                          className={`text-sm font-black truncate ${
-                            ['READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER'].includes(data.status)
-                              ? 'text-blue-900'
-                              : data.status === 'COMPLETED'
-                                ? 'text-slate-800'
-                                : 'text-slate-500'
-                          }`}
-                        >
-                          Kho vận & Bàn giao
-                        </p>
-                        {['READY_TO_PICK', 'PICKING', 'READY_TO_HANDOVER', 'WAITING_HANDOVER'].includes(data.status) && (
-                          <span className="text-[9px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-tighter animate-pulse border border-blue-700">
-                            Đang xử lý
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-slate-500 font-bold">
-                        {data.status === 'APPROVED'
-                          ? 'Chờ kho tiếp nhận...'
-                          : data.status === 'READY_TO_PICK'
-                            ? 'Đã tiếp nhận, chờ soạn hàng'
-                            : data.status === 'PICKING'
-                              ? 'Đang soạn hàng thực tế...'
-                              : ['READY_TO_HANDOVER', 'WAITING_HANDOVER'].includes(data.status)
-                                ? 'Đã soạn xong, chờ bàn giao'
-                                : 'Đã hoàn tất bàn giao'}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col flex-1 min-h-[400px]">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">
-              Nhật ký xử lý (Audit Trail)
-            </h3>
-            <div className="relative pl-6 space-y-8 flex-1 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-100">
-              <div className="relative group">
-                <div className="absolute -left-[23px] top-1 w-4 h-4 rounded-full bg-slate-200 ring-4 ring-white shadow-sm group-hover:scale-125 transition-transform"></div>
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Tạo đề xuất</p>
-                    <span className="text-[10px] font-bold text-slate-400">
-                      {new Date(data.createdAt).toLocaleString('vi-VN', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-1 py-1.5 px-3 bg-slate-50 rounded-xl border border-slate-100 w-fit">
-                    <UserIcon className="w-3.5 h-3.5 text-slate-400" />
-                    <p className="text-xs font-black text-indigo-700">{data.requester?.fullName}</p>
-                  </div>
-                </div>
-              </div>
-
-              {data.approvalHistories?.map((audit: any) => {
-                const actionColor =
-                  audit.action === 'APPROVED'
-                    ? 'text-emerald-700'
-                    : audit.action.includes('ISSUED')
-                      ? 'text-blue-700'
-                      : audit.action === 'COMPLETED'
-                        ? 'text-indigo-700'
-                        : audit.action === 'REJECTED' || audit.action === 'CANCELLED'
-                          ? 'text-rose-700'
-                          : 'text-amber-700';
-
-                const dotColor =
-                  audit.action === 'APPROVED'
-                    ? 'bg-emerald-500'
-                    : audit.action.includes('ISSUED')
-                      ? 'bg-blue-500'
-                      : audit.action === 'COMPLETED'
-                        ? 'bg-indigo-500'
-                        : audit.action === 'REJECTED' || audit.action === 'CANCELLED'
-                          ? 'bg-rose-500'
-                          : 'bg-amber-500';
-
-                const actionLabelMap: any = {
-                  SUBMITTED: 'Gửi Đề Xuất',
-                  APPROVED: 'Phê Duyệt',
-                  REJECTED: 'Từ Chối',
-                  RETURNED: 'Trả Lại / Yêu Cầu Sửa',
-                  CANCELLED: 'Hủy Phiếu',
-                  ISSUED: 'Xuất Kho',
-                  PARTIALLY_ISSUED: 'Xuất Kho Một Phần',
-                  READY_TO_HANDOVER: 'Sẵn Sàng Bàn Giao',
-                  COMPLETED: 'Hoàn Tất',
-                  WITHDRAWN: 'Thu Hồi / Rút Phiếu',
-                  MODIFIED: 'Chỉnh Sửa',
-                  CONFIRMED: 'Xác Nhận Nhận Hàng',
-                  WAREHOUSE_ACCEPT: 'Kho Tiếp Nhận Phiếu',
-                  PICKING_STARTED: 'Bắt Đầu Soạn Hàng',
-                  PICKING_COMPLETED: 'Đã Soạn Hàng Xong',
-                  HANDOVER_CONFIRMED: 'Kho Đã Bàn Giao',
-                };
-
-                const actLabel = actionLabelMap[audit.action] || audit.action;
-
-                return (
-                  <div key={audit.id} className="relative group">
-                    <div className={`absolute -left-[23px] top-1 w-4 h-4 rounded-full ring-4 ring-white shadow-md transition-transform group-hover:scale-150 ${dotColor}`}></div>
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <p className={`text-[10px] font-black uppercase tracking-widest ${actionColor}`}>
-                            {actLabel}
-                          </p>
-                          <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
-                          <p className="text-xs font-black text-slate-700">
-                            {audit.approver?.fullName || 'Hệ thống'}
-                          </p>
-                        </div>
-                        <span className="text-[10px] font-bold text-slate-400">
-                          {new Date(audit.createdAt).toLocaleString('vi-VN', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            day: '2-digit',
-                            month: '2-digit',
-                          })}
-                        </span>
-                      </div>
-                      {audit.reason && (
-                        <div
-                          className={`p-4 rounded-2xl border-l-4 italic shadow-sm bg-slate-50 border-white/50 ${
-                            audit.action === 'APPROVED'
-                              ? 'border-l-emerald-500'
-                              : audit.action === 'REJECTED' || audit.action === 'CANCELLED'
-                                ? 'border-l-rose-500'
-                                : 'border-l-amber-500'
-                          }`}
-                        >
-                          <p className="text-xs leading-relaxed font-medium text-slate-600 opacity-90">
-                            “{audit.reason}”
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {data.status === 'COMPLETED' && (
-                <div className="relative">
-                  <div className="absolute -left-[23px] top-1 w-4 h-4 rounded-full bg-emerald-500 ring-8 ring-emerald-50 animate-pulse shadow-lg"></div>
-                  <div className="bg-emerald-600 py-2.5 px-4 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-200">
-                    <CheckCircle className="w-4 h-4 text-white mr-2" />
-                    <p className="text-[10px] font-black text-white uppercase tracking-[0.25em]">
-                      Quy trình hoàn tất
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+           </div>
         </div>
       </div>
 
-      {showApproveModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] animate-slide-up">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-emerald-500 text-white">
-              <h3 className="text-xl font-black">
-                {data.status === 'PENDING_MANAGER'
-                  ? 'Trưởng BP Phê Duyệt Cấp 1'
-                  : 'Admin Phê Duyệt Cấp 2 (Điều chỉnh số lượng)'}
-              </h3>
-              <button
-                onClick={() => setShowApproveModal(false)}
-                className="text-emerald-100 hover:text-white transition"
-              >
-                <XCircle className="w-7 h-7" />
-              </button>
-            </div>
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col xl:flex-row gap-6 w-full max-w-[1500px] mx-auto">
+        {/* L EF T P A N E L */}
+        <div className="flex-1 flex flex-col gap-6 min-w-0">
+           {/* Info Block */}
+           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <h3 className="text-sm font-black text-slate-800 mb-4 border-b border-slate-100 pb-3 flex items-center"><FileText className="w-4 h-4 mr-2 text-indigo-500" /> Thông Tin Đề Xuất</h3>
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+                 <div>
+                    <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Phòng Ban</label>
+                    <p className="text-sm font-bold text-slate-700 mt-1">{data.department}</p>
+                 </div>
+                 <div>
+                    <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Mục đích</label>
+                    <p className="text-sm font-bold text-slate-700 mt-1">{data.purpose || 'Không có ghi chú'}</p>
+                 </div>
+                 <div>
+                    <label className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Độ ưu tiên</label>
+                    <p className="text-sm font-bold mt-1">
+                       <span className={`px-2 py-1 rounded inline-block ${data.priority === 'Khẩn cấp' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'}`}>{data.priority}</span>
+                    </p>
+                 </div>
+              </div>
+           </div>
 
-            <div className="p-6 overflow-y-auto flex-1">
-              {data.status === 'PENDING_ADMIN' && (
-                <p className="text-sm font-medium text-slate-600 mb-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                  Admin có thể điều chỉnh số lượng duyệt. Số lượng vượt Tồn Kho thực tế sẽ báo đỏ.
-                </p>
-              )}
+           {/* Line Items Block */}
+           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative flex flex-col">
+              <div className="p-5 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                 <h3 className="text-sm font-black text-slate-800">Danh Mục Vật Tư Yêu Cầu ({data.lines.length})</h3>
+                 {outOfStockLines.length > 0 && <span className="px-3 py-1 bg-rose-50 border border-rose-200 text-rose-600 rounded text-[10px] font-black shadow-sm flex items-center"><AlertTriangle className="w-3.5 h-3.5 mr-1" /> Phát hiện {outOfStockLines.length} vật tư TỒN KHO THIẾU</span>}
+              </div>
 
-              {data.status === 'PENDING_MANAGER' && (
-                <p className="text-sm font-medium text-slate-600 mb-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                  Trưởng phòng phê duyệt chuyển đơn lên bộ phận Hành chính. Việc cấp phát kho sẽ do bộ phận Hành chính quyết định.
-                </p>
-              )}
+              <div className="overflow-x-auto">
+                 <table className="w-full text-left whitespace-nowrap min-w-max">
+                   <thead className="bg-white border-b border-slate-200">
+                     <tr className="text-[10px] uppercase font-black text-slate-400 tracking-widest">
+                       <th className="p-4 w-10 text-center">STT</th>
+                       <th className="p-4">Vật Tư</th>
+                       <th className="p-4 text-center bg-slate-50 border-l border-slate-100">SL Xin</th>
+                       <th className="p-4 text-center">Tồn Khả Dụng</th>
+                       <th className="p-4 text-center bg-indigo-50 border-l border-indigo-100 w-32">SL Duyệt</th>
+                       <th className="p-4 w-40">Lý Do Điều Chỉnh (Quyết định)</th>
+                     </tr>
+                   </thead>
+                   <tbody className="divide-y divide-slate-100">
+                      {data.lines.map((l:any, ix:number) => {
+                         const qoh = l.item.stocks?.[0]?.quantityOnHand || 0;
+                         const isLack = l.qtyRequested > qoh;
+                         const draftMod = lineActions.find(a => a.lineId === l.id);
+                         const decisionColor = draftMod?.decision === 'REJECT' ? 'text-rose-500' : draftMod?.decision === 'DECREASE' ? 'text-amber-500' : 'text-emerald-500';
 
-              <table className="w-full text-left whitespace-nowrap">
-                <thead className="bg-slate-50 text-[10px] uppercase font-black text-slate-400">
-                  <tr>
-                    <th className="p-3">Hàng Hóa</th>
-                    <th className="p-3 text-center">Tồn Hiện Tại</th>
-                    <th className="p-3 text-center">KH Yêu cầu</th>
-                    {data.status === 'PENDING_ADMIN' && (
-                      <th className="p-3 text-center bg-emerald-50 border-x-2 border-emerald-100">
-                        QUYẾT ĐỊNH DUYỆT CẤP
-                      </th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {data.lines.map((l: any) => {
-                    const currentApprove =
-                      approvals.find((a: any) => a.lineId === l.id)?.qtyApproved ?? l.qtyRequested;
-                    const currentStock = l.item.stocks?.[0]?.quantityOnHand || 0;
-                    const overStock = currentApprove > currentStock;
+                         return (
+                            <tr key={l.id} className={`hover:bg-slate-50 ${isLack ? 'bg-rose-50/20' : ''}`}>
+                               <td className="p-4 text-center font-bold text-slate-400">{ix+1}</td>
+                               <td className="p-4">
+                                  <p className="font-bold text-slate-800 text-sm">{l.item.name}</p>
+                                  <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase font-black">{l.item.mvpp}</span>
+                               </td>
+                               <td className="p-4 text-center bg-slate-50 border-l border-slate-100 font-black text-lg text-slate-700">{l.qtyRequested}</td>
+                               <td className="p-4 text-center">
+                                  <span className={`font-black text-base px-2 py-1 rounded ${isLack ? 'bg-rose-100 text-rose-700' : 'text-slate-600'}`}>{qoh}</span>
+                               </td>
+                               <td className="p-4 text-center bg-indigo-50 border-l border-indigo-100">
+                                  {currentUserTurn ? (
+                                      <input type="number" min="0" value={draftMod?.approvedQty ?? 0} onChange={(e) => updateLine(l.id, 'approvedQty', parseInt(e.target.value) || 0)} className={`w-20 text-center py-1.5 bg-white border border-indigo-200 rounded-lg font-black text-indigo-700 outline-none focus:ring-2 focus:ring-indigo-400 ${draftMod?.decision==='REJECT'? 'opacity-50 line-through' : ''}`} />
+                                  ) : (
+                                      <span className="font-black text-lg text-emerald-600">{l.qtyApproved ?? '-'}</span>
+                                  )}
+                               </td>
+                               <td className="p-4 relative">
+                                  {currentUserTurn ? (
+                                     <div className="flex flex-col gap-1">
+                                        <span className={`text-[10px] font-black uppercase ${decisionColor}`}>{draftMod?.decision === 'APPROVE' ? 'ĐỒNG Ý CẤP' : draftMod?.decision === 'DECREASE' ? 'GIẢM SỐ LƯỢNG' : 'TỪ CHỐI'}</span>
+                                        <input type="text" placeholder="Nhập lý do nếu giảm/từ chối..." value={draftMod?.reason || ''} onChange={(e) => updateLine(l.id, 'reason', e.target.value)} className={`w-full text-xs p-1.5 border border-slate-200 rounded bg-white outline-none focus:border-indigo-400 ${(draftMod?.decision === 'DECREASE' || draftMod?.decision === 'REJECT') && !draftMod?.reason.trim() ? 'border-rose-400 ring-2 ring-rose-100' : ''}`} />
+                                     </div>
+                                  ) : (
+                                     <span className="text-xs text-slate-500">{l.approvalNote || l.status}</span>
+                                  )}
+                               </td>
+                            </tr>
+                         )
+                      })}
+                   </tbody>
+                 </table>
+              </div>
+           </div>
 
-                    return (
-                      <tr key={l.id}>
-                        <td className="p-3 font-bold text-slate-700 text-sm whitespace-normal">
-                          {l.item.name}
-                        </td>
-                        <td className="p-3 text-center font-black text-slate-600">{currentStock}</td>
-                        <td className="p-3 text-center font-black text-indigo-700 bg-indigo-50 border border-transparent rounded">
-                          {l.qtyRequested}
-                        </td>
-                        {data.status === 'PENDING_ADMIN' && (
-                          <td className="p-3 border-x-2 border-emerald-100 bg-white">
-                            <input
-                              type="number"
-                              min="0"
-                              value={currentApprove}
-                              onChange={(e: any) =>
-                                setApprovals(
-                                  approvals.map((a: any) =>
-                                    a.lineId === l.id
-                                      ? { ...a, qtyApproved: parseInt(e.target.value) || 0 }
-                                      : a
-                                  )
-                                )
-                              }
-                              className={`w-full text-center py-2 bg-slate-100 border outline-none rounded-lg focus:ring-4 focus:bg-white font-black text-lg transition ${
-                                overStock
-                                  ? 'text-rose-600 border-rose-300 ring-4 ring-rose-50'
-                                  : 'text-emerald-700 border-emerald-200 focus:border-emerald-400 focus:ring-emerald-100'
-                              }`}
-                            />
-                            {overStock && (
-                              <p className="text-[9px] font-bold text-rose-500 text-center mt-1">
-                                Duyệt lố tồn!
-                              </p>
-                            )}
-                          </td>
+           {/* Timeline Context Bottom */}
+           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">Nhật ký xử lý hệ thống</h3>
+            <div className="relative pl-6 space-y-6 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-100">
+               {data.approvalHistories?.map((audit: any) => (
+                  <div key={audit.id} className="relative group">
+                     <div className="absolute -left-[23px] top-1 w-4 h-4 rounded-full ring-4 ring-white shadow-sm bg-indigo-200 border-2 border-indigo-500"></div>
+                     <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-3">
+                           <p className="text-[10px] font-black uppercase bg-slate-100 px-2 py-0.5 rounded text-slate-600">{audit.action}</p>
+                           <p className="text-xs font-bold text-slate-800">{audit.approver?.fullName}</p>
+                           <span className="text-[10px] text-slate-400 font-bold">{new Date(audit.createdAt).toLocaleString('vi-VN')}</span>
+                        </div>
+                        {audit.reason && (
+                           <p className="text-xs italic text-slate-600 mt-1 pl-1 border-l-2 border-slate-200 bg-slate-50 p-2 rounded">"{audit.reason}"</p>
                         )}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                     </div>
+                  </div>
+               ))}
             </div>
+           </div>
 
-            <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
-              <button
-                onClick={() => setShowApproveModal(false)}
-                className="px-6 py-2.5 font-bold text-slate-500 hover:bg-slate-200 rounded-xl transition"
-              >
-                Hủy Bỏ
-              </button>
-              <button
-                onClick={() => {
-                  if (data.status === 'PENDING_ADMIN') {
-                    const hasOverStock = data.lines.some(
-                      (l: any) =>
-                        (approvals.find((a: any) => a.lineId === l.id)?.qtyApproved ?? l.qtyRequested) >
-                        (l.item.stocks?.[0]?.quantityOnHand || 0)
-                    );
-                    if (hasOverStock) {
-                      if (
-                        !window.confirm(
-                          'Cảnh báo: Bạn đang duyệt Số lượng vượt quá Tồn Kho thực tế. Hệ thống sẽ báo nợ (Backorder) hoặc Kho không thể xuất dòng này. Vẫn tiếp tục?'
-                        )
-                      ) {
-                        return;
-                      }
-                    }
-                  }
-
-                  handleAction('/approve', { lineApprovals: approvals }, 'Đã duyệt thành công!');
-                  setShowApproveModal(false);
-                }}
-                className="px-8 py-2.5 bg-emerald-600 text-white font-black rounded-xl hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/30 flex items-center"
-              >
-                <CheckCircle className="w-5 h-5 mr-2" /> XÁC NHẬN PHÊ DUYỆT
-              </button>
-            </div>
-          </div>
         </div>
+
+        {/* R I G H T P A N E L => "Khối Xử Lý" */}
+        <div className="w-full xl:w-96 flex flex-col gap-6 shrink-0 relative mt-0">
+           
+           {currentUserTurn && (
+              <div className="bg-indigo-600 rounded-2xl shadow-xl shadow-indigo-600/20 p-6 text-white border-b-4 border-indigo-800 animate-slide-up relative overflow-hidden">
+                 <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <Zap className="w-24 h-24" />
+                 </div>
+                 <h2 className="text-[11px] font-black uppercase tracking-[0.2em] text-indigo-200 mb-2">Trạng thái hiện tại</h2>
+                 <p className="text-2xl font-black mb-4">ĐẾN LƯỢT BẠN XỬ LÝ</p>
+
+                 <div className="bg-white/10 rounded-xl p-4 mb-4 backdrop-blur-sm border border-white/20">
+                    <p className="text-xs font-bold text-indigo-100 uppercase mb-1">Bước duyệt hiện tại</p>
+                    <p className="text-base font-black">{data.permissions?.currentStep?.approverRole || data.status}</p>
+                    
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-indigo-500/50 text-indigo-100">
+                       <Clock className="w-4 h-4" />
+                       <span className="text-xs font-bold">Hạn mức SLA: {data.prioritySlaHours || 24}h</span>
+                    </div>
+                 </div>
+
+                 {apiWarnings.length > 0 && (
+                    <div className="bg-rose-500 rounded-xl p-3 mb-4 shadow-inner">
+                       <p className="text-[10px] font-black uppercase mb-2 flex items-center"><AlertCircle className="w-4 h-4 mr-1.5" /> Có {apiWarnings.length} Cảnh Báo Nghiệp Vụ</p>
+                       <ul className="text-xs space-y-1 list-disc pl-4 font-medium opacity-90">
+                          {apiWarnings.slice(0,3).map((w:any, idx:number) => <li key={idx}>[{w.type}] {w.message}</li>)}
+                          {apiWarnings.length > 3 && <li>...</li>}
+                       </ul>
+                    </div>
+                 )}
+
+                 <div className="space-y-2 mt-2 relative z-10">
+                    <label className="text-[10px] font-black text-indigo-200 uppercase tracking-widest block w-full">Ghi chú Nội Bộ khi xử lý</label>
+                    <textarea value={processNote} onChange={e => setProcessNote(e.target.value)} className="w-full text-sm bg-white/10 text-white placeholder-indigo-200 p-3 rounded-xl border border-indigo-400 outline-none focus:bg-white focus:text-indigo-900 transition min-h-[80px]" placeholder="Ghi chú, ý kiến cá nhân..."/>
+                 </div>
+                 <div className="space-y-2 mt-4 relative z-10">
+                    <label className="text-[10px] font-black text-indigo-200 uppercase tracking-widest block w-full">Chuyển tiếp cho người khác (Tuỳ chọn)</label>
+                    <select value={nextAssigneeId} onChange={e => setNextAssigneeId(e.target.value)} className="w-full text-sm bg-white text-slate-800 p-2.5 rounded-xl border-none outline-none font-bold cursor-pointer">
+                        <option value="">-- Để hệ thống tự điều phối theo line duyệt --</option>
+                        {usersToForward.map(u => (
+                           <option key={u.id} value={u.id}>{u.fullName} ({u.role})</option>
+                        ))}
+                    </select>
+                 </div>
+              </div>
+           )}
+
+           {!currentUserTurn && (
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col items-center justify-center text-center py-10">
+                 <ShieldCheck className="w-12 h-12 text-slate-300 mb-4" />
+                 <p className="text-xs font-black uppercase text-slate-400 tracking-widest">Tiến trình phiếu</p>
+                 <p className="text-lg font-black text-indigo-700 mt-2">{data.status.replace(/_/g, ' ')}</p>
+                 <p className="text-sm font-medium text-slate-500 mt-3 max-w-[250px] leading-relaxed">
+                    Phiếu đang nằm ở bước xử lý của người khác phòng ban khác. Bạn được cấp phép chỉ xem (Read-only view).
+                 </p>
+              </div>
+           )}
+
+        </div>
+      </div>
+
+      {/* MODALS ACTIONS SECTION */}
+      {/* APPROVE PREVIEW MODAL */}
+      {showApproveModal && (
+         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-slide-up flex flex-col">
+                <div className="p-6 bg-indigo-600 text-white flex items-center justify-between border-b-4 border-indigo-800">
+                    <h3 className="text-xl font-black flex items-center"><CheckCircle className="w-6 h-6 mr-3" /> Xem lại trước khi Duyệt</h3>
+                    <button onClick={() => setShowApproveModal(false)} className="text-indigo-200 hover:text-white"><XCircle className="w-6 h-6"/></button>
+                </div>
+                <div className="p-6 space-y-4">
+                   <p className="text-sm font-bold text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                      Bạn đang chuẩn bị chốt duyệt <span className="text-indigo-600 mx-1">{lineActions.filter(a => a.decision === 'APPROVE').length} dòng toàn bộ</span>, 
+                      giảm SL <span className="text-amber-600 mx-1">{lineActions.filter(a => a.decision === 'DECREASE').length} dòng</span>, 
+                      từ chối <span className="text-rose-600 mx-1">{lineActions.filter(a => a.decision === 'REJECT').length} dòng</span>.
+                   </p>
+                   {nextAssigneeId && (
+                      <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex gap-3 text-blue-800">
+                         <Send className="w-5 h-5 shrink-0" />
+                         <p className="text-sm font-bold">Lưu ý: Bạn chọn Explicit Override, luồng duyệt sẽ được bẻ qua để chuyển trực tiếp cho người được chỉ định ngay sau bước này.</p>
+                      </div>
+                   )}
+                </div>
+                <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-end gap-3 rounded-b-3xl">
+                    <button onClick={() => setShowApproveModal(false)} className="px-6 py-2.5 font-bold text-slate-500">Quay lại sửa</button>
+                    <button onClick={submitApprove} className="px-8 py-2.5 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-700 shadow-md transition flex items-center">
+                       <CheckCircle className="w-5 h-5 mr-2" /> TÔI CHẮC CHẮN ĐÃ XONG
+                    </button>
+                </div>
+             </div>
+         </div>
       )}
 
+      {/* REJECT MODAL */}
       {showRejectModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up">
             <div className="p-6 border-b border-slate-100 flex items-center bg-rose-50 text-rose-600">
               <StopCircle className="w-7 h-7 mr-3" />
-              <h3 className="text-xl font-black">Từ chối Yêu Cầu</h3>
+              <h3 className="text-xl font-black">Từ chối Yêu Cầu Hàng Loạt</h3>
             </div>
-            <div className="p-6">
-              <label className="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">
-                Lý do từ chối (Bắt buộc)
-              </label>
-              <textarea
-                autoFocus
-                value={rejectReason}
-                onChange={(e: any) => setRejectReason(e.target.value)}
-                className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl outline-none focus:border-rose-400 focus:bg-white resize-none h-32 font-medium transition"
-                placeholder="Ví dụ: Không hợp lý..."
-              />
+            <div className="p-6 flex flex-col gap-4">
+               <p className="text-sm font-bold text-slate-500">Hành động này sẽ từ chối toàn bộ phiếu và đóng luồng duyệt hiện tại.</p>
+               <div>
+                 <label className="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">
+                   Lý do từ chối chung (Bắt buộc)
+                 </label>
+                 <textarea
+                   autoFocus value={rejectReason} onChange={e => setRejectReason(e.target.value)}
+                   className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl outline-none focus:border-rose-400 focus:bg-white resize-none h-32 font-medium transition"
+                 />
+               </div>
             </div>
             <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-              <button
-                onClick={() => setShowRejectModal(false)}
-                className="px-5 py-2.5 font-bold text-slate-500 hover:bg-slate-200 rounded-xl transition"
-              >
-                Hủy
-              </button>
-              <button
+              <button onClick={() => setShowRejectModal(false)} className="px-5 py-2.5 font-bold text-slate-500 hover:bg-slate-200 rounded-xl transition">Hủy</button>
+              <button 
                 onClick={() => {
-                  if (!rejectReason.trim()) {
-                    return showToast('Bắt buộc nhập lý do!', 'error');
-                  }
-                  handleAction('/reject', { reason: rejectReason }, 'Đã từ chối phiếu');
-                  setShowRejectModal(false);
-                }}
-                className="px-6 py-2.5 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition shadow-lg shadow-rose-500/30"
-              >
+                   if (!rejectReason.trim()) return showToast('Bắt buộc nhập lý do!', 'error');
+                   handleAction('/reject', { reason: rejectReason }, 'Đã từ chối phiếu hoàn toàn');
+                   setShowRejectModal(false);
+                }} 
+                className="px-6 py-2.5 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition shadow-lg shadow-rose-500/30">
                 Xác Nhận Từ Chối
               </button>
             </div>
@@ -1053,128 +446,38 @@ export default function RequestsDetail({
         </div>
       )}
 
-      {showIssueModal && (
+      {/* RETURN MODAL */}
+      {showReturnModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] animate-slide-up">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-blue-600 text-white">
-              <h3 className="text-xl font-black">Bảng Kê Xuất Kho Thực Tế & Giao Hàng</h3>
-              <button
-                onClick={() => setShowIssueModal(false)}
-                className="text-blue-200 hover:text-white transition"
-              >
-                <XCircle className="w-7 h-7" />
-              </button>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up">
+            <div className="p-6 border-b border-slate-100 flex items-center bg-amber-50 text-amber-600">
+              <CornerUpLeft className="w-7 h-7 mr-3" />
+              <h3 className="text-xl font-black">Yêu cầu bổ sung dữ liệu</h3>
             </div>
-
-            <div className="p-6 overflow-y-auto flex-1">
-              <p className="text-sm font-medium text-slate-600 mb-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                Kho thực hiện kiểm hàng đưa cho người nhận. Nhập vào ô "THỰC GIAO" số lượng vật lý anh/chị xuất đi. Hệ thống sẽ ngay lập tức trừ Tồn Kho. Phiếu sẽ chuyển sang trạng thái <b>CHỜ BÀN GIAO</b>.
-              </p>
-
-              <table className="w-full text-left whitespace-nowrap">
-                <thead className="bg-slate-50 text-[10px] uppercase font-black text-slate-400">
-                  <tr>
-                    <th className="p-3">Hàng Hóa</th>
-                    <th className="p-3 text-center">Tồn Hiện Kho</th>
-                    <th className="p-3 text-center">Đã Duyệt Cấp</th>
-                    <th className="p-3 text-center bg-blue-50 border-x-2 border-blue-100">
-                      THỰC GIAO LÚC NÀY
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {data.lines.map((l: any) => {
-                    const qtyDeliv =
-                      issues.find((a: any) => a.lineId === l.id)?.qtyDelivered ??
-                      (l.qtyApproved ?? l.qtyRequested);
-                    const currentStock = l.item.stocks?.[0]?.quantityOnHand || 0;
-                    const overStock = qtyDeliv > currentStock;
-
-                    return (
-                      <tr key={l.id}>
-                        <td className="p-3 font-bold text-slate-700 text-sm whitespace-normal">
-                          {l.item.name}
-                        </td>
-                        <td className="p-3 text-center font-black text-slate-600">{currentStock}</td>
-                        <td className="p-3 text-center font-black text-emerald-600">
-                          {l.qtyApproved ?? l.qtyRequested}
-                        </td>
-                        <td className="p-3 border-x-2 border-blue-100 bg-white">
-                          <input
-                            type="number"
-                            min="0"
-                            value={qtyDeliv}
-                            onChange={(e: any) =>
-                              setIssues(
-                                issues.map((a: any) =>
-                                  a.lineId === l.id
-                                    ? { ...a, qtyDelivered: parseInt(e.target.value) || 0 }
-                                    : a
-                                )
-                              )
-                            }
-                            className={`w-full text-center py-2 bg-slate-100 border outline-none rounded-lg focus:ring-4 focus:bg-white font-black text-lg transition ${
-                              overStock
-                                ? 'text-rose-600 border-rose-300 ring-4 ring-rose-50'
-                                : 'text-blue-700 border-slate-200 focus:border-blue-400 focus:ring-blue-100'
-                            }`}
-                          />
-                          {overStock && (
-                            <p className="text-[9px] font-bold text-rose-500 text-center mt-1 border-t px-2 py-0.5 rounded border border-rose-200 bg-rose-50">
-                              Lỗi: Vượt quá tồn kho thực tế
-                            </p>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className="p-6">
+              <p className="text-sm font-bold text-slate-500 mb-4">Trả lại phiếu về bước xin cấp để nhân viên thay đổi Số Lượng / Vật Tư và submit lại.</p>
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-2">Nhập hướng dẫn (Bắt buộc)</label>
+              <textarea
+                autoFocus value={returnReason} onChange={e => setReturnReason(e.target.value)}
+                className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl outline-none focus:border-amber-400 focus:bg-white resize-none h-32 font-medium transition"
+              />
             </div>
-
-            <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
-              <button
-                onClick={() => setShowIssueModal(false)}
-                className="px-6 py-2.5 font-bold text-slate-500 hover:bg-slate-200 rounded-xl transition"
-              >
-                Hủy Bỏ
-              </button>
-              <button
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+              <button onClick={() => setShowReturnModal(false)} className="px-5 py-2.5 font-bold text-slate-500 hover:bg-slate-200 rounded-xl transition">Hủy</button>
+              <button 
                 onClick={() => {
-                  const hasErr = data.lines.some(
-                    (l: any) =>
-                      (issues.find((a: any) => a.lineId === l.id)?.qtyDelivered ??
-                        (l.qtyApproved ?? l.qtyRequested)) >
-                      (l.item.stocks?.[0]?.quantityOnHand || 0)
-                  );
-
-                  if (hasErr) {
-                    return showToast(
-                      'Không thể xuất dòng có số lượng Giao vượt số Tồn kho. Vui lòng nhận đúng hoặc ít hơn tồn kho hiện hữu.',
-                      'error'
-                    );
-                  }
-
-                  const endpoint =
-                    data.status === 'PICKING'
-                      ? '/warehouse/complete_picking'
-                      : '/issue';
-
-                  handleAction(
-                    endpoint,
-                    { lineIssues: issues },
-                    'ĐÃ XUẤT KHO THÀNH CÔNG VÀ TRỪ TỒN!'
-                  );
-                  setShowIssueModal(false);
-                }}
-                className="px-8 py-2.5 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-500/30 flex items-center"
-              >
-                <Archive className="w-5 h-5 mr-2" /> XUẤT KHO & CHUẨN BỊ BÀN GIAO
+                   if (!returnReason.trim()) return showToast('Bắt buộc nhập lý do trả lại!', 'error');
+                   handleAction('/return', { reason: returnReason }, 'Đã trả phiếu về xin cấp thành công');
+                   setShowReturnModal(false);
+                }} 
+                className="px-6 py-2.5 bg-amber-600 text-white font-bold rounded-xl hover:bg-amber-700 shadow-md transition">
+                Chuyển Trả Lại
               </button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }
