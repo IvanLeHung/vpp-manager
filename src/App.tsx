@@ -24,6 +24,29 @@ function Landing() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isResetMode, setIsResetMode] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username || !newPassword) return;
+    
+    try {
+      setLoading(true);
+      setError('');
+      setSuccessMsg('');
+      await api.post('/auth/reset-password', { username, newPassword });
+      setSuccessMsg('Đổi mật khẩu thành công! Vui lòng đăng nhập lại.');
+      setIsResetMode(false);
+      setPassword('');
+      setNewPassword('');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Lỗi đổi mật khẩu');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,8 +91,9 @@ function Landing() {
         <p className="text-slate-600 mb-8 text-lg font-medium leading-relaxed">
           Nền tảng quản lý văn phòng phẩm thông minh và tối ưu nhất dành cho doanh nghiệp.
         </p>
-        <form onSubmit={handleLogin} className="flex flex-col gap-4">
-          {error && <div className="text-rose-500 bg-rose-50 p-2 rounded text-sm font-bold">{error}</div>}
+        <form onSubmit={isResetMode ? handleResetPassword : handleLogin} className="flex flex-col gap-4">
+          {error && <div className="text-rose-500 bg-rose-50 p-3 rounded-lg text-sm font-bold shadow-sm">{error}</div>}
+          {successMsg && <div className="text-emerald-700 bg-emerald-50 border border-emerald-200 p-3 rounded-lg text-sm font-bold shadow-sm">{successMsg}</div>}
           
           <input 
             type="text" 
@@ -78,22 +102,43 @@ function Landing() {
             onChange={(e) => setUsername(e.target.value)}
             className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium transition"
           />
-          <input 
-            type="password" 
-            placeholder="Mật khẩu" 
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium transition"
-          />
+          
+          {!isResetMode ? (
+            <input 
+              type="password" 
+              placeholder="Mật khẩu" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium transition"
+            />
+          ) : (
+            <input 
+              type="password" 
+              placeholder="Nhập mật khẩu mới" 
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full p-4 bg-emerald-50/50 border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-medium transition"
+            />
+          )}
           
           <button 
             type="submit"
             disabled={loading}
-            className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-lg rounded-xl transition-all duration-300 shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/50 transform hover:-translate-y-1 focus:ring-4 focus:ring-blue-500/20 disabled:opacity-50"
+            className={`w-full px-6 py-4 text-white font-bold text-lg rounded-xl transition-all duration-300 transform hover:-translate-y-1 focus:ring-4 disabled:opacity-50 ${isResetMode ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-xl shadow-teal-500/30 ring-teal-500/20' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-xl shadow-indigo-500/30 ring-blue-500/20'}`}
           >
-            {loading ? 'Đang xác thực...' : 'Đăng nhập hệ thống'}
+            {loading ? 'Đang xử lý...' : (isResetMode ? 'Đặt lại mật khẩu' : 'Đăng nhập hệ thống')}
           </button>
         </form>
+
+        <div className="mt-6 flex justify-center">
+          <button 
+            type="button" 
+            onClick={() => { setIsResetMode(!isResetMode); setError(''); setSuccessMsg(''); }} 
+            className="text-slate-500 font-bold hover:text-indigo-600 transition text-sm"
+          >
+             {isResetMode ? 'Quay lại màn hình Đăng nhập' : 'Quên mật khẩu?'}
+          </button>
+        </div>
         <div className="mt-8 pt-6 border-t border-slate-200">
            <button onClick={() => navigate('/guest-request')} className="text-slate-500 font-bold hover:text-indigo-600 hover:underline transition">
               Không có tài khoản? Tạo yêu cầu làm Khách
