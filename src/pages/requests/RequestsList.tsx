@@ -45,8 +45,10 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     
     if (statusFilter !== 'ALL') {
         if (statusFilter === 'MY_ACTION') {
-            if (currentUser.role === 'MANAGER' || currentUser.role === 'ADMIN') {
+            if (currentUser.role === 'MANAGER') {
                 filtered = filtered.filter(r => r.currentApproverId === currentUid);
+            } else if (currentUser.role === 'ADMIN') {
+                filtered = filtered.filter(r => r.currentApproverId === currentUid || r.status === 'PENDING_ADMIN' || r.status === 'PENDING_MANAGER');
             }
             else if (currentUser.role === 'WAREHOUSE') filtered = filtered.filter(r => r.status === 'READY_TO_ISSUE');
             else filtered = filtered.filter(r => r.status === 'WAITING_HANDOVER'); // For Employee (Self-receipt)
