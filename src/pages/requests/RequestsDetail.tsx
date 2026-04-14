@@ -85,16 +85,17 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
     );
   }
 
-  const isApprover = data.currentApproverId === currentUser.userId;
-  const isManagerInChain = currentUser.role === 'MANAGER' && data.approvalSteps?.some((s: any) => s.approverId === currentUser.userId);
-  const isFutureApprover = isManagerInChain && data.status === 'PENDING_MANAGER' && data.currentApproverId !== currentUser.userId;
+  const currentUid = currentUser.userId || currentUser.id;
+  const isApprover = data.currentApproverId === currentUid;
+  const isManagerInChain = currentUser.role === 'MANAGER' && data.approvalSteps?.some((s: any) => s.approverId === currentUid);
+  const isFutureApprover = isManagerInChain && data.status === 'PENDING_MANAGER' && data.currentApproverId !== currentUid;
 
 
   const isWarehouse = (currentUser.role === 'WAREHOUSE' || currentUser.role === 'ADMIN') && ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED'].includes(data.status);
-  const isOwnerDraft = currentUser.userId === data.requesterId && (data.status === 'DRAFT' || data.status === 'RETURNED');
-  const isOwnerPending = currentUser.userId === data.requesterId && (data.status === 'PENDING_MANAGER' || data.status === 'PENDING_ADMIN');
-  const canCancel = ['DRAFT', 'PENDING_MANAGER', 'PENDING_ADMIN', 'RETURNED', 'APPROVED', 'READY_TO_ISSUE'].includes(data.status) && (currentUser.role !== 'EMPLOYEE' || currentUser.userId === data.requesterId);
-  const isHandover = (currentUser.userId === data.requesterId || currentUser.role === 'ADMIN') && data.status === 'WAITING_HANDOVER';
+  const isOwnerDraft = currentUid === data.requesterId && (data.status === 'DRAFT' || data.status === 'RETURNED');
+  const isOwnerPending = currentUid === data.requesterId && (data.status === 'PENDING_MANAGER' || data.status === 'PENDING_ADMIN');
+  const canCancel = ['DRAFT', 'PENDING_MANAGER', 'PENDING_ADMIN', 'RETURNED', 'APPROVED', 'READY_TO_ISSUE'].includes(data.status) && (currentUser.role !== 'EMPLOYEE' || currentUid === data.requesterId);
+  const isHandover = (currentUid === data.requesterId || currentUser.role === 'ADMIN') && data.status === 'WAITING_HANDOVER';
 
   return (
     <div className="flex flex-col h-full bg-slate-100 overflow-hidden relative print:bg-white print:overflow-auto">

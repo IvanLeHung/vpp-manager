@@ -35,16 +35,18 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     }
   };
 
+  const currentUid = currentUser.userId || currentUser.id;
+
   const filteredRequests = useMemo(() => {
     let filtered = requests;
     if (currentUser.role === 'EMPLOYEE') {
-        filtered = filtered.filter(req => req.requesterId === currentUser.userId || req.requester?.fullName === currentUser.name);
+        filtered = filtered.filter(req => req.requesterId === currentUid || req.requester?.fullName === currentUser.name);
     }
     
     if (statusFilter !== 'ALL') {
         if (statusFilter === 'MY_ACTION') {
             if (currentUser.role === 'MANAGER' || currentUser.role === 'ADMIN') {
-                filtered = filtered.filter(r => r.currentApproverId === currentUser.userId);
+                filtered = filtered.filter(r => r.currentApproverId === currentUid);
             }
             else if (currentUser.role === 'WAREHOUSE') filtered = filtered.filter(r => r.status === 'READY_TO_ISSUE');
             else filtered = filtered.filter(r => r.status === 'WAITING_HANDOVER'); // For Employee (Self-receipt)
@@ -89,16 +91,16 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   };
 
   const getActionName = (req: VPPRequest) => {
-      if (currentUser.role === 'MANAGER' && req.status === 'PENDING_MANAGER' && req.currentApproverId === currentUser.userId) return 'Duyệt (BP)';
+      if (currentUser.role === 'MANAGER' && req.status === 'PENDING_MANAGER' && req.currentApproverId === currentUid) return 'Duyệt (BP)';
       if (currentUser.role === 'ADMIN' && (req.status === 'PENDING_ADMIN' || req.status === 'PENDING_MANAGER')) return 'Duyệt (HChính)';
       if (currentUser.role === 'WAREHOUSE' && req.status === 'READY_TO_ISSUE') return 'Xuất Kho';
-      if (currentUser.userId === req.requesterId && req.status === 'WAITING_HANDOVER') return 'Xác nhận Bàn giao';
-      if (currentUser.userId === req.requesterId && (req.status === 'DRAFT' || req.status === 'RETURNED')) return 'Chỉnh sửa';
+      if (currentUid === req.requesterId && req.status === 'WAITING_HANDOVER') return 'Xác nhận Bàn giao';
+      if (currentUid === req.requesterId && (req.status === 'DRAFT' || req.status === 'RETURNED')) return 'Chỉnh sửa';
       return 'Chi tiết';
   };
 
   const isApprovable = (req: VPPRequest) => {
-    if (currentUser.role === 'MANAGER' && req.status === 'PENDING_MANAGER' && req.currentApproverId === currentUser.userId) return true;
+    if (currentUser.role === 'MANAGER' && req.status === 'PENDING_MANAGER' && req.currentApproverId === currentUid) return true;
     if (currentUser.role === 'ADMIN' && (req.status === 'PENDING_MANAGER' || req.status === 'PENDING_ADMIN')) return true;
     return false;
   };

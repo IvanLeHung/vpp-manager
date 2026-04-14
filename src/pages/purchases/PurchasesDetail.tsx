@@ -1,19 +1,19 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../../lib/api';
 import { useAppContext as useApp } from '../../context/AppContext';
 import { 
-  ArrowLeft, CheckSquare, XCircle, CheckCircle, Clock, 
-  ShoppingCart, Send, Box, MessageSquare, Printer, MapPin, Search
+  ArrowLeft, CheckSquare, XCircle, CheckCircle, 
+  ShoppingCart, Send, Box, Info
 } from 'lucide-react';
 
 interface PurchasesDetailProps {
   poId: string;
   onBack: () => void;
-  onEdit: () => void;
+  showToast: (m: string, t?: 'success' | 'error' | 'warning') => void;
 }
 
-const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, onEdit }) => {
-  const { currentUser, showToast } = useApp();
+const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToast }) => {
+  const { currentUser } = useApp();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -63,14 +63,16 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, onEdit 
     }
   };
 
+  if (!currentUser) return null;
   if (loading || !data) return <div className="p-10 flex justify-center"><div className="w-8 h-8 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin"></div></div>;
 
   const isDRAFT = data.status === 'DRAFT';
   const isPENDING = data.status === 'PENDING_APPROVAL';
   const isAPPROVED = data.status === 'APPROVED';
   
+  const currentUid = currentUser.userId || currentUser.id;
   const canApprove = (currentUser.role === 'MANAGER' || currentUser.role === 'ADMIN') && isPENDING;
-  const canSubmit = (currentUser.userId === data.requesterId || currentUser.role === 'ADMIN') && isDRAFT;
+  const canSubmit = (currentUid === data.requesterId || currentUser.role === 'ADMIN') && isDRAFT;
   const canOrder = (currentUser.role === 'MANAGER' || currentUser.role === 'ADMIN') && (isAPPROVED || (isDRAFT && data.type === 'PO')); // Auto PO can be ordered directly
 
   return (
