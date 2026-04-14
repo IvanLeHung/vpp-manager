@@ -86,7 +86,7 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
   }
 
   const currentUid = currentUser.userId || currentUser.id;
-  const isApprover = data.currentApproverId === currentUid;
+  const isApprover = data.currentApproverId === currentUid || (currentUser.role === 'ADMIN' && (data.status === 'PENDING_ADMIN' || data.status === 'PENDING_MANAGER'));
   const isManagerInChain = currentUser.role === 'MANAGER' && data.approvalSteps?.some((s: any) => s.approverId === currentUid);
   const isFutureApprover = isManagerInChain && data.status === 'PENDING_MANAGER' && data.currentApproverId !== currentUid;
 
