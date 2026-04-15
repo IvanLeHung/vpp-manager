@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import RequestsList from './requests/RequestsList';
 import RequestsCreate from './requests/RequestsCreate';
 import RequestsDetail from './requests/RequestsDetail';
+import RequestsWorkflow from './requests/RequestsWorkflow';
 import type { VPPRequest } from '../context/AppContext';
 
-export type ViewMode = 'LIST' | 'CREATE' | 'VIEW';
+export type ViewMode = 'LIST' | 'CREATE' | 'VIEW' | 'WORKFLOW';
 
 export default function Requests() {
   const { currentUser, requests, refreshData } = useAppContext();
@@ -30,7 +31,7 @@ export default function Requests() {
     <div className="relative h-[calc(100vh-64px)] overflow-hidden bg-slate-50 print:bg-white print:h-auto">
       {/* Toast Notification */}
       {toast && (
-        <div className={`absolute top-4 right-4 z-50 animate-slide-in-right px-6 py-3 rounded-xl shadow-2xl border font-bold flex items-center gap-2 ${
+        <div className={`absolute top-4 right-4 z-[100] animate-slide-in-right px-6 py-3 rounded-xl shadow-2xl border font-bold flex items-center gap-2 ${
           toast.type === 'success' ? 'bg-emerald-500 text-white border-emerald-600' : 
           toast.type === 'error' ? 'bg-rose-500 text-white border-rose-600' : 
           'bg-amber-500 text-white border-amber-600'
@@ -66,6 +67,12 @@ export default function Requests() {
           refreshData={refreshData}
           showToast={showToast}
           currentUser={currentUser!}
+        />
+      )}
+
+      {viewMode === 'WORKFLOW' && (
+        <RequestsWorkflow 
+          onBack={() => setViewMode('LIST')}
         />
       )}
     </div>
