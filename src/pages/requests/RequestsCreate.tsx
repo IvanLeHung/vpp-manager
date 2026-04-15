@@ -52,40 +52,109 @@ export default function RequestsCreate({
     (activeRequest.status === 'DRAFT' || activeRequest.status === 'RETURNED');
 
   useEffect(() => {
-    if (!activeRequest || !isEditingDraft) return;
+    let cancelled = false;
 
-    setReqType(activeRequest.requestType || 'Định kỳ');
-    setPriority(activeRequest.priority || 'Thường');
-    setPurpose(activeRequest.purpose || '');
-    setNeededByDate(
-      activeRequest.neededByDate
-        ? new Date(activeRequest.neededByDate).toISOString().split('T')[0]
-        : ''
-    );
+    const hydrateDraft = async () => {
+      if (!activeRequest || !isEditingDraft) {
+        setReqType('Định kỳ');
+        setPriority('Thường');
+        setPurpose('');
+        setNeededByDate('');
+        setTargetItems([]);
+        return;
+      }
 
-    const prefilled: TargetItem[] = (activeRequest.lines || []).map((line: any) => {
-      const foundItem =
-        items.find((i: VPPItem) => i.id === line.itemId) ||
-        ({
-          ...(line.item || {}),
-          id: line.itemId,
-          stock: line.item?.stock ?? 0,
-          price: line.item?.price ?? 0,
-          quota: line.item?.quota ?? 0,
-          unit: line.item?.unit ?? 'cái',
-          name: line.item?.name ?? 'Vật tư không xác định',
-          mvpp: line.item?.mvpp ?? 'N/A',
-        } as VPPItem);
+      setReqType(activeRequest.requestType || 'Định kỳ');
+      setPriority(activeRequest.priority || 'Thường');
+      setPurpose(activeRequest.purpose || '');
+      setNeededByDate(
+        activeRequest.neededByDate
+          ? new Date(activeRequest.neededByDate).toISOString().split('T')[0]
+          : ''
+      );
 
-      return {
-        itemId: line.itemId,
-        item: foundItem,
-        quantity: Number(line.qtyRequested || 1),
-        note: line.note || '',
-      };
-    });
+      const prefilled: TargetItem[] = await Promise.all(
+        (activeRequest.lines || []).map(async (line: any) => {
+          const fromContext = items.find((i: VPPItem) => i.id === line.itemId);
+          if (fromContext) {
+            return {
+              itemId: line.itemId,
+              item: fromContext,
+              quantity: Number(line.qtyRequested || 1),
+              note: line.note || '',
+            };
+          }
 
-    setTargetItems(prefilled);
+          if (line.item) {
+            return {
+              itemId: line.itemId,
+              item: {
+                ...line.item,
+                id: line.itemId,
+                stock: line.item.stock ?? line.availableQtyAtRequest ?? 0,
+                price: Number(line.item.price ?? line.unitPrice ?? 0),
+                quota: Number(line.item.quota ?? line.quotaRemainingAtRequest ?? 0),
+                unit: line.item.unit ?? 'cái',
+                name: line.item.name ?? 'Vật tư không xác định',
+                mvpp: line.item.mvpp ?? 'N/A',
+              } as VPPItem,
+              quantity: Number(line.qtyRequested || 1),
+              note: line.note || '',
+            };
+          }
+
+          try {
+            const res = await api.get(`/items/${line.itemId}`);
+            const data = res.data?.data || res.data;
+
+            return {
+              itemId: line.itemId,
+              item: {
+                ...data,
+                id: data.id ?? line.itemId,
+                stock:
+                  data.stock ??
+                  data.stocks?.[0]?.quantityOnHand ??
+                  line.availableQtyAtRequest ??
+                  0,
+                price: Number(data.price ?? line.unitPrice ?? 0),
+                quota: Number(data.quota ?? line.quotaRemainingAtRequest ?? 0),
+                unit: data.unit ?? 'cái',
+                name: data.name ?? 'Vật tư không xác định',
+                mvpp: data.mvpp ?? 'N/A',
+              } as VPPItem,
+              quantity: Number(line.qtyRequested || 1),
+              note: line.note || '',
+            };
+          } catch {
+            return {
+              itemId: line.itemId,
+              item: {
+                id: line.itemId,
+                name: line.item?.name ?? 'Vật tư không xác định',
+                mvpp: line.item?.mvpp ?? 'N/A',
+                unit: line.item?.unit ?? 'cái',
+                stock: line.availableQtyAtRequest ?? 0,
+                price: Number(line.unitPrice ?? 0),
+                quota: Number(line.quotaRemainingAtRequest ?? 0),
+              } as VPPItem,
+              quantity: Number(line.qtyRequested || 1),
+              note: line.note || '',
+            };
+          }
+        })
+      );
+
+      if (!cancelled) {
+        setTargetItems(prefilled);
+      }
+    };
+
+    hydrateDraft();
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeRequest, isEditingDraft, items]);
 
   useEffect(() => {
@@ -100,10 +169,11 @@ export default function RequestsCreate({
   }, []);
 
   const searchResults = useMemo(() => {
+    const keyword = searchTerm.trim().toLowerCase();
+    if (!keyword) return [];
+
     return items
       .filter((i: VPPItem) => {
-        const keyword = searchTerm.trim().toLowerCase();
-        if (!keyword) return false;
         return (
           i.name.toLowerCase().includes(keyword) ||
           i.mvpp.toLowerCase().includes(keyword)
@@ -158,9 +228,7 @@ export default function RequestsCreate({
 
   const handleNoteChange = (itemId: string, value: string) => {
     setTargetItems((prev) =>
-      prev.map((t) =>
-        t.itemId === itemId ? { ...t, note: value } : t
-      )
+      prev.map((t) => (t.itemId === itemId ? { ...t, note: value } : t))
     );
   };
 
@@ -254,26 +322,28 @@ export default function RequestsCreate({
       await refreshData();
       setViewMode('LIST');
     } catch (e: any) {
-      showToast(e.response?.data?.error || e.message || 'Lỗi khi lưu phiếu', 'error');
+      showToast(
+        e.response?.data?.error || e.message || 'Lỗi khi lưu phiếu',
+        'error'
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const totalAmount = useMemo(
-    () =>
-      targetItems.reduce(
-        (acc: number, curr) => acc + Number(curr.item.price || 0) * Number(curr.quantity || 0),
-        0
-      ),
-    [targetItems]
-  );
+  const totalAmount = useMemo(() => {
+    return targetItems.reduce(
+      (acc: number, curr) =>
+        acc + Number(curr.item.price || 0) * Number(curr.quantity || 0),
+      0
+    );
+  }, [targetItems]);
 
-  const warningsCount = useMemo(
-    () =>
-      targetItems.filter((t) => Number(t.quantity) > Number(t.item.quota || 0)).length,
-    [targetItems]
-  );
+  const warningsCount = useMemo(() => {
+    return targetItems.filter(
+      (t) => Number(t.quantity) > Number(t.item.quota || 0)
+    ).length;
+  }, [targetItems]);
 
   return (
     <div className="flex flex-col h-full bg-slate-100 overflow-hidden relative print:bg-white print:overflow-auto">
@@ -415,11 +485,17 @@ export default function RequestsCreate({
 
             <div className="text-xs font-bold flex gap-4 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
               <span className="text-slate-500">
-                Mục: <strong className="text-indigo-600 text-[14px]">{targetItems.length}</strong>
+                Mục:{' '}
+                <strong className="text-indigo-600 text-[14px]">
+                  {targetItems.length}
+                </strong>
               </span>
               <div className="w-px h-auto bg-slate-200"></div>
               <span className="text-slate-500">
-                Cảnh báo: <strong className="text-rose-500 text-[14px]">{warningsCount}</strong>
+                Cảnh báo:{' '}
+                <strong className="text-rose-500 text-[14px]">
+                  {warningsCount}
+                </strong>
               </span>
             </div>
           </div>
@@ -486,7 +562,9 @@ export default function RequestsCreate({
             <table className="w-full text-left whitespace-nowrap min-w-max">
               <thead className="bg-slate-50 border-b border-slate-200 relative">
                 <tr className="text-[10px] uppercase font-black text-slate-400 tracking-widest">
-                  <th className="p-3 w-12 text-center border-r border-slate-100">STT</th>
+                  <th className="p-3 w-12 text-center border-r border-slate-100">
+                    STT
+                  </th>
                   <th className="p-3">Hàng hoá (VPP)</th>
                   <th className="p-3 text-center border-l border-slate-100 hidden md:table-cell">
                     Hệ lượng
@@ -502,21 +580,28 @@ export default function RequestsCreate({
               <tbody className="divide-y divide-slate-100">
                 {targetItems.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="p-16 text-center text-slate-400 font-medium bg-slate-50/50">
+                    <td
+                      colSpan={6}
+                      className="p-16 text-center text-slate-400 font-medium bg-slate-50/50"
+                    >
                       <Search className="w-12 h-12 text-slate-300 mx-auto mb-3 opacity-50" />
-                      Lưới chứng từ đang trống. Sử dụng thanh tìm kiếm phía trên để thêm hàng.
+                      Lưới chứng từ đang trống. Sử dụng thanh tìm kiếm phía trên để thêm
+                      hàng.
                     </td>
                   </tr>
                 )}
 
                 {targetItems.map((t, idx) => {
-                  const isOverQuota = Number(t.quantity) > Number(t.item.quota || 0);
+                  const isOverQuota =
+                    Number(t.quantity) > Number(t.item.quota || 0);
                   const isOutStock = Number(t.item.stock || 0) === 0;
 
                   return (
                     <tr
                       key={t.itemId}
-                      className={`hover:bg-slate-50 transition group ${isOverQuota ? 'bg-rose-50/30' : ''}`}
+                      className={`hover:bg-slate-50 transition group ${
+                        isOverQuota ? 'bg-rose-50/30' : ''
+                      }`}
                     >
                       <td className="p-3 text-center font-bold text-slate-400 border-r border-slate-100">
                         {idx + 1}
@@ -537,7 +622,11 @@ export default function RequestsCreate({
                             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
                               Tồn Kho
                             </p>
-                            <p className={`text-xs font-black ${isOutStock ? 'text-rose-500' : 'text-emerald-600'}`}>
+                            <p
+                              className={`text-xs font-black ${
+                                isOutStock ? 'text-rose-500' : 'text-emerald-600'
+                              }`}
+                            >
                               {t.item.stock}
                             </p>
                           </div>
@@ -546,7 +635,9 @@ export default function RequestsCreate({
                             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
                               Quota
                             </p>
-                            <p className="text-xs font-black text-indigo-600">{t.item.quota}</p>
+                            <p className="text-xs font-black text-indigo-600">
+                              {t.item.quota}
+                            </p>
                           </div>
                         </div>
                       </td>
@@ -556,7 +647,9 @@ export default function RequestsCreate({
                           type="number"
                           min="1"
                           value={t.quantity || ''}
-                          onChange={(e) => handleQuantityChange(t.itemId, e.target.value)}
+                          onChange={(e) =>
+                            handleQuantityChange(t.itemId, e.target.value)
+                          }
                           className={`w-full text-center py-2.5 bg-slate-100/50 border outline-none rounded-lg focus:ring-4 focus:ring-indigo-100 focus:bg-white font-black text-lg transition ${
                             isOverQuota
                               ? 'text-rose-600 border-rose-300 ring-4 ring-rose-50'
@@ -577,7 +670,9 @@ export default function RequestsCreate({
                         <input
                           type="text"
                           value={t.note}
-                          onChange={(e) => handleNoteChange(t.itemId, e.target.value)}
+                          onChange={(e) =>
+                            handleNoteChange(t.itemId, e.target.value)
+                          }
                           placeholder="Ghi chú thêm..."
                           className="w-full bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 hover:border-slate-300 transition text-sm text-slate-700 p-2.5 font-medium"
                         />
@@ -615,7 +710,11 @@ export default function RequestsCreate({
           {warningsCount > 0 && (
             <div className="bg-rose-500/10 text-rose-300 border border-rose-500/30 px-5 py-3 rounded-xl font-bold flex items-center text-sm shadow-inner relative z-10">
               <AlertCircle className="w-5 h-5 mr-3 flex-shrink-0 animate-pulse text-rose-400" />
-              Quá <span className="text-white mx-1 bg-rose-500 px-1.5 rounded">{warningsCount}</span> mặt hàng VƯỢT ĐỊNH MỨC QUOTA
+              Quá{' '}
+              <span className="text-white mx-1 bg-rose-500 px-1.5 rounded">
+                {warningsCount}
+              </span>{' '}
+              mặt hàng VƯỢT ĐỊNH MỨC QUOTA
             </div>
           )}
         </div>
