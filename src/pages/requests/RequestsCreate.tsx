@@ -28,6 +28,36 @@ type TargetItem = {
   note: string;
 };
 
+function buildFallbackItem(line: any): VPPItem {
+  return {
+    id: line.itemId,
+    name: line.item?.name ?? 'Vật tư không xác định',
+    mvpp: line.item?.mvpp ?? 'N/A',
+    unit: line.item?.unit ?? 'cái',
+    stock: Number(line.item?.stock ?? line.availableQtyAtRequest ?? 0),
+    price: Number(line.item?.price ?? line.unitPrice ?? 0),
+    quota: Number(line.item?.quota ?? line.quotaRemainingAtRequest ?? 0),
+  } as VPPItem;
+}
+
+function normalizeHydratedItem(raw: any, line: any): VPPItem {
+  return {
+    ...raw,
+    id: raw?.id ?? line.itemId,
+    name: raw?.name ?? line.item?.name ?? 'Vật tư không xác định',
+    mvpp: raw?.mvpp ?? line.item?.mvpp ?? 'N/A',
+    unit: raw?.unit ?? line.item?.unit ?? 'cái',
+    stock: Number(
+      raw?.stock ??
+        raw?.stocks?.[0]?.quantityOnHand ??
+        line.availableQtyAtRequest ??
+        0
+    ),
+    price: Number(raw?.price ?? line.unitPrice ?? 0),
+    quota: Number(raw?.quota ?? line.quotaRemainingAtRequest ?? 0),
+  } as VPPItem;
+}
+
 export default function RequestsCreate({
   setViewMode,
   refreshData,
@@ -44,8 +74,9 @@ export default function RequestsCreate({
 
   const [searchTerm, setSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
-  const searchRef = useRef<HTMLDivElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const searchRef = useRef<HTMLDivElement>(null);
 
   const isEditingDraft =
     !!activeRequest &&
@@ -88,16 +119,7 @@ export default function RequestsCreate({
           if (line.item) {
             return {
               itemId: line.itemId,
-              item: {
-                ...line.item,
-                id: line.itemId,
-                stock: line.item.stock ?? line.availableQtyAtRequest ?? 0,
-                price: Number(line.item.price ?? line.unitPrice ?? 0),
-                quota: Number(line.item.quota ?? line.quotaRemainingAtRequest ?? 0),
-                unit: line.item.unit ?? 'cái',
-                name: line.item.name ?? 'Vật tư không xác định',
-                mvpp: line.item.mvpp ?? 'N/A',
-              } as VPPItem,
+              item: normalizeHydratedItem(line.item, line),
               quantity: Number(line.qtyRequested || 1),
               note: line.note || '',
             };
@@ -106,38 +128,16 @@ export default function RequestsCreate({
           try {
             const res = await api.get(`/items/${line.itemId}`);
             const data = res.data?.data || res.data;
-
             return {
               itemId: line.itemId,
-              item: {
-                ...data,
-                id: data.id ?? line.itemId,
-                stock:
-                  data.stock ??
-                  data.stocks?.[0]?.quantityOnHand ??
-                  line.availableQtyAtRequest ??
-                  0,
-                price: Number(data.price ?? line.unitPrice ?? 0),
-                quota: Number(data.quota ?? line.quotaRemainingAtRequest ?? 0),
-                unit: data.unit ?? 'cái',
-                name: data.name ?? 'Vật tư không xác định',
-                mvpp: data.mvpp ?? 'N/A',
-              } as VPPItem,
+              item: normalizeHydratedItem(data, line),
               quantity: Number(line.qtyRequested || 1),
               note: line.note || '',
             };
           } catch {
             return {
               itemId: line.itemId,
-              item: {
-                id: line.itemId,
-                name: line.item?.name ?? 'Vật tư không xác định',
-                mvpp: line.item?.mvpp ?? 'N/A',
-                unit: line.item?.unit ?? 'cái',
-                stock: line.availableQtyAtRequest ?? 0,
-                price: Number(line.unitPrice ?? 0),
-                quota: Number(line.quotaRemainingAtRequest ?? 0),
-              } as VPPItem,
+              item: buildFallbackItem(line),
               quantity: Number(line.qtyRequested || 1),
               note: line.note || '',
             };
@@ -183,7 +183,7 @@ export default function RequestsCreate({
   }, [items, searchTerm]);
 
   const handleAddItem = (item: VPPItem) => {
-    if (item.stock === 0) {
+    if (Number(item.stock || 0) === 0) {
       showToast(
         'Mặt hàng này hiện đang hết tồn kho. Nếu đưa vào phiếu, hệ thống sẽ đẩy thành Yêu Cầu Chờ Mua Hàng.',
         'warning'
@@ -313,9 +313,7 @@ export default function RequestsCreate({
       }
 
       showToast(
-        status === 'PENDING'
-          ? 'Đã gửi trình duyệt thành công!'
-          : 'Đã lưu nháp!',
+        status === 'PENDING' ? 'Đã gửi trình duyệt thành công!' : 'Đã lưu nháp!',
         'success'
       );
 
@@ -485,17 +483,11 @@ export default function RequestsCreate({
 
             <div className="text-xs font-bold flex gap-4 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
               <span className="text-slate-500">
-                Mục:{' '}
-                <strong className="text-indigo-600 text-[14px]">
-                  {targetItems.length}
-                </strong>
+                Mục: <strong className="text-indigo-600 text-[14px]">{targetItems.length}</strong>
               </span>
               <div className="w-px h-auto bg-slate-200"></div>
               <span className="text-slate-500">
-                Cảnh báo:{' '}
-                <strong className="text-rose-500 text-[14px]">
-                  {warningsCount}
-                </strong>
+                Cảnh báo: <strong className="text-rose-500 text-[14px]">{warningsCount}</strong>
               </span>
             </div>
           </div>
@@ -562,9 +554,7 @@ export default function RequestsCreate({
             <table className="w-full text-left whitespace-nowrap min-w-max">
               <thead className="bg-slate-50 border-b border-slate-200 relative">
                 <tr className="text-[10px] uppercase font-black text-slate-400 tracking-widest">
-                  <th className="p-3 w-12 text-center border-r border-slate-100">
-                    STT
-                  </th>
+                  <th className="p-3 w-12 text-center border-r border-slate-100">STT</th>
                   <th className="p-3">Hàng hoá (VPP)</th>
                   <th className="p-3 text-center border-l border-slate-100 hidden md:table-cell">
                     Hệ lượng
@@ -580,28 +570,21 @@ export default function RequestsCreate({
               <tbody className="divide-y divide-slate-100">
                 {targetItems.length === 0 && (
                   <tr>
-                    <td
-                      colSpan={6}
-                      className="p-16 text-center text-slate-400 font-medium bg-slate-50/50"
-                    >
+                    <td colSpan={6} className="p-16 text-center text-slate-400 font-medium bg-slate-50/50">
                       <Search className="w-12 h-12 text-slate-300 mx-auto mb-3 opacity-50" />
-                      Lưới chứng từ đang trống. Sử dụng thanh tìm kiếm phía trên để thêm
-                      hàng.
+                      Lưới chứng từ đang trống. Sử dụng thanh tìm kiếm phía trên để thêm hàng.
                     </td>
                   </tr>
                 )}
 
                 {targetItems.map((t, idx) => {
-                  const isOverQuota =
-                    Number(t.quantity) > Number(t.item.quota || 0);
+                  const isOverQuota = Number(t.quantity) > Number(t.item.quota || 0);
                   const isOutStock = Number(t.item.stock || 0) === 0;
 
                   return (
                     <tr
                       key={t.itemId}
-                      className={`hover:bg-slate-50 transition group ${
-                        isOverQuota ? 'bg-rose-50/30' : ''
-                      }`}
+                      className={`hover:bg-slate-50 transition group ${isOverQuota ? 'bg-rose-50/30' : ''}`}
                     >
                       <td className="p-3 text-center font-bold text-slate-400 border-r border-slate-100">
                         {idx + 1}
@@ -622,11 +605,7 @@ export default function RequestsCreate({
                             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
                               Tồn Kho
                             </p>
-                            <p
-                              className={`text-xs font-black ${
-                                isOutStock ? 'text-rose-500' : 'text-emerald-600'
-                              }`}
-                            >
+                            <p className={`text-xs font-black ${isOutStock ? 'text-rose-500' : 'text-emerald-600'}`}>
                               {t.item.stock}
                             </p>
                           </div>
@@ -635,9 +614,7 @@ export default function RequestsCreate({
                             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
                               Quota
                             </p>
-                            <p className="text-xs font-black text-indigo-600">
-                              {t.item.quota}
-                            </p>
+                            <p className="text-xs font-black text-indigo-600">{t.item.quota}</p>
                           </div>
                         </div>
                       </td>
@@ -647,9 +624,7 @@ export default function RequestsCreate({
                           type="number"
                           min="1"
                           value={t.quantity || ''}
-                          onChange={(e) =>
-                            handleQuantityChange(t.itemId, e.target.value)
-                          }
+                          onChange={(e) => handleQuantityChange(t.itemId, e.target.value)}
                           className={`w-full text-center py-2.5 bg-slate-100/50 border outline-none rounded-lg focus:ring-4 focus:ring-indigo-100 focus:bg-white font-black text-lg transition ${
                             isOverQuota
                               ? 'text-rose-600 border-rose-300 ring-4 ring-rose-50'
@@ -670,9 +645,7 @@ export default function RequestsCreate({
                         <input
                           type="text"
                           value={t.note}
-                          onChange={(e) =>
-                            handleNoteChange(t.itemId, e.target.value)
-                          }
+                          onChange={(e) => handleNoteChange(t.itemId, e.target.value)}
                           placeholder="Ghi chú thêm..."
                           className="w-full bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 hover:border-slate-300 transition text-sm text-slate-700 p-2.5 font-medium"
                         />
@@ -710,11 +683,7 @@ export default function RequestsCreate({
           {warningsCount > 0 && (
             <div className="bg-rose-500/10 text-rose-300 border border-rose-500/30 px-5 py-3 rounded-xl font-bold flex items-center text-sm shadow-inner relative z-10">
               <AlertCircle className="w-5 h-5 mr-3 flex-shrink-0 animate-pulse text-rose-400" />
-              Quá{' '}
-              <span className="text-white mx-1 bg-rose-500 px-1.5 rounded">
-                {warningsCount}
-              </span>{' '}
-              mặt hàng VƯỢT ĐỊNH MỨC QUOTA
+              Quá <span className="text-white mx-1 bg-rose-500 px-1.5 rounded">{warningsCount}</span> mặt hàng VƯỢT ĐỊNH MỨC QUOTA
             </div>
           )}
         </div>
