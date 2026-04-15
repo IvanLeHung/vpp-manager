@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Plus, Download, Search, FileText, CheckCircle, Clock, XCircle, ChevronLeft, ChevronRight, Eye, CheckSquare, StopCircle } from 'lucide-react';
+import { Plus, Download, Search, FileText, CheckCircle, Clock, XCircle, ChevronLeft, ChevronRight, Eye, CheckSquare, StopCircle, GitBranch } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { VPPRequest, User } from '../../context/AppContext';
 import api from '../../lib/api';
@@ -221,6 +221,10 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                <button onClick={() => setStatusFilter('WAITING_HANDOVER')} className={`px-4 py-2 rounded-lg text-sm font-bold transition ${statusFilter==='WAITING_HANDOVER'?'bg-slate-700 text-white shadow-md':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>Chờ lấy hàng</button>
                <button onClick={() => setStatusFilter('COMPLETED')} className={`px-4 py-2 rounded-lg font-bold text-sm transition ${statusFilter==='COMPLETED'?'bg-emerald-600 text-white shadow-md':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>Đã hoàn tất</button>
                <button onClick={() => setStatusFilter('DRAFT')} className={`px-4 py-2 rounded-lg font-bold text-sm transition ${statusFilter==='DRAFT'?'bg-slate-700 text-white shadow-md':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>Lưu nháp</button>
+               <div className="w-px h-8 bg-slate-200 mx-1 hidden xl:block"></div>
+               <button onClick={() => setViewMode('WORKFLOW')} className="px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap transition bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 flex items-center gap-2 shadow-sm shadow-indigo-500/10">
+                   <GitBranch className="w-4 h-4" /> QUY TRÌNH
+               </button>
             </div>
             <div className="relative w-full xl:w-80 shrink-0">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
