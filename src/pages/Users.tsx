@@ -84,22 +84,41 @@ export default function Users() {
   if (!currentUser) return null;
 
   const fetchData = async () => {
+    setLoading(true);
+    console.log('[Users.tsx] Fetching all HR data...');
+
+    // 1. Fetch Users
     try {
-      setLoading(true);
       const userEndpoint = (currentUser.role === 'MANAGER' && userViewMode === 'MY_DIRECTS') ? '/users/my-employees' : '/users';
-      const [usersRes, deptsRes, managersRes] = await Promise.all([
-        api.get(userEndpoint),
-        api.get('/departments'),
-        api.get('/users/managers')
-      ]);
-      setUsers(usersRes.data.data);
-      setDepartments(deptsRes.data.data || []);
-      setManagers(managersRes.data.data || []);
+      console.log(`[Users.tsx] Fetching users from ${userEndpoint}...`);
+      const usersRes = await api.get(userEndpoint);
+      setUsers(usersRes.data.data || []);
+      console.log(`[Users.tsx] Loaded ${usersRes.data.data?.length} users`);
     } catch (error) {
-      console.error('Lỗi tải dữ liệu:', error);
-    } finally {
-      setLoading(false);
+      console.error('[Users.tsx] Lỗi tải danh sách nhân viên:', error);
     }
+
+    // 2. Fetch Departments
+    try {
+      console.log('[Users.tsx] Fetching departments...');
+      const deptsRes = await api.get('/departments');
+      setDepartments(deptsRes.data.data || []);
+      console.log(`[Users.tsx] Loaded ${deptsRes.data.data?.length} departments`);
+    } catch (error) {
+      console.error('[Users.tsx] Lỗi tải danh sách phòng ban:', error);
+    }
+
+    // 3. Fetch Managers (dropdown)
+    try {
+      console.log('[Users.tsx] Fetching managers for dropdown...');
+      const managersRes = await api.get('/users/managers');
+      setManagers(managersRes.data.data || []);
+      console.log(`[Users.tsx] Loaded ${managersRes.data.data?.length} managers`);
+    } catch (error) {
+      console.error('[Users.tsx] Lỗi tải danh sách quản lý:', error);
+    }
+
+    setLoading(false);
   };
 
   useEffect(() => {
