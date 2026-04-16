@@ -110,7 +110,7 @@ export default function WarehouseTicketDetail({ basePath = '/warehouse-tickets' 
   const handleApprove = async () => {
     try {
       setActionLoading(true);
-      await api.post(`/warehouse-tickets/${id}/approve`);
+      await api.post(`/warehouse-tickets/${id}/approve`, {});
       addToast('Phiếu đã được duyệt!');
       fetchTicket();
     } catch (err: any) {
@@ -121,7 +121,7 @@ export default function WarehouseTicketDetail({ basePath = '/warehouse-tickets' 
   const handleExecute = async () => {
     try {
       setActionLoading(true);
-      await api.post(`/warehouse-tickets/${id}/execute`);
+      await api.post(`/warehouse-tickets/${id}/execute`, {});
       addToast('Phiếu đã được thực thi — tồn kho đã cập nhật!');
       fetchTicket();
     } catch (err: any) {
@@ -132,8 +132,8 @@ export default function WarehouseTicketDetail({ basePath = '/warehouse-tickets' 
   const handleApproveAndExecute = async () => {
     try {
       setActionLoading(true);
-      await api.post(`/warehouse-tickets/${id}/approve`);
-      await api.post(`/warehouse-tickets/${id}/execute`);
+      await api.post(`/warehouse-tickets/${id}/approve`, {});
+      await api.post(`/warehouse-tickets/${id}/execute`, {});
       addToast('Duyệt & thực thi thành công — tồn kho đã cập nhật!');
       fetchTicket();
     } catch (err: any) {
