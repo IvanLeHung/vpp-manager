@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Plus,
   XCircle,
@@ -95,17 +95,26 @@ export default function RequestsCreate({
         return;
       }
 
-      setReqType(activeRequest.requestType || 'Định kỳ');
-      setPriority(activeRequest.priority || 'Thường');
-      setPurpose(activeRequest.purpose || '');
+      let sourceRequest = activeRequest;
+      // Fetch fresh detail to ensure all line items have full details
+      try {
+        const res = await api.get(`/requests/${activeRequest.id}`);
+        sourceRequest = res.data?.data || res.data || activeRequest;
+      } catch (e) {
+        console.error('Failed to fetch request detail for hydration', e);
+      }
+
+      setReqType(sourceRequest.requestType || 'Định kỳ');
+      setPriority(sourceRequest.priority || 'Thường');
+      setPurpose(sourceRequest.purpose || '');
       setNeededByDate(
-        activeRequest.neededByDate
-          ? new Date(activeRequest.neededByDate).toISOString().split('T')[0]
+        sourceRequest.neededByDate
+          ? new Date(sourceRequest.neededByDate).toISOString().split('T')[0]
           : ''
       );
 
       const prefilled: TargetItem[] = await Promise.all(
-        (activeRequest.lines || []).map(async (line: any) => {
+        (sourceRequest.lines || []).map(async (line: any) => {
           const fromContext = items.find((i: VPPItem) => i.id === line.itemId);
           if (fromContext) {
             return {
