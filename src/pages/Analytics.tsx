@@ -124,6 +124,26 @@ export default function Analytics() {
     );
   }
 
+  if (!loading && !kpis) {
+    return (
+      <div className="flex items-center justify-center h-full bg-slate-50 p-10">
+        <div className="bg-white p-12 rounded-[3rem] shadow-2xl border border-slate-100 flex flex-col items-center text-center max-w-lg">
+          <div className="w-20 h-20 bg-rose-50 text-rose-500 rounded-3xl flex items-center justify-center mb-6">
+            <AlertTriangle className="w-10 h-10" />
+          </div>
+          <h2 className="text-2xl font-black text-slate-800 uppercase italic mb-4">Lỗi tải dữ liệu báo cáo</h2>
+          <p className="text-slate-500 font-medium mb-8">Không thể kết nối đến máy chủ hoặc dữ liệu trả về không hợp lệ. Vui lòng kiểm tra lại bộ lọc hoặc thử lại sau.</p>
+          <button 
+            onClick={() => fetchData()}
+            className="px-8 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2"
+          >
+            <RefreshCw className="w-5 h-5" /> Thử tải lại dữ liệu
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const formatCurrency = (val: number) => Math.round(val || 0).toLocaleString('vi-VN') + ' đ';
 
   return (
@@ -227,7 +247,7 @@ export default function Analytics() {
                 <div className="h-[350px] w-full">
                    {kpis?.analytical?.trendData?.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
-                         <AreaChart data={kpis.analytical.trendData}>
+                         <AreaChart data={kpis?.analytical?.trendData || []}>
                             <defs>
                                <linearGradient id="colorIn" x1="0" y1="0" x2="0" y2="1">
                                   <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
@@ -279,15 +299,19 @@ export default function Analytics() {
                       ) : <div className="text-center text-slate-300 italic py-20 font-black">N/A</div>}
                    </div>
                    <div className="w-full space-y-3">
-                      {deptUsage.slice(0, 4).map((d, i) => (
-                         <div key={d.department} className="flex justify-between items-center bg-slate-50 p-3 rounded-2xl">
-                            <div className="flex items-center gap-3">
-                               <div className="w-3 h-3 rounded-full" style={{backgroundColor: COLORS[i % COLORS.length]}}></div>
-                               <span className="text-xs font-black text-slate-600 truncate max-w-[120px] uppercase tracking-tighter">{d.department}</span>
+                      {(deptUsage || []).slice(0, 4).map((d, i) => {
+                         const totalValueAll = (deptUsage || []).reduce((s, x) => s + (x.totalValue || 0), 0);
+                         const percentage = totalValueAll > 0 ? Math.round(((d.totalValue || 0) / totalValueAll) * 100) : 0;
+                         return (
+                            <div key={d.department || i} className="flex justify-between items-center bg-slate-50 p-3 rounded-2xl">
+                               <div className="flex items-center gap-3">
+                                  <div className="w-3 h-3 rounded-full" style={{backgroundColor: COLORS[i % COLORS.length]}}></div>
+                                  <span className="text-xs font-black text-slate-600 truncate max-w-[120px] uppercase tracking-tighter">{d.department || 'N/A'}</span>
+                               </div>
+                               <span className="text-xs font-black text-indigo-600 italic">{percentage}%</span>
                             </div>
-                            <span className="text-xs font-black text-indigo-600 italic">{Math.round((d.totalValue / deptUsage.reduce((s, x) => s + x.totalValue, 0)) * 100)}%</span>
-                         </div>
-                      ))}
+                         );
+                      })}
                    </div>
                 </div>
             </div>
@@ -378,7 +402,7 @@ export default function Analytics() {
                  <Clock className="w-4 h-4" /> Hàng chậm luân chuyển ({">"}60 ngày)
                </h4>
                <div className="flex-1 space-y-4">
-                  {advanced?.deadStock?.length > 0 ? advanced.deadStock.map((s: any) => (
+                  {advanced?.deadStock?.length > 0 ? advanced?.deadStock?.map((s: any) => (
                     <div key={s.mvpp} className="flex justify-between items-center group">
                        <div className="flex flex-col">
                           <span className="text-xs font-black text-slate-700 truncate max-w-[150px] uppercase tracking-tighter group-hover:text-indigo-600 transition-colors">{s.name}</span>
