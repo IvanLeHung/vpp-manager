@@ -389,9 +389,18 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
       <div className="hidden print:block w-full text-black font-sans leading-tight p-4">
           <div className="flex justify-between items-start mb-8">
               <div>
-                  <p className="font-bold text-sm uppercase">CÔNG TY CỔ PHẦN ...</p>
+                  <p className="font-bold text-sm uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
                   <p className="text-[10px] italic mt-1 font-bold">Báo cáo tổng hợp tồn đọng cấp phát</p>
+                  <p className="text-[9px] text-slate-500">Ban Hành chính - Quản trị</p>
               </div>
+              <div className="flex flex-col items-center">
+                   <img 
+                       src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent('https://vpp.danko.vn/requests')}`} 
+                       alt="QR Code" 
+                       className="w-12 h-12 border border-slate-100"
+                   />
+                   <p className="text-[7px] font-bold mt-1 uppercase text-slate-400">Portal Access</p>
+               </div>
               <div className="text-right">
                   <p className="text-sm font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
                   <p className="text-xs font-bold underline decoration-1 underline-offset-4">Độc lập - Tự do - Hạnh phúc</p>
@@ -444,18 +453,19 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
           </table>
 
           <div className="grid grid-cols-2 gap-4 text-center text-sm font-bold min-h-[140px] mt-12">
-              <div className="flex flex-col h-full">
-                  <p className="mb-2 uppercase">Bộ phận tổng hợp</p>
+              <div className="flex flex-col h-full uppercase">
+                  <p className="mb-2">Người lập biểu</p>
                   <p className="text-[11px] font-normal italic mb-12">(Ký và ghi họ tên)</p>
                   <div className="mt-auto pt-4">
-                     <p className="font-bold italic text-slate-300">............................</p>
+                     <p className="font-black text-sm uppercase">{currentUser.name || '............................'}</p>
+                     <p className="text-[9px] font-normal text-slate-400 italic">Hệ thống trích xuất lúc {new Date().toLocaleTimeString('vi-VN')}</p>
                   </div>
               </div>
-              <div className="flex flex-col h-full shrink-0">
-                  <p className="mb-2 uppercase">Xác nhận Kho / Hành chính</p>
+              <div className="flex flex-col h-full shrink-0 uppercase">
+                  <p className="mb-2">Phụ trách Hành chính / Kho</p>
                   <p className="text-[11px] font-normal italic mb-12">(Ký xác nhận)</p>
                   <div className="mt-auto pt-4">
-                     <p className="font-bold italic text-slate-300">............................</p>
+                     <p className="font-black text-sm uppercase">............................</p>
                   </div>
               </div>
           </div>

@@ -497,8 +497,17 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
       <div className="hidden print:block w-full text-black font-sans leading-tight">
           <div className="flex justify-between items-start mb-8">
               <div>
-                  <p className="font-bold text-sm uppercase">CÔNG TY CỔ PHẦN ...</p>
-                  <p className="text-xs italic mt-1 font-bold">Số phiếu: {data.id}</p>
+                  <p className="font-bold text-sm uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
+                  <p className="text-[10px] italic mt-1 font-bold">Số phiếu: {data.id}</p>
+                  <p className="text-[9px] text-slate-500">Ban Hành chính - Quản trị</p>
+              </div>
+              <div className="flex flex-col items-center">
+                  <img 
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(data.id)}`} 
+                      alt="QR Code" 
+                      className="w-16 h-16 border border-slate-100"
+                  />
+                  <p className="text-[8px] font-bold mt-1 uppercase text-slate-400">Scan to Verify</p>
               </div>
               <div className="text-right">
                   <p className="text-sm font-bold">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
@@ -557,23 +566,54 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
               </tbody>
           </table>
 
-          <div className="grid grid-cols-3 gap-4 text-center text-sm font-bold min-h-[160px]">
+          <div className="grid grid-cols-4 gap-2 text-center text-[13px] font-bold min-h-[160px] mt-8">
               <div className="flex flex-col h-full">
                   <p className="mb-2 uppercase">Người đề xuất</p>
-                  <p className="text-[11px] font-normal italic mb-12">(Ký và ghi họ tên)</p>
+                  <p className="text-[10px] font-normal italic mb-12">(Ký và ghi họ tên)</p>
                   <div className="mt-auto pt-4">
-                     <p className="font-black text-base">{data.requester?.fullName}</p>
+                     <p className="font-black text-sm uppercase">{data.requester?.fullName}</p>
+                     <p className="text-[9px] font-normal text-slate-400">{new Date(data.createdAt).toLocaleDateString('vi-VN')}</p>
                   </div>
               </div>
-              <div className="flex flex-col h-full shrink-0">
-                  <p className="mb-2 uppercase">Hành chính / Kho</p>
-                  <p className="text-[11px] font-normal italic mb-12">(Ký xác nhận)</p>
-                  <div className="mt-auto pt-4 border-t border-transparent h-[40px]"></div>
+              <div className="flex flex-col h-full border-x border-slate-100 px-2">
+                  <p className="mb-2 uppercase">Người duyệt</p>
+                  <p className="text-[10px] font-normal italic mb-12">(Ký xác nhận)</p>
+                  <div className="mt-auto pt-4">
+                     <p className="font-black text-sm uppercase">
+                        {data.approvalHistories?.find((h:any) => h.action === 'APPROVED')?.approver?.fullName || '............................'}
+                     </p>
+                     {data.approvalHistories?.find((h:any) => h.action === 'APPROVED') && (
+                         <p className="text-[9px] font-normal text-slate-400">
+                            {new Date(data.approvalHistories.find((h:any) => h.action === 'APPROVED').createdAt).toLocaleDateString('vi-VN')}
+                         </p>
+                     )}
+                  </div>
               </div>
-              <div className="flex flex-col h-full">
-                  <p className="mb-2 uppercase">Duyệt cấp (Admin)</p>
-                  <p className="text-[11px] font-normal italic mb-12">(Ký và đóng dấu)</p>
-                  <div className="mt-auto pt-4 border-t border-transparent h-[40px]"></div>
+              <div className="flex flex-col h-full pr-2">
+                  <p className="mb-2 uppercase">Thủ kho / Xuất</p>
+                  <p className="text-[10px] font-normal italic mb-12">(Ký và ghi tên)</p>
+                  <div className="mt-auto pt-4">
+                     <p className="font-black text-sm uppercase">
+                        {data.approvalHistories?.find((h:any) => h.action.includes('ISSUED'))?.approver?.fullName || '............................'}
+                     </p>
+                     {data.approvalHistories?.find((h:any) => h.action.includes('ISSUED')) && (
+                        <p className="text-[9px] font-normal text-slate-400">
+                           {new Date(data.approvalHistories.find((h:any) => h.action.includes('ISSUED')).createdAt).toLocaleDateString('vi-VN')}
+                        </p>
+                    )}
+                  </div>
+              </div>
+              <div className="flex flex-col h-full bg-slate-50/50 p-1 rounded">
+                  <p className="mb-2 uppercase text-indigo-700">Người nhận</p>
+                  <p className="text-[10px] font-normal italic mb-12">(Ký nhận đủ hàng)</p>
+                  <div className="mt-auto pt-4">
+                     <p className="font-black text-sm uppercase">
+                        {data.status === 'COMPLETED' ? data.requester?.fullName : '............................'}
+                     </p>
+                     {data.status === 'COMPLETED' && (
+                         <p className="text-[9px] font-normal text-slate-400 italic">Đã nhận đủ hàng</p>
+                     )}
+                  </div>
               </div>
           </div>
           
