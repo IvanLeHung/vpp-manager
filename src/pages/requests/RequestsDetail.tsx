@@ -118,7 +118,7 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
           </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col xl:flex-row gap-6 w-full max-w-[1400px] mx-auto print:p-0">
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col xl:flex-row gap-6 w-full max-w-[1400px] mx-auto print:hidden">
           
           {/* LEFT COLUMN: Main Info & Lines */}
           <div className="flex-1 flex flex-col gap-6 min-w-0">
@@ -271,8 +271,8 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                       <hr className="border-slate-700 my-2" />
                       
                       {canCancel && <button onClick={() => handleAction('/cancel', {reason: prompt('Nhập lý do hủy phiếu:')}, 'Đã Hủy phiếu')} className="w-full py-2.5 bg-transparent text-slate-400 hover:text-rose-500 flex items-center justify-center rounded-xl font-bold transition"><Trash2 className="w-4 h-4 mr-2"/> Hủy Bỏ Phiếu Này</button>}
-                      {(data.status === 'APPROVED' || data.status === 'READY_TO_ISSUE' || data.status === 'WAITING_HANDOVER' || data.status === 'COMPLETED') && (
-                          <button onClick={printDocument} className="w-full py-2.5 bg-white text-slate-800 hover:bg-slate-100 flex items-center justify-center rounded-xl font-bold transition shadow-sm"><Printer className="w-4 h-4 mr-2"/> In Lệnh Xuất Kho</button>
+                      {['PENDING_MANAGER', 'PENDING_ADMIN', 'APPROVED', 'READY_TO_ISSUE', 'WAITING_HANDOVER', 'COMPLETED', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED'].includes(data.status) && (
+                          <button onClick={printDocument} className="w-full py-2.5 bg-white text-slate-800 hover:bg-slate-100 flex items-center justify-center rounded-xl font-bold transition shadow-sm"><Printer className="w-4 h-4 mr-2"/> In Phiếu Yêu Cầu</button>
                       )}
 
                       {isFutureApprover && (
@@ -493,6 +493,96 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
               </div>
           </div>
       )}
+      {/* FORMAL PRINT-ONLY SECTION (A4 Standard) */}
+      <div className="hidden print:block w-full text-black font-sans leading-tight">
+          <div className="flex justify-between items-start mb-8">
+              <div>
+                  <p className="font-bold text-sm uppercase">CÔNG TY CỔ PHẦN ...</p>
+                  <p className="text-xs italic mt-1 font-bold">Số phiếu: {data.id}</p>
+              </div>
+              <div className="text-right">
+                  <p className="text-sm font-bold">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+                  <p className="text-xs font-bold underline decoration-1 underline-offset-4">Độc lập - Tự do - Hạnh phúc</p>
+                  <p className="text-[10px] mt-2 text-slate-500 italic">..., ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
+              </div>
+          </div>
+
+          <div className="text-center mb-10">
+              <h1 className="text-2xl font-black uppercase tracking-widest break-words leading-tight underline underline-offset-8 decoration-slate-300">
+                  {['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'WAITING_HANDOVER', 'COMPLETED', 'PARTIALLY_APPROVED'].includes(data.status) 
+                      ? 'PHIẾU CẤP PHÁT VĂN PHÒNG PHẨM' 
+                      : 'PHIẾU ĐỀ XUẤT VĂN PHÒNG PHẨM'}
+              </h1>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-2 gap-y-4 gap-x-12 mb-10 text-sm">
+              <div className="flex items-end"><span className="w-40 font-bold shrink-0">Người đề xuất:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{data.requester?.fullName}</span></div>
+              <div className="flex items-end"><span className="w-40 font-bold shrink-0">Phòng ban:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{data.department}</span></div>
+              <div className="flex items-end"><span className="w-40 font-bold shrink-0">Ngày lập phiếu:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{new Date(data.createdAt).toLocaleDateString('vi-VN')}</span></div>
+              <div className="flex items-end"><span className="w-40 font-bold shrink-0">Loại yêu cầu:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{data.requestType}</span></div>
+              <div className="col-span-2 flex items-end"><span className="w-40 font-bold shrink-0">Lý do / Mục đích:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5 italic">"{data.purpose || 'Không có ghi chú'}"</span></div>
+          </div>
+
+          <table className="w-full border-collapse border border-black text-[13px] mb-12">
+              <thead className="bg-slate-100">
+                  <tr>
+                      <th className="border border-black p-2 text-center w-12 font-bold uppercase">STT</th>
+                      <th className="border border-black p-2 text-center w-28 font-bold uppercase">Mã VT</th>
+                      <th className="border border-black p-2 text-left font-bold uppercase">Tên Văn Phòng Phẩm</th>
+                      <th className="border border-black p-2 text-center w-20 font-bold uppercase">ĐVT</th>
+                      <th className="border border-black p-2 text-center w-24 font-bold uppercase">S.Lượng</th>
+                      <th className="border border-black p-2 text-left font-bold uppercase">Ghi chú</th>
+                  </tr>
+              </thead>
+              <tbody>
+                  {data.lines.map((l: any, idx: number) => (
+                      <tr key={l.id} className="h-10">
+                          <td className="border border-black p-2 text-center font-medium">{idx + 1}</td>
+                          <td className="border border-black p-2 text-center font-bold">{l.item.mvpp}</td>
+                          <td className="border border-black p-2 font-medium">{l.item.name}</td>
+                          <td className="border border-black p-2 text-center">{l.item.unit}</td>
+                          <td className="border border-black p-2 text-center font-black text-base">
+                              {l.qtyApproved ?? l.qtyRequested}
+                          </td>
+                          <td className="border border-black p-2 text-[10px] italic leading-tight">{l.note || '—'}</td>
+                      </tr>
+                  ))}
+                  <tr className="bg-slate-50 h-10 font-black">
+                      <td colSpan={4} className="border border-black p-2 text-right uppercase text-xs">Tổng cộng số lượng thực cấp:</td>
+                      <td className="border border-black p-2 text-center text-lg">
+                          {data.lines.reduce((sum: number, line: any) => sum + (line.qtyApproved ?? line.qtyRequested), 0)}
+                      </td>
+                      <td className="border border-black p-2"></td>
+                  </tr>
+              </tbody>
+          </table>
+
+          <div className="grid grid-cols-3 gap-4 text-center text-sm font-bold min-h-[160px]">
+              <div className="flex flex-col h-full">
+                  <p className="mb-2 uppercase">Người đề xuất</p>
+                  <p className="text-[11px] font-normal italic mb-12">(Ký và ghi họ tên)</p>
+                  <div className="mt-auto pt-4">
+                     <p className="font-black text-base">{data.requester?.fullName}</p>
+                  </div>
+              </div>
+              <div className="flex flex-col h-full shrink-0">
+                  <p className="mb-2 uppercase">Hành chính / Kho</p>
+                  <p className="text-[11px] font-normal italic mb-12">(Ký xác nhận)</p>
+                  <div className="mt-auto pt-4 border-t border-transparent h-[40px]"></div>
+              </div>
+              <div className="flex flex-col h-full">
+                  <p className="mb-2 uppercase">Duyệt cấp (Admin)</p>
+                  <p className="text-[11px] font-normal italic mb-12">(Ký và đóng dấu)</p>
+                  <div className="mt-auto pt-4 border-t border-transparent h-[40px]"></div>
+              </div>
+          </div>
+          
+          <div className="mt-20 pt-4 border-t border-slate-200 text-[10px] text-slate-400 flex justify-between italic">
+              <p>Ngày in: {new Date().toLocaleString('vi-VN')} • Mã tra cứu: {data.id}</p>
+              <p>Hệ thống Quản lý VPP - {data.id} • Trang 1/1</p>
+          </div>
+      </div>
     </div>
   );
 }
+
