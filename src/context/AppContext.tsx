@@ -11,6 +11,9 @@ export type User = {
   username: string;
   role: UserRole;
   department: string;
+  avatar?: string | null;
+  phoneNumber?: string | null;
+  bio?: string | null;
 };
 
 export type VPPItem = {

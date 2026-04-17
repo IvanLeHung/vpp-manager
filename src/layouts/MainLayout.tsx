@@ -1,11 +1,27 @@
+import { useState, useRef, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Package, LayoutDashboard, LogOut, FileText, ClipboardList, ShieldAlert, ShoppingCart, Users as UsersIcon, Database, ClipboardCheck, Droplets, TrendingDown } from 'lucide-react';
+import { Package, LayoutDashboard, LogOut, FileText, ClipboardList, ShieldAlert, ShoppingCart, Users as UsersIcon, Database, ClipboardCheck, Droplets, TrendingDown, ChevronDown, User, Key } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import ProfileDialog from '../components/ProfileDialog';
 
 export default function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser } = useAppContext();
+  const { currentUser, logout } = useAppContext();
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [showProfileDialog, setShowProfileDialog] = useState(false);
+  const [dialogTab, setDialogTab] = useState<'info' | 'password'>('info');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowProfileDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const getActiveClass = (path: string) => {
     return location.pathname === path 
@@ -109,18 +125,68 @@ export default function MainLayout() {
                {currentUser?.role === 'ADMIN' && <span className="ml-4 bg-rose-100 text-rose-700 font-bold text-xs px-2 py-1 rounded flex items-center"><ShieldAlert className="w-3 h-3 mr-1"/> Quyền Admin</span>}
             </div>
             <div className="flex items-center gap-4">
-              <div className="flex items-center bg-slate-100 border border-slate-200 rounded-full px-4 py-1.5 shadow-sm">
-                 <span className="text-xs font-bold text-slate-500 mr-2 uppercase tracking-wide">Tài khoản:</span>
-                 <span className="text-sm font-bold text-indigo-700">
-                   {currentUser?.fullName || currentUser?.username} [{currentUser?.role}]
-                 </span>
-              </div>
-              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold border border-indigo-200 shadow-sm text-lg uppercase">
-                {currentUser?.fullName ? currentUser?.fullName.charAt(0) : currentUser?.username.charAt(0)}
+              <div className="relative" ref={dropdownRef}>
+                <button 
+                  onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                  className="flex items-center gap-3 p-1 pr-4 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-all shadow-sm cursor-pointer group"
+                >
+                  <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white font-black border-2 border-white shadow-sm overflow-hidden transform group-hover:scale-105 transition-transform">
+                    {currentUser?.avatar ? (
+                      <img src={currentUser.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-sm uppercase">{currentUser?.fullName ? currentUser?.fullName.charAt(0) : currentUser?.username.charAt(0)}</span>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-start hidden sm:flex">
+                     <span className="text-[11px] font-black text-slate-400 uppercase tracking-tighter leading-none mb-0.5">Tài khoản</span>
+                     <span className="text-xs font-black text-slate-700 max-w-[120px] truncate">{currentUser?.fullName || currentUser?.username}</span>
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${showProfileDropdown ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Profile Dropdown Menu */}
+                {showProfileDropdown && (
+                  <div className="absolute right-0 mt-3 w-56 bg-white rounded-3xl shadow-2xl border border-slate-100 p-2 z-[100] animate-in slide-in-from-top-2 duration-200">
+                    <div className="px-4 py-3 border-b border-slate-50 mb-1">
+                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Đang đăng nhập</p>
+                       <p className="text-xs font-black text-indigo-600 truncate">@{currentUser?.username}</p>
+                    </div>
+                    
+                    <button 
+                      onClick={() => { setShowProfileDialog(true); setDialogTab('info'); setShowProfileDropdown(false); }}
+                      className="w-full flex items-center px-4 py-3 text-xs font-black text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 rounded-2xl transition-all gap-3"
+                    >
+                      <User className="w-4 h-4" /> Hồ sơ cá nhân
+                    </button>
+                    
+                    <button 
+                      onClick={() => { setShowProfileDialog(true); setDialogTab('password'); setShowProfileDropdown(false); }}
+                      className="w-full flex items-center px-4 py-3 text-xs font-black text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 rounded-2xl transition-all gap-3"
+                    >
+                      <Key className="w-4 h-4" /> Đổi mật khẩu
+                    </button>
+
+                    <div className="h-px bg-slate-50 my-1 mx-2"></div>
+
+                    <button 
+                      onClick={() => { logout(); navigate('/'); }}
+                      className="w-full flex items-center px-4 py-3 text-xs font-black text-rose-500 hover:bg-rose-50 rounded-2xl transition-all gap-3"
+                    >
+                      <LogOut className="w-4 h-4" /> Đăng xuất
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </header>
+
+        {/* Profile Dialog */}
+        <ProfileDialog 
+          isOpen={showProfileDialog} 
+          onClose={() => setShowProfileDialog(false)} 
+          initialTab={dialogTab}
+        />
 
         {/* Dynamic Page Component Outlet */}
         <div className="flex-1 overflow-hidden bg-slate-50 flex flex-col print:h-auto print:overflow-visible print:bg-white">

@@ -27,5 +27,53 @@
     background-color: white !important;
     height: auto !important;
     overflow: visible !important;
+    font-size: 10pt;
+  }
+
+  .flex, .grid {
+    display: block !important;
+  }
+
+  .bg-slate-50, .bg-slate-100, .bg-white {
+    background-color: white !important;
+    border-color: #eee !important;
+  }
+
+  canvas {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  @page {
+    margin: 1.5cm;
+    size: A4 portrait;
+  }
+
+  table {
+    page-break-inside: auto;
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  .rounded-\[2\.5rem\], .rounded-\[2rem\], .rounded-2xl {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    border: 1px solid #eee !important;
+    margin-bottom: 20px !important;
+    padding: 15px !important;
+  }
+
+  h2, h3, h4 {
+    color: black !important;
+    margin-top: 10px !important;
   }
 }
