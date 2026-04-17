@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Plus, Download, Search, FileText, CheckCircle, Clock, XCircle, ChevronLeft, ChevronRight, Eye, CheckSquare, StopCircle, GitBranch } from 'lucide-react';
+import { Plus, Download, Search, FileText, CheckCircle, Clock, XCircle, ChevronLeft, ChevronRight, Eye, CheckSquare, StopCircle, GitBranch, Printer } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { VPPRequest, User } from '../../context/AppContext';
 import api from '../../lib/api';
@@ -158,6 +158,48 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     XLSX.writeFile(wb, `Danh_Sach_Phieu_VPP_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
+  const summaryItems = useMemo(() => {
+    const map = new Map<string, {
+        mvpp: string,
+        name: string,
+        unit: string,
+        qtyRequested: number,
+        qtyDelivered: number
+    }>();
+
+    // Aggregates across all shown requests that aren't closed
+    filteredRequests.forEach(req => {
+        if (['REJECTED', 'CANCELLED', 'COMPLETED'].includes(req.status)) return;
+        
+        req.lines?.forEach(line => {
+            if (!line.item) return;
+            const key = line.item.mvpp;
+            const current = map.get(key) || {
+                mvpp: line.item.mvpp,
+                name: line.item.name,
+                unit: line.item.unit,
+                qtyRequested: 0,
+                qtyDelivered: 0
+            };
+            
+            current.qtyRequested += (line.qtyApproved ?? line.qtyRequested);
+            current.qtyDelivered += (line.qtyDelivered || 0);
+            
+            map.set(key, current);
+        });
+    });
+
+    return Array.from(map.values()).filter(i => (i.qtyRequested - i.qtyDelivered) > 0);
+  }, [filteredRequests]);
+
+  const handlePrintSummary = () => {
+    if (summaryItems.length === 0) {
+        return showToast('Không có vật tư nào đang tồn đọng cấp phát trong danh sách này.', 'warning');
+    }
+    window.print();
+  };
+
+
   return (
     <div className="flex flex-col h-full p-4 md:p-8 relative print:p-0">
       <div className="flex justify-between items-center mb-6 shrink-0 print:hidden">
@@ -167,9 +209,14 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         </div>
         <div className="flex gap-3">
             {currentUser.role !== 'EMPLOYEE' && (
-              <button onClick={handleExportExcel} className="flex items-center px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition font-bold shadow-sm">
-                 <Download className="w-5 h-5 mr-2 text-slate-400"/> Tải Excel
-              </button>
+              <div className="flex gap-2">
+                  <button onClick={handleExportExcel} className="flex items-center px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition font-bold shadow-sm">
+                    <Download className="w-5 h-5 mr-2 text-slate-400"/> Tải Excel
+                  </button>
+                  <button onClick={handlePrintSummary} className="flex items-center px-4 py-2.5 bg-white border border-slate-200 text-indigo-700 rounded-xl hover:bg-slate-50 transition font-bold shadow-sm">
+                    <Printer className="w-5 h-5 mr-2 text-indigo-400"/> In Tổng Hợp Còn Nợ
+                  </button>
+              </div>
             )}
             <button onClick={() => { setActiveRequest(null); setViewMode('CREATE'); }} className="flex items-center px-5 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition font-bold shadow-lg shadow-indigo-500/30">
                <Plus className="w-5 h-5 mr-2"/> Tạo Đề Xuất
@@ -336,6 +383,87 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                 </div>
             </div>
         )}
+      </div>
+
+      {/* FORMAL SUMMARY PRINT SECTION */}
+      <div className="hidden print:block w-full text-black font-sans leading-tight p-4">
+          <div className="flex justify-between items-start mb-8">
+              <div>
+                  <p className="font-bold text-sm uppercase">CÔNG TY CỔ PHẦN ...</p>
+                  <p className="text-[10px] italic mt-1 font-bold">Báo cáo tổng hợp tồn đọng cấp phát</p>
+              </div>
+              <div className="text-right">
+                  <p className="text-sm font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+                  <p className="text-xs font-bold underline decoration-1 underline-offset-4">Độc lập - Tự do - Hạnh phúc</p>
+                  <p className="text-[10px] mt-2 text-slate-500 italic">..., ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
+              </div>
+          </div>
+
+          <div className="text-center mb-10">
+              <h1 className="text-2xl font-black uppercase tracking-widest leading-tight decoration-slate-300">
+                  PHIẾU TỔNG HỢP VĂN PHÒNG PHẨM CHƯA CẤP
+              </h1>
+              <p className="text-xs italic mt-2">(Tổng hợp từ {filteredRequests.length} phiếu đang lọc trên màn hình)</p>
+          </div>
+
+          <table className="w-full border-collapse border border-black text-[12px] mb-12">
+              <thead className="bg-slate-100 uppercase font-bold">
+                  <tr>
+                      <th className="border border-black p-2 text-center w-12">STT</th>
+                      <th className="border border-black p-2 text-center w-28">Mã VT</th>
+                      <th className="border border-black p-2 text-left">Tên Văn Phòng Phẩm</th>
+                      <th className="border border-black p-2 text-center w-20">ĐVT</th>
+                      <th className="border border-black p-2 text-center w-20">Tổng Cầu</th>
+                      <th className="border border-black p-2 text-center w-20">Đã Cấp</th>
+                      <th className="border border-black p-2 text-center w-20 bg-amber-50">Cần Xuất</th>
+                  </tr>
+              </thead>
+              <tbody>
+                  {summaryItems.length === 0 ? (
+                      <tr><td colSpan={7} className="border border-black p-8 text-center italic">Không có dữ liệu tồn đọng</td></tr>
+                  ) : (
+                      summaryItems.map((item, idx) => (
+                        <tr key={item.mvpp} className="h-9">
+                            <td className="border border-black p-2 text-center">{idx + 1}</td>
+                            <td className="border border-black p-2 text-center font-bold">{item.mvpp}</td>
+                            <td className="border border-black p-2 font-medium">{item.name}</td>
+                            <td className="border border-black p-2 text-center">{item.unit}</td>
+                            <td className="border border-black p-2 text-center">{item.qtyRequested}</td>
+                            <td className="border border-black p-2 text-center text-emerald-600">{item.qtyDelivered}</td>
+                            <td className="border border-black p-2 text-center font-black text-base bg-amber-50">
+                                {item.qtyRequested - item.qtyDelivered}
+                            </td>
+                        </tr>
+                      ))
+                  )}
+                  <tr className="bg-slate-50 h-10 font-bold">
+                      <td colSpan={6} className="border border-black p-2 text-right text-[10px]">TỔNG SỐ LƯỢNG MẶT HÀNG ĐANG NỢ:</td>
+                      <td className="border border-black p-2 text-center text-lg">{summaryItems.length}</td>
+                  </tr>
+              </tbody>
+          </table>
+
+          <div className="grid grid-cols-2 gap-4 text-center text-sm font-bold min-h-[140px] mt-12">
+              <div className="flex flex-col h-full">
+                  <p className="mb-2 uppercase">Bộ phận tổng hợp</p>
+                  <p className="text-[11px] font-normal italic mb-12">(Ký và ghi họ tên)</p>
+                  <div className="mt-auto pt-4">
+                     <p className="font-bold italic text-slate-300">............................</p>
+                  </div>
+              </div>
+              <div className="flex flex-col h-full shrink-0">
+                  <p className="mb-2 uppercase">Xác nhận Kho / Hành chính</p>
+                  <p className="text-[11px] font-normal italic mb-12">(Ký xác nhận)</p>
+                  <div className="mt-auto pt-4">
+                     <p className="font-bold italic text-slate-300">............................</p>
+                  </div>
+              </div>
+          </div>
+          
+          <div className="mt-20 pt-4 border-t border-slate-200 text-[10px] text-slate-400 flex justify-between italic">
+              <p>Ngày in: {new Date().toLocaleString('vi-VN')} • Báo cáo tự động từ VPP-Manager</p>
+              <p>Trang 1/1</p>
+          </div>
       </div>
     </div>
   )
