@@ -579,28 +579,30 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                   <p className="mb-2 uppercase">Người duyệt</p>
                   <p className="text-[10px] font-normal italic mb-12">(Ký xác nhận)</p>
                   <div className="mt-auto pt-4">
-                     <p className="font-black text-sm uppercase">
-                        {data.approvalHistories?.find((h:any) => h.action === 'APPROVED')?.approver?.fullName || '............................'}
-                     </p>
-                     {data.approvalHistories?.find((h:any) => h.action === 'APPROVED') && (
-                         <p className="text-[9px] font-normal text-slate-400">
-                            {new Date(data.approvalHistories.find((h:any) => h.action === 'APPROVED').createdAt).toLocaleDateString('vi-VN')}
-                         </p>
-                     )}
+                     {(() => {
+                        const h = data.approvalHistories?.slice().reverse().find((x:any) => x.action === 'APPROVE' || x.action === 'APPROVED');
+                        return (
+                          <>
+                            <p className="font-black text-sm uppercase">{h?.approver?.fullName || '............................'}</p>
+                            {h && <p className="text-[9px] font-normal text-slate-400">{new Date(h.createdAt).toLocaleDateString('vi-VN')}</p>}
+                          </>
+                        );
+                     })()}
                   </div>
               </div>
               <div className="flex flex-col h-full pr-2">
                   <p className="mb-2 uppercase">Thủ kho / Xuất</p>
                   <p className="text-[10px] font-normal italic mb-12">(Ký và ghi tên)</p>
                   <div className="mt-auto pt-4">
-                     <p className="font-black text-sm uppercase">
-                        {data.approvalHistories?.find((h:any) => h.action.includes('ISSUED'))?.approver?.fullName || '............................'}
-                     </p>
-                     {data.approvalHistories?.find((h:any) => h.action.includes('ISSUED')) && (
-                        <p className="text-[9px] font-normal text-slate-400">
-                           {new Date(data.approvalHistories.find((h:any) => h.action.includes('ISSUED')).createdAt).toLocaleDateString('vi-VN')}
-                        </p>
-                    )}
+                     {(() => {
+                        const h = data.approvalHistories?.slice().reverse().find((x:any) => x.action === 'ISSUE' || x.action === 'ISSUED');
+                        return (
+                          <>
+                            <p className="font-black text-sm uppercase">{h?.approver?.fullName || '............................'}</p>
+                            {h && <p className="text-[9px] font-normal text-slate-400">{new Date(h.createdAt).toLocaleDateString('vi-VN')}</p>}
+                          </>
+                        );
+                     })()}
                   </div>
               </div>
               <div className="flex flex-col h-full bg-slate-50/50 p-1 rounded">
