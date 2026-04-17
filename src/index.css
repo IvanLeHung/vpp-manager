@@ -17,3 +17,15 @@
 .animation-delay-4000 {
   animation-delay: 4s;
 }
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  body, html {
+    background-color: white !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+}
