@@ -100,7 +100,7 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
   return (
     <div className="flex flex-col h-full bg-slate-100 overflow-hidden relative print:bg-white print:overflow-auto">
       {/* HEADER BAR */}
-      <div className="h-20 bg-white border-b border-slate-200 flex justify-between items-center px-6 md:px-10 shrink-0 z-20 shadow-sm print:hidden">
+      <div className="no-print h-20 bg-white border-b border-slate-200 flex justify-between items-center px-6 md:px-10 shrink-0 z-20 shadow-sm">
           <div className="flex items-center gap-6">
               <button onClick={() => setViewMode('LIST')} className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition shadow-inner">
                   <ArrowLeft className="w-5 h-5"/>
@@ -118,7 +118,7 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
           </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col xl:flex-row gap-6 w-full max-w-[1400px] mx-auto print:hidden">
+      <div className="no-print flex-1 overflow-y-auto p-4 md:p-8 flex flex-col xl:flex-row gap-6 w-full max-w-[1400px] mx-auto">
           
           {/* LEFT COLUMN: Main Info & Lines */}
           <div className="flex-1 flex flex-col gap-6 min-w-0">
@@ -164,7 +164,7 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
               </div>
 
               {/* Box 2: Lines Grid */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden relative print:shadow-none print:border-none">
+              <div className="no-print bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden relative">
                   <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
                      <h3 className="text-[11px] font-black text-indigo-700 uppercase tracking-widest">Chi tiết Vật tư Xin Cấp</h3>
                      {data.lines.some((l:any) => l.qtyRequested > (l.item.stocks?.[0]?.quantityOnHand||0)) && <span className="text-[10px] font-bold text-rose-600 bg-rose-100 px-3 py-1 rounded border border-rose-200 flex items-center print:hidden"><AlertTriangle className="w-3.5 h-3.5 mr-1"/> Cảnh báo thiếu Tồn Kho Hiện Tại</span>}
@@ -215,7 +215,7 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
           </div>
 
           {/* RIGHT COLUMN: Actions & History */}
-          <div className="w-full xl:w-96 flex flex-col gap-6 shrink-0 print:hidden">
+          <div className="no-print w-full xl:w-96 flex flex-col gap-6 shrink-0">
               
               {/* Box 3: Action Toolbar (Role-based) */}
               <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl shadow-2xl p-6 border border-slate-700 relative overflow-hidden">

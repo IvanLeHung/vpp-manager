@@ -201,8 +201,8 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
 
 
   return (
-    <div className="flex flex-col h-full p-4 md:p-8 relative print:p-0">
-      <div className="flex justify-between items-center mb-6 shrink-0 print:hidden">
+    <div className="flex flex-col h-full p-4 md:p-8 relative print:p-0 print:h-auto print:block">
+      <div className="no-print flex justify-between items-center mb-6 shrink-0">
         <div>
            <h2 className="text-2xl font-bold text-slate-800">Cổng Yêu cầu Cấp phát</h2>
            <p className="text-slate-500 font-medium text-sm mt-1">Quản lý duyệt luồng đa cấp, cấp phát và giao nhận.</p>
@@ -224,7 +224,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 shrink-0 print:hidden">
+      <div className="no-print grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 shrink-0">
          <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center">
             <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mr-4"><FileText className="w-6 h-6 text-slate-600"/></div>
             <div>
@@ -258,7 +258,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
          </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-[0_0_15px_rgba(0,0,0,0.03)] border border-slate-200 flex flex-col flex-1 overflow-hidden print:hidden">
+      <div className="no-print bg-white rounded-2xl shadow-[0_0_15px_rgba(0,0,0,0.03)] border border-slate-200 flex flex-col flex-1 overflow-hidden">
         <div className="p-4 border-b border-slate-200 bg-slate-50/50 flex flex-col xl:flex-row gap-4 justify-between items-center print:hidden">
             <div className="flex flex-wrap gap-2 overflow-x-auto w-full xl:w-auto">
                <button onClick={() => setStatusFilter('ALL')} className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap transition ${statusFilter==='ALL'?'bg-indigo-600 text-white shadow-md':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>Tất cả</button>
@@ -374,7 +374,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         </div>
 
         {totalPages > 1 && (
-            <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-between items-center print:hidden shrink-0">
+            <div className="no-print p-4 border-t border-slate-200 bg-slate-50 flex justify-between items-center shrink-0">
                 <span className="text-sm font-medium text-slate-500">Hiển thị {currentData.length} / {filteredRequests.length}</span>
                 <div className="flex bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
                     <button disabled={currentPage===1} onClick={()=>setCurrentPage(c=>Math.max(1,c-1))} className="p-2 hover:bg-slate-50 disabled:opacity-50 border-r border-slate-200"><ChevronLeft className="w-5 h-5 text-slate-600"/></button>
