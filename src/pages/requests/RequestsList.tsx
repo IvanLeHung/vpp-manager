@@ -158,6 +158,39 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     XLSX.writeFile(wb, `Danh_Sach_Phieu_VPP_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
+  const handleExportSummaryExcel = () => {
+    if (summaryItems.length === 0) {
+        return showToast('Không có vật tư nào đang tồn đọng cấp phát.', 'warning');
+    }
+    const exportData = summaryItems.map((item, index) => ({
+        'STT': index + 1,
+        'Mã Vật Tư': item.mvpp,
+        'Tên Văn Phòng Phẩm': item.name,
+        'Đơn Vị Tính': item.unit,
+        'Tổng Cầu (Duyệt)': item.qtyRequested,
+        'Đã Cấp': item.qtyDelivered,
+        'Cần Xuất (Còn Nợ)': item.qtyRequested - item.qtyDelivered
+    }));
+    
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    
+    // Set column widths
+    const wscols = [
+        {wch: 5},  // STT
+        {wch: 15}, // Mã VT
+        {wch: 35}, // Tên
+        {wch: 10}, // ĐVT
+        {wch: 15}, // Tổng Cầu
+        {wch: 15}, // Đã Cấp
+        {wch: 15}  // Cần Xuất
+    ];
+    ws['!cols'] = wscols;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Tong_Hop_Con_No");
+    XLSX.writeFile(wb, `Tong_Hop_VPP_Con_No_${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+
   const summaryItems = useMemo(() => {
     const map = new Map<string, {
         mvpp: string,
@@ -211,10 +244,13 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             {currentUser.role !== 'EMPLOYEE' && (
               <div className="flex gap-2">
                   <button onClick={handleExportExcel} className="flex items-center px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition font-bold shadow-sm">
-                    <Download className="w-5 h-5 mr-2 text-slate-400"/> Tải Excel
+                    <Download className="w-5 h-5 mr-1.5 text-slate-400"/> Tải Excel
+                  </button>
+                  <button onClick={handleExportSummaryExcel} className="flex items-center px-4 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl hover:bg-emerald-100 transition font-bold shadow-sm">
+                    <FileText className="w-5 h-5 mr-1.5 text-emerald-500"/> Excel Tổng Hợp (Owed)
                   </button>
                   <button onClick={handlePrintSummary} className="flex items-center px-4 py-2.5 bg-white border border-slate-200 text-indigo-700 rounded-xl hover:bg-slate-50 transition font-bold shadow-sm">
-                    <Printer className="w-5 h-5 mr-2 text-indigo-400"/> In Tổng Hợp Còn Nợ
+                    <Printer className="w-5 h-5 mr-1.5 text-indigo-400"/> In Tổng Hợp
                   </button>
               </div>
             )}
