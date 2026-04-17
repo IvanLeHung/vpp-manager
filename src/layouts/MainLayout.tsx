@@ -14,9 +14,9 @@ export default function MainLayout() {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
+    <div className="flex h-screen bg-slate-50 font-sans text-slate-900 print:h-auto print:bg-white print:block">
       {/* Sidebar */}
-      <aside className="w-72 bg-white border-r border-slate-200 flex flex-col shadow-sm hidden md:flex shrink-0 z-20">
+      <aside className="w-72 bg-white border-r border-slate-200 flex flex-col shadow-sm hidden md:flex shrink-0 z-20 print:hidden">
         <div className="h-16 flex items-center px-6 border-b border-slate-100 mt-2">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl mr-3 shadow-md">D</div>
           <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-700">Danko VPP</span>
@@ -100,9 +100,9 @@ export default function MainLayout() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden relative print:h-auto print:overflow-visible">
         {/* Universal Top Header */}
-        <header className="bg-white/90 backdrop-blur-md border-b border-slate-200 z-10 shrink-0 sticky top-0">
+        <header className="bg-white/90 backdrop-blur-md border-b border-slate-200 z-10 shrink-0 sticky top-0 print:hidden">
           <div className="h-16 flex items-center justify-between px-6 md:px-8">
             <div className="flex items-center">
                <h1 className="text-xl font-bold text-slate-800 tracking-tight hidden md:block">Hệ thống Quản Trị VPP nội bộ</h1>
@@ -123,7 +123,7 @@ export default function MainLayout() {
         </header>
 
         {/* Dynamic Page Component Outlet */}
-        <div className="flex-1 overflow-hidden bg-slate-50 flex flex-col">
+        <div className="flex-1 overflow-hidden bg-slate-50 flex flex-col print:h-auto print:overflow-visible print:bg-white">
            <Outlet />
         </div>
       </main>
