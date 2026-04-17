@@ -581,10 +581,10 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                   <p className="text-[10px] font-normal italic mb-12">(Ký xác nhận)</p>
                   <div className="mt-auto pt-4">
                      {(() => {
-                        // Find the first approval by a MANAGER or ADMIN (acting as manager)
+                        // Find manager approval by role OR by note content
                         const h = data.approvalHistories?.find((x:any) => 
-                          (x.approver?.role === 'MANAGER' || x.approver?.id === data.requester?.managerId) && 
-                          (x.action === 'APPROVE' || x.action === 'APPROVED')
+                          (x.action === 'APPROVE' || x.action === 'APPROVED') && 
+                          (x.approver?.role === 'MANAGER' || x.reason?.toLowerCase().includes('quản lý') || x.approver?.id === data.requester?.managerId)
                         );
                         return (
                           <>
@@ -601,9 +601,10 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                   <p className="text-[10px] font-normal italic mb-12">(Hành chính/Lãnh đạo)</p>
                   <div className="mt-auto pt-4">
                      {(() => {
-                        // Find the approval by an ADMIN
+                        // Find admin approval by role OR by note content (Hành chính)
                         const h = data.approvalHistories?.slice().reverse().find((x:any) => 
-                          x.approver?.role === 'ADMIN' && (x.action === 'APPROVE' || x.action === 'APPROVED')
+                          (x.action === 'APPROVE' || x.action === 'APPROVED') && 
+                          (x.approver?.role === 'ADMIN' || x.reason?.toLowerCase().includes('hành chính'))
                         );
                         return (
                           <>
@@ -643,6 +644,59 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                      )}
                   </div>
               </div>
+          </div>
+
+          {/* Audit Trail Section for Print */}
+          <div className="mt-12 border-t border-slate-300 pt-6">
+              <h3 className="text-[11px] font-black uppercase mb-3 text-slate-800 tracking-widest flex items-center">
+                  <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full mr-2"></span>
+                  Lịch sử Xử lý (Audit Trail)
+              </h3>
+              <table className="w-full border-collapse text-[10px]">
+                  <thead>
+                      <tr className="bg-slate-50">
+                          <th className="border border-slate-300 p-1.5 text-left font-bold uppercase w-32">Thời gian</th>
+                          <th className="border border-slate-300 p-1.5 text-left font-bold uppercase w-48">Người thực hiện</th>
+                          <th className="border border-slate-300 p-1.5 text-left font-bold uppercase w-32">Hành động</th>
+                          <th className="border border-slate-300 p-1.5 text-left font-bold uppercase">Ghi chú / Nội dung</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {data.approvalHistories?.map((h: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                              <td className="border border-slate-300 p-1.5 whitespace-nowrap">
+                                  {new Date(h.createdAt).toLocaleString('vi-VN', { 
+                                      day: '2-digit', month: '2-digit', year: 'numeric',
+                                      hour: '2-digit', minute: '2-digit'
+                                  })}
+                              </td>
+                              <td className="border border-slate-300 p-1.5 font-bold uppercase text-slate-700">
+                                  {h.approver?.fullName} {h.approver?.role === 'ADMIN' ? '(ADM)' : ''}
+                              </td>
+                              <td className="border border-slate-300 p-1.5">
+                                  <span className={`px-1.5 py-0.5 rounded-sm font-bold text-[9px] ${
+                                      h.action.includes('REJECT') ? 'bg-rose-50 text-rose-700' :
+                                      h.action.includes('APPROVE') ? 'bg-emerald-50 text-emerald-700' :
+                                      'bg-slate-100 text-slate-600'
+                                  }`}>
+                                      {h.action}
+                                  </span>
+                              </td>
+                              <td className="border border-slate-300 p-1.5 italic text-slate-600">
+                                  {h.reason || '—'}
+                              </td>
+                          </tr>
+                      ))}
+                      {(!data.approvalHistories || data.approvalHistories.length === 0) && (
+                          <tr>
+                              <td colSpan={4} className="border border-slate-300 p-4 text-center text-slate-400 italic">
+                                  Chưa có lịch sử xử lý.
+                              </td>
+                          </tr>
+                      )}
+                  </tbody>
+              </table>
+              <p className="mt-2 text-[8px] text-slate-400 text-right italic">HỆ THỐNG TRÍCH XUẤT LÚC {new Date().toLocaleTimeString('vi-VN')}</p>
           </div>
           
           <div className="mt-20 pt-4 border-t border-slate-200 text-[10px] text-slate-400 flex justify-between italic">
