@@ -24,10 +24,11 @@ export default function ReportFilters({ onFilterChange, isLoading }: ReportFilte
           api.get('/departments'),
           api.get('/items?all=true')
         ]);
-        setDepartments(deptRes.data);
+        setDepartments(Array.isArray(deptRes.data) ? deptRes.data : []);
         
         // Extract unique categories
-        const cats = Array.from(new Set(itemRes.data.map((i: any) => i.category))).filter(Boolean) as string[];
+        const itemData = Array.isArray(itemRes.data) ? itemRes.data : [];
+        const cats = Array.from(new Set(itemData.map((i: any) => i.category))).filter(Boolean) as string[];
         setCategories(cats);
       } catch (err) {
         console.error('Failed to load filter data', err);
