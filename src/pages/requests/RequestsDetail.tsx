@@ -566,31 +566,56 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
               </tbody>
           </table>
 
-          <div className="grid grid-cols-4 gap-2 text-center text-[13px] font-bold min-h-[160px] mt-8">
+          <div className="grid grid-cols-5 gap-1 text-center text-[12px] font-bold min-h-[160px] mt-8">
               <div className="flex flex-col h-full">
                   <p className="mb-2 uppercase">Người đề xuất</p>
                   <p className="text-[10px] font-normal italic mb-12">(Ký và ghi họ tên)</p>
                   <div className="mt-auto pt-4">
-                     <p className="font-black text-sm uppercase">{data.requester?.fullName}</p>
+                     <p className="font-black text-xs uppercase">{data.requester?.fullName}</p>
                      <p className="text-[9px] font-normal text-slate-400">{new Date(data.createdAt).toLocaleDateString('vi-VN')}</p>
                   </div>
               </div>
-              <div className="flex flex-col h-full border-x border-slate-100 px-2">
-                  <p className="mb-2 uppercase">Người duyệt</p>
+              
+              <div className="flex flex-col h-full border-l border-slate-100 px-1">
+                  <p className="mb-2 uppercase text-slate-600">Trưởng bộ phận</p>
                   <p className="text-[10px] font-normal italic mb-12">(Ký xác nhận)</p>
                   <div className="mt-auto pt-4">
                      {(() => {
-                        const h = data.approvalHistories?.slice().reverse().find((x:any) => x.action === 'APPROVE' || x.action === 'APPROVED');
+                        // Find the first approval by a MANAGER or ADMIN (acting as manager)
+                        const h = data.approvalHistories?.find((x:any) => 
+                          (x.approver?.role === 'MANAGER' || x.approver?.id === data.requester?.managerId) && 
+                          (x.action === 'APPROVE' || x.action === 'APPROVED')
+                        );
                         return (
                           <>
-                            <p className="font-black text-sm uppercase">{h?.approver?.fullName || '............................'}</p>
+                            <p className="font-black text-xs uppercase">{h?.approver?.fullName || '............................'}</p>
                             {h && <p className="text-[9px] font-normal text-slate-400">{new Date(h.createdAt).toLocaleDateString('vi-VN')}</p>}
                           </>
                         );
                      })()}
                   </div>
               </div>
-              <div className="flex flex-col h-full pr-2">
+
+              <div className="flex flex-col h-full border-l border-slate-100 px-1">
+                  <p className="mb-2 uppercase">Người duyệt</p>
+                  <p className="text-[10px] font-normal italic mb-12">(Hành chính/Lãnh đạo)</p>
+                  <div className="mt-auto pt-4">
+                     {(() => {
+                        // Find the approval by an ADMIN
+                        const h = data.approvalHistories?.slice().reverse().find((x:any) => 
+                          x.approver?.role === 'ADMIN' && (x.action === 'APPROVE' || x.action === 'APPROVED')
+                        );
+                        return (
+                          <>
+                            <p className="font-black text-xs uppercase">{h?.approver?.fullName || '............................'}</p>
+                            {h && <p className="text-[9px] font-normal text-slate-400">{new Date(h.createdAt).toLocaleDateString('vi-VN')}</p>}
+                          </>
+                        );
+                     })()}
+                  </div>
+              </div>
+
+              <div className="flex flex-col h-full border-l border-slate-100 px-1">
                   <p className="mb-2 uppercase">Thủ kho / Xuất</p>
                   <p className="text-[10px] font-normal italic mb-12">(Ký và ghi tên)</p>
                   <div className="mt-auto pt-4">
@@ -598,18 +623,19 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                         const h = data.approvalHistories?.slice().reverse().find((x:any) => x.action === 'ISSUE' || x.action === 'ISSUED');
                         return (
                           <>
-                            <p className="font-black text-sm uppercase">{h?.approver?.fullName || '............................'}</p>
+                            <p className="font-black text-xs uppercase">{h?.approver?.fullName || '............................'}</p>
                             {h && <p className="text-[9px] font-normal text-slate-400">{new Date(h.createdAt).toLocaleDateString('vi-VN')}</p>}
                           </>
                         );
                      })()}
                   </div>
               </div>
-              <div className="flex flex-col h-full bg-slate-50/50 p-1 rounded">
+
+              <div className="flex flex-col h-full bg-slate-50/50 p-1 rounded border-l border-slate-100">
                   <p className="mb-2 uppercase text-indigo-700">Người nhận</p>
                   <p className="text-[10px] font-normal italic mb-12">(Ký nhận đủ hàng)</p>
                   <div className="mt-auto pt-4">
-                     <p className="font-black text-sm uppercase">
+                     <p className="font-black text-xs uppercase">
                         {data.status === 'COMPLETED' ? data.requester?.fullName : '............................'}
                      </p>
                      {data.status === 'COMPLETED' && (
