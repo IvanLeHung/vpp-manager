@@ -41,8 +41,13 @@
   /* Kích thước khổ giấy A4 chuẩn */
   .print-sheet {
     width: 190mm;
+    min-height: 267mm;
     margin: 0 auto;
     font-family: "Times New Roman", serif;
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
     color: #000;
   }
 
@@ -50,6 +55,8 @@
   .print-area {
     position: relative !important;
     display: block !important;
+    transform: none !important;
+    zoom: 1 !important;
   }
 
   /* Chặn ngắt trang giữa chừng bảng hoặc chữ ký */
@@ -63,7 +70,17 @@
   }
 
   thead { display: table-header-group; }
-  table { width: 100% !important; border-collapse: collapse !important; }
+  
+  table { 
+    width: 100% !important; 
+    border-collapse: collapse !important; 
+    margin-top: 12px;
+  }
+  
+  th, td {
+    padding: 6px 8px !important;
+    font-size: 13px !important;
+  }
 
   * {
     -webkit-print-color-adjust: exact !important;
@@ -73,5 +90,5 @@
 
 @page {
   size: A4 portrait;
-  margin: 15mm;
+  margin: 12mm;
 }
