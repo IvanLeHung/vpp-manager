@@ -496,29 +496,29 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
       {/* FORMAL PRINT-ONLY SECTION (A4 Standard) */}
       <div className="hidden print:block print-area mb-8">
           <div className="print-sheet text-black font-sans leading-tight">
-              <div className="flex justify-between items-start mb-8">
-              <div>
-                  <p className="font-bold text-sm uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
-                  <p className="text-[10px] italic mt-1 font-bold">Số phiếu: {data.id}</p>
-                  <p className="text-[9px] text-slate-500">Ban Hành chính - Quản trị</p>
+              <div className="flex justify-between items-start mb-8 w-full print-header">
+                  <div className="w-[40%] text-left">
+                      <p className="font-bold text-sm uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
+                      <p className="text-[10px] italic mt-1 font-bold">Số phiếu: {data.id}</p>
+                      <p className="text-[9px] text-slate-500">Ban Hành chính - Quản trị</p>
+                  </div>
+                  <div className="w-[20%] flex flex-col items-center text-center">
+                      <img 
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(data.id)}`} 
+                          alt="QR Code" 
+                          className="w-16 h-16 border border-slate-100"
+                      />
+                      <p className="text-[8px] font-bold mt-1 uppercase text-slate-400">Scan to Verify</p>
+                  </div>
+                  <div className="w-[40%] text-right">
+                      <p className="text-sm font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+                      <p className="text-xs font-bold underline decoration-1 underline-offset-4">Độc lập - Tự do - Hạnh phúc</p>
+                      <p className="text-[10px] mt-2 text-slate-500 italic">..., ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
+                  </div>
               </div>
-              <div className="flex flex-col items-center">
-                  <img 
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(data.id)}`} 
-                      alt="QR Code" 
-                      className="w-16 h-16 border border-slate-100"
-                  />
-                  <p className="text-[8px] font-bold mt-1 uppercase text-slate-400">Scan to Verify</p>
-              </div>
-              <div className="text-right">
-                  <p className="text-sm font-bold">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
-                  <p className="text-xs font-bold underline decoration-1 underline-offset-4">Độc lập - Tự do - Hạnh phúc</p>
-                  <p className="text-[10px] mt-2 text-slate-500 italic">..., ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
-              </div>
-          </div>
 
           <div className="text-center mb-10">
-              <h1 className="text-2xl font-black uppercase tracking-widest break-words leading-tight underline underline-offset-8 decoration-slate-300">
+              <h1 className="text-[22px] font-black uppercase tracking-widest break-words leading-tight underline underline-offset-8 decoration-slate-300">
                   {['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'WAITING_HANDOVER', 'COMPLETED', 'PARTIALLY_APPROVED'].includes(data.status) 
                       ? 'PHIẾU CẤP PHÁT VĂN PHÒNG PHẨM' 
                       : 'PHIẾU ĐỀ XUẤT VĂN PHÒNG PHẨM'}
@@ -570,8 +570,8 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
           <div className="grid grid-cols-3 gap-y-12 gap-x-4 text-center text-[12px] font-bold mt-8 print-signatures">
               <div className="flex flex-col h-full">
                   <p className="mb-2 uppercase">Người đề xuất</p>
-                  <p className="text-[11px] font-normal italic mb-14">(Ký và ghi họ tên)</p>
-                  <div className="mt-auto pt-4">
+                  <p className="text-[11px] font-normal italic mb-4">(Ký và ghi họ tên)</p>
+                  <div className="mt-24 border-t border-dotted border-black w-[70%] mx-auto pt-2">
                      <p className="font-black text-xs uppercase">{data.requester?.fullName}</p>
                      <p className="text-[9px] font-normal text-slate-400">{new Date(data.createdAt).toLocaleDateString('vi-VN')}</p>
                   </div>
@@ -579,8 +579,8 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
               
               <div className="flex flex-col h-full">
                   <p className="mb-2 uppercase text-slate-600">Trưởng bộ phận</p>
-                  <p className="text-[11px] font-normal italic mb-14">(Ký xác nhận)</p>
-                  <div className="mt-auto pt-4">
+                  <p className="text-[11px] font-normal italic mb-4">(Ký xác nhận)</p>
+                  <div className="mt-24 border-t border-dotted border-black w-[70%] mx-auto pt-2">
                      {(() => {
                         const h = data.approvalHistories?.find((x:any) => 
                           (x.action === 'APPROVE' || x.action === 'APPROVED') && 
@@ -598,8 +598,8 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
 
               <div className="flex flex-col h-full">
                   <p className="mb-2 uppercase">Người duyệt</p>
-                  <p className="text-[11px] font-normal italic mb-14">(Hành chính/Lãnh đạo)</p>
-                  <div className="mt-auto pt-4">
+                  <p className="text-[11px] font-normal italic mb-4">(Hành chính/Lãnh đạo)</p>
+                  <div className="mt-24 border-t border-dotted border-black w-[70%] mx-auto pt-2">
                      {(() => {
                         const h = data.approvalHistories?.slice().reverse().find((x:any) => 
                           (x.action === 'APPROVE' || x.action === 'APPROVED') && 
@@ -617,8 +617,8 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
 
               <div className="flex flex-col h-full">
                   <p className="mb-2 uppercase">Thủ kho / Xuất</p>
-                  <p className="text-[11px] font-normal italic mb-14">(Ký và ghi tên)</p>
-                  <div className="mt-auto pt-4">
+                  <p className="text-[11px] font-normal italic mb-4">(Ký và ghi tên)</p>
+                  <div className="mt-24 border-t border-dotted border-black w-[70%] mx-auto pt-2">
                      {(() => {
                         const h = data.approvalHistories?.slice().reverse().find((x:any) => x.action === 'ISSUE' || x.action === 'ISSUED');
                         return (
@@ -633,8 +633,8 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
 
               <div className="flex flex-col h-full">
                   <p className="mb-2 uppercase text-indigo-700">Người nhận</p>
-                  <p className="text-[11px] font-normal italic mb-14">(Ký nhận đủ hàng)</p>
-                  <div className="mt-auto pt-4">
+                  <p className="text-[11px] font-normal italic mb-4">(Ký nhận đủ hàng)</p>
+                  <div className="mt-24 border-t border-dotted border-black w-[70%] mx-auto pt-2">
                      <p className="font-black text-xs uppercase">
                         {data.status === 'COMPLETED' ? data.requester?.fullName : '............................'}
                      </p>
@@ -702,7 +702,7 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
               <p className="mt-2 text-[8px] text-slate-400 text-right italic">HỆ THỐNG TRÍCH XUẤT LÚC {new Date().toLocaleTimeString('vi-VN')}</p>
           </div>
           
-          <div className="mt-20 pt-4 border-t border-slate-200 text-[10px] text-slate-400 flex justify-between italic">
+          <div className="mt-auto pt-4 border-t border-slate-200 text-[11px] text-[#555] flex justify-between print-info">
               <p>Ngày in: {new Date().toLocaleString('vi-VN')} • Mã tra cứu: {data.id}</p>
               <p>Hệ thống Quản lý VPP - {data.id} • Trang 1/1</p>
           </div>

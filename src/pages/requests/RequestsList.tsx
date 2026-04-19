@@ -424,29 +424,29 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
       {/* FORMAL SUMMARY PRINT SECTION */}
       <div className="hidden print:block print-area mb-8">
           <div className="print-sheet text-black font-sans leading-tight p-4">
-              <div className="flex justify-between items-start mb-8">
-                  <div>
+              <div className="flex justify-between items-start mb-8 w-full print-header">
+                  <div className="w-[40%] text-left">
                       <p className="font-bold text-sm uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
-                  <p className="text-[10px] italic mt-1 font-bold">Báo cáo tổng hợp tồn đọng cấp phát</p>
-                  <p className="text-[9px] text-slate-500">Ban Hành chính - Quản trị</p>
+                      <p className="text-[10px] italic mt-1 font-bold">Báo cáo tổng hợp tồn đọng cấp phát</p>
+                      <p className="text-[9px] text-slate-500">Ban Hành chính - Quản trị</p>
+                  </div>
+                  <div className="w-[20%] flex flex-col items-center text-center">
+                       <img 
+                           src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent('https://vpp.danko.vn/requests')}`} 
+                           alt="QR Code" 
+                           className="w-12 h-12 border border-slate-100"
+                       />
+                       <p className="text-[7px] font-bold mt-1 uppercase text-slate-400">Portal Access</p>
+                   </div>
+                  <div className="w-[40%] text-right">
+                      <p className="text-sm font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+                      <p className="text-xs font-bold underline decoration-1 underline-offset-4">Độc lập - Tự do - Hạnh phúc</p>
+                      <p className="text-[10px] mt-2 text-slate-500 italic">..., ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
+                  </div>
               </div>
-              <div className="flex flex-col items-center">
-                   <img 
-                       src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent('https://vpp.danko.vn/requests')}`} 
-                       alt="QR Code" 
-                       className="w-12 h-12 border border-slate-100"
-                   />
-                   <p className="text-[7px] font-bold mt-1 uppercase text-slate-400">Portal Access</p>
-               </div>
-              <div className="text-right">
-                  <p className="text-sm font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
-                  <p className="text-xs font-bold underline decoration-1 underline-offset-4">Độc lập - Tự do - Hạnh phúc</p>
-                  <p className="text-[10px] mt-2 text-slate-500 italic">..., ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
-              </div>
-          </div>
 
           <div className="text-center mb-10">
-              <h1 className="text-2xl font-black uppercase tracking-widest leading-tight decoration-slate-300">
+              <h1 className="text-[22px] font-black uppercase tracking-widest leading-tight decoration-slate-300">
                   PHIẾU TỔNG HỢP VĂN PHÒNG PHẨM CHƯA CẤP
               </h1>
               <p className="text-xs italic mt-2">(Tổng hợp từ {filteredRequests.length} phiếu đang lọc trên màn hình)</p>
@@ -489,25 +489,25 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
               </tbody>
           </table>
 
-          <div className="grid grid-cols-2 gap-4 text-center text-sm font-bold min-h-[140px] mt-12">
-              <div className="flex flex-col h-full uppercase">
+          <div className="flex justify-between text-center text-sm font-bold mt-12 print-signatures">
+              <div className="w-[40%] flex flex-col uppercase">
                   <p className="mb-2">Người lập biểu</p>
-                  <p className="text-[11px] font-normal italic mb-12">(Ký và ghi họ tên)</p>
-                  <div className="mt-auto pt-4">
+                  <p className="text-[11px] font-normal italic mb-4">(Ký và ghi họ tên)</p>
+                  <div className="mt-24 border-t border-dotted border-black w-[70%] mx-auto pt-2">
                      <p className="font-black text-sm uppercase">{currentUser.name || '............................'}</p>
                      <p className="text-[9px] font-normal text-slate-400 italic">Hệ thống trích xuất lúc {new Date().toLocaleTimeString('vi-VN')}</p>
                   </div>
               </div>
-              <div className="flex flex-col h-full shrink-0 uppercase">
+              <div className="w-[40%] flex flex-col uppercase">
                   <p className="mb-2">Phụ trách Hành chính / Kho</p>
-                  <p className="text-[11px] font-normal italic mb-12">(Ký xác nhận)</p>
-                  <div className="mt-auto pt-4">
+                  <p className="text-[11px] font-normal italic mb-4">(Ký xác nhận)</p>
+                  <div className="mt-24 border-t border-dotted border-black w-[70%] mx-auto pt-2">
                      <p className="font-black text-sm uppercase">............................</p>
                   </div>
               </div>
           </div>
           
-          <div className="mt-20 pt-4 border-t border-slate-200 text-[10px] text-slate-400 flex justify-between italic">
+          <div className="mt-auto pt-4 border-t border-slate-200 text-[11px] text-[#555] flex justify-between print-info">
               <p>Ngày in: {new Date().toLocaleString('vi-VN')} • Báo cáo tự động từ VPP-Manager</p>
               <p>Trang 1/1</p>
           </div>
