@@ -494,8 +494,9 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
           </div>
       )}
       {/* FORMAL PRINT-ONLY SECTION (A4 Standard) */}
-      <div className="hidden print:block w-full text-black font-sans leading-tight print-area">
-          <div className="flex justify-between items-start mb-8">
+      <div className="hidden print:block print-area mb-8">
+          <div className="print-sheet text-black font-sans leading-tight">
+              <div className="flex justify-between items-start mb-8">
               <div>
                   <p className="font-bold text-sm uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
                   <p className="text-[10px] italic mt-1 font-bold">Số phiếu: {data.id}</p>
@@ -532,15 +533,15 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
               <div className="col-span-2 flex items-end"><span className="w-40 font-bold shrink-0">Lý do / Mục đích:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5 italic">"{data.purpose || 'Không có ghi chú'}"</span></div>
           </div>
 
-          <table className="w-full border-collapse border border-black text-[13px] mb-12">
+          <table className="w-full border-collapse border border-black text-[13px] mb-12 print-table">
               <thead className="bg-slate-100">
                   <tr>
-                      <th className="border border-black p-2 text-center w-12 font-bold uppercase">STT</th>
-                      <th className="border border-black p-2 text-center w-28 font-bold uppercase">Mã VT</th>
-                      <th className="border border-black p-2 text-left font-bold uppercase">Tên Văn Phòng Phẩm</th>
-                      <th className="border border-black p-2 text-center w-20 font-bold uppercase">ĐVT</th>
-                      <th className="border border-black p-2 text-center w-24 font-bold uppercase">S.Lượng</th>
-                      <th className="border border-black p-2 text-left font-bold uppercase">Ghi chú</th>
+                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '8%'}}>STT</th>
+                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '16%'}}>Mã VT</th>
+                      <th className="border border-black p-2 text-left font-bold uppercase" style={{width: '40%'}}>Tên Văn Phòng Phẩm</th>
+                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '10%'}}>ĐVT</th>
+                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '12%'}}>S.Lượng</th>
+                      <th className="border border-black p-2 text-left font-bold uppercase" style={{width: '14%'}}>Ghi chú</th>
                   </tr>
               </thead>
               <tbody>
@@ -566,22 +567,21 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
               </tbody>
           </table>
 
-          <div className="grid grid-cols-5 gap-1 text-center text-[12px] font-bold min-h-[160px] mt-8">
+          <div className="grid grid-cols-3 gap-y-12 gap-x-4 text-center text-[12px] font-bold mt-8 print-signatures">
               <div className="flex flex-col h-full">
                   <p className="mb-2 uppercase">Người đề xuất</p>
-                  <p className="text-[10px] font-normal italic mb-12">(Ký và ghi họ tên)</p>
+                  <p className="text-[11px] font-normal italic mb-14">(Ký và ghi họ tên)</p>
                   <div className="mt-auto pt-4">
                      <p className="font-black text-xs uppercase">{data.requester?.fullName}</p>
                      <p className="text-[9px] font-normal text-slate-400">{new Date(data.createdAt).toLocaleDateString('vi-VN')}</p>
                   </div>
               </div>
               
-              <div className="flex flex-col h-full border-l border-slate-100 px-1">
+              <div className="flex flex-col h-full">
                   <p className="mb-2 uppercase text-slate-600">Trưởng bộ phận</p>
-                  <p className="text-[10px] font-normal italic mb-12">(Ký xác nhận)</p>
+                  <p className="text-[11px] font-normal italic mb-14">(Ký xác nhận)</p>
                   <div className="mt-auto pt-4">
                      {(() => {
-                        // Find manager approval by role OR by note content
                         const h = data.approvalHistories?.find((x:any) => 
                           (x.action === 'APPROVE' || x.action === 'APPROVED') && 
                           (x.approver?.role === 'MANAGER' || x.reason?.toLowerCase().includes('quản lý') || x.approver?.id === data.requester?.managerId)
@@ -596,12 +596,11 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                   </div>
               </div>
 
-              <div className="flex flex-col h-full border-l border-slate-100 px-1">
+              <div className="flex flex-col h-full">
                   <p className="mb-2 uppercase">Người duyệt</p>
-                  <p className="text-[10px] font-normal italic mb-12">(Hành chính/Lãnh đạo)</p>
+                  <p className="text-[11px] font-normal italic mb-14">(Hành chính/Lãnh đạo)</p>
                   <div className="mt-auto pt-4">
                      {(() => {
-                        // Find admin approval by role OR by note content (Hành chính)
                         const h = data.approvalHistories?.slice().reverse().find((x:any) => 
                           (x.action === 'APPROVE' || x.action === 'APPROVED') && 
                           (x.approver?.role === 'ADMIN' || x.reason?.toLowerCase().includes('hành chính'))
@@ -616,9 +615,9 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                   </div>
               </div>
 
-              <div className="flex flex-col h-full border-l border-slate-100 px-1">
+              <div className="flex flex-col h-full">
                   <p className="mb-2 uppercase">Thủ kho / Xuất</p>
-                  <p className="text-[10px] font-normal italic mb-12">(Ký và ghi tên)</p>
+                  <p className="text-[11px] font-normal italic mb-14">(Ký và ghi tên)</p>
                   <div className="mt-auto pt-4">
                      {(() => {
                         const h = data.approvalHistories?.slice().reverse().find((x:any) => x.action === 'ISSUE' || x.action === 'ISSUED');
@@ -632,9 +631,9 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                   </div>
               </div>
 
-              <div className="flex flex-col h-full bg-slate-50/50 p-1 rounded border-l border-slate-100">
+              <div className="flex flex-col h-full">
                   <p className="mb-2 uppercase text-indigo-700">Người nhận</p>
-                  <p className="text-[10px] font-normal italic mb-12">(Ký nhận đủ hàng)</p>
+                  <p className="text-[11px] font-normal italic mb-14">(Ký nhận đủ hàng)</p>
                   <div className="mt-auto pt-4">
                      <p className="font-black text-xs uppercase">
                         {data.status === 'COMPLETED' ? data.requester?.fullName : '............................'}
@@ -643,6 +642,10 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
                          <p className="text-[9px] font-normal text-slate-400 italic">Đã nhận đủ hàng</p>
                      )}
                   </div>
+              </div>
+              
+              <div className="flex flex-col h-full">
+                  {/* Empty Spacer */}
               </div>
           </div>
 
@@ -703,6 +706,7 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
               <p>Ngày in: {new Date().toLocaleString('vi-VN')} • Mã tra cứu: {data.id}</p>
               <p>Hệ thống Quản lý VPP - {data.id} • Trang 1/1</p>
           </div>
+        </div>
       </div>
     </div>
   );

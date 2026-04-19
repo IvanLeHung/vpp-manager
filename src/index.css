@@ -19,70 +19,59 @@
 }
 
 @media print {
-  /* Hide everything by default */
-  body * {
-    visibility: hidden;
-  }
-  
-  /* Reveal only the designated print area */
-  .print-area, .print-area * {
-    visibility: visible !important;
+  /* Tắt shadow */
+  * {
+    box-shadow: none !important;
   }
 
-  .print-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-  }
-
+  /* Ẩn triệt để bằng display none thay vì visibility hidden để giải phóng không gian */
   .no-print, [print-hidden] {
     display: none !important;
   }
   
-  body, html {
-    background-color: white !important;
-    height: auto !important;
+  /* Reset lại trạng thái cao của body để nội dung không bị giới hạn chiều cao gây mất chữ */
+  html, body {
+    height: auto !important; 
     overflow: visible !important;
+    background-color: white !important;
     margin: 0 !important;
     padding: 0 !important;
   }
 
-  @page {
-    margin: 1cm 1.5cm;
-    size: A4 portrait;
+  /* Kích thước khổ giấy A4 chuẩn */
+  .print-sheet {
+    width: 190mm;
+    margin: 0 auto;
+    font-family: "Times New Roman", serif;
+    color: #000;
   }
 
-  table {
-    page-break-inside: auto;
-    width: 100% !important;
-    border-collapse: collapse !important;
+  /* Đảm bảo print-area nằm trong luồng mặc định */
+  .print-area {
+    position: relative !important;
+    display: block !important;
   }
-  
-  tr {
+
+  /* Chặn ngắt trang giữa chừng bảng hoặc chữ ký */
+  .print-signatures,
+  .print-table,
+  .print-header,
+  .print-info,
+  table, tr {
     page-break-inside: avoid;
-    page-break-after: auto;
+    break-inside: avoid;
   }
 
-  thead {
-    display: table-header-group;
-  }
+  thead { display: table-header-group; }
+  table { width: 100% !important; border-collapse: collapse !important; }
 
-  /* Force background colors and images for a premium look */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
+}
 
-  /* Reset layout for print */
-  .flex, .grid {
-    display: block !important;
-  }
-
-  /* Ensure formal tables look good */
-  .border-black {
-    border-color: black !important;
-  }
+@page {
+  size: A4 portrait;
+  margin: 15mm;
 }

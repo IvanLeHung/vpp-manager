@@ -422,8 +422,8 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
       </div>
 
       {/* FORMAL SUMMARY PRINT SECTION */}
-      <div className="hidden print:block w-full text-black font-sans leading-tight p-4 print-area">
-          <div className="flex justify-between items-start mb-8">
+      <div className="hidden print:block print-area mb-8">
+          <div className="print-sheet text-black font-sans leading-tight">
               <div>
                   <p className="font-bold text-sm uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
                   <p className="text-[10px] italic mt-1 font-bold">Báo cáo tổng hợp tồn đọng cấp phát</p>
@@ -510,6 +510,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
               <p>Ngày in: {new Date().toLocaleString('vi-VN')} • Báo cáo tự động từ VPP-Manager</p>
               <p>Trang 1/1</p>
           </div>
+        </div>
       </div>
     </div>
   )
