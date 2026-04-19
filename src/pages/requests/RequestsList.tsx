@@ -423,9 +423,10 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
 
       {/* FORMAL SUMMARY PRINT SECTION */}
       <div className="hidden print:block print-area mb-8">
-          <div className="print-sheet text-black font-sans leading-tight">
-              <div>
-                  <p className="font-bold text-sm uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
+          <div className="print-sheet text-black font-sans leading-tight p-4">
+              <div className="flex justify-between items-start mb-8">
+                  <div>
+                      <p className="font-bold text-sm uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
                   <p className="text-[10px] italic mt-1 font-bold">Báo cáo tổng hợp tồn đọng cấp phát</p>
                   <p className="text-[9px] text-slate-500">Ban Hành chính - Quản trị</p>
               </div>
