@@ -425,10 +425,10 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
       <div className="hidden print:block print-area mb-8">
           <div className="print-sheet text-black font-sans leading-tight p-4">
               <div className="flex justify-between items-start mb-8 w-full print-header">
-                  <div className="w-[40%] text-left">
-                      <p className="font-bold text-sm uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
+                  <div className="w-[35%] text-left">
+                      <p className="font-bold text-[13px] uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
                       <p className="text-[10px] italic mt-1 font-bold">Báo cáo tổng hợp tồn đọng cấp phát</p>
-                      <p className="text-[9px] text-slate-500">Ban Hành chính - Quản trị</p>
+                      <p className="text-[9px] text-slate-500 mt-1">Ban Hành chính - Quản trị</p>
                   </div>
                   <div className="w-[20%] flex flex-col items-center text-center">
                        <img 
@@ -438,10 +438,10 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                        />
                        <p className="text-[7px] font-bold mt-1 uppercase text-slate-400">Portal Access</p>
                    </div>
-                  <div className="w-[40%] text-right">
-                      <p className="text-sm font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
-                      <p className="text-xs font-bold underline decoration-1 underline-offset-4">Độc lập - Tự do - Hạnh phúc</p>
-                      <p className="text-[10px] mt-2 text-slate-500 italic">..., ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
+                  <div className="w-[45%] text-center">
+                      <p className="text-[14px] font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+                      <p className="text-[13px] font-bold underline decoration-[1.5px] underline-offset-[5px] mt-1">Độc lập - Tự do - Hạnh phúc</p>
+                      <p className="text-[11px] mt-3 text-slate-600 italic">..., ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
                   </div>
               </div>
 
