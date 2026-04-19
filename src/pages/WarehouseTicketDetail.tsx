@@ -200,7 +200,7 @@ export default function WarehouseTicketDetail({ basePath = '/warehouse-tickets' 
   const isOwner = ticket.createdBy.username === currentUser?.username;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] p-4 md:p-8 bg-slate-50 overflow-auto">
+    <div className="flex flex-col h-[calc(100vh-64px)] p-4 md:p-8 bg-slate-50 overflow-auto relative print:p-0 print:overflow-visible print:h-auto print:bg-white print:block">
       {/* Toast */}
       <div className="fixed bottom-6 right-6 z-[200] flex flex-col gap-2">
         {toasts.map(t => (
@@ -212,7 +212,7 @@ export default function WarehouseTicketDetail({ basePath = '/warehouse-tickets' 
       </div>
 
       {/* Back + Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 no-print shrink-0">
         <div className="flex items-center gap-4">
           <button onClick={() => navigate(basePath)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-white rounded-xl transition border border-transparent hover:border-slate-200">
             <ArrowLeft className="w-5 h-5" />
@@ -234,6 +234,9 @@ export default function WarehouseTicketDetail({ basePath = '/warehouse-tickets' 
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={() => window.print()} className="flex items-center px-4 py-2.5 bg-white text-indigo-600 border border-indigo-200 rounded-xl font-bold hover:bg-indigo-50 shadow-sm transition">
+             <ClipboardList className="w-4 h-4 mr-2" /> In phiếu
+          </button>
           {/* WAREHOUSE: Submit Draft */}
           {isWarehouse && isOwner && ticket.status === 'DRAFT' && (
             <button onClick={handleSubmit} disabled={actionLoading} className="flex items-center px-5 py-2.5 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 shadow-md transition disabled:opacity-50">
@@ -270,7 +273,7 @@ export default function WarehouseTicketDetail({ basePath = '/warehouse-tickets' 
       </div>
 
       {/* Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 no-print shrink-0">
         {/* Left: Info + Lines */}
         <div className="lg:col-span-2 space-y-6">
           {/* Reject reason */}
@@ -454,6 +457,120 @@ export default function WarehouseTicketDetail({ basePath = '/warehouse-tickets' 
           </div>
         </div>
       )}
+      {/* ── FORMAL PRINT-ONLY SECTION (A4 Standard) ── */}
+      <div className="hidden print:block print-area mb-8">
+          <div className="print-sheet text-black font-sans leading-tight">
+              <div className="flex justify-between items-start mb-8 w-full print-header">
+                  <div className="w-[35%] text-left">
+                      <p className="font-bold text-[13px] uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
+                      <p className="text-[10px] italic mt-1 font-bold">Số phiếu: {ticket.ticketCode}</p>
+                      <p className="text-[9px] text-slate-500 mt-1">Ban Hành chính - Quản trị</p>
+                  </div>
+                  <div className="w-[20%] flex flex-col items-center text-center">
+                      <img 
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(ticket.ticketCode)}`} 
+                          alt="QR Code" 
+                          className="w-16 h-16 border border-slate-100"
+                      />
+                      <p className="text-[8px] font-bold mt-1 uppercase text-slate-400">Scan to Verify</p>
+                  </div>
+                  <div className="w-[45%] text-center">
+                      <p className="text-[14px] font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+                      <p className="text-[13px] font-bold underline decoration-[1.5px] underline-offset-[5px] mt-1">Độc lập - Tự do - Hạnh phúc</p>
+                      <p className="text-[11px] mt-3 text-slate-600 italic">..., ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
+                  </div>
+              </div>
+
+              <div className="text-center mb-10">
+                  <h1 className="text-[22px] font-black uppercase tracking-widest break-words leading-tight underline underline-offset-8 decoration-slate-300">
+                      {tc.label.toUpperCase()}
+                  </h1>
+              </div>
+
+              <div className="grid grid-cols-2 gap-y-4 gap-x-12 mb-10 text-sm">
+                  <div className="flex items-end"><span className="w-40 font-bold shrink-0">Người lập phiếu:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{ticket.createdBy.fullName}</span></div>
+                  <div className="flex items-end"><span className="w-40 font-bold shrink-0">Kho xuất/nhập:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{ticket.warehouseCode}</span></div>
+                  <div className="flex items-end"><span className="w-40 font-bold shrink-0">Ngày lập phiếu:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{new Date(ticket.createdAt).toLocaleDateString('vi-VN')}</span></div>
+                  <div className="flex items-end"><span className="w-40 font-bold shrink-0">Ngày thực thi:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{ticket.executedAt ? new Date(ticket.executedAt).toLocaleDateString('vi-VN') : '......................'}</span></div>
+                  <div className="col-span-2 flex items-end"><span className="w-40 font-bold shrink-0">Lý do / Ghi chú:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5 italic">"{ticket.reason || ticket.note || 'Không có ghi chú'}"</span></div>
+              </div>
+
+              <table className="w-full border-collapse border border-black text-[13px] mb-12 print-table">
+                  <thead className="bg-slate-100">
+                      <tr>
+                          <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '6%'}}>STT</th>
+                          <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '14%'}}>Mã VT</th>
+                          <th className="border border-black p-2 text-left font-bold uppercase" style={{width: '40%'}}>Tên Vật tư / Linh kiện</th>
+                          <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '10%'}}>ĐVT</th>
+                          <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '8%'}}>Đ.Nghị</th>
+                          <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '10%'}}>Thực tế</th>
+                          <th className="border border-black p-2 text-left font-bold uppercase" style={{width: '12%'}}>Ghi chú</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {ticket.lines.map((l, idx) => (
+                          <tr key={l.id} className="h-10">
+                              <td className="border border-black p-2 text-center font-medium">{idx + 1}</td>
+                              <td className="border border-black p-2 text-center font-bold">{l.item.mvpp}</td>
+                              <td className="border border-black p-2 font-medium">{l.item.name}</td>
+                              <td className="border border-black p-2 text-center">{l.item.unit}</td>
+                              <td className="border border-black p-2 text-center">
+                                  {Math.abs(l.qty)}
+                              </td>
+                              <td className="border border-black p-2 text-center font-black text-base">
+                                  {l.qtyApproved !== null ? Math.abs(l.qtyApproved) : '...'}
+                              </td>
+                              <td className="border border-black p-2 text-[10px] italic leading-tight">{l.note || '—'}</td>
+                          </tr>
+                      ))}
+                      <tr className="bg-slate-50 h-10 font-black">
+                          <td colSpan={4} className="border border-black p-2 text-right uppercase text-xs">Tổng cộng số lượng:</td>
+                          <td className="border border-black p-2 text-center">
+                              {ticket.lines.reduce((sum, line) => sum + Math.abs(line.qty), 0)}
+                          </td>
+                          <td className="border border-black p-2 text-center text-lg text-emerald-700">
+                              {ticket.lines.reduce((sum, line) => sum + (line.qtyApproved !== null ? Math.abs(line.qtyApproved) : 0), 0) || '...'}
+                          </td>
+                          <td className="border border-black p-2"></td>
+                      </tr>
+                  </tbody>
+              </table>
+
+              <div className="grid grid-cols-3 gap-y-12 gap-x-4 text-center text-[12px] font-bold mt-12 print-signatures">
+                  <div className="flex flex-col h-full">
+                      <p className="mb-2 uppercase">Người lập phiếu</p>
+                      <p className="text-[11px] font-normal italic mb-4">(Ký và ghi họ tên)</p>
+                      <div className="mt-24 border-t border-dotted border-black w-[70%] mx-auto pt-2">
+                         <p className="font-black text-xs uppercase">{ticket.createdBy.fullName}</p>
+                         <p className="text-[9px] font-normal text-slate-400">{new Date(ticket.createdAt).toLocaleDateString('vi-VN')}</p>
+                      </div>
+                  </div>
+                  
+                  <div className="flex flex-col h-full">
+                      <p className="mb-2 uppercase text-slate-600">Người duyệt</p>
+                      <p className="text-[11px] font-normal italic mb-4">(Ký xác nhận)</p>
+                      <div className="mt-24 border-t border-dotted border-black w-[70%] mx-auto pt-2">
+                         <p className="font-black text-xs uppercase">{ticket.approvedBy?.fullName || '............................'}</p>
+                         {ticket.approvedAt && <p className="text-[9px] font-normal text-slate-400">{new Date(ticket.approvedAt).toLocaleDateString('vi-VN')}</p>}
+                      </div>
+                  </div>
+
+                  <div className="flex flex-col h-full">
+                      <p className="mb-2 uppercase">Thủ kho</p>
+                      <p className="text-[11px] font-normal italic mb-4">(Ký và ghi tên)</p>
+                      <div className="mt-24 border-t border-dotted border-black w-[70%] mx-auto pt-2">
+                         <p className="font-black text-xs uppercase">{ticket.executedBy?.fullName || '............................'}</p>
+                         {ticket.executedAt && <p className="text-[9px] font-normal text-slate-400">{new Date(ticket.executedAt).toLocaleDateString('vi-VN')}</p>}
+                      </div>
+                  </div>
+              </div>
+
+              <div className="mt-auto pt-4 border-t border-slate-200 text-[11px] text-[#555] flex justify-between print-info">
+                  <p>Ngày in: {new Date().toLocaleString('vi-VN')} • Mã hệ thống: {ticket.id}</p>
+                  <p>Hệ thống Quản lý Tồn kho - {ticket.ticketCode} • Trang 1/1</p>
+              </div>
+          </div>
+      </div>
     </div>
   );
 }
