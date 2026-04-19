@@ -422,7 +422,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
       </div>
 
       {/* FORMAL SUMMARY PRINT SECTION */}
-      <div className="hidden print:block w-full text-black font-sans leading-tight p-4">
+      <div className="hidden print:block w-full text-black font-sans leading-tight p-4 print-area">
           <div className="flex justify-between items-start mb-8">
               <div>
                   <p className="font-bold text-sm uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>

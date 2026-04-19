@@ -494,7 +494,7 @@ export default function RequestsDetail({ requestId, setViewMode, refreshData, sh
           </div>
       )}
       {/* FORMAL PRINT-ONLY SECTION (A4 Standard) */}
-      <div className="hidden print:block w-full text-black font-sans leading-tight">
+      <div className="hidden print:block w-full text-black font-sans leading-tight print-area">
           <div className="flex justify-between items-start mb-8">
               <div>
                   <p className="font-bold text-sm uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>

@@ -19,7 +19,26 @@
 }
 
 @media print {
-  .no-print {
+  /* Hide everything by default */
+  body * {
+    visibility: hidden;
+  }
+  
+  /* Reveal only the designated print area */
+  .print-area, .print-area * {
+    visibility: visible !important;
+  }
+
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .no-print, [print-hidden] {
     display: none !important;
   }
   
@@ -27,25 +46,12 @@
     background-color: white !important;
     height: auto !important;
     overflow: visible !important;
-    font-size: 10pt;
-  }
-
-  .flex, .grid {
-    display: block !important;
-  }
-
-  .bg-slate-50, .bg-slate-100, .bg-white {
-    background-color: white !important;
-    border-color: #eee !important;
-  }
-
-  canvas {
-    max-width: 100% !important;
-    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   @page {
-    margin: 1.5cm;
+    margin: 1cm 1.5cm;
     size: A4 portrait;
   }
 
@@ -64,16 +70,19 @@
     display: table-header-group;
   }
 
-  .rounded-\[2\.5rem\], .rounded-\[2rem\], .rounded-2xl {
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    border: 1px solid #eee !important;
-    margin-bottom: 20px !important;
-    padding: 15px !important;
+  /* Force background colors and images for a premium look */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  h2, h3, h4 {
-    color: black !important;
-    margin-top: 10px !important;
+  /* Reset layout for print */
+  .flex, .grid {
+    display: block !important;
+  }
+
+  /* Ensure formal tables look good */
+  .border-black {
+    border-color: black !important;
   }
 }
