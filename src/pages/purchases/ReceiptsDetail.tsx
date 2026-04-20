@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../lib/api';
-import { useAppContext as useApp } from '../../context/AppContext';
 import {
   ArrowLeft, CheckCircle, Package, AlertTriangle, Save, Printer
 } from 'lucide-react';
@@ -12,7 +11,6 @@ interface ReceiptsDetailProps {
 }
 
 const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, onBack, showToast }) => {
-  const { currentUser } = useApp();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -102,7 +100,7 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, onBack, show
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col gap-6 w-full max-w-[1400px] mx-auto">
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col gap-6 w-full max-w-[1400px] mx-auto print:hidden">
         {/* Header Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
@@ -227,78 +225,64 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, onBack, show
       </div>
 
       {/* FORMAL PRINT-ONLY SECTION (A4 Standard) */}
-      <div className="hidden print:block print-area mb-8">
-          <div className="print-sheet text-black font-sans leading-tight">
-              <div className="flex justify-between items-start mb-8 w-full print-header">
-                  <div className="w-[35%] text-left">
-                      <p className="font-bold text-[13px] uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
-                      <p className="text-[10px] italic mt-1 font-bold">Số phiếu: {data.id}</p>
-                      <p className="text-[9px] text-slate-500 mt-1">Ban Giao nhận - Kho Tổng</p>
-                  </div>
-                  <div className="w-[45%] text-center border-l-2 border-slate-700 pl-4">
-                      <p className="text-[14px] font-bold uppercase">PHIẾU KIỂM HOÁ & NHẬP VẬT TƯ (GRN)</p>
-                      <p className="text-[11px] mt-3 text-slate-600 italic">..., ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
-                  </div>
-              </div>
+      <div className="hidden print:block print-container">
+          <div className="text-center text-lg font-bold uppercase mb-4">PHIẾU KIỂM HOÁ & NHẬP VẬT TƯ (GRN)</div>
 
-              <div className="grid grid-cols-2 gap-y-4 gap-x-12 mb-10 text-sm">
-                  <div className="flex items-end"><span className="w-40 font-bold shrink-0">Nhà Cung Cấp:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{data.supplier || '...................................................'}</span></div>
-                  <div className="flex items-end"><span className="w-40 font-bold shrink-0">Tham chiếu PO:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{data.poId || '.......................'}</span></div>
-                  <div className="col-span-2 flex items-end"><span className="w-40 font-bold shrink-0">Kho nhận hàng:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{data.warehouseCode || '.......................'}</span></div>
-              </div>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-2 mb-4 text-[13px]">
+              <div><strong>Mã Phiếu:</strong> {data.id}</div>
+              <div><strong>Thực Kiểm:</strong> {data.receiveDate ? new Date(data.receiveDate).toLocaleString('vi-VN') : '....'}</div>
+              <div><strong>Người Làm Phiếu:</strong> {data.receiver?.fullName || '....................'}</div>
+              <div><strong>Kho Nhận Hàng:</strong> {data.warehouseCode || '....................'}</div>
+              <div className="col-span-2"><strong>Nhà Cung Cấp:</strong> {data.supplier || '....................'}</div>
+              <div className="col-span-2"><strong>Tham chiếu PO:</strong> {data.poId || '....................'}</div>
+          </div>
 
-              <table className="w-full border-collapse border border-black text-[13px] mb-12 print-table">
-                  <thead className="bg-slate-100">
-                      <tr>
-                          <th className="border border-black p-2 text-center font-bold uppercase" style={{width:'8%'}}>STT</th>
-                          <th className="border border-black p-2 text-center font-bold uppercase" style={{width:'15%'}}>Mã VT</th>
-                          <th className="border border-black p-2 text-left font-bold uppercase">Tên Văn Phòng Phẩm</th>
-                          <th className="border border-black p-2 text-center font-bold uppercase" style={{width:'8%'}}>ĐVT</th>
-                          <th className="border border-black p-2 text-center font-bold uppercase" style={{width:'12%'}}>Treo (Sổ)</th>
-                          <th className="border border-black p-2 text-center font-bold uppercase" style={{width:'12%'}}>Thực Nhận</th>
-                          <th className="border border-black p-2 text-center font-bold uppercase" style={{width:'12%'}}>Thiếu / Lỗi</th>
+          <table className="print-table">
+              <thead className="bg-slate-100">
+                  <tr>
+                      <th className="text-center font-bold" style={{width:'6%'}}>STT</th>
+                      <th className="text-center font-bold" style={{width:'15%'}}>Mã VT</th>
+                      <th className="text-left font-bold" style={{width:'37%'}}>Tên Văn Phòng Phẩm</th>
+                      <th className="text-center font-bold" style={{width:'8%'}}>ĐVT</th>
+                      <th className="text-center font-bold" style={{width:'12%'}}>Treo (Sổ)</th>
+                      <th className="text-center font-bold" style={{width:'12%'}}>Thực Nhận</th>
+                      <th className="text-center font-bold" style={{width:'10%'}}>Hư/Lỗi</th>
+                  </tr>
+              </thead>
+              <tbody>
+                  {data.lines.map((l: any, idx: number) => (
+                      <tr key={l.id}>
+                          <td className="text-center">{idx + 1}</td>
+                          <td className="text-center font-medium">{l.item.mvpp}</td>
+                          <td className="font-medium">{l.item.name}</td>
+                          <td className="text-center">{l.item.unit}</td>
+                          <td className="text-center">{l.qtyOrdered}</td>
+                          <td className="text-center font-bold">{l.qtyAccepted}</td>
+                          <td className="text-center italic text-xs">{l.qtyDefective > 0 ? l.qtyDefective : '-'}</td>
                       </tr>
-                  </thead>
-                  <tbody>
-                      {data.lines.map((l: any, idx: number) => (
-                          <tr key={l.id} className="h-10">
-                              <td className="border border-black p-2 text-center font-medium">{idx + 1}</td>
-                              <td className="border border-black p-2 text-center font-bold">{l.item.mvpp}</td>
-                              <td className="border border-black p-2 font-medium">{l.item.name}</td>
-                              <td className="border border-black p-2 text-center">{l.item.unit}</td>
-                              <td className="border border-black p-2 text-center">{l.qtyOrdered}</td>
-                              <td className="border border-black p-2 text-center font-black">{l.qtyAccepted}</td>
-                              <td className="border border-black p-2 text-center italic">{l.qtyDefective > 0 ? l.qtyDefective : '-'}</td>
-                          </tr>
-                      ))}
-                      <tr className="bg-slate-50 h-10 font-black">
-                          <td colSpan={5} className="border border-black p-2 text-right uppercase text-xs">Tổng Sl Thực Tế:</td>
-                          <td className="border border-black p-2 text-center text-lg">
-                              {data.lines.reduce((sum: number, line: any) => sum + (line.qtyAccepted || 0), 0)}
-                          </td>
-                          <td className="border border-black p-2"></td>
-                      </tr>
-                  </tbody>
-              </table>
+                  ))}
+                  <tr className="font-bold bg-slate-50">
+                      <td colSpan={5} className="text-right uppercase">Tổng SL Thực Tế:</td>
+                      <td className="text-center text-lg">{data.lines.reduce((sum: number, line: any) => sum + (line.qtyAccepted || 0), 0)}</td>
+                      <td></td>
+                  </tr>
+              </tbody>
+          </table>
 
-              <div className="grid grid-cols-2 gap-y-12 gap-x-4 text-center text-[12px] font-bold mt-8 print-signatures">
-                  <div className="flex flex-col h-full">
-                      <p className="mb-2 uppercase">Thủ Kho / Người Kiểm Định</p>
-                      <p className="text-[11px] font-normal italic mb-4">(Ký, ghi gõ họ tên xác nhận nhận hàng)</p>
-                      <div className="mt-24 border-t border-dotted border-black w-[70%] mx-auto pt-2">
-                         <p className="font-black text-xs uppercase">{data.receiver?.fullName || '....................................'}</p>
-                      </div>
-                  </div>
-                  <div className="flex flex-col h-full">
-                      <p className="mb-2 uppercase">Bên Giao / Đơn vị cung cấp</p>
-                      <p className="text-[11px] font-normal italic mb-4">(Ký và xác nhận đối chiếu đúng hàng)</p>
-                      <div className="mt-24 border-t border-dotted border-black w-[70%] mx-auto pt-2">
-                         <p className="font-black text-xs uppercase">....................................</p>
-                      </div>
-                  </div>
+          <div className="signature-section">
+              <div className="text-center min-h-[120px]">
+                  <p className="font-bold uppercase mb-1">Thủ Kho / Người Kiểm Định</p>
+                  <p className="text-[11px] italic mb-16">(Ký, ghi gõ họ tên xác nhận nhận hàng)</p>
+                  <p className="font-bold uppercase text-[13px]">{data.receiver?.fullName || '....................................'}</p>
+              </div>
+              <div className="text-center min-h-[120px]">
+                  <p className="font-bold uppercase mb-1">Bên Giao / Đơn vị cung cấp</p>
+                  <p className="text-[11px] italic mb-16">(Ký và xác nhận đối chiếu đúng hàng)</p>
+                  <p className="font-bold uppercase text-[13px]">....................................</p>
               </div>
           </div>
       </div>
+
     </div>
   );
 };

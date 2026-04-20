@@ -109,7 +109,7 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToa
           </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col xl:flex-row gap-6 w-full max-w-[1400px] mx-auto print:p-0">
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col xl:flex-row gap-6 w-full max-w-[1400px] mx-auto print:hidden">
           
           <div className="flex-1 flex flex-col gap-6 min-w-0">
               {/* Box 1: Info */}
@@ -390,84 +390,66 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToa
       )}
 
       {/* FORMAL PRINT-ONLY SECTION (A4 Standard) */}
-      <div className="hidden print:block print-area mb-8">
-          <div className="print-sheet text-black font-sans leading-tight">
-              <div className="flex justify-between items-start mb-8 w-full print-header">
-                  <div className="w-[35%] text-left">
-                      <p className="font-bold text-[13px] uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
-                      <p className="text-[10px] italic mt-1 font-bold">Số PO: {data.id}</p>
-                      <p className="text-[9px] text-slate-500 mt-1">Ban Hành chính - Quản trị</p>
-                  </div>
-                  <div className="w-[45%] text-center border-l-2 border-slate-700 pl-4">
-                      <p className="text-[14px] font-bold uppercase">PHIẾU ĐƠN ĐẶT HÀNG / MUA SẮM (PURCHASE ORDER)</p>
-                      <p className="text-[11px] mt-3 text-slate-600 italic">..., ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
-                  </div>
-              </div>
+      <div className="hidden print:block print-container">
+          <div className="text-center text-lg font-bold uppercase mb-4">PHIẾU ĐƠN ĐẶT HÀNG / MUA SẮM (PO)</div>
 
-              <div className="grid grid-cols-2 lg:grid-cols-2 gap-y-4 gap-x-12 mb-10 text-sm">
-                  <div className="flex items-end"><span className="w-40 font-bold shrink-0">Nhà Cung Cấp:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{data.supplier || '...................................................'}</span></div>
-                  <div className="flex items-end"><span className="w-40 font-bold shrink-0">Ngày Đặt Hàng:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{data.orderedAt ? new Date(data.orderedAt).toLocaleDateString('vi-VN') : '..../..../2026'}</span></div>
-                  <div className="col-span-2 flex items-end"><span className="w-40 font-bold shrink-0">Lý do / Mục đích:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{data.purpose || 'Không ghi chú'}</span></div>
-              </div>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-2 mb-4 text-[13px]">
+              <div><strong>Mã PO:</strong> {data.id}</div>
+              <div><strong>Ngày Đặt Hàng:</strong> {data.orderedAt ? new Date(data.orderedAt).toLocaleString('vi-VN') : '....'}</div>
+              <div><strong>Người Yêu Cầu:</strong> {data.requester?.fullName || '....................'}</div>
+              <div><strong>Phòng Ban:</strong> {data.department || '....................'}</div>
+              <div><strong>Nhà Cung Cấp:</strong> {data.supplier || '....................'}</div>
+              <div><strong>Tổng Giá Trị:</strong> <span className="font-bold">{data.totalAmount?.toLocaleString('vi-VN')} đ</span></div>
+              <div className="col-span-2"><strong>Mục Đích:</strong> {data.purpose || '....................'}</div>
+          </div>
 
-              <table className="w-full border-collapse border border-black text-[13px] mb-12 print-table">
-                  <thead className="bg-slate-100">
-                      <tr>
-                          <th className="border border-black p-2 text-center font-bold uppercase">STT</th>
-                          <th className="border border-black p-2 text-center font-bold uppercase">Mã VT</th>
-                          <th className="border border-black p-2 text-left font-bold uppercase">Tên Văn Phòng Phẩm</th>
-                          <th className="border border-black p-2 text-center font-bold uppercase">ĐVT</th>
-                          <th className="border border-black p-2 text-center font-bold uppercase">S.Lượng</th>
-                          <th className="border border-black p-2 text-right font-bold uppercase">Đơn Giá</th>
-                          <th className="border border-black p-2 text-right font-bold uppercase">Thành Tiền</th>
+          <table className="print-table">
+              <thead className="bg-slate-100">
+                  <tr>
+                      <th className="text-center font-bold" style={{width: '6%'}}>STT</th>
+                      <th className="text-center font-bold" style={{width: '14%'}}>Mã VT</th>
+                      <th className="text-left font-bold" style={{width: '36%'}}>Tên Văn Phòng Phẩm</th>
+                      <th className="text-center font-bold" style={{width: '8%'}}>ĐVT</th>
+                      <th className="text-center font-bold" style={{width: '8%'}}>S.Lượng</th>
+                      <th className="text-right font-bold" style={{width: '14%'}}>Đơn Giá</th>
+                      <th className="text-right font-bold" style={{width: '14%'}}>Thành Tiền</th>
+                  </tr>
+              </thead>
+              <tbody>
+                  {data.lines.map((l: any, idx: number) => (
+                      <tr key={l.id}>
+                          <td className="text-center">{idx + 1}</td>
+                          <td className="text-center font-medium">{l.item.mvpp}</td>
+                          <td className="font-medium">{l.item.name}</td>
+                          <td className="text-center">{l.item.unit}</td>
+                          <td className="text-center font-bold">{l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested}</td>
+                          <td className="text-right">{l.unitPrice?.toLocaleString('vi-VN')} đ</td>
+                          <td className="text-right font-bold">{l.lineAmount?.toLocaleString('vi-VN')} đ</td>
                       </tr>
-                  </thead>
-                  <tbody>
-                      {data.lines.map((l: any, idx: number) => (
-                          <tr key={l.id} className="h-10">
-                              <td className="border border-black p-2 text-center font-medium">{idx + 1}</td>
-                              <td className="border border-black p-2 text-center font-bold">{l.item.mvpp}</td>
-                              <td className="border border-black p-2 font-medium">{l.item.name}</td>
-                              <td className="border border-black p-2 text-center">{l.item.unit}</td>
-                              <td className="border border-black p-2 text-center font-black">
-                                  {l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested}
-                              </td>
-                              <td className="border border-black p-2 text-right">{l.unitPrice?.toLocaleString('vi-VN')} đ</td>
-                              <td className="border border-black p-2 text-right">{l.lineAmount?.toLocaleString('vi-VN')} đ</td>
-                          </tr>
-                      ))}
-                      <tr className="bg-slate-50 h-10 font-black">
-                          <td colSpan={6} className="border border-black p-2 text-right uppercase text-xs">Tổng giá trị đơn hàng:</td>
-                          <td className="border border-black p-2 text-right text-lg">
-                              {data.totalAmount?.toLocaleString('vi-VN')} đ
-                          </td>
-                      </tr>
-                  </tbody>
-              </table>
+                  ))}
+                  <tr className="font-bold bg-slate-50">
+                      <td colSpan={6} className="text-right uppercase">Tổng giá trị đơn hàng:</td>
+                      <td className="text-right">{data.totalAmount?.toLocaleString('vi-VN')} đ</td>
+                  </tr>
+              </tbody>
+          </table>
 
-              <div className="grid grid-cols-2 gap-y-12 gap-x-4 text-center text-[12px] font-bold mt-8 print-signatures">
-                  <div className="flex flex-col h-full">
-                      <p className="mb-2 uppercase">Người Đề Xuất / Soạn Đơn</p>
-                      <p className="text-[11px] font-normal italic mb-4">(Ký và ghi họ tên)</p>
-                      <div className="mt-24 border-t border-dotted border-black w-[70%] mx-auto pt-2">
-                         <p className="font-black text-xs uppercase">{data.requester?.fullName}</p>
-                      </div>
-                  </div>
-                  <div className="flex flex-col h-full">
-                      <p className="mb-2 uppercase">Trưởng Bộ Phận / Người Duyệt PO</p>
-                      <p className="text-[11px] font-normal italic mb-4">(Ký và đóng dấu)</p>
-                      <div className="mt-24 border-t border-dotted border-black w-[70%] mx-auto pt-2">
-                         <p className="font-black text-xs uppercase">....................................</p>
-                      </div>
-                  </div>
+          <div className="signature-section">
+              <div className="text-center min-h-[120px]">
+                  <p className="font-bold uppercase mb-1">Người Đề Xuất / Soạn Đơn</p>
+                  <p className="text-[11px] italic mb-16">(Ký và ghi họ tên)</p>
+                  <p className="font-bold uppercase text-[13px]">{data.requester?.fullName}</p>
+              </div>
+              <div className="text-center min-h-[120px]">
+                  <p className="font-bold uppercase mb-1">Trưởng Bộ Phận / Người Duyệt PO</p>
+                  <p className="text-[11px] italic mb-16">(Ký và đóng dấu)</p>
+                  <p className="font-bold uppercase text-[13px]">....................................</p>
               </div>
           </div>
       </div>
-
 
     </div>
   );
 };
 
 export default PurchasesDetail;
-

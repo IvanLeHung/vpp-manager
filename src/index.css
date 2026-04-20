@@ -36,19 +36,22 @@
     background-color: white !important;
     margin: 0 !important;
     padding: 0 !important;
+    width: 210mm;
+    color: #000 !important;
+    font-family: "Times New Roman", serif;
+    font-size: 13px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   /* Kích thước khổ giấy A4 chuẩn */
   .print-sheet {
     width: 190mm;
-    min-height: 267mm;
     margin: 0 auto;
-    font-family: "Times New Roman", serif;
-    font-size: 14px;
+    font-size: 13px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    color: #000;
+    justify-content: flex-start;
   }
 
   /* Đảm bảo print-area nằm trong luồng mặc định */
@@ -61,25 +64,40 @@
 
   /* Chặn ngắt trang giữa chừng bảng hoặc chữ ký */
   .print-signatures,
-  .print-table,
   .print-header,
   .print-info,
-  table, tr {
+  tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Chống bật sang trang khi vừa chạm đến chữ ký 
+     bằng cách neo cứng khoảng cách và bảo vệ khối này */
+  .signature-section, .print-signatures {
+    margin-top: 24px !important;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
     page-break-inside: avoid;
     break-inside: avoid;
   }
 
   thead { display: table-header-group; }
   
-  table { 
+  table.print-table { 
     width: 100% !important; 
     border-collapse: collapse !important; 
+    table-layout: fixed !important;
     margin-top: 12px;
   }
   
-  th, td {
+  table.print-table th, table.print-table td {
+    border: 1px solid #000 !important;
     padding: 6px 8px !important;
-    font-size: 13px !important;
+    vertical-align: top;
+    white-space: normal !important;
+    word-break: break-word !important;
+    font-size: 12px !important;
   }
 
   * {
@@ -90,5 +108,5 @@
 
 @page {
   size: A4 portrait;
-  margin: 12mm;
+  margin: 10mm 12mm 12mm 12mm;
 }
