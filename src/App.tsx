@@ -86,7 +86,7 @@ function Landing() {
         </div>
         
         <h1 className="text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-700 mb-4 tracking-tight">
-          Danko VPP
+          Văn phòng phẩm Danko Group
         </h1>
         <p className="text-slate-600 mb-8 text-lg font-medium leading-relaxed">
           Nền tảng quản lý văn phòng phẩm thông minh và tối ưu nhất dành cho doanh nghiệp.
