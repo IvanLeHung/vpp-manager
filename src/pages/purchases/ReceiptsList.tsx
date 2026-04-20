@@ -1,8 +1,8 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../../lib/api';
 import { 
   Search, Filter, Calendar, Package, 
-  CheckCircle, Clock, XCircle, ChevronRight, AlertTriangle
+  CheckCircle, Clock, XCircle, ChevronRight, AlertTriangle, PlusCircle
 } from 'lucide-react';
 
 interface ReceiptsListProps {
@@ -35,6 +35,7 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
           case 'PENDING': return <span className="px-2 py-1 rounded bg-amber-100 text-amber-700 font-bold text-[10px] uppercase border border-amber-200">Chờ Kiểm Hàng</span>;
           case 'COMPLETED': return <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-700 font-bold text-[10px] uppercase border border-emerald-200">Đã Nhập Kho</span>;
           case 'DISCREPANCY': return <span className="px-2 py-1 rounded bg-rose-100 text-rose-700 font-bold text-[10px] uppercase border border-rose-200 flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Lệch / Lỗi</span>;
+          case 'CANCELLED': return <span className="px-2 py-1 rounded bg-slate-100 text-slate-500 font-bold text-[10px] uppercase border border-slate-200 line-through">Đã Hủy</span>;
           default: return <span className="px-2 py-1 rounded bg-slate-100 text-slate-500 font-bold text-[10px] uppercase">{status}</span>;
       }
   };
@@ -54,8 +55,28 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
   return (
     <div className="flex flex-col h-full bg-slate-50/50">
         <div className="p-6 md:p-8 shrink-0">
-            <h1 className="text-3xl font-black text-slate-800 tracking-tight mb-2 flex items-center"><Package className="w-8 h-8 mr-3 text-indigo-600"/> Phiếu Nhập Kho (GRN)</h1>
-            <p className="text-sm font-medium text-slate-500 mb-6">Theo dõi tiếp nhận, kiểm đếm và lưu kho từ các đơn mua hàng (PO).</p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div>
+                    <h1 className="text-3xl font-black text-slate-800 tracking-tight mb-2 flex items-center"><Package className="w-8 h-8 mr-3 text-indigo-600"/> Phiếu Nhập Kho (GRN)</h1>
+                    <p className="text-sm font-medium text-slate-500">Theo dõi tiếp nhận, kiểm đếm và lưu kho từ các đơn mua hàng (PO).</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    const poId = window.prompt('Nhập Mã PO muốn tạo Phiếu Nhập:');
+                    if (poId) {
+                        api.post('/receipts/from_po', { poId })
+                           .then(res => {
+                               fetchData();
+                               onViewDetail(res.data.id);
+                           })
+                           .catch(err => alert(err.response?.data?.error || 'Không thể tạo phiếu từ PO này'));
+                    }
+                  }}
+                  className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl shadow-lg shadow-indigo-500/30 flex items-center justify-center transition active:scale-95"
+                >
+                    <PlusCircle className="w-5 h-5 mr-2" /> Tạo Phiếu Nhập
+                </button>
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition group" onClick={()=>setActiveTab('PENDING')}>

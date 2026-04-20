@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../lib/api';
 import {
-  ArrowLeft, CheckCircle, Package, AlertTriangle, Save, Printer
+  ArrowLeft, CheckCircle, Package, AlertTriangle, Save, Printer, Trash2, XCircle
 } from 'lucide-react';
 
 interface ReceiptsDetailProps {
@@ -66,6 +66,28 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, onBack, show
     }
   };
 
+  const handleCancelReceipt = async () => {
+    if (!window.confirm('CẢNH BÁO: Hành động này sẽ trừ lại Tồn kho và hoàn trả trạng thái Đơn PO. Bạn chắc chắn muốn HỦY phiếu nhập này?')) return;
+    try {
+      await api.post(`/receipts/${receiptId}/cancel`);
+      showToast('Đã hủy phiếu nhập kho!', 'warning');
+      await refreshData();
+    } catch (err: any) {
+      showToast(err.response?.data?.error || 'Lỗi khi hủy phiếu', 'error');
+    }
+  };
+
+  const handleDeleteReceipt = async () => {
+    if (!window.confirm('Bạn có chắc chắn muốn XÓA VĨNH VIỄN phiếu nhập này? (Chỉ áp dụng với phiếu ở trạng thái Chờ hoặc Đã Hủy)')) return;
+    try {
+      await api.delete(`/receipts/${receiptId}`);
+      showToast('Đã xóa phiếu nhập kho!', 'success');
+      onBack(); // Go back to list
+    } catch (err: any) {
+      showToast(err.response?.data?.error || 'Lỗi khi xóa phiếu', 'error');
+    }
+  };
+
   if (loading || !data) return <div className="p-10 flex justify-center"><div className="w-8 h-8 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin"></div></div>;
 
   const isPending = data.status === 'PENDING';
@@ -94,9 +116,31 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, onBack, show
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg ${data.status === 'COMPLETED' ? 'bg-emerald-500 text-white shadow-emerald-500/30' : data.status === 'DISCREPANCY' ? 'bg-rose-500 text-white shadow-rose-500/30' : 'bg-amber-500 text-white shadow-amber-500/30'}`}>
-            {data.status === 'PENDING' ? 'CHỜ KIỂM HÀNG' : data.status === 'COMPLETED' ? 'ĐÃ NHẬP KHO' : 'LỆCH / LỖI'}
+          <span className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg ${data.status === 'COMPLETED' ? 'bg-emerald-500 text-white shadow-emerald-500/30' : data.status === 'DISCREPANCY' ? 'bg-rose-500 text-white shadow-rose-500/30' : data.status === 'CANCELLED' ? 'bg-slate-400 text-white' : 'bg-amber-500 text-white shadow-amber-500/30'}`}>
+            {data.status === 'PENDING' ? 'CHỜ KIỂM HÀNG' : data.status === 'COMPLETED' ? 'ĐÃ NHẬP KHO' : data.status === 'CANCELLED' ? 'ĐÃ HỦY' : 'LỆCH / LỖI'}
           </span>
+
+          <div className="flex items-center gap-2 ml-4">
+            {data.status !== 'CANCELLED' && (
+              <button 
+                onClick={handleCancelReceipt}
+                className="p-2 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-xl transition flex items-center gap-1.5 text-xs font-bold border border-rose-100"
+                title="Hủy phiếu và hoàn trả tồn kho"
+              >
+                <XCircle className="w-4 h-4" /> Hủy Phiếu
+              </button>
+            )}
+            
+            {(data.status === 'PENDING' || data.status === 'CANCELLED') && (
+              <button 
+                onClick={handleDeleteReceipt}
+                className="p-2 bg-slate-50 text-slate-500 hover:bg-rose-50 hover:text-rose-600 rounded-xl transition flex items-center gap-1.5 text-xs font-bold border border-slate-200"
+                title="Xóa vĩnh viễn phiếu"
+              >
+                <Trash2 className="w-4 h-4" /> Xóa
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
