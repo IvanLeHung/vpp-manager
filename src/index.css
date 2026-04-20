@@ -76,10 +76,23 @@
   .signature-section, .print-signatures {
     margin-top: 24px !important;
     display: grid;
-    grid-template-columns: 1fr 1fr;
     gap: 40px;
     page-break-inside: avoid;
     break-inside: avoid;
+  }
+
+  /* Support both 2 and 3 columns depending on Tailwind classes or use default 2 */
+  .signature-section:not(.grid-cols-3) {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .signature-section.grid-cols-3 {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .print-container {
+    width: 190mm;
+    margin: 0 auto;
   }
 
   thead { display: table-header-group; }
