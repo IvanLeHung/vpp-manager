@@ -3,7 +3,7 @@ import api from '../../lib/api';
 import { useAppContext as useApp } from '../../context/AppContext';
 import { 
   ArrowLeft, CheckSquare, XCircle, CheckCircle, 
-  ShoppingCart, Send, Box, Info
+  ShoppingCart, Send, Box, Info, CalendarClock, Archive
 } from 'lucide-react';
 
 interface PurchasesDetailProps {
@@ -26,6 +26,14 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToa
   const [orderSupplier, setOrderSupplier] = useState('');
   const [orderExpectedDate, setOrderExpectedDate] = useState('');
 
+  // Delivery Modal
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  
+  // Receive Modal
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [receiptLines, setReceiptLines] = useState<any[]>([]);
+  const [receiptNote, setReceiptNote] = useState('');
+
   const refreshData = async () => {
     try {
       const res = await api.get(`/purchases/${poId}`);
@@ -39,6 +47,13 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToa
           })));
           setOrderSupplier(res.data.supplier || '');
           setOrderExpectedDate(res.data.expectedDate ? res.data.expectedDate.substring(0, 10) : '');
+          
+          setReceiptLines(res.data.lines.map((l:any) => ({
+              lineId: l.id,
+              qtyAccepted: (l.qtyOrdered || l.qtyApproved || l.qtyRequested || 0) - l.qtyReceived,
+              qtyDefective: 0,
+              note: ''
+          })));
       }
     } catch(err) {
       console.error(err);
@@ -58,6 +73,8 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToa
       await refreshData();
       setShowApproveModal(false);
       setShowOrderModal(false);
+      setShowDeliveryModal(false);
+      setShowReceiveModal(false);
     } catch (err: any) {
       showToast(err.response?.data?.error || 'Thao tác thất bại', 'error');
     }
@@ -74,6 +91,8 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToa
   const canApprove = (currentUser.role === 'MANAGER' || currentUser.role === 'ADMIN') && isPENDING;
   const canSubmit = (currentUid === data.requesterId || currentUser.role === 'ADMIN') && isDRAFT;
   const canOrder = (currentUser.role === 'MANAGER' || currentUser.role === 'ADMIN') && (isAPPROVED || (isDRAFT && data.type === 'PO')); // Auto PO can be ordered directly
+  const canConfirmDelivery = (currentUser.role === 'MANAGER' || currentUser.role === 'ADMIN') && data.status === 'ORDERED';
+  const canReceive = (currentUser.role === 'WAREHOUSE' || currentUser.role === 'ADMIN') && (data.status === 'DELIVERING' || data.status === 'PARTIALLY_DELIVERED');
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative print:bg-white print:overflow-auto">
@@ -176,28 +195,48 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToa
               </div>
 
                {/* Tracking Details */}
-               {data.receipts && data.receipts.length > 0 && (
-                   <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 flex flex-col flex-1">
-                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 border-b border-slate-100 pb-4">Lịch sử Nhận Hàng (Phiếu Nhập)</h3>
-                      <div className="space-y-4">
-                          {data.receipts.map((rc:any) => (
-                              <div key={rc.id} className="flex justify-between items-center p-4 rounded-xl border border-slate-100 bg-slate-50 hover:bg-white transition cursor-pointer">
-                                  <div className="flex gap-4 items-center">
-                                      <div className={`p-3 rounded-xl ${rc.status==='COMPLETED'?'bg-emerald-100 text-emerald-600':'bg-amber-100 text-amber-600'}`}><CheckCircle className="w-5 h-5"/></div>
-                                      <div>
-                                          <p className="font-bold text-sm text-slate-800">{rc.id}</p>
-                                          <p className="text-[10px] font-semibold text-slate-500 mt-0.5 tracking-widest uppercase">Người nhận: {rc.receiver?.fullName}</p>
-                                      </div>
-                                  </div>
-                                  <div className="text-right">
-                                      <p className={`text-xs font-black uppercase tracking-widest ${rc.status==='COMPLETED'?'text-emerald-500':'text-amber-500'}`}>{rc.status}</p>
-                                      <p className="text-[10px] font-semibold text-slate-400 mt-1">{new Date(rc.createdAt).toLocaleDateString('vi-VN')}</p>
-                                  </div>
-                              </div>
-                          ))}
-                      </div>
-                   </div>
-               )}
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 {data.receipts && data.receipts.length > 0 && (
+                     <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 flex flex-col flex-1">
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 border-b border-slate-100 pb-4">Phiếu Nhập (Receipts)</h3>
+                        <div className="space-y-4">
+                            {data.receipts.map((rc:any) => (
+                                <div key={rc.id} className="flex justify-between items-center p-4 rounded-xl border border-slate-100 bg-slate-50 hover:bg-white transition cursor-pointer">
+                                    <div className="flex gap-4 items-center">
+                                        <div className={`p-3 rounded-xl ${rc.status==='COMPLETED'?'bg-emerald-100 text-emerald-600':rc.status==='CANCELLED'?'bg-rose-100 text-rose-600':'bg-amber-100 text-amber-600'}`}><CheckCircle className="w-5 h-5"/></div>
+                                        <div>
+                                            <p className="font-bold text-sm text-slate-800">{rc.id}</p>
+                                            <p className="text-[10px] font-semibold text-slate-500 mt-0.5 tracking-widest uppercase">Người nhận: {rc.receiver?.fullName}</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className={`text-xs font-black uppercase tracking-widest ${rc.status==='COMPLETED'?'text-emerald-500':'text-amber-500'}`}>{rc.status}</p>
+                                        <p className="text-[10px] font-semibold text-slate-400 mt-1">{new Date(rc.createdAt).toLocaleDateString('vi-VN')}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                     </div>
+                 )}
+
+                 {data.auditLogs && data.auditLogs.length > 0 && (
+                     <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 flex flex-col flex-1">
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 border-b border-slate-100 pb-4 flex items-center">
+                           <span className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></span>Lịch sử (Audit Trail)
+                        </h3>
+                        <div className="relative pl-3 border-l-2 border-slate-100 space-y-6">
+                            {data.auditLogs.map((audit:any) => (
+                               <div key={audit.id} className="relative">
+                                 <div className="absolute -left-[17px] top-1 w-3 h-3 rounded-full bg-slate-300 ring-4 ring-white"></div>
+                                 <p className="text-xs font-bold text-slate-800">{audit.action}</p>
+                                 <p className="text-[10px] font-semibold text-slate-500 mt-0.5">{new Date(audit.createdAt).toLocaleString('vi-VN')} • {audit.user?.fullName || 'Hệ thống'}</p>
+                                 {audit.newValues?.reason && <p className="text-[10px] font-medium text-indigo-700 bg-indigo-50 p-2 rounded mt-1 shadow-sm border border-indigo-100 border-l-2 border-l-indigo-400">{audit.newValues.reason}</p>}
+                               </div>
+                            ))}
+                        </div>
+                     </div>
+                 )}
+               </div>
           </div>
 
           <div className="w-full xl:w-96 flex flex-col gap-6 shrink-0 print:hidden">
@@ -221,7 +260,17 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToa
 
                       {/* Place Order (To PO) */}
                       {canOrder && (
-                          <button onClick={() => setShowOrderModal(true)} className="w-full py-4 bg-blue-500 text-white rounded-2xl font-black hover:bg-blue-600 transition shadow-lg shadow-blue-500/30 transform hover:scale-[1.02] uppercase tracking-wider text-sm mt-4 border border-blue-400"><ShoppingCart className="w-5 h-5 inline mr-2 mb-0.5"/> PHÁT HÀNH ĐƠN ĐẶT HÀNG (PO)</button>
+                          <button onClick={() => setShowOrderModal(true)} className="w-full py-4 bg-blue-500 text-white rounded-2xl font-black hover:bg-blue-600 transition shadow-lg shadow-blue-500/30 transform hover:scale-[1.02] uppercase tracking-wider text-sm mt-4 border border-blue-400"><ShoppingCart className="w-5 h-5 inline mr-2 mb-0.5"/> PHÁT HÀNH ĐƠN ĐẶT HÀNG</button>
+                      )}
+
+                      {/* Confirm Delivery Date */}
+                      {canConfirmDelivery && (
+                          <button onClick={() => setShowDeliveryModal(true)} className="w-full py-4 bg-purple-500 text-white rounded-2xl font-black hover:bg-purple-600 transition shadow-lg shadow-purple-500/30 transform hover:scale-[1.02] uppercase tracking-wider text-sm mt-4 border border-purple-400"><CalendarClock className="w-5 h-5 inline mr-2 mb-0.5"/> XÁC NHẬN HẸN GIAO & CHỜ NHẬP KHO</button>
+                      )}
+
+                      {/* Receive Stock */}
+                      {canReceive && (
+                          <button onClick={() => setShowReceiveModal(true)} className="w-full py-4 bg-amber-500 text-white rounded-2xl font-black hover:bg-amber-600 transition shadow-lg shadow-amber-500/30 transform hover:scale-[1.02] uppercase tracking-wider text-sm mt-4 border border-amber-400"><Archive className="w-5 h-5 inline mr-2 mb-0.5"/> GHI NHẬN NHẬP KHO THỰC TẾ</button>
                       )}
 
                   </div>
@@ -310,7 +359,7 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToa
                       </div>
                       <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl flex items-start gap-3 mt-2">
                           <Info className="w-5 h-5 text-blue-500 shrink-0 mt-0.5"/>
-                          <p className="text-sm font-medium text-blue-800">Sau khi xác nhận, Phiếu đề nghị này sẽ chính thức thành <b>ĐƠN ĐẶT HÀNG (PO)</b> với trạng thái <b>ĐÃ ĐẶT (ORDERED)</b>. Kho có thể dựa vào dữ liệu này để nhập hàng.</p>
+                          <p className="text-sm font-medium text-blue-800">Sau khi xác nhận, Phiếu đề nghị này sẽ chính thức thành <b>ĐƠN ĐẶT HÀNG (PO)</b> với trạng thái <b>ĐÃ ĐẶT (ORDERED)</b>.</p>
                       </div>
                   </div>
                   <div className="p-5 bg-white border-t border-slate-100 flex justify-end gap-3 flex-wrap">
@@ -318,6 +367,105 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToa
                       <button onClick={() => {
                           handleAction('/place_order', { supplier: orderSupplier, expectedDate: orderExpectedDate }, 'Phát hành PO Thành Công!');
                       }} className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black tracking-wider uppercase text-sm rounded-xl transition shadow-lg shadow-blue-500/30 flex items-center">Chốt Phát Hành PO <Send className="w-4 h-4 ml-2"/></button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* MODAL XÁC NHẬN NGÀY GIAO HÀNG */}
+      {showDeliveryModal && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-slide-up">
+                  <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-purple-600 text-white">
+                      <h3 className="text-xl font-black">Xác Nhận Hẹn Giao & Chờ Nhập Kho</h3>
+                      <button onClick={()=>setShowDeliveryModal(false)} className="text-purple-200 hover:text-white transition"><XCircle className="w-7 h-7"/></button>
+                  </div>
+                  <div className="p-6 space-y-5 bg-slate-50">
+                      <div>
+                          <label className="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-1.5">NGÀY GIAO DỰ KIẾN (TỪ NCC)</label>
+                          <input type="date" value={orderExpectedDate} onChange={e=>setOrderExpectedDate(e.target.value)} className="w-full bg-white border border-slate-200 px-4 py-3 rounded-xl outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-50 transition font-bold text-slate-800"/>
+                      </div>
+                      <div className="p-4 bg-purple-50 border border-purple-100 rounded-2xl flex items-start gap-3 mt-2">
+                          <Info className="w-5 h-5 text-purple-500 shrink-0 mt-0.5"/>
+                          <p className="text-sm font-medium text-purple-800">Chuyển trạng thái PO sang <b>ĐANG GIAO HÀNG (DELIVERING)</b>. Kho có thể dựa vào dữ liệu này để theo dõi tiến độ nhập kho.</p>
+                      </div>
+                  </div>
+                  <div className="p-5 bg-white border-t border-slate-100 flex justify-end gap-3 flex-wrap">
+                      <button onClick={()=>setShowDeliveryModal(false)} className="px-6 py-2.5 font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition">Hủy</button>
+                      <button onClick={() => {
+                          handleAction('/confirm_delivery', { expectedDate: orderExpectedDate }, 'Đã chuyển trạng thái Chờ Nhập Kho!');
+                      }} className="px-8 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-black tracking-wider uppercase text-sm rounded-xl transition shadow-lg shadow-purple-500/30 flex items-center">Xác Nhận Hẹn Giao <CalendarClock className="w-4 h-4 ml-2"/></button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* MODAL GHI NHẬN NHẬP KHO */}
+      {showReceiveModal && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh] animate-slide-up">
+                  <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-amber-500 text-white">
+                      <h3 className="text-xl font-black">Xác nhận Số Lượng Thuộc Đơn Nhập Kho</h3>
+                      <button onClick={()=>setShowReceiveModal(false)} className="text-amber-100 hover:text-white transition"><XCircle className="w-7 h-7"/></button>
+                  </div>
+                  <div className="p-6 overflow-y-auto flex-1 bg-slate-50">
+                      <p className="text-sm font-medium text-slate-600 mb-4 bg-amber-50 p-4 rounded-2xl border border-amber-100 text-amber-800">Kho ghi lại chính xác số lượng vật lý từng mặt hàng thực tế đã nhập kho. Hệ thống sẽ tự động cập nhật số Tồn Kho trong kho.</p>
+                      
+                      <table className="w-full text-left whitespace-nowrap bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200">
+                          <thead className="bg-slate-50 text-[10px] uppercase font-black text-slate-400">
+                             <tr>
+                                <th className="p-4 border-b border-slate-100">Hàng Hóa</th>
+                                <th className="p-4 border-b border-slate-100 w-24 text-center">Nợ Nhận</th>
+                                <th className="p-4 border-b border-slate-100 bg-amber-50/50 w-40 border-l border-amber-100 text-center">THỰC NHẬN</th>
+                                <th className="p-4 border-b border-slate-100 bg-amber-50/50 w-48 border-r border-amber-100 text-center">Ghi chú</th>
+                             </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                              {data.lines.map((l:any) => {
+                                  let backorderQty = (l.qtyOrdered || l.qtyApproved || l.qtyRequested) - l.qtyReceived;
+                                  if (backorderQty <= 0) return null; // Fully received
+
+                                  const rcl = receiptLines.find((a:any)=>a.lineId===l.id);
+                                  return (
+                                  <tr key={l.id}>
+                                      <td className="p-4">
+                                          <p className="font-bold text-slate-700 text-sm whitespace-normal leading-tight">{l.item.name}</p>
+                                          <span className="text-[10px] font-black tracking-widest text-slate-400 mt-1 uppercase">{l.item.mvpp}</span>
+                                      </td>
+                                      <td className="p-4 text-center font-black text-slate-500 text-lg bg-slate-50/50">{backorderQty}</td>
+                                      <td className="p-4 border-l border-amber-100 bg-white">
+                                          <input type="number" min="0" value={rcl?.qtyAccepted} 
+                                             onChange={(e:any) => setReceiptLines(receiptLines.map((a:any) => a.lineId === l.id ? {...a, qtyAccepted: parseInt(e.target.value)||0} : a))}
+                                             className="w-full text-center py-2.5 bg-slate-50 border border-slate-200 outline-none rounded-xl focus:border-amber-400 focus:bg-white font-black text-lg transition text-amber-600"
+                                          />
+                                      </td>
+                                      <td className="p-4 border-r border-amber-100 bg-white">
+                                          <input type="text" placeholder="Lý do (nếu thiếu)..." value={rcl?.note} 
+                                             onChange={(e:any) => setReceiptLines(receiptLines.map((a:any) => a.lineId === l.id ? {...a, note: e.target.value} : a))}
+                                             className="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-xl focus:border-amber-400 focus:bg-white font-medium text-sm transition"
+                                          />
+                                      </td>
+                                  </tr>
+                              )})}
+                          </tbody>
+                      </table>
+
+                      <div className="mt-6">
+                          <label className="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-1.5">Ghi chú đợt giao (tùy chọn)</label>
+                          <textarea value={receiptNote} onChange={e=>setReceiptNote(e.target.value)} className="w-full bg-white border border-slate-200 px-4 py-3 rounded-xl outline-none focus:border-amber-400 transition font-medium text-sm text-slate-800" rows={3}/>
+                      </div>
+                  </div>
+                  <div className="p-6 bg-white border-t border-slate-100 flex justify-end gap-3 shrink-0">
+                      <button onClick={()=>setShowReceiveModal(false)} className="px-6 py-3 font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition">Hủy Bỏ</button>
+                      <button onClick={() => {
+                          const hasErr = receiptLines.some((rc:any) => {
+                             const line = data.lines.find((l:any)=>l.id === rc.lineId);
+                             return line && rc.qtyAccepted > ((line.qtyOrdered || line.qtyApproved || line.qtyRequested) - line.qtyReceived);
+                          });
+                          if(hasErr) return showToast('Bạn đã nhập Số lượng Thực Nhận lớn hơn Số Nợ. Vui lòng kiểm tra lại.', 'error');
+                          
+                          handleAction('/receive', { lines: receiptLines, note: receiptNote }, 'Nhập Kho Phân Luồng thành công!');
+                      }} className="px-8 py-3 bg-amber-500 text-white font-black tracking-wider uppercase text-sm rounded-xl hover:bg-amber-600 transition shadow-lg shadow-amber-500/30 flex items-center">GHI NHẬN NHẬP KHO VÀO HỆ THỐNG <Archive className="w-4 h-4 ml-2"/></button>
                   </div>
               </div>
           </div>
