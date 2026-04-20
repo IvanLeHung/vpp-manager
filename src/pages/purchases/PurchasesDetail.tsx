@@ -34,6 +34,8 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToa
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [cancelFiles, setCancelFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   const refreshData = async () => {
     try {
@@ -618,7 +620,7 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToa
       {/* MODAL HỦY PO */}
       {showCancelModal && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden animate-slide-up">
+              <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-slide-up">
                   <div className="p-6 bg-rose-500 text-white text-center">
                      <AlertTriangle className="w-12 h-12 mx-auto mb-2 text-rose-200"/>
                      <h4 className="text-xl font-black uppercase tracking-tight">Hủy Đơn Hàng?</h4>
@@ -629,11 +631,78 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToa
                         value={cancelReason} 
                         onChange={e=>setCancelReason(e.target.value)} 
                         placeholder="VD: Nhà cung cấp báo hết hàng, Thay đổi quy cách hàng hóa..."
-                        className="w-full h-32 bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 text-sm font-bold outline-none focus:border-rose-400 transition"
+                        className="w-full h-32 bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 text-sm font-bold outline-none focus:border-rose-400 transition mb-6"
                       ></textarea>
-                      <div className="mt-8 flex flex-col gap-2">
-                        <button onClick={() => handleAction('/cancel', { reason: cancelReason }, 'Đã hủy đơn hàng!')} className="w-full py-4 bg-rose-500 text-white rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-rose-600 transition shadow-lg shadow-rose-500/30">Xác Nhận Hủy Ngay</button>
-                        <button onClick={()=>setShowCancelModal(false)} className="w-full py-4 bg-white text-slate-400 hover:text-slate-600 rounded-2xl font-black uppercase tracking-widest text-xs transition">Bỏ Qua</button>
+
+                      {/* Attachment Section In Modal */}
+                      <div className="mb-6">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Tài liệu đính kèm (nếu có)</label>
+                        <div className="space-y-3">
+                           {cancelFiles.map((file, idx) => (
+                             <div key={idx} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                <div className="flex items-center gap-2 overflow-hidden">
+                                   <FileText className="w-4 h-4 text-indigo-500 shrink-0"/>
+                                   <span className="text-xs font-bold text-slate-700 truncate">{file.name}</span>
+                                </div>
+                                <button onClick={() => setCancelFiles(prev => prev.filter((_, i) => i !== idx))} className="text-rose-500 hover:bg-rose-50 p-1 rounded-lg transition">
+                                   <Trash2 className="w-4 h-4"/>
+                                </button>
+                             </div>
+                           ))}
+                           
+                           <label className="flex items-center justify-center gap-2 w-full py-4 bg-white border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/30 transition text-slate-400 hover:text-indigo-600">
+                              <Paperclip className="w-5 h-5"/>
+                              <span className="text-xs font-bold uppercase tracking-widest">Thêm đính kèm</span>
+                              <input 
+                                type="file" 
+                                multiple 
+                                className="hidden" 
+                                onChange={(e) => {
+                                  if (e.target.files) {
+                                    setCancelFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+                                  }
+                                }}
+                              />
+                           </label>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <button 
+                          disabled={isUploading}
+                          onClick={async () => {
+                             try {
+                               setIsUploading(true);
+                               // 1. Upload files first if any
+                               const uploadedAttachments = [];
+                               for (const file of cancelFiles) {
+                                  const formData = new FormData();
+                                  formData.append('file', file);
+                                  const res = await api.post('/attachments/upload', formData, {
+                                    headers: { 'Content-Type': 'multipart/form-data' }
+                                  });
+                                  uploadedAttachments.push(res.data);
+                               }
+
+                               // 2. Call cancel API with attachments
+                               await handleAction('/cancel', { 
+                                 reason: cancelReason, 
+                                 attachments: uploadedAttachments 
+                               }, 'Đã hủy đơn hàng thành công!');
+                               
+                               setCancelFiles([]);
+                               setCancelReason('');
+                             } catch (err: any) {
+                               showToast(err.response?.data?.error || 'Lỗi khi hủy đơn hàng', 'error');
+                             } finally {
+                               setIsUploading(false);
+                             }
+                          }} 
+                          className={`w-full py-4 ${isUploading ? 'bg-slate-400' : 'bg-rose-500 hover:bg-rose-600'} text-white rounded-2xl font-black uppercase tracking-widest text-sm transition shadow-lg shadow-rose-500/30 flex items-center justify-center gap-2`}
+                        >
+                          {isUploading ? <><div className="w-4 h-4 border-2 border-white border-t-transparent animate-spin rounded-full"></div> ĐANG XỬ LÝ...</> : 'Xác Nhận Hủy Ngay'}
+                        </button>
+                        <button onClick={()=>{ setShowCancelModal(false); setCancelFiles([]); }} className="w-full py-4 bg-white text-slate-400 hover:text-slate-600 rounded-2xl font-black uppercase tracking-widest text-xs transition">Bỏ Qua</button>
                       </div>
                   </div>
               </div>
