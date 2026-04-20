@@ -1,17 +1,18 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../../lib/api';
 import { useAppContext as useApp } from '../../context/AppContext';
 import {
-  ArrowLeft, CheckSquare, XCircle, CheckCircle, Package, AlertTriangle, Save
+  ArrowLeft, CheckCircle, Package, AlertTriangle, Save, Printer
 } from 'lucide-react';
 
 interface ReceiptsDetailProps {
   receiptId: string;
   onBack: () => void;
+  showToast: (m: string, t?: 'success' | 'error' | 'warning') => void;
 }
 
-const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, onBack }) => {
-  const { showToast } = useApp();
+const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, onBack, showToast }) => {
+  const { currentUser } = useApp();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -83,6 +84,9 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, onBack }) =>
         <div className="flex items-center gap-6">
           <button onClick={onBack} className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition shadow-inner">
             <ArrowLeft className="w-5 h-5" />
+          </button>
+          <button onClick={() => window.print()} className="p-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-full transition shadow-sm print:hidden" title="In Phiếu Kiểm Kê & Nhập Kho">
+            <Printer className="w-5 h-5"/>
           </button>
           <div>
             <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center">
@@ -203,6 +207,97 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, onBack }) =>
             </table>
           </div>
         </div>
+        {data.auditLogs && data.auditLogs.length > 0 && (
+          <div className="mt-2 bg-white rounded-3xl shadow-sm border border-slate-200 p-6 flex flex-col w-full print:hidden">
+             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 border-b border-slate-100 pb-4 flex items-center">
+                <span className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></span>Lịch sử thao tác mã phiếu (Audit Trail)
+             </h3>
+             <div className="relative pl-3 border-l-2 border-slate-100 space-y-6">
+                 {data.auditLogs.map((audit:any) => (
+                    <div key={audit.id} className="relative">
+                      <div className="absolute -left-[17px] top-1 w-3 h-3 rounded-full bg-slate-300 ring-4 ring-white"></div>
+                      <p className="text-xs font-bold text-slate-800">{audit.action}</p>
+                      <p className="text-[10px] font-semibold text-slate-500 mt-0.5">{new Date(audit.createdAt).toLocaleString('vi-VN')} • {audit.user?.fullName || 'Hệ thống'}</p>
+                      {audit.newValues?.reason && <p className="text-[10px] font-medium text-indigo-700 bg-indigo-50 p-2 rounded mt-1 shadow-sm border border-indigo-100 border-l-2 border-l-indigo-400">{audit.newValues.reason}</p>}
+                    </div>
+                 ))}
+             </div>
+          </div>
+        )}
+      </div>
+
+      {/* FORMAL PRINT-ONLY SECTION (A4 Standard) */}
+      <div className="hidden print:block print-area mb-8">
+          <div className="print-sheet text-black font-sans leading-tight">
+              <div className="flex justify-between items-start mb-8 w-full print-header">
+                  <div className="w-[35%] text-left">
+                      <p className="font-bold text-[13px] uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
+                      <p className="text-[10px] italic mt-1 font-bold">Số phiếu: {data.id}</p>
+                      <p className="text-[9px] text-slate-500 mt-1">Ban Giao nhận - Kho Tổng</p>
+                  </div>
+                  <div className="w-[45%] text-center border-l-2 border-slate-700 pl-4">
+                      <p className="text-[14px] font-bold uppercase">PHIẾU KIỂM HOÁ & NHẬP VẬT TƯ (GRN)</p>
+                      <p className="text-[11px] mt-3 text-slate-600 italic">..., ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
+                  </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-y-4 gap-x-12 mb-10 text-sm">
+                  <div className="flex items-end"><span className="w-40 font-bold shrink-0">Nhà Cung Cấp:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{data.supplier || '...................................................'}</span></div>
+                  <div className="flex items-end"><span className="w-40 font-bold shrink-0">Tham chiếu PO:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{data.poId || '.......................'}</span></div>
+                  <div className="col-span-2 flex items-end"><span className="w-40 font-bold shrink-0">Kho nhận hàng:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{data.warehouseCode || '.......................'}</span></div>
+              </div>
+
+              <table className="w-full border-collapse border border-black text-[13px] mb-12 print-table">
+                  <thead className="bg-slate-100">
+                      <tr>
+                          <th className="border border-black p-2 text-center font-bold uppercase" style={{width:'8%'}}>STT</th>
+                          <th className="border border-black p-2 text-center font-bold uppercase" style={{width:'15%'}}>Mã VT</th>
+                          <th className="border border-black p-2 text-left font-bold uppercase">Tên Văn Phòng Phẩm</th>
+                          <th className="border border-black p-2 text-center font-bold uppercase" style={{width:'8%'}}>ĐVT</th>
+                          <th className="border border-black p-2 text-center font-bold uppercase" style={{width:'12%'}}>Treo (Sổ)</th>
+                          <th className="border border-black p-2 text-center font-bold uppercase" style={{width:'12%'}}>Thực Nhận</th>
+                          <th className="border border-black p-2 text-center font-bold uppercase" style={{width:'12%'}}>Thiếu / Lỗi</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {data.lines.map((l: any, idx: number) => (
+                          <tr key={l.id} className="h-10">
+                              <td className="border border-black p-2 text-center font-medium">{idx + 1}</td>
+                              <td className="border border-black p-2 text-center font-bold">{l.item.mvpp}</td>
+                              <td className="border border-black p-2 font-medium">{l.item.name}</td>
+                              <td className="border border-black p-2 text-center">{l.item.unit}</td>
+                              <td className="border border-black p-2 text-center">{l.qtyOrdered}</td>
+                              <td className="border border-black p-2 text-center font-black">{l.qtyAccepted}</td>
+                              <td className="border border-black p-2 text-center italic">{l.qtyDefective > 0 ? l.qtyDefective : '-'}</td>
+                          </tr>
+                      ))}
+                      <tr className="bg-slate-50 h-10 font-black">
+                          <td colSpan={5} className="border border-black p-2 text-right uppercase text-xs">Tổng Sl Thực Tế:</td>
+                          <td className="border border-black p-2 text-center text-lg">
+                              {data.lines.reduce((sum: number, line: any) => sum + (line.qtyAccepted || 0), 0)}
+                          </td>
+                          <td className="border border-black p-2"></td>
+                      </tr>
+                  </tbody>
+              </table>
+
+              <div className="grid grid-cols-2 gap-y-12 gap-x-4 text-center text-[12px] font-bold mt-8 print-signatures">
+                  <div className="flex flex-col h-full">
+                      <p className="mb-2 uppercase">Thủ Kho / Người Kiểm Định</p>
+                      <p className="text-[11px] font-normal italic mb-4">(Ký, ghi gõ họ tên xác nhận nhận hàng)</p>
+                      <div className="mt-24 border-t border-dotted border-black w-[70%] mx-auto pt-2">
+                         <p className="font-black text-xs uppercase">{data.receiver?.fullName || '....................................'}</p>
+                      </div>
+                  </div>
+                  <div className="flex flex-col h-full">
+                      <p className="mb-2 uppercase">Bên Giao / Đơn vị cung cấp</p>
+                      <p className="text-[11px] font-normal italic mb-4">(Ký và xác nhận đối chiếu đúng hàng)</p>
+                      <div className="mt-24 border-t border-dotted border-black w-[70%] mx-auto pt-2">
+                         <p className="font-black text-xs uppercase">....................................</p>
+                      </div>
+                  </div>
+              </div>
+          </div>
       </div>
     </div>
   );

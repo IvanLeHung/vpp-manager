@@ -3,7 +3,7 @@ import api from '../../lib/api';
 import { useAppContext as useApp } from '../../context/AppContext';
 import { 
   ArrowLeft, CheckSquare, XCircle, CheckCircle, 
-  ShoppingCart, Send, Box, Info, CalendarClock, Archive
+  ShoppingCart, Send, Box, Info, CalendarClock, Printer
 } from 'lucide-react';
 
 interface PurchasesDetailProps {
@@ -29,10 +29,7 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToa
   // Delivery Modal
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   
-  // Receive Modal
-  const [showReceiveModal, setShowReceiveModal] = useState(false);
-  const [receiptLines, setReceiptLines] = useState<any[]>([]);
-  const [receiptNote, setReceiptNote] = useState('');
+  // Removed Receive Modal states
 
   const refreshData = async () => {
     try {
@@ -48,12 +45,7 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToa
           setOrderSupplier(res.data.supplier || '');
           setOrderExpectedDate(res.data.expectedDate ? res.data.expectedDate.substring(0, 10) : '');
           
-          setReceiptLines(res.data.lines.map((l:any) => ({
-              lineId: l.id,
-              qtyAccepted: (l.qtyOrdered || l.qtyApproved || l.qtyRequested || 0) - l.qtyReceived,
-              qtyDefective: 0,
-              note: ''
-          })));
+
       }
     } catch(err) {
       console.error(err);
@@ -74,7 +66,6 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToa
       setShowApproveModal(false);
       setShowOrderModal(false);
       setShowDeliveryModal(false);
-      setShowReceiveModal(false);
     } catch (err: any) {
       showToast(err.response?.data?.error || 'Thao tác thất bại', 'error');
     }
@@ -92,7 +83,6 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToa
   const canSubmit = (currentUid === data.requesterId || currentUser.role === 'ADMIN') && isDRAFT;
   const canOrder = (currentUser.role === 'MANAGER' || currentUser.role === 'ADMIN') && (isAPPROVED || (isDRAFT && data.type === 'PO')); // Auto PO can be ordered directly
   const canConfirmDelivery = (currentUser.role === 'MANAGER' || currentUser.role === 'ADMIN') && data.status === 'ORDERED';
-  const canReceive = (currentUser.role === 'WAREHOUSE' || currentUser.role === 'ADMIN') && (data.status === 'DELIVERING' || data.status === 'PARTIALLY_DELIVERED');
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative print:bg-white print:overflow-auto">
@@ -101,6 +91,9 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToa
           <div className="flex items-center gap-6">
               <button onClick={onBack} className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition shadow-inner">
                   <ArrowLeft className="w-5 h-5"/>
+              </button>
+              <button onClick={() => window.print()} className="p-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-full transition shadow-sm print:hidden" title="In Phiếu Mua Sắm">
+                  <Printer className="w-5 h-5"/>
               </button>
               <div>
                   <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center">
@@ -268,10 +261,6 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToa
                           <button onClick={() => setShowDeliveryModal(true)} className="w-full py-4 bg-purple-500 text-white rounded-2xl font-black hover:bg-purple-600 transition shadow-lg shadow-purple-500/30 transform hover:scale-[1.02] uppercase tracking-wider text-sm mt-4 border border-purple-400"><CalendarClock className="w-5 h-5 inline mr-2 mb-0.5"/> XÁC NHẬN HẸN GIAO & CHỜ NHẬP KHO</button>
                       )}
 
-                      {/* Receive Stock */}
-                      {canReceive && (
-                          <button onClick={() => setShowReceiveModal(true)} className="w-full py-4 bg-amber-500 text-white rounded-2xl font-black hover:bg-amber-600 transition shadow-lg shadow-amber-500/30 transform hover:scale-[1.02] uppercase tracking-wider text-sm mt-4 border border-amber-400"><Archive className="w-5 h-5 inline mr-2 mb-0.5"/> GHI NHẬN NHẬP KHO THỰC TẾ</button>
-                      )}
 
                   </div>
               </div>
@@ -400,76 +389,81 @@ const PurchasesDetail: React.FC<PurchasesDetailProps> = ({ poId, onBack, showToa
           </div>
       )}
 
-      {/* MODAL GHI NHẬN NHẬP KHO */}
-      {showReceiveModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh] animate-slide-up">
-                  <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-amber-500 text-white">
-                      <h3 className="text-xl font-black">Xác nhận Số Lượng Thuộc Đơn Nhập Kho</h3>
-                      <button onClick={()=>setShowReceiveModal(false)} className="text-amber-100 hover:text-white transition"><XCircle className="w-7 h-7"/></button>
+      {/* FORMAL PRINT-ONLY SECTION (A4 Standard) */}
+      <div className="hidden print:block print-area mb-8">
+          <div className="print-sheet text-black font-sans leading-tight">
+              <div className="flex justify-between items-start mb-8 w-full print-header">
+                  <div className="w-[35%] text-left">
+                      <p className="font-bold text-[13px] uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
+                      <p className="text-[10px] italic mt-1 font-bold">Số PO: {data.id}</p>
+                      <p className="text-[9px] text-slate-500 mt-1">Ban Hành chính - Quản trị</p>
                   </div>
-                  <div className="p-6 overflow-y-auto flex-1 bg-slate-50">
-                      <p className="text-sm font-medium text-slate-600 mb-4 bg-amber-50 p-4 rounded-2xl border border-amber-100 text-amber-800">Kho ghi lại chính xác số lượng vật lý từng mặt hàng thực tế đã nhập kho. Hệ thống sẽ tự động cập nhật số Tồn Kho trong kho.</p>
-                      
-                      <table className="w-full text-left whitespace-nowrap bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200">
-                          <thead className="bg-slate-50 text-[10px] uppercase font-black text-slate-400">
-                             <tr>
-                                <th className="p-4 border-b border-slate-100">Hàng Hóa</th>
-                                <th className="p-4 border-b border-slate-100 w-24 text-center">Nợ Nhận</th>
-                                <th className="p-4 border-b border-slate-100 bg-amber-50/50 w-40 border-l border-amber-100 text-center">THỰC NHẬN</th>
-                                <th className="p-4 border-b border-slate-100 bg-amber-50/50 w-48 border-r border-amber-100 text-center">Ghi chú</th>
-                             </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                              {data.lines.map((l:any) => {
-                                  let backorderQty = (l.qtyOrdered || l.qtyApproved || l.qtyRequested) - l.qtyReceived;
-                                  if (backorderQty <= 0) return null; // Fully received
+                  <div className="w-[45%] text-center border-l-2 border-slate-700 pl-4">
+                      <p className="text-[14px] font-bold uppercase">PHIẾU ĐƠN ĐẶT HÀNG / MUA SẮM (PURCHASE ORDER)</p>
+                      <p className="text-[11px] mt-3 text-slate-600 italic">..., ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
+                  </div>
+              </div>
 
-                                  const rcl = receiptLines.find((a:any)=>a.lineId===l.id);
-                                  return (
-                                  <tr key={l.id}>
-                                      <td className="p-4">
-                                          <p className="font-bold text-slate-700 text-sm whitespace-normal leading-tight">{l.item.name}</p>
-                                          <span className="text-[10px] font-black tracking-widest text-slate-400 mt-1 uppercase">{l.item.mvpp}</span>
-                                      </td>
-                                      <td className="p-4 text-center font-black text-slate-500 text-lg bg-slate-50/50">{backorderQty}</td>
-                                      <td className="p-4 border-l border-amber-100 bg-white">
-                                          <input type="number" min="0" value={rcl?.qtyAccepted} 
-                                             onChange={(e:any) => setReceiptLines(receiptLines.map((a:any) => a.lineId === l.id ? {...a, qtyAccepted: parseInt(e.target.value)||0} : a))}
-                                             className="w-full text-center py-2.5 bg-slate-50 border border-slate-200 outline-none rounded-xl focus:border-amber-400 focus:bg-white font-black text-lg transition text-amber-600"
-                                          />
-                                      </td>
-                                      <td className="p-4 border-r border-amber-100 bg-white">
-                                          <input type="text" placeholder="Lý do (nếu thiếu)..." value={rcl?.note} 
-                                             onChange={(e:any) => setReceiptLines(receiptLines.map((a:any) => a.lineId === l.id ? {...a, note: e.target.value} : a))}
-                                             className="w-full px-3 py-2 bg-slate-50 border border-slate-200 outline-none rounded-xl focus:border-amber-400 focus:bg-white font-medium text-sm transition"
-                                          />
-                                      </td>
-                                  </tr>
-                              )})}
-                          </tbody>
-                      </table>
+              <div className="grid grid-cols-2 lg:grid-cols-2 gap-y-4 gap-x-12 mb-10 text-sm">
+                  <div className="flex items-end"><span className="w-40 font-bold shrink-0">Nhà Cung Cấp:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{data.supplier || '...................................................'}</span></div>
+                  <div className="flex items-end"><span className="w-40 font-bold shrink-0">Ngày Đặt Hàng:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{data.orderedAt ? new Date(data.orderedAt).toLocaleDateString('vi-VN') : '..../..../2026'}</span></div>
+                  <div className="col-span-2 flex items-end"><span className="w-40 font-bold shrink-0">Lý do / Mục đích:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{data.purpose || 'Không ghi chú'}</span></div>
+              </div>
 
-                      <div className="mt-6">
-                          <label className="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-1.5">Ghi chú đợt giao (tùy chọn)</label>
-                          <textarea value={receiptNote} onChange={e=>setReceiptNote(e.target.value)} className="w-full bg-white border border-slate-200 px-4 py-3 rounded-xl outline-none focus:border-amber-400 transition font-medium text-sm text-slate-800" rows={3}/>
+              <table className="w-full border-collapse border border-black text-[13px] mb-12 print-table">
+                  <thead className="bg-slate-100">
+                      <tr>
+                          <th className="border border-black p-2 text-center font-bold uppercase">STT</th>
+                          <th className="border border-black p-2 text-center font-bold uppercase">Mã VT</th>
+                          <th className="border border-black p-2 text-left font-bold uppercase">Tên Văn Phòng Phẩm</th>
+                          <th className="border border-black p-2 text-center font-bold uppercase">ĐVT</th>
+                          <th className="border border-black p-2 text-center font-bold uppercase">S.Lượng</th>
+                          <th className="border border-black p-2 text-right font-bold uppercase">Đơn Giá</th>
+                          <th className="border border-black p-2 text-right font-bold uppercase">Thành Tiền</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {data.lines.map((l: any, idx: number) => (
+                          <tr key={l.id} className="h-10">
+                              <td className="border border-black p-2 text-center font-medium">{idx + 1}</td>
+                              <td className="border border-black p-2 text-center font-bold">{l.item.mvpp}</td>
+                              <td className="border border-black p-2 font-medium">{l.item.name}</td>
+                              <td className="border border-black p-2 text-center">{l.item.unit}</td>
+                              <td className="border border-black p-2 text-center font-black">
+                                  {l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested}
+                              </td>
+                              <td className="border border-black p-2 text-right">{l.unitPrice?.toLocaleString('vi-VN')} đ</td>
+                              <td className="border border-black p-2 text-right">{l.lineAmount?.toLocaleString('vi-VN')} đ</td>
+                          </tr>
+                      ))}
+                      <tr className="bg-slate-50 h-10 font-black">
+                          <td colSpan={6} className="border border-black p-2 text-right uppercase text-xs">Tổng giá trị đơn hàng:</td>
+                          <td className="border border-black p-2 text-right text-lg">
+                              {data.totalAmount?.toLocaleString('vi-VN')} đ
+                          </td>
+                      </tr>
+                  </tbody>
+              </table>
+
+              <div className="grid grid-cols-2 gap-y-12 gap-x-4 text-center text-[12px] font-bold mt-8 print-signatures">
+                  <div className="flex flex-col h-full">
+                      <p className="mb-2 uppercase">Người Đề Xuất / Soạn Đơn</p>
+                      <p className="text-[11px] font-normal italic mb-4">(Ký và ghi họ tên)</p>
+                      <div className="mt-24 border-t border-dotted border-black w-[70%] mx-auto pt-2">
+                         <p className="font-black text-xs uppercase">{data.requester?.fullName}</p>
                       </div>
                   </div>
-                  <div className="p-6 bg-white border-t border-slate-100 flex justify-end gap-3 shrink-0">
-                      <button onClick={()=>setShowReceiveModal(false)} className="px-6 py-3 font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition">Hủy Bỏ</button>
-                      <button onClick={() => {
-                          const hasErr = receiptLines.some((rc:any) => {
-                             const line = data.lines.find((l:any)=>l.id === rc.lineId);
-                             return line && rc.qtyAccepted > ((line.qtyOrdered || line.qtyApproved || line.qtyRequested) - line.qtyReceived);
-                          });
-                          if(hasErr) return showToast('Bạn đã nhập Số lượng Thực Nhận lớn hơn Số Nợ. Vui lòng kiểm tra lại.', 'error');
-                          
-                          handleAction('/receive', { lines: receiptLines, note: receiptNote }, 'Nhập Kho Phân Luồng thành công!');
-                      }} className="px-8 py-3 bg-amber-500 text-white font-black tracking-wider uppercase text-sm rounded-xl hover:bg-amber-600 transition shadow-lg shadow-amber-500/30 flex items-center">GHI NHẬN NHẬP KHO VÀO HỆ THỐNG <Archive className="w-4 h-4 ml-2"/></button>
+                  <div className="flex flex-col h-full">
+                      <p className="mb-2 uppercase">Trưởng Bộ Phận / Người Duyệt PO</p>
+                      <p className="text-[11px] font-normal italic mb-4">(Ký và đóng dấu)</p>
+                      <div className="mt-24 border-t border-dotted border-black w-[70%] mx-auto pt-2">
+                         <p className="font-black text-xs uppercase">....................................</p>
+                      </div>
                   </div>
               </div>
           </div>
-      )}
+      </div>
+
 
     </div>
   );
