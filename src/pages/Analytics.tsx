@@ -7,7 +7,7 @@ import { useAppContext } from '../context/AppContext';
 import { 
   TrendingUp, Download, Clock, CheckCircle, RefreshCw, 
   FileText, Printer, 
-  ArrowUpRight, ArrowDownRight, Package, Activity
+  ArrowUpRight, ArrowDownRight, Package, Activity, AlertTriangle
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../lib/api';
