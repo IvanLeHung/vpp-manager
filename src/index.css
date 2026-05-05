@@ -1,0 +1,175 @@
+@import "tailwindcss";
+
+.animate-blob {
+  animation: blob 7s infinite;
+}
+
+@keyframes blob {
+  0% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+@media print {
+  /* Tắt shadow */
+  * {
+    box-shadow: none !important;
+  }
+
+  /* Ẩn triệt để bằng display none thay vì visibility hidden để giải phóng không gian */
+  .no-print, [print-hidden] {
+    display: none !important;
+  }
+  
+  /* Reset lại trạng thái cao của body để nội dung không bị giới hạn chiều cao gây mất chữ */
+  html, body {
+    height: auto !important; 
+    overflow: visible !important;
+    background-color: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 210mm;
+    color: #000 !important;
+    font-family: "Times New Roman", serif;
+    font-size: 13px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Kích thước khổ giấy A4 chuẩn */
+  .print-sheet {
+    width: 190mm;
+    margin: 0 auto;
+    font-size: 13px;
+    display: block;
+    position: relative;
+    background-color: white !important;
+  }
+
+  /* Đảm bảo print-area nằm trong luồng mặc định */
+  .print-area {
+    position: relative !important;
+    display: block !important;
+    transform: none !important;
+    zoom: 1 !important;
+  }
+
+  /* Chặn ngắt trang giữa chừng bảng hoặc chữ ký */
+  .print-signatures,
+  .print-header,
+  .print-info,
+  tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Chống bật sang trang khi vừa chạm đến chữ ký 
+     bằng cách neo cứng khoảng cách và bảo vệ khối này */
+  .signature-section, .print-signatures {
+    margin-top: 24px !important;
+    display: grid;
+    gap: 40px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Support both 2 and 3 columns depending on Tailwind classes or use default 2 */
+  .signature-section:not(.grid-cols-3) {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .signature-section.grid-cols-3 {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .print-container {
+    width: 190mm;
+    margin: 0 auto;
+  }
+
+  thead { display: table-header-group; }
+  
+  .page-break-before {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  .avoid-page-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Dynamic Page Numbering per Sheet */
+  .print-sheet {
+    counter-reset: sheet-page;
+  }
+
+  .sheet-page-number::after {
+    counter-increment: sheet-page;
+    content: counter(sheet-page);
+  }
+
+  table.print-table { 
+    width: 100% !important; 
+    border-collapse: collapse !important; 
+    table-layout: fixed !important;
+    margin-top: 12px;
+  }
+  
+  table.print-table th, table.print-table td {
+    border: 1px solid #000 !important;
+    padding: 6px 8px !important;
+    vertical-align: top;
+    white-space: normal !important;
+    word-break: break-word !important;
+    font-size: 12px !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+@page {
+  size: A4 portrait;
+  margin: 10mm 12mm 12mm 12mm;
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+/* Animations */
+@keyframes slide-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+

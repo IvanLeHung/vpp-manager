@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Danko VPP - Professional Manual Generator</title>
+    <!-- Use the bundle version which includes everything -->
+    <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+    <style>
+        :root { --primary: #4f46e5; --slate-800: #1e293b; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f8fafc; color: var(--slate-800); display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+        .container { background: white; padding: 3rem; border-radius: 2rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1); max-width: 500px; width: 90%; }
+        h1 { font-weight: 900; margin-bottom: 0.5rem; }
+        p { color: #64748b; margin-bottom: 2rem; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 1.5rem; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #status { font-weight: bold; font-size: 0.9rem; color: var(--primary); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="loader"></div>
+        <h1>Đang tạo Cẩm nang</h1>
+        <p>Hệ thống đang đóng gói hình ảnh và slide chuyên nghiệp...</p>
+        <div id="status">Đang khởi tạo...</div>
+    </div>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        
+        async function generatePPTX() {
+            try {
+                // Initialize PptxGenJS
+                let pptx = new PptxGenJS();
+                
+                // Identify Shape constants - Try all known locations
+                // The error message specifically suggested "pptxgen.shapes.LINE"
+                // Since our instance is 'pptx', we try 'pptx.shapes' first
+                const shapes = pptx.shapes || pptx.ShapeType || {};
+                const RECT = shapes.RECT || shapes.rectangle || "rect";
+                
+                statusEl.innerText = 'Cấu hình Layout...';
+                pptx.layout = 'LAYOUT_WIDE';
+                
+                // --- SLIDE 1: COVER ---
+                statusEl.innerText = 'Đang vẽ Slide trang bìa...';
+                let cover = pptx.addSlide();
+                cover.background = { color: 'F1F5F9' };
+                // Top accent line
+                cover.addShape(RECT, { x:0.0, y:0.0, w:'100%', h:0.1, fill: {color:'4F46E5'} });
+                
+                cover.addText('HỆ THỐNG QUẢN TRỊ VPP NỘI BỘ', { 
+                    x: 0, y: 2.2, w: '100%', fontSize: 44, bold: true, color: '1E293B', align: 'center'
+                });
+                cover.addText('DANKO GROUP v2.0', { 
+                    x: 0, y: 3.1, w: '100%', fontSize: 24, color: '4F46E5', align: 'center', bold: true 
+                });
+                cover.addText('Cẩm nang Hướng dẫn Vận hành Chi tiết', { 
+                    x: 0, y: 4.2, w: '100%', fontSize: 14, color: '64748B', align: 'center' 
+                });
+
+                // Content Slides Data
+                const slides = [
+                    { 
+                        title: '0. Đăng ký & Kích hoạt Tài khoản', 
+                        img: 'register_form.png', 
+                        points: ['Nhân sự mới tự đăng ký tại Landing page.', 'Cung cấp Họ tên, Username, Phòng ban.', 'Cần Admin phê duyệt mới có thể đăng nhập.']
+                    },
+                    { 
+                        title: '0.1. Phê duyệt (Dành cho Admin)', 
+                        img: 'pending_tab.png', 
+                        points: ['Admin quản lý tại Tab "Chờ duyệt".', 'Xác thực nhân sự chính xác.', 'Nhấn "Phê duyệt ngay" để kích hoạt.']
+                    },
+                    { 
+                        title: '1. Dashboard Tổng quan', 
+                        img: 'dashboard_overview.png', 
+                        points: ['Theo dõi tồn kho thực tế & sẵn sàng.', 'Cảnh báo tự động khi sắp hết hàng.', 'Trực quan hóa dữ liệu theo nhóm hàng.']
+                    },
+                    { 
+                        title: '2. Báo cáo & Phân tích BI', 
+                        img: 'analytics_charts.png', 
+                        points: ['Biểu đồ chi phí xuất kho theo tháng.', 'Phân bổ ngân sách theo phòng ban.', 'Theo dõi chỉ số Fill-rate (Tỉ lệ đáp ứng).']
+                    }
+                ];
+
+                for (let i = 0; i < slides.length; i++) {
+                    const item = slides[i];
+                    statusEl.innerText = `Đang tạo Slide: ${item.title}`;
+                    
+                    let slide = pptx.addSlide();
+                    
+                    // Title Bar Overlay
+                    slide.addShape(RECT, { x:0, y:0, w:'100%', h:0.7, fill: {color:'F8FAFC'} });
+                    slide.addText(item.title, { x: 0.5, y: 0.2, w: 9, fontSize: 24, bold: true, color: '1E293B' });
+                    
+                    // Points List
+                    slide.addText(item.points.join('\n\n'), { 
+                        x: 0.5, y: 1.2, w: 3.5, fontSize: 13, color: '475569', bullet: true, valign: 'top'
+                    });
+
+                    // Image Frame & Image
+                    // IMPORTANT: Relative paths like '/screenshots/...' work when served by Vite/Dev server
+                    slide.addShape(RECT, { x: 4.3, y: 1.0, w: 8.5, h: 4.8, fill: {color:'FFFFFF'}, line: {color:'E2E8F0', width:1} });
+                    slide.addImage({ 
+                        path: './screenshots/' + item.img, 
+                        x: 4.4, y: 1.1, w: 8.3, h: 4.6 
+                    });
+                }
+
+                // --- FINAL SLIDE ---
+                statusEl.innerText = 'Đang đóng gói file...';
+                let end = pptx.addSlide();
+                end.background = { color: '4F46E5' };
+                end.addText('HOÀN TẤT HƯỚNG DẪN', { 
+                    x: 0, y: 2.5, w: '100%', fontSize: 36, bold: true, color: 'FFFFFF', align: 'center' 
+                });
+                
+                await pptx.writeFile({ fileName: 'Danko_VPP_Manual_Official_v2.pptx' });
+                
+                statusEl.innerText = 'HOÀN TẤT! File đã được tải xuống.';
+                document.title = 'GENERATION_COMPLETE';
+
+            } catch (err) {
+                console.error(err);
+                statusEl.innerText = 'LỖI: ' + err.message;
+            }
+        }
+
+        window.onload = () => { setTimeout(generatePPTX, 2000); };
+    </script>
+</body>
+</html>
