@@ -219,7 +219,13 @@ const PurchasesDetail = ({ poId, onBack, showToast }: PurchasesDetailProps) => {
   };
 
   // Financial Stats
-  const totalAmount = Number(data.totalAmount || 0);
+  const totalAmount = data.lines?.reduce((sum: number, l: any) => {
+      const qtyReq = l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested;
+      const isReplaced = !!l.requestLine?.replacementItemId;
+      const effectivePrice = isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0);
+      const effectiveQty = isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyReq;
+      return sum + (effectivePrice * effectiveQty);
+  }, 0) || Number(data.totalAmount || 0);
   const vatAmount = totalAmount * (Number(data.vat || 0) / 100);
   const discountAmount = Number(data.discount || 0);
   const finalTotal = totalAmount + vatAmount - discountAmount;
