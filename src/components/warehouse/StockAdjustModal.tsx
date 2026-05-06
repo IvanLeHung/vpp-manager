@@ -64,6 +64,7 @@ export function StockAdjustModal({ isOpen, onClose, stock, onSuccess }: AdjustSt
           qty: diff, // Signed difference
         }]
       });
+      alert('Thao tác thành công! Đã ghi nhận vào lịch sử.');
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -208,7 +209,7 @@ export function StockAdjustModal({ isOpen, onClose, stock, onSuccess }: AdjustSt
             disabled={loading}
             className={`flex-[2] px-8 py-4 text-white font-black rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2 ${loading ? 'bg-slate-300' : 'bg-amber-600 hover:bg-amber-700 shadow-amber-200'}`}
           >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : showConfirm ? 'XÁC NHẬN THỰC THI' : 'KIỂM TRA & XÁC NHẬN'}
+            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : showConfirm ? 'LƯU VÀ GHI LỊCH SỬ' : 'KIỂM TRA & XÁC NHẬN'}
           </button>
         </div>
       </div>

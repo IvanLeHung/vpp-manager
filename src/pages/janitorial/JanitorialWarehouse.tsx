@@ -89,6 +89,7 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
           gender: type === 'ISSUE' ? gender : null
         }]
       });
+      alert('Thao tác thành công! Đã ghi nhận vào lịch sử.');
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -163,7 +164,7 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
         <div className="px-8 py-6 bg-slate-50 border-t border-slate-100 flex gap-3">
           <button onClick={onClose} className="flex-1 px-6 py-4 bg-white text-slate-600 font-black rounded-2xl border border-slate-200">HỦY</button>
           <button onClick={handleAction} disabled={loading} className={`flex-1 px-6 py-4 text-white font-black rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center ${loading ? 'bg-slate-300' : type === 'RECEIVE' ? 'bg-emerald-600' : 'bg-rose-600 shadow-rose-200'}`}>
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : showConfirm ? 'XÁC NHẬN' : 'THỰC THI'}
+            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : showConfirm ? 'LƯU VÀ GHI LỊCH SỬ' : 'THỰC THI'}
           </button>
         </div>
       </div>
