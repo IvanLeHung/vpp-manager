@@ -79,6 +79,54 @@ const ROLE_LABELS: Record<string, string> = {
   PURCHASING: 'Mua hàng'
 };
 
+const defaultNumbers = ' hai ba bốn năm sáu bảy tám chín';
+const units = ('1 một' + defaultNumbers).split(' ');
+const ch = 'lẻ mười' + defaultNumbers;
+const tr = 'không một' + defaultNumbers;
+const tram = tr.split(' ').map(x => x + ' trăm');
+const chuc = ch.split(' ').map(x => x + ' mươi');
+chuc[0] = 'lẻ'; chuc[1] = 'mười';
+const block = [null, 'nghìn', 'triệu', 'tỷ', 'nghìn tỷ', 'triệu tỷ'];
+
+function toVietnamese(number: number): string {
+  if (number === 0) return 'Không đồng';
+  let str = Math.floor(number).toString();
+  let result = [];
+  let index = 0;
+  let isNegative = false;
+  if (str[0] === '-') { isNegative = true; str = str.substring(1); }
+  
+  while (str.length > 0) {
+    let chunk = str.substring(Math.max(0, str.length - 3));
+    str = str.substring(0, Math.max(0, str.length - 3));
+    if (chunk === '000') { index++; continue; }
+    
+    let chunkStr = '';
+    let c = chunk.padStart(3, '0');
+    let h = parseInt(c[0]), t = parseInt(c[1]), u = parseInt(c[2]);
+    
+    if (h > 0 || str.length > 0) chunkStr += tram[h] + ' ';
+    if (t > 0) {
+        chunkStr += chuc[t] + ' ';
+        if (u === 1 && t > 1) chunkStr += 'mốt ';
+        else if (u === 5) chunkStr += 'lăm ';
+        else if (u > 0) chunkStr += units[u] + ' ';
+    } else if (u > 0) {
+        if (h > 0 || str.length > 0) chunkStr += 'lẻ ';
+        chunkStr += units[u] + ' ';
+    }
+    
+    chunkStr += (block[index] ? block[index] + ' ' : '');
+    result.unshift(chunkStr);
+    index++;
+  }
+  
+  let finalStr = result.join('').trim().replace(/\s+/g, ' ');
+  if (!finalStr) return 'Không đồng';
+  finalStr = finalStr.charAt(0).toUpperCase() + finalStr.slice(1);
+  return (isNegative ? 'Âm ' : '') + finalStr + ' đồng chẵn.';
+}
+
 export default function WarehouseTicketDetail({ basePath = '/warehouse-tickets' }: { basePath?: string }) {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -632,7 +680,9 @@ export default function WarehouseTicketDetail({ basePath = '/warehouse-tickets' 
                         <tr className="h-10">
                             <td colSpan={7} className="border border-black p-2 text-right">
                                 <span className="font-bold uppercase text-[11px] mr-2 italic">Bằng chữ:</span>
-                                <span className="font-black italic text-indigo-800">.....(Chưa tích hợp đọc tiền)....</span>
+                                <span className="font-black italic text-indigo-800">
+                                  {toVietnamese(Number(ticket.totalAmount) > 0 ? Number(ticket.totalAmount) : ticket.lines.reduce((sum, l) => sum + (Number(l.totalAmount) > 0 ? Number(l.totalAmount) : (Number(l.item?.price || 0) * Math.abs(l.qtyApproved ?? l.qty))), 0))}
+                                </span>
                             </td>
                         </tr>
                       )}
