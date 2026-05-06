@@ -457,10 +457,10 @@ export default function WarehouseTicketDetail({ basePath = '/warehouse-tickets' 
                         {line.qtyApproved !== null ? (line.qtyApproved > 0 ? `+${line.qtyApproved}` : Math.abs(line.qtyApproved)) : '—'}
                       </td>
                       <td className="p-4 text-right font-bold text-slate-700">
-                        {Number(line.unitPrice) > 0 || Number(line.item?.price) > 0 ? `${Number(line.unitPrice || line.item?.price).toLocaleString('vi-VN')} đ` : '—'}
+                        {Number(line.unitPrice || line.item?.price) > 0 ? `${Number(line.unitPrice || line.item?.price).toLocaleString('vi-VN')} đ` : '—'}
                       </td>
                       <td className="p-4 text-right font-black text-indigo-600">
-                        {Number(line.totalAmount) > 0 || Number(line.item?.price) > 0 ? `${(Number(line.totalAmount) > 0 ? Number(line.totalAmount) : Number(line.item?.price || 0) * Math.abs(line.qtyApproved ?? line.qty)).toLocaleString('vi-VN')} đ` : '—'}
+                        {(Number(line.unitPrice || line.item?.price || 0) * Math.abs(line.qtyApproved ?? line.qty)) > 0 ? `${(Number(line.unitPrice || line.item?.price || 0) * Math.abs(line.qtyApproved ?? line.qty)).toLocaleString('vi-VN')} đ` : '—'}
                       </td>
                       <td className="p-4 text-right text-slate-400 font-medium">{line.beforeQty ?? '—'}</td>
                       <td className="p-4 text-right font-bold text-emerald-600">{line.afterQty ?? '—'}</td>
@@ -709,7 +709,7 @@ function PrintTemplate({ ticket }: { ticket: any }) {
                         <td className="border border-black p-2 text-center">{line.uom || line.item.unit}</td>
                         <td className="border border-black p-2 text-center font-black">{Math.abs(line.qtyApproved ?? line.qty)}</td>
                         <td className="border border-black p-2 text-right">{Number(line.unitPrice || line.item?.price || 0).toLocaleString('vi-VN')}₫</td>
-                        <td className="border border-black p-2 text-right font-black">{(Number(line.totalAmount) > 0 ? Number(line.totalAmount) : (Number(line.item?.price || 0) * Math.abs(line.qtyApproved ?? line.qty))).toLocaleString('vi-VN')}₫</td>
+                        <td className="border border-black p-2 text-right font-black">{(Number(line.unitPrice || line.item?.price || 0) * Math.abs(line.qtyApproved ?? line.qty)).toLocaleString('vi-VN')}₫</td>
                     </tr>
                 ))}
                 <tr className="bg-slate-50 h-10 font-black">
@@ -721,15 +721,15 @@ function PrintTemplate({ ticket }: { ticket: any }) {
                         {/* Empty for unit price total */}
                     </td>
                     <td className="border border-black p-2 text-right">
-                        {(Number(ticket.totalAmount) > 0 ? Number(ticket.totalAmount) : ticket.lines.reduce((sum: number, l: any) => sum + (Number(l.totalAmount) > 0 ? Number(l.totalAmount) : (Number(l.item?.price || 0) * Math.abs(l.qtyApproved ?? l.qty))), 0)).toLocaleString('vi-VN')}₫
+                        {ticket.lines.reduce((sum: number, l: any) => sum + (Number(l.unitPrice || l.item?.price || 0) * Math.abs(l.qtyApproved ?? l.qty)), 0).toLocaleString('vi-VN')}₫
                     </td>
                 </tr>
-                {(Number(ticket.totalAmount) > 0 ? Number(ticket.totalAmount) : ticket.lines.reduce((sum: number, l: any) => sum + (Number(l.totalAmount) > 0 ? Number(l.totalAmount) : (Number(l.item?.price || 0) * Math.abs(l.qtyApproved ?? l.qty))), 0)) > 0 && (
+                {ticket.lines.reduce((sum: number, l: any) => sum + (Number(l.unitPrice || l.item?.price || 0) * Math.abs(l.qtyApproved ?? l.qty)), 0) > 0 && (
                   <tr className="h-10">
                       <td colSpan={7} className="border border-black p-2 text-right">
                           <span className="font-bold uppercase text-[11px] mr-2 italic">Bằng chữ:</span>
                           <span className="font-black italic text-indigo-800">
-                            {toVietnamese(Number(ticket.totalAmount) > 0 ? Number(ticket.totalAmount) : ticket.lines.reduce((sum: number, l: any) => sum + (Number(l.totalAmount) > 0 ? Number(l.totalAmount) : (Number(l.item?.price || 0) * Math.abs(l.qtyApproved ?? l.qty))), 0))}
+                            {toVietnamese(ticket.lines.reduce((sum: number, l: any) => sum + (Number(l.unitPrice || l.item?.price || 0) * Math.abs(l.qtyApproved ?? l.qty)), 0))}
                           </span>
                       </td>
                   </tr>
