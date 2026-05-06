@@ -3,13 +3,13 @@ import api from '../../lib/api';
 import { 
   Search, Plus, DollarSign,
   ShoppingCart, Package, Clock, ChevronRight, Truck, User as UserIcon,
-  Printer, CheckSquare, ChevronDown, FileText, AlertTriangle, X, CheckCircle, Download
+  Printer, CheckSquare, ChevronDown, FileText, AlertTriangle, X, CheckCircle, Download, Eye
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface PurchasesListProps {
   onCreateNew: () => void;
-  onViewDetail: (id: string) => void;
+  onViewDetail: (id: string, ids?: string[]) => void;
 }
 
 function getItemSortGroupName(itemName: string) {
@@ -47,6 +47,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   const [showPrintMenu, setShowPrintMenu] = useState(false);
   const [showPrintConfirm, setShowPrintConfirm] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [previewPO, setPreviewPO] = useState<any | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -529,8 +530,10 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
         </div>
 
         {/* MAIN LIST SECTION */}
-        <div className="flex-1 overflow-hidden flex flex-col px-4 md:px-6 pb-6 no-print">
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col h-full overflow-hidden">
+        <div className="flex-1 overflow-hidden flex gap-4 px-4 md:px-6 pb-6 no-print">
+            {/* LEFT: Purchase List */}
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col h-full overflow-hidden" style={{ width: previewPO ? '55%' : '100%', transition: 'width 0.3s' }}>
+
                 
                 {/* TOOLBAR */}
                 <div className="p-3.5 border-b border-slate-100 flex flex-wrap gap-3 justify-between items-center bg-slate-50/50">
@@ -697,9 +700,11 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                             {filteredData.map(d => {
                                 const isDelayed = d.expectedDate && new Date(d.expectedDate) < new Date() && d.status !== 'COMPLETED';
                                 const isSelected = selectedIds.includes(d.id);
+                                const isPreviewing = previewPO?.id === d.id;
                                 return (
-                                <tr key={d.id} onClick={() => onViewDetail(d.id)} 
-                                  className={`group hover:bg-indigo-50/30 cursor-pointer transition-all border-b border-slate-50 last:border-0 ${d.pendingReplacement ? 'bg-rose-50/20' : ''} ${isSelected ? 'bg-indigo-50/50' : ''}`}>
+                                <tr key={d.id} onClick={() => setPreviewPO(isPreviewing ? null : d)} 
+                                  className={`group hover:bg-indigo-50/30 cursor-pointer transition-all border-b border-slate-50 last:border-0 ${d.pendingReplacement ? 'bg-rose-50/20' : ''} ${isSelected ? 'bg-indigo-50/50' : ''} ${isPreviewing ? 'bg-indigo-50 border-l-[3px] border-l-indigo-500' : 'border-l-[3px] border-l-transparent'}`}>
+
                                     
                                     {isBulkMode && (
                                        <td className="p-3.5 pl-6 text-center" onClick={e => e.stopPropagation()}>
@@ -824,6 +829,75 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                     </table>
                 </div>
             </div>
+
+            {/* RIGHT: Quick View Panel */}
+            {previewPO && (
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col h-full overflow-hidden animate-in slide-in-from-right-4 duration-300" style={{ width: '45%' }}>
+                <div key={previewPO.id} className="flex flex-col h-full animate-in fade-in duration-500">
+                  <div className="p-5 border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-white flex justify-between items-start shrink-0">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <h3 className="text-sm font-black text-indigo-700 uppercase tracking-tight">{previewPO.id}</h3>
+                        {getStatusBadge(previewPO.status)}
+                      </div>
+                      <p className="text-xs font-bold text-slate-600 truncate">{previewPO.requesterName} • {previewPO.department || 'Phòng ban chung'}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1 truncate" title={previewPO.title}>{previewPO.title || 'Không có mô tả'}</p>
+                    </div>
+                    <button onClick={() => setPreviewPO(null)} className="p-2 hover:bg-white rounded-xl transition-all ml-2 text-slate-400 hover:text-slate-600 shadow-sm border border-transparent hover:border-slate-100">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div className="flex-1 overflow-auto custom-scrollbar">
+                    <table className="w-full text-left border-separate border-spacing-0">
+                      <thead className="bg-slate-50/50 backdrop-blur-md sticky top-0 z-10">
+                        <tr className="text-[9px] uppercase font-black text-slate-400 tracking-widest">
+                          <th className="px-5 py-3 text-center w-12 border-b border-slate-100">STT</th>
+                          <th className="px-5 py-3 border-b border-slate-100">Vật tư / Hàng hóa</th>
+                          <th className="px-5 py-3 text-center w-20 border-b border-slate-100">SL</th>
+                          <th className="px-5 py-3 text-right w-24 border-b border-slate-100">Đơn giá</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {(previewPO.lines || []).map((line: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-slate-50/30 transition-colors">
+                            <td className="px-5 py-4 text-center text-[10px] font-black text-slate-300 italic">{idx + 1}</td>
+                            <td className="px-5 py-4">
+                              <p className="font-bold text-slate-700 text-[11px] leading-snug whitespace-normal line-clamp-2">{line.item?.name || 'N/A'}</p>
+                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{line.item?.mvpp || '—'}</span>
+                            </td>
+                            <td className="px-5 py-4 text-center">
+                              <span className="font-black text-sm text-indigo-600">{line.qtyRequested || line.qtyOrdered}</span>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase">{line.item?.unit}</p>
+                            </td>
+                            <td className="px-5 py-4 text-right">
+                              <p className="text-[11px] font-black text-slate-600">{Number(line.unitPrice || line.item?.price || 0).toLocaleString('vi-VN')} đ</p>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="p-5 border-t border-slate-100 bg-slate-50/50 shrink-0 flex justify-between items-center">
+                    <div className="flex gap-6">
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Hạng mục</p>
+                        <p className="text-xl font-black text-slate-800 italic">{previewPO.lines?.length || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Thành tiền</p>
+                        <p className="text-xl font-black text-indigo-600 italic">{Number(previewPO.actualTotal || previewPO.totalAmount).toLocaleString('vi-VN')} đ</p>
+                      </div>
+                    </div>
+                    <button onClick={() => onViewDetail(previewPO.id, filteredData.map(d => d.id))} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg shadow-indigo-200">
+                      <Eye className="w-4 h-4" /> Chi tiết
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
         </div>
 
         {/* PRINT CONFIRM MODAL */}

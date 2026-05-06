@@ -79,14 +79,28 @@ export default function WarehouseTicketModal({ isOpen, onClose, onSuccess, initi
   const [scannerEnabled, setScannerEnabled] = useState(false);
   const [barcodeBuffer, setBarcodeBuffer] = useState('');
 
+  // User list for receiver selection
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+
   useEffect(() => {
     if (isOpen) {
       setStep('SELECT');
       setWarehouse(warehouseCode);
       const defaultGroup = ITEM_GROUPS.find(g => g.warehouse === warehouseCode)?.id || 'VPP';
       setItemGroup(defaultGroup);
+      fetchUsers();
     }
   }, [isOpen, warehouseCode]);
+
+  const fetchUsers = async () => {
+    try {
+      const res = await api.get('/users?isActive=true');
+      setAllUsers(res.data.data || []);
+    } catch (err) {
+      console.error('Failed to fetch users', err);
+    }
+  };
 
   const addLine = () => {
     setLines([...lines, { id: Date.now(), itemId: '', qty: 1, unitPrice: 0, uom: '', location: '', note: '', itemData: null, stockData: null }]);
@@ -348,13 +362,70 @@ export default function WarehouseTicketModal({ isOpen, onClose, onSuccess, initi
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-1.5">
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Người nhận / Người phụ trách *</label>
-                  <div className="relative"><User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input type="text" value={receiverName} onChange={e => setReceiverName(e.target.value)} className="w-full pl-11 pr-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-bold text-slate-700" placeholder="Họ và tên..." /></div>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input 
+                      type="text" 
+                      value={receiverName} 
+                      onChange={e => {
+                        setReceiverName(e.target.value);
+                        setShowUserDropdown(true);
+                      }}
+                      onFocus={() => setShowUserDropdown(true)}
+                      className="w-full pl-11 pr-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-bold text-slate-700" 
+                      placeholder="Tìm nhân sự..." 
+                    />
+                    
+                    {showUserDropdown && (
+                      <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 z-[70] max-h-60 overflow-y-auto overflow-x-hidden">
+                        {allUsers
+                          .filter(u => 
+                            u.fullName.toLowerCase().includes(receiverName.toLowerCase()) || 
+                            u.username.toLowerCase().includes(receiverName.toLowerCase())
+                          )
+                          .map(u => (
+                            <button 
+                              key={u.id} 
+                              onClick={() => {
+                                setReceiverName(u.fullName);
+                                setReceiverDept(u.departmentName || 'Chưa xác định');
+                                setShowUserDropdown(false);
+                              }}
+                              className="w-full flex items-center justify-between p-4 hover:bg-indigo-50 border-b border-slate-50 last:border-0 text-left transition-colors"
+                            >
+                              <div>
+                                <p className="font-black text-slate-800 uppercase tracking-tight">{u.fullName}</p>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                                  {u.departmentName || 'N/A'} • @{u.username}
+                                </p>
+                              </div>
+                              <ArrowRight className="w-4 h-4 text-indigo-300" />
+                            </button>
+                          ))
+                        }
+                        {allUsers.filter(u => u.fullName.toLowerCase().includes(receiverName.toLowerCase())).length === 0 && (
+                          <div className="p-8 text-center">
+                            <Users className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Không tìm thấy nhân sự</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
+
                 <div className="space-y-1.5">
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Bộ phận / Đơn vị *</label>
-                  <div className="relative"><Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input type="text" value={receiverDept} onChange={e => setReceiverDept(e.target.value)} className="w-full pl-11 pr-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none font-bold text-slate-700" placeholder="Phòng ban..." /></div>
+                  <div className="relative">
+                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input 
+                      type="text" 
+                      value={receiverDept} 
+                      readOnly
+                      className="w-full pl-11 pr-5 py-4 bg-slate-100/50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-500 cursor-not-allowed" 
+                      placeholder="Tự động điền..." 
+                    />
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Ngày chứng từ *</label>

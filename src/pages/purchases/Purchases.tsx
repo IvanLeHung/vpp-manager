@@ -8,6 +8,7 @@ export type ViewMode = 'LIST' | 'CREATE' | 'DETAIL';
 const Purchases: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('LIST');
   const [selectedPoId, setSelectedPoId] = useState<string | null>(null);
+  const [navigationIds, setNavigationIds] = useState<string[]>([]);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'warning'} | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
@@ -20,8 +21,9 @@ const Purchases: React.FC = () => {
     setViewMode('CREATE');
   };
 
-  const handleViewDetail = (id: string) => {
+  const handleViewDetail = (id: string, ids: string[] = []) => {
     setSelectedPoId(id);
+    setNavigationIds(ids);
     setViewMode('DETAIL');
   };
 
@@ -55,6 +57,8 @@ const Purchases: React.FC = () => {
       {viewMode === 'DETAIL' && selectedPoId && (
         <PurchasesDetail 
           poId={selectedPoId}
+          navigationIds={navigationIds}
+          onNavigate={setSelectedPoId}
           onBack={() => setViewMode('LIST')}
           showToast={showToast}
         />

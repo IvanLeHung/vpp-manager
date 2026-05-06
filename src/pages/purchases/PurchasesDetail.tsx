@@ -6,13 +6,16 @@ import {
   ShoppingCart, Send, Info, Printer,
   TrendingUp, Coins, FileText, AlertTriangle, Download, Trash2,
   ExternalLink, User as UserIcon, Building, Clock, Paperclip,
-  Truck, Package, Search, Plus, RotateCcw
+  Truck, Package, Search, Plus, RotateCcw,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import WorkflowStepper from '../../components/purchases/WorkflowStepper';
 
 interface PurchasesDetailProps {
   poId: string;
+  navigationIds?: string[];
+  onNavigate?: (id: string) => void;
   onBack: () => void;
   showToast: (message: string, type: 'success' | 'error' | 'warning') => void;
 }
@@ -32,13 +35,41 @@ const formatAuditAction = (action: string) => {
   }
 };
 
-const PurchasesDetail = ({ poId, onBack, showToast }: PurchasesDetailProps) => {
+const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }: PurchasesDetailProps) => {
   const navigate = useNavigate();
   const { currentUser } = useApp();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Navigation Logic
+  const currentIndex = navigationIds ? navigationIds.indexOf(poId) : -1;
+  const total = navigationIds?.length || 0;
+  const canGoPrev = currentIndex > 0;
+  const canGoNext = currentIndex < total - 1 && currentIndex !== -1;
+
+  const goPrev = () => {
+    if (canGoPrev && onNavigate && navigationIds) {
+      onNavigate(navigationIds[currentIndex - 1]);
+    }
+  };
+
+  const goNext = () => {
+    if (canGoNext && onNavigate && navigationIds) {
+      onNavigate(navigationIds[currentIndex + 1]);
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === 'ArrowLeft') goPrev();
+      if (e.key === 'ArrowRight') goNext();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentIndex, navigationIds, onNavigate]);
 
   // Modal States
   const [showApproveModal, setShowApproveModal] = useState(false);
@@ -112,11 +143,18 @@ const PurchasesDetail = ({ poId, onBack, showToast }: PurchasesDetailProps) => {
     try {
       await api.post(`/purchases/${poId}${actionPath}`, payload);
       showToast(msg, 'success');
-      await refreshData();
+      
       setShowApproveModal(false);
       setShowOrderModal(false);
       setShowDeliveryModal(false);
       setShowCancelModal(false);
+
+      // Auto navigate to next if approved/rejected/submitted
+      if (canGoNext && (actionPath === '/approve' || actionPath === '/reject' || actionPath === '/cancel' || actionPath === '/submit')) {
+          goNext();
+      } else {
+          await refreshData();
+      }
     } catch (err: any) {
       showToast(err.response?.data?.error || 'Thao tác thất bại', 'error');
     }
@@ -126,6 +164,9 @@ const PurchasesDetail = ({ poId, onBack, showToast }: PurchasesDetailProps) => {
     try {
       await api.post(`/requests/lines/${lineId}/admin-action`, { action, reason: 'Phê duyệt từ trang chi tiết PO' });
       showToast(action === 'APPROVE' ? 'Đã duyệt thay thế vật tư!' : 'Đã từ chối thay thế!', 'success');
+      
+      // If there are no more pending replacements in THIS PO, maybe go next?
+      // For now just refresh or go next if explicitly requested.
       refreshData();
     } catch (err: any) {
       showToast(err.response?.data?.error || 'Thao tác thất bại', 'error');
@@ -299,7 +340,30 @@ const PurchasesDetail = ({ poId, onBack, showToast }: PurchasesDetailProps) => {
                         <h2 className="text-xl font-black text-slate-800 tracking-tight flex items-center leading-tight">
                           {data.id} 
                         </h2>
-                        <span className="text-[9px] tracking-widest bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-black uppercase">{data.type}</span>
+                        {navigationIds && navigationIds.length > 0 && (
+                          <div className="flex items-center bg-slate-100 rounded-xl p-1 ml-4 border border-slate-200">
+                            <button 
+                              onClick={goPrev}
+                              disabled={!canGoPrev}
+                              className={`p-1.5 rounded-lg transition-all ${canGoPrev ? 'hover:bg-white text-indigo-600 shadow-sm' : 'text-slate-300 cursor-not-allowed'}`}
+                              title="Phiếu trước (Arrow Left)"
+                            >
+                              <ChevronLeft className="w-4 h-4" />
+                            </button>
+                            <span className="px-3 text-[10px] font-black text-slate-500 uppercase tracking-widest min-w-[60px] text-center border-x border-slate-200">
+                              {currentIndex + 1} / {total}
+                            </span>
+                            <button 
+                              onClick={goNext}
+                              disabled={!canGoNext}
+                              className={`p-1.5 rounded-lg transition-all ${canGoNext ? 'hover:bg-white text-indigo-600 shadow-sm' : 'text-slate-300 cursor-not-allowed'}`}
+                              title="Phiếu sau (Arrow Right)"
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                        <span className="text-[9px] tracking-widest bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-black uppercase ml-2">{data.type}</span>
                         {isCANCELLED && <span className="text-[9px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-black uppercase">ĐÃ HỦY</span>}
                       </div>
                       <p className="text-[11px] font-semibold text-slate-500 mt-0.5 flex items-center gap-1.5">
@@ -346,7 +410,7 @@ const PurchasesDetail = ({ poId, onBack, showToast }: PurchasesDetailProps) => {
           </div>
       </div>
 
-      <div className="flex-1 p-4 md:p-6 flex flex-col xl:flex-row gap-4 w-full max-w-[1600px] mx-auto print:hidden">
+      <div key={data.id} className="flex-1 p-4 md:p-6 flex flex-col xl:flex-row gap-4 w-full max-w-[1600px] mx-auto print:hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
           
           <div className="flex-1 flex flex-col gap-4 min-w-0">
               
