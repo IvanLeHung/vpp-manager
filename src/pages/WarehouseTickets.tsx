@@ -97,6 +97,7 @@ export default function WarehouseTickets({ warehouseCode: initialWarehouseCode =
   const [warehouseFilter, setWarehouseFilter] = useState(initialWarehouseCode);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
+  const [selectedTickets, setSelectedTickets] = useState<string[]>([]);
 
   // Create modal
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -201,6 +202,16 @@ export default function WarehouseTickets({ warehouseCode: initialWarehouseCode =
     }
   };
 
+  const handleBatchPrint = () => {
+    if (selectedTickets.length === 0) return addToast('Vui lòng chọn ít nhất 1 phiếu', 'error');
+    if (selectedTickets.length > 10) return addToast('Vui lòng chọn tối đa 10 phiếu mỗi lần in', 'error');
+    selectedTickets.forEach((id, index) => {
+      setTimeout(() => {
+        window.open(`${basePath}/${id}?autoprint=true`, '_blank');
+      }, index * 500);
+    });
+  };
+
   const handleGenerateReport = async () => {
     try {
       setLoading(true);
@@ -264,6 +275,11 @@ export default function WarehouseTickets({ warehouseCode: initialWarehouseCode =
           <button onClick={handleGenerateReport} className="flex items-center px-4 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 shadow-sm transition-all">
             <FilePieChart className="w-4 h-4 mr-2" /> Lập báo cáo
           </button>
+          {selectedTickets.length > 0 && (
+            <button onClick={handleBatchPrint} className="flex items-center px-4 py-3 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-indigo-100 shadow-sm transition-all animate-in zoom-in-95">
+              <Printer className="w-4 h-4 mr-2" /> In phiếu ({selectedTickets.length})
+            </button>
+          )}
           {canCreate && (
             <button onClick={() => setShowCreateModal(true)} className="flex items-center px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black uppercase text-[11px] tracking-widest hover:bg-indigo-700 shadow-xl shadow-indigo-500/20 transition-all transform hover:-translate-y-1 active:translate-y-0">
               <Plus className="w-5 h-5 mr-2" /> Tạo phiếu mới
@@ -336,6 +352,15 @@ export default function WarehouseTickets({ warehouseCode: initialWarehouseCode =
           <table className="w-full text-left whitespace-nowrap min-w-max">
             <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-20 shadow-sm">
               <tr className="text-xs uppercase font-black text-slate-500 tracking-wider">
+                <th className="p-4 w-12 text-center">
+                  <input type="checkbox" className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    checked={pagedTickets.length > 0 && selectedTickets.length === pagedTickets.length}
+                    onChange={e => {
+                      if (e.target.checked) setSelectedTickets(pagedTickets.map(t => t.id));
+                      else setSelectedTickets([]);
+                    }}
+                  />
+                </th>
                 <th className="p-4 w-12 text-center">#</th>
                 <th className="p-4">Phiếu (Loại / Thời gian)</th>
                 <th className="p-4">Người tạo</th>
@@ -359,6 +384,15 @@ export default function WarehouseTickets({ warehouseCode: initialWarehouseCode =
                 const StatusIcon = sc.icon;
                 return (
                   <tr key={t.id} className="hover:bg-indigo-50/30 transition-colors group cursor-pointer" onClick={() => navigate(`${basePath}/${t.id}`)}>
+                    <td className="p-4 text-center" onClick={e => e.stopPropagation()}>
+                       <input type="checkbox" className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                         checked={selectedTickets.includes(t.id)}
+                         onChange={e => {
+                           if (e.target.checked) setSelectedTickets([...selectedTickets, t.id]);
+                           else setSelectedTickets(selectedTickets.filter(id => id !== t.id));
+                         }}
+                       />
+                    </td>
                     <td className="p-4 text-center text-xs text-slate-400 font-bold">{(safePage - 1) * PAGE_SIZE + idx + 1}</td>
                     <td className="p-4">
                       <div className="font-black text-indigo-700 tracking-wide">{t.ticketCode}</div>

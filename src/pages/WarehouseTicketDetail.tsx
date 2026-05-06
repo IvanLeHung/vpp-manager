@@ -170,6 +170,16 @@ export default function WarehouseTicketDetail({ basePath = '/warehouse-tickets' 
 
   useEffect(() => { if (id) fetchTicket(); }, [id]);
 
+  useEffect(() => {
+    if (ticket && new URLSearchParams(window.location.search).get('autoprint')) {
+      const timer = setTimeout(() => {
+        window.print();
+        // Optional: window.close() after print if needed, but often browsers block it if not explicitly opened by a script.
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [ticket]);
+
   // Actions
   const handleSubmit = async () => {
     try {
