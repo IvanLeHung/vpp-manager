@@ -204,12 +204,9 @@ export default function WarehouseTickets({ warehouseCode: initialWarehouseCode =
 
   const handleBatchPrint = () => {
     if (selectedTickets.length === 0) return addToast('Vui lòng chọn ít nhất 1 phiếu', 'error');
-    if (selectedTickets.length > 10) return addToast('Vui lòng chọn tối đa 10 phiếu mỗi lần in', 'error');
-    selectedTickets.forEach((id, index) => {
-      setTimeout(() => {
-        window.open(`${basePath}/${id}?autoprint=true`, '_blank');
-      }, index * 500);
-    });
+    if (selectedTickets.length > 50) return addToast('Vui lòng chọn tối đa 50 phiếu mỗi lần in', 'error');
+    const ids = selectedTickets.join(',');
+    window.open(`${basePath}/${ids}?autoprint=true`, '_blank');
   };
 
   const handleGenerateReport = async () => {
