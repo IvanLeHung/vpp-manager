@@ -26,6 +26,8 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
   const [loading, setLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
+  const [sourceRef, setSourceRef] = useState('');
+  const [supplier, setSupplier] = useState('');
 
 
 
@@ -41,6 +43,16 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
     { id: 'OTHER', label: 'Khác' },
   ];
 
+  const RECEIVE_TYPES = [
+    { id: 'NEW_PURCHASE', label: 'Mua mới' },
+    { id: 'RETURN', label: 'Hoàn trả' },
+    { id: 'TRANSFER', label: 'Điều chuyển' },
+    { id: 'RECALL', label: 'Thu hồi' },
+    { id: 'AUDIT', label: 'Nhập kiểm kê' },
+    { id: 'DONATION', label: 'Tài trợ/biếu tặng' },
+    { id: 'OTHER', label: 'Khác' }
+  ];
+
   const LOCATIONS = [
     'VPBH Danko Avenue', 'VPBH Sông Công', 'VPBH Thái Nguyên', 'Mặt trước C6-I', 'Mặt sau C6-I', 'Tầng 9 C6-I',
     'TTTM Danko City', 'VPBH Danko Sun River', 'VPBH Danko Riverside', 'VPBH Danko Center', 'VPBH Danko Royal',
@@ -53,6 +65,9 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
       setReason('');
       setReceiverName('');
       setReceiverDept('');
+      setSourceRef('');
+      setSupplier('');
+      setIssueType(isOpen && type === 'RECEIVE' ? 'NEW_PURCHASE' : 'INTERNAL');
       setShowConfirm(false);
       api.get('/users').then(res => setUsers(res.data)).catch(console.error);
     }
@@ -66,6 +81,8 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
   const handleAction = async () => {
     if (qty <= 0) return alert('Số lượng phải lớn hơn 0');
     if (type === 'ISSUE' && qty > khadung) return alert('Số lượng xuất không được lớn hơn tồn hiện tại (' + khadung + ')');
+    if (!receiverName.trim()) return alert(type === 'RECEIVE' ? 'Vui lòng nhập người giao hàng' : 'Vui lòng chọn người nhận');
+    if (type === 'RECEIVE' && ['NEW_PURCHASE', 'RETURN', 'TRANSFER'].includes(issueType) && !supplier.trim()) return alert('Vui lòng điền các thông tin nhập nguồn phụ trợ bắt buộc');
     if (!reason.trim()) return alert('Vui lòng nhập mô tả chi tiết');
     if (type === 'ISSUE' && !location) return alert('Vui lòng chọn địa điểm/khu vực nhận');
 
@@ -83,7 +100,8 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
         ticketDate: ticketDate,
         issueType,
         receiverName,
-        receiverDept,
+        receiverDept: type === 'RECEIVE' ? supplier : receiverDept,
+        sourceRef: sourceRef || null,
         lines: [{ 
           itemId: stock.item.id, 
           qty: type === 'ISSUE' ? -Math.abs(qty) : Math.abs(qty),
@@ -172,6 +190,62 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
                   </select>
                 </div>
               </div>
+            </>
+          )}
+
+          {type === 'RECEIVE' && (
+            <>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Người giao *</label>
+                  <input type="text" value={receiverName} onChange={(e) => setReceiverName(e.target.value)} className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700" placeholder="Tên người giao hàng..." />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Nguồn nhập *</label>
+                  <select value={issueType} onChange={e => setIssueType(e.target.value)} className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700">
+                    {RECEIVE_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {issueType === 'NEW_PURCHASE' && (
+                <div className="grid grid-cols-2 gap-6 animate-in slide-in-from-top-2">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Nhà cung cấp *</label>
+                    <input type="text" value={supplier} onChange={(e) => setSupplier(e.target.value)} className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700" placeholder="Tên NCC..." />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Số PO / Báo giá</label>
+                    <input type="text" value={sourceRef} onChange={(e) => setSourceRef(e.target.value)} className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700" placeholder="Mã PO..." />
+                  </div>
+                </div>
+              )}
+
+              {issueType === 'RETURN' && (
+                <div className="grid grid-cols-2 gap-6 animate-in slide-in-from-top-2">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Người trả / Bộ phận trả *</label>
+                    <input type="text" value={supplier} onChange={(e) => setSupplier(e.target.value)} className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700" placeholder="Người/BP trả hàng..." />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Biên bản trả hàng</label>
+                    <input type="text" value={sourceRef} onChange={(e) => setSourceRef(e.target.value)} className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700" placeholder="Mã BB..." />
+                  </div>
+                </div>
+              )}
+
+              {issueType === 'TRANSFER' && (
+                <div className="grid grid-cols-2 gap-6 animate-in slide-in-from-top-2">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Kho xuất (Chuyển đến từ) *</label>
+                    <input type="text" value={supplier} onChange={(e) => setSupplier(e.target.value)} className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700" placeholder="Tên kho..." />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Phiếu xuất kho gốc</label>
+                    <input type="text" value={sourceRef} onChange={(e) => setSourceRef(e.target.value)} className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700" placeholder="Mã PXK..." />
+                  </div>
+                </div>
+              )}
             </>
           )}
 
