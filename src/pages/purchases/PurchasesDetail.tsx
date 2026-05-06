@@ -1386,39 +1386,52 @@ const PurchasesDetail = ({ poId, onBack, showToast }: PurchasesDetailProps) => {
                   </tr>
               </thead>
               <tbody>
-                  {data.lines.map((l: any, idx: number) => {
-                      const qtyActual = l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested;
-                      const isReplaced = !!l.requestLine?.replacementItemId;
-                      const origItem = l.requestLine?.item;
-                      
-                      return (
-                      <tr key={l.id} className="text-[11px] border-b border-slate-400">
-                          <td className="text-center p-2 border-r border-slate-400 font-bold">{idx + 1}</td>
-                          <td className="text-center p-2 border-r border-slate-400 font-medium">{l.item.mvpp}</td>
-                          <td className="p-2 border-r border-slate-400">
-                              <div className="flex flex-col">
-                                  <span className="font-bold uppercase">{l.item.name}</span>
-                                  {isReplaced && (
-                                      <span className="text-[9px] text-slate-500 italic mt-0.5">
-                                          (Thay cho: {origItem?.name})
-                                      </span>
-                                  )}
-                              </div>
-                          </td>
-                          <td className="text-center p-2 border-r border-slate-400">{l.item.unit}</td>
-                          <td className="text-center p-2 border-r border-slate-400 font-black">{qtyActual}</td>
-                          <td className="text-right p-2 border-r border-slate-400 font-medium">{Number(l.unitPrice).toLocaleString('vi-VN')}</td>
-                          <td className="text-right p-2 border-r border-slate-400 font-black bg-slate-50">{Number(l.lineAmount).toLocaleString('vi-VN')}</td>
-                          <td className="p-2 italic text-[9px]">{l.note || (l.location ? `@${l.location}` : '')} {l.gender ? `[${l.gender}]` : ''}</td>
-                      </tr>
-                                   )})}
-                  <tr className="font-black bg-slate-100 uppercase text-[12px] border-t-2 border-slate-900">
-                      <td colSpan={6} className="text-right p-3 border-r border-slate-900">TỔNG CỘNG TRƯỚC THUẾ/CK:</td>
-                      <td className="text-right p-3 border-r border-slate-900 text-[14px]">
-                          {Number(data.totalAmount).toLocaleString('vi-VN')}
-                      </td>
-                      <td className="p-3">VNĐ</td>
-                  </tr>
+                  {(() => {
+                    let totalPoAmount = 0;
+                    return (
+                      <>
+                        {data.lines.map((l: any, idx: number) => {
+                            const isReplaced = !!l.requestLine?.replacementItemId;
+                            const effectiveItem = isReplaced ? l.requestLine?.replacementItem : l.item;
+                            const effectivePrice = isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0);
+                            const qtyActual = l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested;
+                            const effectiveQty = isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyActual;
+                            const effectiveAmount = effectivePrice * effectiveQty;
+                            totalPoAmount += effectiveAmount;
+                            
+                            const origItem = l.requestLine?.item;
+                            
+                            return (
+                            <tr key={l.id} className="text-[11px] border-b border-slate-400">
+                                <td className="text-center p-2 border-r border-slate-400 font-bold">{idx + 1}</td>
+                                <td className="text-center p-2 border-r border-slate-400 font-medium">{effectiveItem?.mvpp || l.item.mvpp}</td>
+                                <td className="p-2 border-r border-slate-400">
+                                    <div className="flex flex-col">
+                                        <span className="font-bold uppercase">{effectiveItem?.name || l.item.name}</span>
+                                        {isReplaced && (
+                                            <span className="text-[9px] text-slate-500 italic mt-0.5">
+                                                (Thay cho: {origItem?.name})
+                                            </span>
+                                        )}
+                                    </div>
+                                </td>
+                                <td className="text-center p-2 border-r border-slate-400">{effectiveItem?.unit || l.item.unit}</td>
+                                <td className="text-center p-2 border-r border-slate-400 font-black">{effectiveQty}</td>
+                                <td className="text-right p-2 border-r border-slate-400 font-medium">{effectivePrice.toLocaleString('vi-VN')}</td>
+                                <td className="text-right p-2 border-r border-slate-400 font-black bg-slate-50">{effectiveAmount.toLocaleString('vi-VN')}</td>
+                                <td className="p-2 italic text-[9px]">{l.note || (l.location ? `@${l.location}` : '')} {l.gender ? `[${l.gender}]` : ''}</td>
+                            </tr>
+                        )})}
+                        <tr className="font-black bg-slate-100 uppercase text-[12px] border-t-2 border-slate-900">
+                            <td colSpan={6} className="text-right p-3 border-r border-slate-900">TỔNG CỘNG TRƯỚC THUẾ/CK:</td>
+                            <td className="text-right p-3 border-r border-slate-900 text-[14px]">
+                                {totalPoAmount.toLocaleString('vi-VN')}
+                            </td>
+                            <td className="p-3">VNĐ</td>
+                        </tr>
+                      </>
+                    );
+                  })()}
               </tbody>
           </table>
 
@@ -1442,7 +1455,18 @@ const PurchasesDetail = ({ poId, onBack, showToast }: PurchasesDetailProps) => {
                    </div>
                    <div>
                       <p className="text-[10px] font-bold text-slate-500 uppercase">TỔNG GIÁ TRỊ MUA THỰC TẾ SAU RÀ SOÁT</p>
-                      <p className="text-[14px] font-black text-indigo-700">{Number(data.totalAmount).toLocaleString('vi-VN')} đ</p>
+                      <p className="text-[14px] font-black text-indigo-700">
+                        {(() => {
+                           const actualTotal = data.lines.reduce((sum: number, l: any) => {
+                             const isReplaced = !!l.requestLine?.replacementItemId;
+                             const effectivePrice = isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0);
+                             const qtyActual = l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested;
+                             const effectiveQty = isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyActual;
+                             return sum + (effectivePrice * effectiveQty);
+                           }, 0);
+                           return actualTotal.toLocaleString('vi-VN');
+                        })()} đ
+                      </p>
                    </div>
                    <div>
                       <p className="text-[10px] font-bold text-slate-500 uppercase">HIỆU QUẢ TỐI ƯU CHI PHÍ MUA SẮM</p>
@@ -1453,13 +1477,19 @@ const PurchasesDetail = ({ poId, onBack, showToast }: PurchasesDetailProps) => {
                                const origQty = Number(l.requestLine?.qtyApproved || l.requestLine?.qtyRequested || 0);
                                return sum + (origPrice * origQty);
                             }, 0);
-                            const actualTotal = Number(data.totalAmount);
+                            const actualTotal = data.lines.reduce((sum: number, l: any) => {
+                              const isReplaced = !!l.requestLine?.replacementItemId;
+                              const effectivePrice = isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0);
+                              const qtyActual = l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested;
+                              const effectiveQty = isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyActual;
+                              return sum + (effectivePrice * effectiveQty);
+                            }, 0);
                             const diff = actualTotal - approvedTotal;
                             return (
                                <span className={diff <= 0 ? 'text-emerald-600' : 'text-rose-600'}>
                                   {diff <= 0 ? 'Tiết kiệm: ' : 'Tăng thêm: '}
                                   {Math.abs(diff).toLocaleString('vi-VN')} đ
-                               </span>
+                                </span>
                             );
                          })()}
                       </p>

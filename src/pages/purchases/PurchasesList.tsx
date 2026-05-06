@@ -152,13 +152,13 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               const typeMap = groups.get(type)!;
               
               const key = effectiveItem.mvpp;
-              const effectiveQty = isReplaced ? (line.requestLine.replacementQty || line.qtyRequested) : line.qtyRequested;
-              const effectivePrice = isReplaced ? (line.requestLine.replacementPrice || line.unitPrice) : line.unitPrice;
-              const effectiveItemName = effectiveItem.name || line.item.name;
+              const effectiveQty = Number(isReplaced ? (line.requestLine?.replacementQty || line.qtyRequested || 0) : (line.qtyOrdered ?? line.qtyApproved ?? line.qtyRequested ?? 0));
+              const effectivePrice = Number(isReplaced ? (line.requestLine?.replacementPrice || line.unitPrice || line.item?.price || 0) : (line.unitPrice || line.item?.price || 0));
+              const effectiveItemName = effectiveItem.name || line.item?.name || '';
 
               // For Totals comparison
-              const originalQty = line.qtyRequested || 0;
-              const originalPrice = line.requestLine?.unitPrice || line.item?.price || line.unitPrice || 0;
+              const originalQty = Number(line.qtyRequested || 0);
+              const originalPrice = Number(line.requestLine?.unitPrice || line.item?.price || line.unitPrice || 0);
 
               const current = typeMap.get(key) || {
                   mvpp: effectiveItem.mvpp,
@@ -216,6 +216,11 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               current.qty += effectiveQty;
               current.originalTotal += (originalQty * originalPrice);
               current.actualTotal += (effectiveQty * effectivePrice);
+              
+              // Ensure the displayed price is consistent with the total if possible
+              // For the summary, we'll use the price from the latest PO line processed
+              if (effectivePrice > 0) current.price = effectivePrice;
+              
               current.deptBreakdown.set(allocationKey, existingDept);
 
               if (isReplaced) {
@@ -239,18 +244,25 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
       return Array.from(groups.entries()).map(([type, itemsMap]) => {
           const items = sortItemsForPrinting(Array.from(itemsMap.values())
-              .map(item => ({
-                  ...item,
-                  deptEntries: Array.from(item.deptBreakdown.values())
-                    .map((d: any) => ({ 
-                      dept: d.dept, 
-                      qty: d.qty, 
-                      note: d.notes.filter(Boolean).join('; '), 
-                      requestCode: d.requestCode,
-                      unit: d.unit
-                    }))
-                    .sort((a: any, b: any) => b.qty - a.qty)
-              })));
+              .map(item => {
+                  // Normalize total to ensure consistency with displayed Price * Qty in the summary report
+                  // This prevents discrepancies when lines have slightly different prices or fallbacks.
+                  const normalizedTotal = Number(item.qty) * Number(item.price);
+                  
+                  return {
+                      ...item,
+                      actualTotal: normalizedTotal,
+                      deptEntries: Array.from(item.deptBreakdown.values())
+                        .map((d: any) => ({ 
+                          dept: d.dept, 
+                          qty: d.qty, 
+                          note: d.notes.filter(Boolean).join('; '), 
+                          requestCode: d.requestCode,
+                          unit: d.unit
+                        }))
+                        .sort((a: any, b: any) => b.qty - a.qty)
+                  };
+              }));
           
           const groupApprovedTotal = items.reduce((s, i) => s + i.originalTotal, 0);
           const groupActualTotal = items.reduce((s, i) => s + i.actualTotal, 0);
