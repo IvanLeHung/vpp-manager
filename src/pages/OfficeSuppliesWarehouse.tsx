@@ -164,128 +164,98 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
 }
 
 // ── Print Inventory Template ──
-function PrintInventoryTemplate({ stocks, warehouseLabel, warehouseCode, printedBy }: {
-  stocks: any[];
-  warehouseLabel: string;
-  warehouseCode: string;
-  printedBy: string;
+function PrintInventoryTemplate({ stocks, allStocks, warehouseLabel, warehouseCode, warehouseTitle, printedBy }: {
+  stocks: any[]; allStocks: any[]; warehouseLabel: string; warehouseCode: string; warehouseTitle: string; printedBy: string;
 }) {
   const now = new Date();
   const totalValue = stocks.reduce((sum, s) => sum + (s.quantityOnHand * Number(s.item.price || 0)), 0);
   const totalQty = stocks.reduce((sum, s) => sum + s.quantityOnHand, 0);
-
+  const readyCount = stocks.filter(s => (s.quantityOnHand - s.quantityReserved) > 0).length;
+  const lowCount = stocks.filter(s => s.quantityOnHand > 0 && s.quantityOnHand <= Math.max(Math.floor(s.item.quota * 0.2), 5)).length;
+  const outCount = allStocks.filter(s => s.quantityOnHand === 0).length;
   return (
     <div className="print-sheet text-black font-sans leading-tight flex flex-col min-h-[280mm] p-10 bg-white">
-        {/* Header */}
-        <div className="flex justify-between items-start mb-8 w-full print-header">
-            <div className="w-[35%] text-left">
+        <div className="flex justify-between items-start mb-6 w-full print-header">
+            <div className="w-[40%] text-left">
                 <p className="font-bold text-[13px] uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
                 <p className="text-[10px] italic mt-1 font-bold">Kho: {warehouseCode}</p>
                 <p className="text-[9px] text-slate-500 mt-1">Ban Hành chính - Quản trị</p>
             </div>
-            <div className="w-[20%] flex flex-col items-center text-center">
-                <img 
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(`INVENTORY-${warehouseCode}-${now.toISOString().slice(0,10)}`)}`} 
-                    alt="QR Code" 
-                    className="w-16 h-16 border border-slate-100"
-                />
-                <p className="text-[8px] font-bold mt-1 uppercase text-slate-400">Scan to Verify</p>
-            </div>
-            <div className="w-[45%] text-center">
+            <div className="w-[60%] text-right">
                 <p className="text-[14px] font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
                 <p className="text-[13px] font-bold underline decoration-[1.5px] underline-offset-[5px] mt-1">Độc lập - Tự do - Hạnh phúc</p>
-                <p className="text-[11px] mt-3 text-slate-600 italic">..., ngày {now.getDate()} tháng {now.getMonth() + 1} năm {now.getFullYear()}</p>
+                <p className="text-[11px] mt-3 text-slate-600 italic">Hà Nội, ngày {now.getDate()} tháng {now.getMonth() + 1} năm {now.getFullYear()}</p>
             </div>
         </div>
-
-        {/* Title */}
-        <div className="text-center mb-8">
-            <h1 className="text-[20px] font-black uppercase tracking-widest leading-tight underline underline-offset-8 decoration-slate-300">
-                PHIẾU TỒN KHO
-            </h1>
-            <p className="text-[12px] mt-2 italic text-slate-600">(Tồn tại thời điểm in: {now.toLocaleString('vi-VN')})</p>
+        <div className="text-center mb-6">
+            <h1 className="text-[20px] font-black uppercase tracking-widest leading-tight">{warehouseTitle}</h1>
+            <p className="text-[12px] mt-2 italic text-slate-600">Tồn tại thời điểm: {now.toLocaleTimeString('vi-VN')} {now.toLocaleDateString('vi-VN')}</p>
         </div>
-
-        {/* Info Grid */}
-        <div className="grid grid-cols-2 gap-y-3 gap-x-12 mb-8 text-[12px]">
+        <div className="grid grid-cols-2 gap-y-2 gap-x-12 mb-4 text-[12px]">
             <div className="flex items-end"><span className="w-32 font-bold shrink-0">Người lập phiếu:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{printedBy}</span></div>
-            <div className="flex items-end"><span className="w-32 font-bold shrink-0">Kho:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{warehouseLabel} ({warehouseCode})</span></div>
-            <div className="flex items-end"><span className="w-32 font-bold shrink-0">Ngày in:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{now.toLocaleDateString('vi-VN')}</span></div>
-            <div className="flex items-end"><span className="w-32 font-bold shrink-0">Tổng mặt hàng:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5 font-bold">{stocks.length} mặt hàng</span></div>
-            <div className="col-span-2 flex items-end"><span className="w-32 font-bold shrink-0">Ghi chú:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5 italic">"Phiếu tồn kho tại thời điểm in — dữ liệu thực tế từ hệ thống"</span></div>
+            <div className="flex items-end"><span className="w-32 font-bold shrink-0">Kho:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{warehouseLabel}</span></div>
         </div>
-
-        {/* Table */}
-        <table className="w-full border-collapse border border-black text-[13px] mb-8 print-table">
-            <thead className="bg-slate-100">
-                <tr>
-                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '5%'}}>STT</th>
-                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '13%'}}>Mã VT</th>
-                    <th className="border border-black p-2 text-left font-bold uppercase" style={{width: '28%'}}>Tên Vật tư / Hàng hóa</th>
-                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '10%'}}>Nhóm</th>
-                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '8%'}}>ĐVT</th>
-                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '10%'}}>Tồn kho</th>
-                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '11%'}}>Đơn giá</th>
-                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '15%'}}>Thành tiền</th>
-                </tr>
-            </thead>
+        <div className="flex flex-wrap gap-x-6 gap-y-1 mb-6 text-[11px] border border-slate-200 rounded p-3 bg-slate-50">
+            <span>Tổng mặt hàng: <strong>{stocks.length}</strong></span><span className="text-slate-300">|</span>
+            <span>Sẵn sàng cấp: <strong>{readyCount}</strong></span><span className="text-slate-300">|</span>
+            <span>Sắp hết: <strong>{lowCount}</strong></span><span className="text-slate-300">|</span>
+            <span>Hết hàng: <strong>{outCount}</strong></span><span className="text-slate-300">|</span>
+            <span>Giá trị tồn: <strong>{totalValue.toLocaleString('vi-VN')}₫</strong></span>
+        </div>
+        <table className="w-full border-collapse border border-black text-[11px] mb-6 print-table">
+            <thead className="bg-slate-100"><tr>
+                <th className="border border-black p-1.5 text-center font-bold uppercase" style={{width:'4%'}}>STT</th>
+                <th className="border border-black p-1.5 text-center font-bold uppercase" style={{width:'10%'}}>Mã hàng</th>
+                <th className="border border-black p-1.5 text-left font-bold uppercase" style={{width:'24%'}}>Tên hàng hóa</th>
+                <th className="border border-black p-1.5 text-center font-bold uppercase" style={{width:'10%'}}>Nhóm hàng</th>
+                <th className="border border-black p-1.5 text-center font-bold uppercase" style={{width:'6%'}}>ĐVT</th>
+                <th className="border border-black p-1.5 text-center font-bold uppercase" style={{width:'8%'}}>Tồn kho</th>
+                <th className="border border-black p-1.5 text-center font-bold uppercase" style={{width:'8%'}}>Tạm giữ</th>
+                <th className="border border-black p-1.5 text-center font-bold uppercase" style={{width:'8%'}}>Khả dụng</th>
+                <th className="border border-black p-1.5 text-center font-bold uppercase" style={{width:'10%'}}>Đơn giá</th>
+                <th className="border border-black p-1.5 text-center font-bold uppercase" style={{width:'12%'}}>Thành tiền</th>
+            </tr></thead>
             <tbody>
                 {stocks.map((stock, idx) => {
-                    const unitPrice = Number(stock.item.price || 0);
-                    const lineTotal = stock.quantityOnHand * unitPrice;
-                    return (
-                        <tr key={stock.id} className="h-10">
-                            <td className="border border-black p-2 text-center font-medium">{idx + 1}</td>
-                            <td className="border border-black p-2 text-center font-bold">{stock.item.mvpp}</td>
-                            <td className="border border-black p-2 font-medium">{stock.item.name}</td>
-                            <td className="border border-black p-2 text-center text-[11px]">{stock.item.category}</td>
-                            <td className="border border-black p-2 text-center">{stock.item.unit}</td>
-                            <td className="border border-black p-2 text-center font-black">{stock.quantityOnHand}</td>
-                            <td className="border border-black p-2 text-right">{unitPrice.toLocaleString('vi-VN')}₫</td>
-                            <td className="border border-black p-2 text-right font-black">{lineTotal.toLocaleString('vi-VN')}₫</td>
-                        </tr>
-                    );
+                    const up = Number(stock.item.price||0), lt = stock.quantityOnHand*up, kd = stock.quantityOnHand-stock.quantityReserved;
+                    return (<tr key={stock.id}>
+                        <td className="border border-black p-1.5 text-center">{idx+1}</td>
+                        <td className="border border-black p-1.5 text-center font-bold">{stock.item.mvpp}</td>
+                        <td className="border border-black p-1.5">{stock.item.name}</td>
+                        <td className="border border-black p-1.5 text-center text-[10px]">{stock.item.category}</td>
+                        <td className="border border-black p-1.5 text-center">{stock.item.unit}</td>
+                        <td className="border border-black p-1.5 text-center font-bold">{stock.quantityOnHand}</td>
+                        <td className="border border-black p-1.5 text-center">{stock.quantityReserved}</td>
+                        <td className="border border-black p-1.5 text-center font-bold">{kd}</td>
+                        <td className="border border-black p-1.5 text-right">{up.toLocaleString('vi-VN')}₫</td>
+                        <td className="border border-black p-1.5 text-right font-bold">{lt.toLocaleString('vi-VN')}₫</td>
+                    </tr>);
                 })}
-                <tr className="bg-slate-50 h-10 font-black">
-                    <td colSpan={5} className="border border-black p-2 text-right uppercase text-[10px]">Cộng:</td>
-                    <td className="border border-black p-2 text-center">{totalQty}</td>
-                    <td className="border border-black p-2 text-right"></td>
-                    <td className="border border-black p-2 text-right">{totalValue.toLocaleString('vi-VN')}₫</td>
+                <tr className="bg-slate-50 font-black">
+                    <td colSpan={5} className="border border-black p-1.5 text-right uppercase text-[10px]">TỔNG CỘNG:</td>
+                    <td className="border border-black p-1.5 text-center">{totalQty}</td>
+                    <td className="border border-black p-1.5 text-center">{stocks.reduce((s,st)=>s+st.quantityReserved,0)}</td>
+                    <td className="border border-black p-1.5 text-center">{stocks.reduce((s,st)=>s+st.quantityOnHand-st.quantityReserved,0)}</td>
+                    <td className="border border-black p-1.5 text-right"></td>
+                    <td className="border border-black p-1.5 text-right">{totalValue.toLocaleString('vi-VN')}₫</td>
                 </tr>
             </tbody>
         </table>
-
-        {/* Signatures */}
-        <div className="grid grid-cols-3 gap-y-12 gap-x-4 text-center text-[11px] font-bold mt-12 print-signatures">
+        <div className="grid grid-cols-2 gap-y-12 gap-x-8 text-center text-[11px] font-bold mt-auto print-signatures">
             <div className="flex flex-col h-full">
-                <p className="mb-2 uppercase">Người lập phiếu</p>
-                <p className="text-[10px] font-normal italic mb-4">(Ký, họ tên)</p>
-                <div className="mt-16 border-t border-dotted border-black w-[80%] mx-auto pt-2">
-                   <p className="font-bold uppercase">{printedBy}</p>
-                </div>
+                <p className="mb-2 uppercase">NGƯỜI LẬP BIỂU</p>
+                <p className="text-[10px] font-normal italic mb-4">(Ký và ghi họ tên)</p>
+                <div className="mt-16 border-t border-dotted border-black w-[70%] mx-auto pt-2"><p className="font-bold uppercase">{printedBy}</p></div>
             </div>
-
             <div className="flex flex-col h-full">
-                <p className="mb-2 uppercase">Thủ kho</p>
-                <p className="text-[10px] font-normal italic mb-4">(Ký, họ tên)</p>
-                <div className="mt-16 border-t border-dotted border-black w-[80%] mx-auto pt-2">
-                   <p className="font-bold uppercase">....................</p>
-                </div>
-            </div>
-
-            <div className="flex flex-col h-full">
-                <p className="mb-2 uppercase text-slate-600">Người duyệt</p>
+                <p className="mb-2 uppercase">PHỤ TRÁCH HC/KHO</p>
                 <p className="text-[10px] font-normal italic mb-4">(Ký xác nhận)</p>
-                <div className="mt-16 border-t border-dotted border-black w-[80%] mx-auto pt-2">
-                   <p className="font-bold uppercase">....................</p>
-                </div>
+                <div className="mt-16 border-t border-dotted border-black w-[70%] mx-auto pt-2"><p className="font-bold uppercase">....................</p></div>
             </div>
         </div>
-
-        {/* Footer info */}
-        <div className="mt-auto pt-4 border-t border-slate-200 text-[10px] text-[#555] flex justify-between print-info">
+        <div className="mt-4 pt-3 border-t border-slate-200 text-[9px] text-[#555] flex justify-between print-info">
             <p>Ngày in: {now.toLocaleString('vi-VN')} • Người in: {printedBy}</p>
-            <p>Hệ thống Quản lý Kho - Phiếu Tồn {warehouseCode} • Trang 1/1</p>
+            <p>Hệ thống Quản lý Kho - {warehouseTitle} • Trang 1/1</p>
         </div>
     </div>
   );
@@ -417,7 +387,8 @@ export default function OfficeSuppliesWarehouse() {
   const totalValue = displayedStocks.reduce((sum, s) => sum + (s.quantityOnHand * Number(s.item.price)), 0);
 
   return (
-    <div className="flex flex-col min-h-full bg-slate-50 relative">
+    <>
+    <div className="flex flex-col min-h-full bg-slate-50 relative no-print">
       <div className="bg-white px-8 pt-4 pb-4 border-b border-slate-200 shrink-0 sticky top-0 z-10 w-full shadow-sm">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-black flex items-center text-indigo-700 tracking-tight uppercase">
@@ -425,7 +396,7 @@ export default function OfficeSuppliesWarehouse() {
           </h1>
           <button 
             onClick={() => setShowPrintPreview(true)} 
-            className="flex items-center px-5 py-2.5 bg-white text-indigo-600 border-2 border-indigo-200 rounded-xl font-black hover:bg-indigo-50 shadow-md transition transform hover:scale-[1.02] no-print"
+            className="flex items-center px-5 py-2.5 bg-white text-indigo-600 border-2 border-indigo-200 rounded-xl font-black hover:bg-indigo-50 shadow-md transition transform hover:scale-[1.02]"
           >
             <Printer className="w-5 h-5 mr-2" /> IN PHIẾU TỒN
           </button>
@@ -459,9 +430,9 @@ export default function OfficeSuppliesWarehouse() {
             <div className="p-6">
               <div className="border border-slate-200 rounded-xl overflow-hidden">
                 <PrintInventoryTemplate 
-                  stocks={displayedStocks} 
-                  warehouseLabel="Kho Văn Phòng Phẩm" 
-                  warehouseCode="MAIN" 
+                  stocks={displayedStocks} allStocks={stocks}
+                  warehouseLabel="Kho Văn Phòng Phẩm" warehouseCode="MAIN"
+                  warehouseTitle="PHIẾU TỒN KHO VĂN PHÒNG PHẨM"
                   printedBy={currentUser?.fullName || 'Hệ thống'} 
                 />
               </div>
@@ -727,15 +698,15 @@ export default function OfficeSuppliesWarehouse() {
         </div>
       </div>
 
-      {/* Hidden Print Area */}
-      <div className="hidden print:block print-area" ref={printRef}>
-        <PrintInventoryTemplate 
-          stocks={displayedStocks} 
-          warehouseLabel="Kho Văn Phòng Phẩm" 
-          warehouseCode="MAIN" 
-          printedBy={currentUser?.fullName || 'Hệ thống'} 
-        />
-      </div>
     </div>
+    <div className="hidden print:block print-area" ref={printRef}>
+      <PrintInventoryTemplate 
+        stocks={displayedStocks} allStocks={stocks}
+        warehouseLabel="Kho Văn Phòng Phẩm" warehouseCode="MAIN"
+        warehouseTitle="PHIẾU TỒN KHO VĂN PHÒNG PHẨM"
+        printedBy={currentUser?.fullName || 'Hệ thống'} 
+      />
+    </div>
+    </>
   );
 }
