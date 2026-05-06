@@ -214,8 +214,8 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                 if (!current.replacements.some((r: any) => r.key === repKey)) {
                   current.replacements.push({
                     key: repKey,
-                    originalName: line.item.name,
-                    originalCode: line.item.mvpp,
+                    originalName: line.requestLine?.item?.name || line.item?.name,
+                    originalCode: line.requestLine?.item?.mvpp || line.item?.mvpp,
                     originalPrice: originalPrice,
                     originalQty: originalQty,
                     reason: line.requestLine.replacementReason,
@@ -776,7 +776,14 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                 <tr className="item-main-row">
                                     <td className="text-center">{idx + 1}</td>
                                     <td className="text-center">{item.mvpp}</td>
-                                    <td className="uppercase">{item.name}</td>
+                                    <td className="uppercase">
+                                        <div className="font-bold">{item.name}</div>
+                                        {item.replacements?.map((rep: any, ri: number) => (
+                                           <div key={ri} className="text-[7pt] italic text-slate-500 normal-case mt-0.5">
+                                              (Thay cho: {rep.originalName})
+                                           </div>
+                                        ))}
+                                    </td>
                                     <td className="text-center">{item.unit}</td>
                                     <td className="text-center">{item.qty}</td>
                                     <td className="text-right">{Number(item.price).toLocaleString('vi-VN')}</td>
