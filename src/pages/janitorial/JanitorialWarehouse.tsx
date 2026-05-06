@@ -25,6 +25,7 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
   const [ticketDate, setTicketDate] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [users, setUsers] = useState<any[]>([]);
 
 
 
@@ -53,6 +54,7 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
       setReceiverName('');
       setReceiverDept('');
       setShowConfirm(false);
+      api.get('/users').then(res => setUsers(res.data)).catch(console.error);
     }
   }, [isOpen]);
 
@@ -131,21 +133,46 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
           </div>
 
           {type === 'ISSUE' && (
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-1.5">
-                <label className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Khu vực nhận *</label>
-                <select value={location} onChange={e => setLocation(e.target.value)} className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700">
-                  <option value="">-- Chọn vị trí --</option>
-                  {LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
-                </select>
+            <>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Người nhận</label>
+                  <select 
+                    value={receiverName} 
+                    onChange={e => {
+                       const u = users.find(x => x.fullName === e.target.value);
+                       setReceiverName(e.target.value);
+                       if (u && u.department) {
+                         setReceiverDept(u.department.name);
+                       }
+                    }} 
+                    className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700">
+                    <option value="">-- Chọn người nhận --</option>
+                    {users.map(u => <option key={u.id} value={u.fullName}>{u.fullName} {u.department?.name ? `(${u.department.name})` : ''}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Phòng ban người nhận</label>
+                  <input type="text" value={receiverDept} onChange={(e) => setReceiverDept(e.target.value)} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-slate-500" placeholder="Tự động điền..." />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <label className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Loại xuất *</label>
-                <select value={issueType} onChange={e => setIssueType(e.target.value)} className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700">
-                  {ISSUE_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                </select>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Khu vực / Tòa nhà *</label>
+                  <select value={location} onChange={e => setLocation(e.target.value)} className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700">
+                    <option value="">-- Chọn vị trí --</option>
+                    {LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Loại xuất *</label>
+                  <select value={issueType} onChange={e => setIssueType(e.target.value)} className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700">
+                    {ISSUE_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                  </select>
+                </div>
               </div>
-            </div>
+            </>
           )}
 
           <div className="space-y-1.5">
