@@ -128,7 +128,8 @@ function toVietnamese(number: number): string {
 }
 
 export default function WarehouseTicketDetail({ basePath = '/warehouse-tickets' }: { basePath?: string }) {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
+  const ids = id?.split(',') || [];
   const navigate = useNavigate();
   const { currentUser } = useAppContext();
   const role = currentUser?.role || 'EMPLOYEE';
@@ -163,8 +164,8 @@ export default function WarehouseTicketDetail({ basePath = '/warehouse-tickets' 
         const res = await api.get(`/warehouse-tickets/${ids[0]}`);
         setTicket(res.data);
       } else if (ids.length > 1) {
-        const resList = await Promise.all(ids.map(i => api.get(`/warehouse-tickets/${i}`)));
-        setTickets(resList.map(r => r.data));
+        const resList = await Promise.all(ids.map((i: string) => api.get(`/warehouse-tickets/${i}`)));
+        setTickets(resList.map((r: any) => r.data));
       }
     } catch (err) {
       console.error(err);
