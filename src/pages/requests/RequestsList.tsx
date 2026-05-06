@@ -279,11 +279,12 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         if (['REJECTED', 'CANCELLED', 'COMPLETED'].includes(req.status)) return;
         
         req.lines?.forEach((line: any) => {
-            if (!line.item) return;
-            const isReplaced = !!line.replacementItemId;
+            const isReplaced = !!line.replacementItemId && !!line.replacementItem;
             const effectiveItem = isReplaced ? line.replacementItem : line.item;
             const effectiveQty = isReplaced ? (line.replacementQty || line.qtyApproved || line.qtyRequested) : (line.qtyApproved ?? line.qtyRequested);
             const effectivePrice = isReplaced ? (line.replacementPrice || line.item.price) : line.item.price;
+
+            if (!effectiveItem) return; // Safeguard against deleted items
 
             const mvpp = effectiveItem?.mvpp || '';
             
