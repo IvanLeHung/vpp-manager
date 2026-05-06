@@ -736,14 +736,9 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               .print-sheet:last-child { page-break-after: auto; break-after: auto; }
               
               .print-table { width: 100%; border-collapse: collapse; table-layout: fixed; background: #fff !important; }
-              .print-table th, .print-table td { 
-                border: 0.7px solid #000 !important; 
-                padding: 2px 4px !important; 
-                vertical-align: middle; 
-                background: #fff !important;
-                color: #000 !important;
-                word-wrap: break-word;
-              }
+              .print-table th { padding: 6px 4px; border: 1px solid #000; text-transform: uppercase; background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              .print-table td { padding: 6px 4px; border: 1px solid #000; vertical-align: middle; }
+              .print-highlight-row td { background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
               
               .header-text { font-size: 10pt; }
               .title-main { font-size: 16pt; font-weight: bold; text-align: center; margin-top: 20px; }
@@ -831,7 +826,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                         {group.items.map((item: any, idx: number) => (
                             <React.Fragment key={item.mvpp}>
                                 {/* MAIN ITEM ROW */}
-                                <tr className="item-main-row">
+                                <tr className="item-main-row print-highlight-row">
                                     <td className="text-center">{idx + 1}</td>
                                     <td className="text-center">{item.mvpp}</td>
                                     <td className="uppercase">
