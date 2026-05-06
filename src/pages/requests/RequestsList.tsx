@@ -280,36 +280,45 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         
         req.lines?.forEach((line: any) => {
             if (!line.item) return;
-            const mvpp = line.item.mvpp || '';
+            const isReplaced = !!line.replacementItemId;
+            const effectiveItem = isReplaced ? line.replacementItem : line.item;
+            const effectiveQty = isReplaced ? (line.replacementQty || line.qtyApproved || line.qtyRequested) : (line.qtyApproved ?? line.qtyRequested);
+            const effectivePrice = isReplaced ? (line.replacementPrice || line.item.price) : line.item.price;
+
+            const mvpp = effectiveItem?.mvpp || '';
             
             // Cross-reference with master goods category for accurate classification
             const masterItem = masterItems.find(i => i.mvpp === mvpp);
-            let type = masterItem?.itemType || line.item.itemType || 'UNKNOWN';
+            let type = masterItem?.itemType || effectiveItem?.itemType || effectiveItem?.category || 'UNKNOWN';
             
-            // Fallback to prefix if still unknown
+            const upperType = type.toString().toUpperCase();
+            if (upperType.includes('VPP') || upperType.includes('VĂN PHÒNG PHẨM')) type = 'VPP';
+            else if (upperType.includes('VS') || upperType.includes('VỆ SINH')) type = 'VE_SINH';
             if (type === 'UNKNOWN') {
                 if (mvpp.startsWith('VPP')) type = 'VPP';
                 else if (mvpp.startsWith('VS')) type = 'VE_SINH';
             }
 
-            if (type === 'UNKNOWN' && !unclassified.includes(line.item.name)) unclassified.push(line.item.name);
+            if (type === 'UNKNOWN' && !unclassified.includes(effectiveItem?.name || '')) unclassified.push(effectiveItem?.name || '');
 
             if (!groups.has(type)) groups.set(type, new Map());
             const typeMap = groups.get(type)!;
             
-            const key = line.item.mvpp;
+            const key = effectiveItem.mvpp;
             const current = typeMap.get(key) || {
-                mvpp: line.item.mvpp,
-                name: line.item.name,
-                unit: line.item.unit,
-                price: line.item.price || 0,
+                mvpp: effectiveItem.mvpp,
+                name: effectiveItem.name,
+                unit: effectiveItem.unit,
+                price: effectivePrice || 0,
                 qtyRequested: 0,
                 qtyDelivered: 0,
-                deptBreakdown: new Map<string, { qty: number, notes: string[] }>(),
-                printSortGroup: (masterItem as any)?.printSortGroup || (line.item as any).printSortGroup
+                originalTotal: 0,
+                actualTotal: 0,
+                deptBreakdown: new Map<string, { qty: number, notes: string[], replacements: any[] }>(),
+                printSortGroup: (masterItem as any)?.printSortGroup || (effectiveItem as any).printSortGroup
             };
             
-            const pendingQty = (line.qtyApproved ?? line.qtyRequested) - (line.qtyDelivered || 0);
+            const pendingQty = effectiveQty - (line.qtyDelivered || 0);
             if (pendingQty > 0) {
               const deptName = req.department || 'Khác';
               const existingDept = current.deptBreakdown.get(deptName) || { qty: 0, notes: [], replacements: [] };
@@ -317,11 +326,11 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
               if (line.note && line.note.trim() && !existingDept.notes.includes(line.note)) {
                 existingDept.notes.push(line.note);
               }
-              if (line.replacementItemId) {
+              if (isReplaced) {
                 existingDept.replacements.push({
-                  name: line.replacementItem?.name || 'Vật tư thay thế',
-                  qty: line.replacementQty,
-                  price: line.replacementPrice,
+                  name: line.item.name,
+                  qty: line.qtyApproved || line.qtyRequested,
+                  price: line.item.price,
                   reason: line.replacementReason,
                   status: line.status
                 });
@@ -329,8 +338,13 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
               current.deptBreakdown.set(deptName, existingDept);
             }
 
-            current.qtyRequested += (line.qtyApproved ?? line.qtyRequested);
+            const originalQtyForTotal = line.qtyApproved || line.qtyRequested;
+            const originalPriceForTotal = line.item.price || 0;
+
+            current.qtyRequested += effectiveQty;
             current.qtyDelivered += (line.qtyDelivered || 0);
+            current.originalTotal += (originalQtyForTotal * originalPriceForTotal);
+            current.actualTotal += (effectiveQty * effectivePrice);
             
             if (line.note && line.note.trim()) {
               // Note already handled in deptBreakdown
@@ -921,7 +935,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                               <div className="mt-1 text-[7.2pt] border-t border-dotted border-black/30 pt-1 text-black">
                                 {de.replacements.map((r:any, ri:number) => (
                                   <div key={ri} className="flex flex-col">
-                                    <p className="font-bold">↳ THỰC TẾ MUA: {r.name}</p>
+                                    <p className="font-bold">↳ THAY CHO: {r.name} (SL cũ: {r.qty})</p>
                                     <p className="font-normal text-[6.8pt] opacity-80 italic">Lý do: {r.reason} • {r.status === 'REPLACEMENT_PENDING_ADMIN' ? 'TRẠNG THÁI: CHỜ ADMIN DUYỆT' : 'TRẠNG THÁI: ĐÃ CHẤP THUẬN'}</p>
                                   </div>
                                 ))}
@@ -939,6 +953,12 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                         <td className="p-1 border border-black"></td>
                         <td className="p-1 text-right text-[11pt] border border-black">
                           {group.items.reduce((s, i) => s + (i.price * (i.qtyRequested - i.qtyDelivered)), 0).toLocaleString('vi-VN')} đ
+                        </td>
+                    </tr>
+                    <tr className="font-bold text-[8pt] text-slate-600 bg-slate-50">
+                        <td colSpan={6} className="p-1 text-right border border-black">Tổng giá trị đề xuất ban đầu đã duyệt:</td>
+                        <td className="p-1 text-right border border-black">
+                          {group.items.reduce((s, i) => s + i.originalTotal, 0).toLocaleString('vi-VN')} đ
                         </td>
                     </tr>
                </tbody>
