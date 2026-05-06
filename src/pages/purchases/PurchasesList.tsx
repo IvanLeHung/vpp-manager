@@ -905,15 +905,15 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                    
                    <div className="mt-4 border-t pt-2 border-dashed">
                       <div className="total-row text-[9pt]">
-                         <div className="total-label uppercase">TỔNG GIÁ TRỊ THEO ĐỀ XUẤT ĐÃ DUYỆT:</div>
+                         <div className="total-label uppercase">TỔNG GIÁ TRỊ ĐỀ XUẤT ĐÃ DUYỆT:</div>
                          <div className="total-value text-right">{Number(group.approvedTotal).toLocaleString('vi-VN')} đ</div>
                       </div>
                       <div className="total-row text-[9pt]">
-                         <div className="total-label uppercase">TỔNG GIÁ TRỊ THEO PHƯƠNG ÁN MUA THỰC TẾ:</div>
+                         <div className="total-label uppercase">TỔNG GIÁ TRỊ MUA THỰC TẾ SAU RÀ SOÁT:</div>
                          <div className="total-value text-right text-indigo-700">{Number(group.actualTotal).toLocaleString('vi-VN')} đ</div>
                       </div>
                       <div className="total-row text-[10pt] font-black border-t border-slate-200 mt-1 pt-1">
-                         <div className="total-label uppercase tracking-tight">{group.savings >= 0 ? 'CHÊNH LỆCH TIẾT KIỆM (LÃI):' : 'CHÊNH LỆCH CHI PHÍ TĂNG:'}</div>
+                         <div className="total-label uppercase tracking-tight">{group.savings >= 0 ? 'HIỆU QUẢ TỐI ƯU CHI PHÍ MUA SẮM:' : 'CHÊNH LỆCH CHI PHÍ TĂNG:'}</div>
                          <div className={`total-value text-right ${group.savings >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                             {Number(Math.abs(group.savings)).toLocaleString('vi-VN')} đ
                          </div>

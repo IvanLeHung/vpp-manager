@@ -1428,7 +1428,7 @@ const PurchasesDetail = ({ poId, onBack, showToast }: PurchasesDetailProps) => {
                 <h4 className="text-[12px] font-black uppercase mb-3 border-b border-slate-300 pb-2">BÁO CÁO THAY THẾ VẬT TƯ THỰC TẾ</h4>
                 <div className="grid grid-cols-3 gap-8">
                    <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase">TỔNG THEO ĐỀ XUẤT ĐÃ DUYỆT</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase">TỔNG GIÁ TRỊ ĐỀ XUẤT ĐÃ DUYỆT</p>
                       <p className="text-[14px] font-bold text-slate-700">
                          {(() => {
                             const approvedTotal = data.lines.reduce((sum: number, l: any) => {
@@ -1441,11 +1441,11 @@ const PurchasesDetail = ({ poId, onBack, showToast }: PurchasesDetailProps) => {
                       </p>
                    </div>
                    <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase">TỔNG THEO PHƯƠNG ÁN MUA THỰC TẾ</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase">TỔNG GIÁ TRỊ MUA THỰC TẾ SAU RÀ SOÁT</p>
                       <p className="text-[14px] font-black text-indigo-700">{Number(data.totalAmount).toLocaleString('vi-VN')} đ</p>
                    </div>
                    <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase">CHÊNH LỆCH TIẾT KIỆM/TĂNG</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase">HIỆU QUẢ TỐI ƯU CHI PHÍ MUA SẮM</p>
                       <p className="text-[14px] font-black">
                          {(() => {
                             const approvedTotal = data.lines.reduce((sum: number, l: any) => {
