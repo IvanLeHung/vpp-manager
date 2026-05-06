@@ -11,6 +11,7 @@ interface Props {
   currentUser: User;
   setViewMode: (mode: ViewMode) => void;
   setActiveRequest: (req: VPPRequest | null) => void;
+  setNavigationIds?: (ids: string[]) => void;
   refreshData: () => Promise<void>;
   showToast: (m: string, t?: 'success' | 'error' | 'warning') => void;
 }
@@ -37,7 +38,7 @@ function sortItemsForPrinting(items: any[]) {
   });
 }
 
-export default function RequestsList({ requests, currentUser, setViewMode, setActiveRequest, refreshData, showToast }: Props) {
+export default function RequestsList({ requests, currentUser, setViewMode, setActiveRequest, setNavigationIds, refreshData, showToast }: Props) {
   const { items: masterItems } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
@@ -71,6 +72,14 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   };
 
   const currentUid = currentUser.userId || currentUser.id;
+
+  const handleOpenDetail = (req: VPPRequest, targetMode: ViewMode = 'VIEW') => {
+    if (setNavigationIds) {
+      setNavigationIds(filteredRequests.map(r => r.id));
+    }
+    setActiveRequest(req);
+    setViewMode(targetMode);
+  };
 
   const filteredRequests = useMemo(() => {
     let filtered = requests;
@@ -704,7 +713,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                                  </td>
                               )}
                               <td className={`p-3 ${!isBulkMode ? 'pl-6' : ''}`}>
-                                  <button onClick={e => { e.stopPropagation(); setActiveRequest(req); setViewMode('VIEW'); }} className="font-extrabold text-indigo-700 hover:text-indigo-900 hover:underline text-xs text-left">{req.id}</button>
+                                  <button onClick={e => { e.stopPropagation(); handleOpenDetail(req); }} className="font-extrabold text-indigo-700 hover:text-indigo-900 hover:underline text-xs text-left">{req.id}</button>
                                   {req.priority === 'Khẩn cấp' && <span className="ml-1 inline-flex animate-pulse px-1 py-0.5 rounded text-[8px] font-bold bg-rose-500 text-white uppercase">Khẩn</span>}
                                   <p className="text-[10px] text-slate-400 mt-0.5">{new Date(req.createdAt).toLocaleDateString('vi-VN')} {new Date(req.createdAt).toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit'})}</p>
                               </td>
@@ -715,7 +724,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                               <td className="p-3 text-center"><span className="text-xs font-black text-slate-600">{req.lines?.length || 0}</span></td>
                               <td className="p-3 text-center"><span className={`px-2 py-0.5 rounded text-[9px] font-bold border uppercase ${getStatusColor(req.status)}`}>{req.status.replace(/_/g,' ')}</span></td>
                               <td className="p-3 pr-4 text-right" onClick={e => e.stopPropagation()}>
-                                  <button onClick={() => { setActiveRequest(req); actName === 'Chỉnh sửa' ? setViewMode('CREATE') : setViewMode('VIEW'); }}
+                                  <button onClick={() => handleOpenDetail(req, actName === 'Chỉnh sửa' ? 'CREATE' : 'VIEW')}
                                     className={`px-2 py-1 rounded-lg font-bold text-[11px] inline-flex items-center ${isActionable ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
                                     {isActionable ? <span className="w-1.5 h-1.5 bg-white rounded-full mr-1 animate-pulse"></span> : <Eye className="w-3 h-3 mr-1"/>}{actName}
                                   </button>
@@ -785,13 +794,13 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
               </div>
               <div className="flex gap-3">
                 {isActionable && (
-                  <button onClick={() => { setActiveRequest(previewReq); actName === 'Chỉnh sửa' ? setViewMode('CREATE') : setViewMode('VIEW'); }}
+                  <button onClick={() => handleOpenDetail(previewReq, actName === 'Chỉnh sửa' ? 'CREATE' : 'VIEW')}
                     className={`px-4 py-2 rounded-xl font-bold text-xs transition shadow-md flex items-center gap-1.5 ${actName.includes('Duyệt') || actName.includes('Xuất') ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-500/20' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-500/20'}`}>
                     <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
                     {actName}
                   </button>
                 )}
-                <button onClick={() => { setActiveRequest(previewReq); setViewMode('VIEW'); }} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-200 transition flex items-center gap-1.5"><Eye className="w-4 h-4" /> Chi tiết</button>
+                <button onClick={() => handleOpenDetail(previewReq)} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-200 transition flex items-center gap-1.5"><Eye className="w-4 h-4" /> Chi tiết</button>
               </div>
             </div>
           </div>

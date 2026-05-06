@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { XCircle, Printer, CheckCircle, RefreshCw, ArrowLeft, Archive, CheckSquare, Trash2, StopCircle, AlertTriangle, ShoppingCart, Minus, Plus, Check, FileSpreadsheet } from 'lucide-react';
+import { XCircle, Printer, CheckCircle, RefreshCw, ArrowLeft, Archive, CheckSquare, Trash2, StopCircle, AlertTriangle, ShoppingCart, Minus, Plus, Check, FileSpreadsheet, ChevronLeft, ChevronRight } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../../lib/api';
 import type { User } from '../../context/AppContext';
@@ -7,6 +7,8 @@ import type { ViewMode } from '../Requests';
 
 interface Props {
   requestId: string;
+  navigationIds?: string[];
+  onNavigate?: (id: string) => void;
   setViewMode: (mode: ViewMode) => void;
   setActiveRequest?: (req: any) => void;
   refreshData: () => Promise<void>;
@@ -38,9 +40,37 @@ function sortLinesForPrinting(lines: any[]) {
   });
 }
 
-export default function RequestsDetail({ requestId, setViewMode, setActiveRequest, refreshData, showToast, currentUser }: Props) {
+export default function RequestsDetail({ requestId, navigationIds, onNavigate, setViewMode, setActiveRequest, refreshData, showToast, currentUser }: Props) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Navigation Logic
+  const currentIndex = navigationIds ? navigationIds.indexOf(requestId) : -1;
+  const total = navigationIds?.length || 0;
+  const canGoPrev = currentIndex > 0;
+  const canGoNext = currentIndex < total - 1 && currentIndex !== -1;
+
+  const goPrev = () => {
+    if (canGoPrev && onNavigate && navigationIds) {
+      onNavigate(navigationIds[currentIndex - 1]);
+    }
+  };
+
+  const goNext = () => {
+    if (canGoNext && onNavigate && navigationIds) {
+      onNavigate(navigationIds[currentIndex + 1]);
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === 'ArrowLeft') goPrev();
+      if (e.key === 'ArrowRight') goNext();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentIndex, navigationIds, onNavigate]);
 
   // Modals state
   const [rejectReason, setRejectReason] = useState('');
@@ -120,8 +150,17 @@ export default function RequestsDetail({ requestId, setViewMode, setActiveReques
     try {
       await api.post(`/requests/${requestId}${actionPath}`, payload);
       showToast(successMsg);
-      await refreshData();
-      setViewMode('LIST');
+      
+      // Auto navigate to next if approved/rejected/cancelled/returned
+      const nextActions = ['/approve', '/tbp_approve', '/admin_approve', '/reject', '/tbp_reject', '/admin_reject', '/return', '/cancel', '/confirm_receipt'];
+      if (canGoNext && nextActions.includes(actionPath)) {
+          goNext();
+      } else {
+          await refreshData();
+          if (['/submit', '/withdraw'].includes(actionPath)) {
+            setViewMode('LIST');
+          }
+      }
     } catch (err: any) {
       showToast(err.response?.data?.error || 'Thao tác thất bại', 'error');
     }
@@ -243,6 +282,29 @@ export default function RequestsDetail({ requestId, setViewMode, setActiveReques
               <div>
                   <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center">
                     {data.id} 
+                    {navigationIds && navigationIds.length > 0 && (
+                      <div className="flex items-center bg-slate-100 rounded-xl p-1 ml-4 border border-slate-200">
+                        <button 
+                          onClick={goPrev}
+                          disabled={!canGoPrev}
+                          className={`p-1.5 rounded-lg transition-all ${canGoPrev ? 'hover:bg-white text-indigo-600 shadow-sm' : 'text-slate-300 cursor-not-allowed'}`}
+                          title="Phiếu trước (Arrow Left)"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <span className="px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest min-w-[70px] text-center border-x border-slate-200">
+                          {currentIndex + 1} / {total}
+                        </span>
+                        <button 
+                          onClick={goNext}
+                          disabled={!canGoNext}
+                          className={`p-1.5 rounded-lg transition-all ${canGoNext ? 'hover:bg-white text-indigo-600 shadow-sm' : 'text-slate-300 cursor-not-allowed'}`}
+                          title="Phiếu sau (Arrow Right)"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </div>
+                    )}
                     {data.priority === 'Khẩn cấp' && <span className="ml-3 text-[10px] bg-rose-500 text-white px-2 py-0.5 rounded uppercase tracking-wider animate-pulse shadow-sm shadow-rose-500/50">Khẩn cấp</span>}
                   </h2>
                   <p className="text-sm font-semibold text-slate-500 mt-0.5">{data.requestType} • Lập lúc {new Date(data.createdAt).toLocaleString('vi-VN')}</p>
@@ -253,7 +315,7 @@ export default function RequestsDetail({ requestId, setViewMode, setActiveReques
           </div>
       </div>
 
-      <div className="no-print flex-1 overflow-y-auto p-4 md:p-8 flex flex-col xl:flex-row gap-6 w-full max-w-[1400px] mx-auto">
+      <div key={requestId} className="no-print flex-1 overflow-y-auto p-4 md:p-8 flex flex-col xl:flex-row gap-6 w-full max-w-[1400px] mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
           
           {/* LEFT COLUMN: Main Info & Lines */}
           <div className="flex-1 flex flex-col gap-6 min-w-0">

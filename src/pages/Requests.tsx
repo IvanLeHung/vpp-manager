@@ -20,6 +20,7 @@ export default function Requests() {
   const [viewMode, setViewMode] = useState<ViewMode>('LIST');
   const [requests, setRequests] = useState<VPPRequest[]>([]);
   const [activeRequest, setActiveRequest] = useState<VPPRequest | null>(null);
+  const [navigationIds, setNavigationIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'warning'} | null>(null);
 
@@ -85,6 +86,7 @@ export default function Requests() {
           currentUser={currentUser!}
           setViewMode={setViewMode}
           setActiveRequest={setActiveRequest}
+          setNavigationIds={setNavigationIds}
           refreshData={fetchRequests}
           showToast={showToast}
         />
@@ -102,6 +104,8 @@ export default function Requests() {
       {viewMode === 'VIEW' && (activeRequest || id) && (
         <RequestsDetail 
           requestId={activeRequest?.id || id || ''}
+          navigationIds={navigationIds}
+          onNavigate={(reqId) => setActiveRequest({ id: reqId } as any)}
           setViewMode={setViewMode}
           setActiveRequest={setActiveRequest}
           refreshData={fetchRequests}
