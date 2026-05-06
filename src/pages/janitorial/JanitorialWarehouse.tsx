@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Droplets, ArrowDownToLine, ArrowUpFromLine, X, Zap, Loader2, Download, SlidersHorizontal, Scale, AlertTriangle, Search, CheckSquare, Square, Printer } from 'lucide-react';
 import api from '../../lib/api';
+import { useAppContext } from '../../context/AppContext';
 import WarehouseTicketModal from '../../components/warehouse/WarehouseTicketModal';
 import QuickHandoverModal from '../../components/warehouse/QuickHandoverModal';
 import { StockAdjustModal } from '../../components/warehouse/StockAdjustModal';
-import InventoryPrintModal from '../../components/warehouse/InventoryPrintModal';
 import * as XLSX from 'xlsx';
 
 type QuickActionModalProps = {
@@ -274,19 +274,149 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
   );
 }
 
+// ── Print Inventory Template ──
+function PrintInventoryTemplate({ stocks, warehouseLabel, warehouseCode, printedBy }: {
+  stocks: any[];
+  warehouseLabel: string;
+  warehouseCode: string;
+  printedBy: string;
+}) {
+  const now = new Date();
+  const totalValue = stocks.reduce((sum, s) => sum + (s.quantityOnHand * Number(s.item.price || 0)), 0);
+  const totalQty = stocks.reduce((sum, s) => sum + s.quantityOnHand, 0);
+
+  return (
+    <div className="print-sheet text-black font-sans leading-tight flex flex-col min-h-[280mm] p-10 bg-white">
+        {/* Header */}
+        <div className="flex justify-between items-start mb-8 w-full print-header">
+            <div className="w-[35%] text-left">
+                <p className="font-bold text-[13px] uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
+                <p className="text-[10px] italic mt-1 font-bold">Kho: {warehouseCode}</p>
+                <p className="text-[9px] text-slate-500 mt-1">Ban Hành chính - Quản trị</p>
+            </div>
+            <div className="w-[20%] flex flex-col items-center text-center">
+                <img 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(`INVENTORY-${warehouseCode}-${now.toISOString().slice(0,10)}`)}`} 
+                    alt="QR Code" 
+                    className="w-16 h-16 border border-slate-100"
+                />
+                <p className="text-[8px] font-bold mt-1 uppercase text-slate-400">Scan to Verify</p>
+            </div>
+            <div className="w-[45%] text-center">
+                <p className="text-[14px] font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+                <p className="text-[13px] font-bold underline decoration-[1.5px] underline-offset-[5px] mt-1">Độc lập - Tự do - Hạnh phúc</p>
+                <p className="text-[11px] mt-3 text-slate-600 italic">..., ngày {now.getDate()} tháng {now.getMonth() + 1} năm {now.getFullYear()}</p>
+            </div>
+        </div>
+
+        {/* Title */}
+        <div className="text-center mb-8">
+            <h1 className="text-[20px] font-black uppercase tracking-widest leading-tight underline underline-offset-8 decoration-slate-300">
+                PHIẾU TỒN KHO
+            </h1>
+            <p className="text-[12px] mt-2 italic text-slate-600">(Tồn tại thời điểm in: {now.toLocaleString('vi-VN')})</p>
+        </div>
+
+        {/* Info Grid */}
+        <div className="grid grid-cols-2 gap-y-3 gap-x-12 mb-8 text-[12px]">
+            <div className="flex items-end"><span className="w-32 font-bold shrink-0">Người lập phiếu:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{printedBy}</span></div>
+            <div className="flex items-end"><span className="w-32 font-bold shrink-0">Kho:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{warehouseLabel} ({warehouseCode})</span></div>
+            <div className="flex items-end"><span className="w-32 font-bold shrink-0">Ngày in:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{now.toLocaleDateString('vi-VN')}</span></div>
+            <div className="flex items-end"><span className="w-32 font-bold shrink-0">Tổng mặt hàng:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5 font-bold">{stocks.length} mặt hàng</span></div>
+            <div className="col-span-2 flex items-end"><span className="w-32 font-bold shrink-0">Ghi chú:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5 italic">"Phiếu tồn kho tại thời điểm in — dữ liệu thực tế từ hệ thống"</span></div>
+        </div>
+
+        {/* Table */}
+        <table className="w-full border-collapse border border-black text-[13px] mb-8 print-table">
+            <thead className="bg-slate-100">
+                <tr>
+                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '5%'}}>STT</th>
+                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '13%'}}>Mã VT</th>
+                    <th className="border border-black p-2 text-left font-bold uppercase" style={{width: '28%'}}>Tên Vật tư / Hàng hóa</th>
+                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '10%'}}>Nhóm</th>
+                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '8%'}}>ĐVT</th>
+                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '10%'}}>Tồn kho</th>
+                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '11%'}}>Đơn giá</th>
+                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '15%'}}>Thành tiền</th>
+                </tr>
+            </thead>
+            <tbody>
+                {stocks.map((stock, idx) => {
+                    const unitPrice = Number(stock.item.price || 0);
+                    const lineTotal = stock.quantityOnHand * unitPrice;
+                    return (
+                        <tr key={stock.id} className="h-10">
+                            <td className="border border-black p-2 text-center font-medium">{idx + 1}</td>
+                            <td className="border border-black p-2 text-center font-bold">{stock.item.mvpp}</td>
+                            <td className="border border-black p-2 font-medium">{stock.item.name}</td>
+                            <td className="border border-black p-2 text-center text-[11px]">{stock.item.category}</td>
+                            <td className="border border-black p-2 text-center">{stock.item.unit}</td>
+                            <td className="border border-black p-2 text-center font-black">{stock.quantityOnHand}</td>
+                            <td className="border border-black p-2 text-right">{unitPrice.toLocaleString('vi-VN')}₫</td>
+                            <td className="border border-black p-2 text-right font-black">{lineTotal.toLocaleString('vi-VN')}₫</td>
+                        </tr>
+                    );
+                })}
+                <tr className="bg-slate-50 h-10 font-black">
+                    <td colSpan={5} className="border border-black p-2 text-right uppercase text-[10px]">Cộng:</td>
+                    <td className="border border-black p-2 text-center">{totalQty}</td>
+                    <td className="border border-black p-2 text-right"></td>
+                    <td className="border border-black p-2 text-right">{totalValue.toLocaleString('vi-VN')}₫</td>
+                </tr>
+            </tbody>
+        </table>
+
+        {/* Signatures */}
+        <div className="grid grid-cols-3 gap-y-12 gap-x-4 text-center text-[11px] font-bold mt-12 print-signatures">
+            <div className="flex flex-col h-full">
+                <p className="mb-2 uppercase">Người lập phiếu</p>
+                <p className="text-[10px] font-normal italic mb-4">(Ký, họ tên)</p>
+                <div className="mt-16 border-t border-dotted border-black w-[80%] mx-auto pt-2">
+                   <p className="font-bold uppercase">{printedBy}</p>
+                </div>
+            </div>
+
+            <div className="flex flex-col h-full">
+                <p className="mb-2 uppercase">Thủ kho</p>
+                <p className="text-[10px] font-normal italic mb-4">(Ký, họ tên)</p>
+                <div className="mt-16 border-t border-dotted border-black w-[80%] mx-auto pt-2">
+                   <p className="font-bold uppercase">....................</p>
+                </div>
+            </div>
+
+            <div className="flex flex-col h-full">
+                <p className="mb-2 uppercase text-slate-600">Người duyệt</p>
+                <p className="text-[10px] font-normal italic mb-4">(Ký xác nhận)</p>
+                <div className="mt-16 border-t border-dotted border-black w-[80%] mx-auto pt-2">
+                   <p className="font-bold uppercase">....................</p>
+                </div>
+            </div>
+        </div>
+
+        {/* Footer info */}
+        <div className="mt-auto pt-4 border-t border-slate-200 text-[10px] text-[#555] flex justify-between print-info">
+            <p>Ngày in: {now.toLocaleString('vi-VN')} • Người in: {printedBy}</p>
+            <p>Hệ thống Quản lý Kho - Phiếu Tồn {warehouseCode} • Trang 1/1</p>
+        </div>
+    </div>
+  );
+}
+
 export default function JanitorialWarehouse() {
 
+  const { currentUser } = useAppContext();
   const [stocks, setStocks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [metrics, setMetrics] = useState<any>({ pending: 0, executedToday: 0 });
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
 
   const [modalType, setModalType] = useState<'RECEIVE' | 'ISSUE' | null>(null);
   const [selectedStock, setSelectedStock] = useState<any>(null);
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [showMegaModal, setShowMegaModal] = useState(false);
   const [showHandoverModal, setShowHandoverModal] = useState(false);
-  const [showInventoryPrintModal, setShowInventoryPrintModal] = useState(false);
 
   // Filter & Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -399,10 +529,56 @@ export default function JanitorialWarehouse() {
   return (
     <div className="flex flex-col min-h-full bg-slate-50 relative">
       <div className="bg-white px-8 pt-4 pb-4 border-b border-slate-200 shrink-0 sticky top-0 z-10 w-full shadow-sm">
-        <h1 className="text-xl font-black flex items-center text-emerald-700 tracking-tight uppercase">
-           <Droplets className="w-6 h-6 mr-3 text-emerald-500" /> TỒN KHO ĐỒ VỆ SINH
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-black flex items-center text-emerald-700 tracking-tight uppercase">
+             <Droplets className="w-6 h-6 mr-3 text-emerald-500" /> TỒN KHO ĐỒ VỆ SINH
+          </h1>
+          <button 
+            onClick={() => setShowPrintPreview(true)} 
+            className="flex items-center px-5 py-2.5 bg-white text-emerald-600 border-2 border-emerald-200 rounded-xl font-black hover:bg-emerald-50 shadow-md transition transform hover:scale-[1.02] no-print"
+          >
+            <Printer className="w-5 h-5 mr-2" /> IN PHIẾU TỒN
+          </button>
+        </div>
       </div>
+
+      {/* Print Preview Modal */}
+      {showPrintPreview && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm no-print">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[240mm] max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white z-10 px-8 py-5 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-black text-slate-800">Xem trước Phiếu Tồn Kho</h2>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">Kho Đồ Vệ Sinh — {displayedStocks.length} mặt hàng</p>
+              </div>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => {
+                    setShowPrintPreview(false);
+                    setTimeout(() => window.print(), 300);
+                  }} 
+                  className="flex items-center px-6 py-2.5 bg-emerald-600 text-white rounded-xl font-black hover:bg-emerald-700 shadow-lg transition-all transform hover:scale-[1.02]"
+                >
+                  <Printer className="w-4 h-4 mr-2" /> IN NGAY
+                </button>
+                <button onClick={() => setShowPrintPreview(false)} className="px-5 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="p-6">
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <PrintInventoryTemplate 
+                  stocks={displayedStocks} 
+                  warehouseLabel="Kho Đồ Vệ Sinh" 
+                  warehouseCode="VE_SINH" 
+                  printedBy={currentUser?.fullName || 'Hệ thống'} 
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-4 md:p-8 relative pb-24">
         {/* Modals */}
@@ -436,12 +612,6 @@ export default function JanitorialWarehouse() {
           warehouseCode="VE_SINH"
           itemType="VE_SINH"
           selectedStocks={stocks.filter(s => selectedIds.has(s.id))}
-        />
-
-        <InventoryPrintModal
-          isOpen={showInventoryPrintModal}
-          onClose={() => setShowInventoryPrintModal(false)}
-          stocks={displayedStocks}
         />
 
         {/* KPI Cards */}
@@ -505,38 +675,18 @@ export default function JanitorialWarehouse() {
                   </button>
                 ))}
               </div>
-              <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
-                 <FilterPill label="TẤT CẢ" active={activeFilter === 'ALL'} onClick={() => setActiveFilter('ALL')} color="emerald" />
-                 <FilterPill label="CÒN TỒN" active={activeFilter === 'IN_STOCK'} onClick={() => setActiveFilter('IN_STOCK')} color="emerald" />
-                 <FilterPill label="SẴN SÀNG CẤP" active={activeFilter === 'AVAILABLE'} onClick={() => setActiveFilter('AVAILABLE')} color="emerald" />
-                 <FilterPill label="SẮP HẾT" active={activeFilter === 'LOW'} onClick={() => setActiveFilter('LOW')} color="amber" />
-                 <FilterPill label="CÓ TẠM GIỮ" active={activeFilter === 'RESERVED'} onClick={() => setActiveFilter('RESERVED')} color="indigo" />
-                 <FilterPill label="CẦN MUA BỔ SUNG" active={activeFilter === 'NEED_BUY'} onClick={() => setActiveFilter('NEED_BUY')} color="rose" />
-                 <FilterPill label="HẾT HÀNG" active={activeFilter === 'OUT'} onClick={() => setActiveFilter('OUT')} color="rose" />
-                 
-                 <div className="w-px h-8 bg-slate-200 mx-2 hidden xl:block"></div>
-                 
-                 <button 
-                   onClick={() => setHideZeroStock(!hideZeroStock)}
-                   className={`flex items-center gap-2 px-4 py-3 rounded-xl font-black text-xs transition-all ${hideZeroStock ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-500 border-slate-200'} border`}
-                 >
-                   <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${hideZeroStock ? 'bg-emerald-500' : 'bg-slate-300'}`}>
-                      <div className={`w-3 h-3 bg-white rounded-full shadow-sm transition-transform ${hideZeroStock ? 'translate-x-4' : 'translate-x-0'}`}></div>
-                   </div>
-                   Ẩn tồn 0
-                 </button>
 
-                 <button
-                    onClick={() => setShowInventoryPrintModal(true)}
-                    className="flex items-center gap-2 px-4 py-3 rounded-xl font-black text-xs transition-all bg-indigo-50 text-indigo-700 border-indigo-200 border hover:bg-indigo-100 shadow-sm"
+              <div className="flex items-center gap-3 shrink-0">
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <div 
+                    onClick={() => setHideZeroStock(!hideZeroStock)}
+                    className={`w-10 h-6 rounded-full p-1 transition-colors duration-300 ${hideZeroStock ? 'bg-emerald-600' : 'bg-slate-200'}`}
                   >
-                    <Printer className="w-4 h-4" />
-                    IN PHIẾU TỒN
-                 </button>
-                 
-                 <button className="p-3 bg-slate-50 text-slate-500 rounded-xl border border-slate-200 hover:bg-slate-100 hover:text-slate-800 transition-colors">
-                    <SlidersHorizontal className="w-5 h-5" />
-                 </button>
+                    <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 ${hideZeroStock ? 'translate-x-4' : 'translate-x-0'}`} />
+                  </div>
+                  <span className="text-xs font-black text-slate-500 uppercase tracking-widest group-hover:text-slate-700">Ẩn tồn 0</span>
+                </label>
+                <button className="p-3 bg-slate-50 text-slate-500 rounded-2xl hover:bg-slate-100 border border-slate-200 transition-all"><SlidersHorizontal className="w-5 h-5" /></button>
               </div>
            </div>
 
@@ -685,6 +835,16 @@ export default function JanitorialWarehouse() {
             </table>
           </div>
         </div>
+      </div>
+
+      {/* Hidden Print Area */}
+      <div className="hidden print:block print-area" ref={printRef}>
+        <PrintInventoryTemplate 
+          stocks={displayedStocks} 
+          warehouseLabel="Kho Đồ Vệ Sinh" 
+          warehouseCode="VE_SINH" 
+          printedBy={currentUser?.fullName || 'Hệ thống'} 
+        />
       </div>
     </div>
   );

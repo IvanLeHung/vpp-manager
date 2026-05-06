@@ -62,7 +62,6 @@ const TYPE_CONFIG: Record<string, { label: string; icon: any; color: string }> =
   RECEIVE: { label: 'Phiếu nhập kho', icon: ArrowDownToLine, color: 'text-emerald-600' },
   ISSUE: { label: 'Phiếu xuất kho', icon: ArrowUpFromLine, color: 'text-rose-600' },
   ADJUSTMENT: { label: 'Phiếu điều chỉnh', icon: Settings2, color: 'text-amber-600' },
-  INVENTORY_REPORT: { label: 'Phiếu Tồn Kho', icon: ClipboardList, color: 'text-indigo-600' },
 };
 
 const AUDIT_LABELS: Record<string, string> = {
@@ -666,37 +665,23 @@ function PrintTemplate({ ticket }: { ticket: any }) {
             <h1 className="text-[20px] font-black uppercase tracking-widest leading-tight underline underline-offset-8 decoration-slate-300">
                 {tc.label.toUpperCase()}
             </h1>
-            {ticket.ticketType === 'INVENTORY_REPORT' && (
-               <p className="text-[12px] mt-2 italic text-slate-600 font-bold">Dữ liệu tồn kho tại thời điểm in phiếu</p>
-            )}
         </div>
 
         {/* Info Grid */}
         <div className="grid grid-cols-2 gap-y-3 gap-x-12 mb-8 text-[12px]">
-            {ticket.ticketType === 'INVENTORY_REPORT' ? (
-               <>
-                 <div className="flex items-end"><span className="w-32 font-bold shrink-0">Kho:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{ticket.warehouseCode} ({ticket.itemGroup || 'VPP'})</span></div>
-                 <div className="flex items-end"><span className="w-32 font-bold shrink-0">Thời điểm chốt:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5 uppercase font-bold">{new Date(ticket.createdAt).toLocaleString('vi-VN')}</span></div>
-                 <div className="flex items-end"><span className="w-32 font-bold shrink-0">Người in:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{ticket.createdBy.fullName}</span></div>
-                 <div className="flex items-end"><span className="w-32 font-bold shrink-0">Tổng số mặt hàng:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{ticket.lines.length}</span></div>
-               </>
-            ) : (
-               <>
-                 <div className="flex items-end"><span className="w-32 font-bold shrink-0">Người lập phiếu:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{ticket.createdBy.fullName}</span></div>
-                 <div className="flex items-end"><span className="w-32 font-bold shrink-0">Kho xuất/nhập:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{ticket.warehouseCode} ({ticket.itemGroup || 'VPP'})</span></div>
-                 
-                 <div className="flex items-end"><span className="w-32 font-bold shrink-0">Người nhận/giao:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5 uppercase font-bold">{ticket.receiverName || '......................'}</span></div>
-                 <div className="flex items-end"><span className="w-32 font-bold shrink-0">Bộ phận/Đơn vị:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{ticket.receiverDept || '......................'}</span></div>
-                 
-                 {ticket.receiverAddress && <div className="col-span-2 flex items-end"><span className="w-32 font-bold shrink-0">Địa chỉ / Khu vực:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{ticket.receiverAddress}</span></div>}
-                 
-                 <div className="flex items-end"><span className="w-32 font-bold shrink-0">Ngày lập phiếu:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{new Date(ticket.createdAt).toLocaleDateString('vi-VN')}</span></div>
-                 <div className="flex items-end"><span className="w-32 font-bold shrink-0">Loại nghiệp vụ:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5 font-bold">{ticket.issueType || ticket.ticketType}</span></div>
-                 
-                 {ticket.metadata?.assetCode && <div className="flex items-end"><span className="w-32 font-bold shrink-0">Mã tài sản:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5 font-bold">{ticket.metadata.assetCode}</span></div>}
-                 {ticket.metadata?.period && <div className="flex items-end"><span className="w-32 font-bold shrink-0">Chu kỳ/Định mức:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{ticket.metadata.period} / {ticket.metadata.quota || '—'}</span></div>}
-               </>
-            )}
+            <div className="flex items-end"><span className="w-32 font-bold shrink-0">Người lập phiếu:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{ticket.createdBy.fullName}</span></div>
+            <div className="flex items-end"><span className="w-32 font-bold shrink-0">Kho xuất/nhập:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{ticket.warehouseCode} ({ticket.itemGroup || 'VPP'})</span></div>
+            
+            <div className="flex items-end"><span className="w-32 font-bold shrink-0">Người nhận/giao:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5 uppercase font-bold">{ticket.receiverName || '......................'}</span></div>
+            <div className="flex items-end"><span className="w-32 font-bold shrink-0">Bộ phận/Đơn vị:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{ticket.receiverDept || '......................'}</span></div>
+            
+            {ticket.receiverAddress && <div className="col-span-2 flex items-end"><span className="w-32 font-bold shrink-0">Địa chỉ / Khu vực:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{ticket.receiverAddress}</span></div>}
+            
+            <div className="flex items-end"><span className="w-32 font-bold shrink-0">Ngày lập phiếu:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{new Date(ticket.createdAt).toLocaleDateString('vi-VN')}</span></div>
+            <div className="flex items-end"><span className="w-32 font-bold shrink-0">Loại nghiệp vụ:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5 font-bold">{ticket.issueType || ticket.ticketType}</span></div>
+            
+            {ticket.metadata?.assetCode && <div className="flex items-end"><span className="w-32 font-bold shrink-0">Mã tài sản:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5 font-bold">{ticket.metadata.assetCode}</span></div>}
+            {ticket.metadata?.period && <div className="flex items-end"><span className="w-32 font-bold shrink-0">Chu kỳ/Định mức:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{ticket.metadata.period} / {ticket.metadata.quota || '—'}</span></div>}
 
             <div className="col-span-2 flex items-end"><span className="w-32 font-bold shrink-0">Lý do / Ghi chú:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5 italic">"{ticket.reason || ticket.note || 'Không có ghi chú'}"</span></div>
         </div>
@@ -706,92 +691,45 @@ function PrintTemplate({ ticket }: { ticket: any }) {
         <table className="w-full border-collapse border border-black text-[13px] mb-8 print-table">
             <thead className="bg-slate-100">
                 <tr>
-                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '5%'}}>STT</th>
-                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '12%'}}>Mã VT</th>
-                    <th className="border border-black p-2 text-left font-bold uppercase" style={{width: ticket.ticketType === 'INVENTORY_REPORT' ? '25%' : '30%'}}>Tên Vật tư / Linh kiện</th>
-                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '8%'}}>ĐVT</th>
-                    {ticket.ticketType === 'INVENTORY_REPORT' ? (
-                       <>
-                         <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '10%'}}>Tồn kho</th>
-                         {ticket.metadata?.includeReserved && <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '10%'}}>Tạm giữ</th>}
-                         <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '10%'}}>Khả dụng</th>
-                       </>
-                    ) : (
-                       <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '10%'}}>Thực tế</th>
-                    )}
-                    {(!ticket.metadata || ticket.metadata?.showPrice !== false) && (
-                       <>
-                         <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '10%'}}>Đơn giá</th>
-                         <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '10%'}}>Thành tiền</th>
-                       </>
-                    )}
+                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '6%'}}>STT</th>
+                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '14%'}}>Mã VT</th>
+                    <th className="border border-black p-2 text-left font-bold uppercase" style={{width: '30%'}}>Tên Vật tư / Linh kiện</th>
+                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '10%'}}>ĐVT</th>
+                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '10%'}}>Thực tế</th>
+                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '15%'}}>Đơn giá</th>
+                    <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '15%'}}>Thành tiền</th>
                 </tr>
             </thead>
             <tbody>
-                {ticket.lines.map((line: any, idx: number) => {
-                    let parsedReason: any = null;
-                    if (ticket.ticketType === 'INVENTORY_REPORT') {
-                       try { parsedReason = JSON.parse(line.reason || '{}'); } catch(e) {}
-                    }
-                    const isReport = ticket.ticketType === 'INVENTORY_REPORT';
-                    const showPrice = !ticket.metadata || ticket.metadata?.showPrice !== false;
-                    
-                    return (
-                      <tr key={line.id} className="h-10">
-                          <td className="border border-black p-2 text-center font-medium">{idx + 1}</td>
-                          <td className="border border-black p-2 text-center font-bold">{line.item.mvpp}</td>
-                          <td className="border border-black p-2 font-medium">{line.item.name}</td>
-                          <td className="border border-black p-2 text-center">{line.uom || line.item.unit}</td>
-                          
-                          {isReport ? (
-                             <>
-                               <td className="border border-black p-2 text-center">{line.qty}</td>
-                               {ticket.metadata?.includeReserved && <td className="border border-black p-2 text-center">{parsedReason?.reserved || 0}</td>}
-                               <td className="border border-black p-2 text-center font-black">{parsedReason?.available ?? line.qty}</td>
-                             </>
-                          ) : (
-                             <td className="border border-black p-2 text-center font-black">{Math.abs(line.qtyApproved ?? line.qty)}</td>
-                          )}
-
-                          {showPrice && (
-                             <>
-                               <td className="border border-black p-2 text-right">{Number(line.unitPrice || line.item?.price || 0).toLocaleString('vi-VN')}₫</td>
-                               <td className="border border-black p-2 text-right font-black">{(Number(line.totalAmount) > 0 ? Number(line.totalAmount) : (Number(line.item?.price || 0) * Math.abs(isReport ? line.qty : (line.qtyApproved ?? line.qty)))).toLocaleString('vi-VN')}₫</td>
-                             </>
-                          )}
-                      </tr>
-                    );
-                })}
+                {ticket.lines.map((line: any, idx: number) => (
+                    <tr key={line.id} className="h-10">
+                        <td className="border border-black p-2 text-center font-medium">{idx + 1}</td>
+                        <td className="border border-black p-2 text-center font-bold">{line.item.mvpp}</td>
+                        <td className="border border-black p-2 font-medium">{line.item.name}</td>
+                        <td className="border border-black p-2 text-center">{line.uom || line.item.unit}</td>
+                        <td className="border border-black p-2 text-center font-black">{Math.abs(line.qtyApproved ?? line.qty)}</td>
+                        <td className="border border-black p-2 text-right">{Number(line.unitPrice || line.item?.price || 0).toLocaleString('vi-VN')}₫</td>
+                        <td className="border border-black p-2 text-right font-black">{(Number(line.totalAmount) > 0 ? Number(line.totalAmount) : (Number(line.item?.price || 0) * Math.abs(line.qtyApproved ?? line.qty))).toLocaleString('vi-VN')}₫</td>
+                    </tr>
+                ))}
                 <tr className="bg-slate-50 h-10 font-black">
-                    <td colSpan={ticket.ticketType === 'INVENTORY_REPORT' ? (ticket.metadata?.includeReserved ? 4 : 4) : 4} className="border border-black p-2 text-right uppercase text-[10px]">Cộng:</td>
-                    
-                    {ticket.ticketType === 'INVENTORY_REPORT' ? (
-                       <>
-                          <td className="border border-black p-2 text-center">{ticket.lines.reduce((sum: number, line: any) => sum + Math.abs(line.qty), 0)}</td>
-                          {ticket.metadata?.includeReserved && <td className="border border-black p-2 text-center"></td>}
-                          <td className="border border-black p-2 text-center">{ticket.lines.reduce((sum: number, line: any) => sum + Math.abs(JSON.parse(line.reason || '{}')?.available || line.qty), 0)}</td>
-                       </>
-                    ) : (
-                       <td className="border border-black p-2 text-center">
-                           {ticket.lines.reduce((sum: number, line: any) => sum + Math.abs(line.qtyApproved ?? line.qty), 0)}
-                       </td>
-                    )}
-                    
-                    {(!ticket.metadata || ticket.metadata?.showPrice !== false) && (
-                       <>
-                          <td className="border border-black p-2 text-right"></td>
-                          <td className="border border-black p-2 text-right">
-                              {(Number(ticket.totalAmount) > 0 ? Number(ticket.totalAmount) : ticket.lines.reduce((sum: number, l: any) => sum + (Number(l.totalAmount) > 0 ? Number(l.totalAmount) : (Number(l.item?.price || 0) * Math.abs(ticket.ticketType === 'INVENTORY_REPORT' ? l.qty : (l.qtyApproved ?? l.qty)))), 0)).toLocaleString('vi-VN')}₫
-                          </td>
-                       </>
-                    )}
+                    <td colSpan={4} className="border border-black p-2 text-right uppercase text-[10px]">Cộng:</td>
+                    <td className="border border-black p-2 text-center">
+                        {ticket.lines.reduce((sum: number, line: any) => sum + Math.abs(line.qtyApproved ?? line.qty), 0)}
+                    </td>
+                    <td className="border border-black p-2 text-right">
+                        {/* Empty for unit price total */}
+                    </td>
+                    <td className="border border-black p-2 text-right">
+                        {(Number(ticket.totalAmount) > 0 ? Number(ticket.totalAmount) : ticket.lines.reduce((sum: number, l: any) => sum + (Number(l.totalAmount) > 0 ? Number(l.totalAmount) : (Number(l.item?.price || 0) * Math.abs(l.qtyApproved ?? l.qty))), 0)).toLocaleString('vi-VN')}₫
+                    </td>
                 </tr>
-                {(!ticket.metadata || ticket.metadata?.showPrice !== false) && (Number(ticket.totalAmount) > 0 ? Number(ticket.totalAmount) : ticket.lines.reduce((sum: number, l: any) => sum + (Number(l.totalAmount) > 0 ? Number(l.totalAmount) : (Number(l.item?.price || 0) * Math.abs(ticket.ticketType === 'INVENTORY_REPORT' ? l.qty : (l.qtyApproved ?? l.qty)))), 0)) > 0 && (
+                {(Number(ticket.totalAmount) > 0 ? Number(ticket.totalAmount) : ticket.lines.reduce((sum: number, l: any) => sum + (Number(l.totalAmount) > 0 ? Number(l.totalAmount) : (Number(l.item?.price || 0) * Math.abs(l.qtyApproved ?? l.qty))), 0)) > 0 && (
                   <tr className="h-10">
-                      <td colSpan={ticket.ticketType === 'INVENTORY_REPORT' ? (ticket.metadata?.includeReserved ? 9 : 8) : 7} className="border border-black p-2 text-right">
+                      <td colSpan={7} className="border border-black p-2 text-right">
                           <span className="font-bold uppercase text-[11px] mr-2 italic">Bằng chữ:</span>
                           <span className="font-black italic text-indigo-800">
-                            {toVietnamese(Number(ticket.totalAmount) > 0 ? Number(ticket.totalAmount) : ticket.lines.reduce((sum: number, l: any) => sum + (Number(l.totalAmount) > 0 ? Number(l.totalAmount) : (Number(l.item?.price || 0) * Math.abs(ticket.ticketType === 'INVENTORY_REPORT' ? l.qty : (l.qtyApproved ?? l.qty)))), 0))}
+                            {toVietnamese(Number(ticket.totalAmount) > 0 ? Number(ticket.totalAmount) : ticket.lines.reduce((sum: number, l: any) => sum + (Number(l.totalAmount) > 0 ? Number(l.totalAmount) : (Number(l.item?.price || 0) * Math.abs(l.qtyApproved ?? l.qty))), 0))}
                           </span>
                       </td>
                   </tr>
@@ -799,10 +737,11 @@ function PrintTemplate({ ticket }: { ticket: any }) {
             </tbody>
         </table>
 
+
         {/* Signatures */}
         <div className="grid grid-cols-4 gap-y-12 gap-x-4 text-center text-[11px] font-bold mt-12 print-signatures">
             <div className="flex flex-col h-full">
-                <p className="mb-2 uppercase">{ticket.ticketType === 'INVENTORY_REPORT' ? 'NGƯỜI IN PHIẾU' : 'Người lập phiếu'}</p>
+                <p className="mb-2 uppercase">Người lập phiếu</p>
                 <p className="text-[10px] font-normal italic mb-4">(Ký, họ tên)</p>
                 <div className="mt-16 border-t border-dotted border-black w-[80%] mx-auto pt-2">
                    <p className="font-bold uppercase">{ticket.createdBy.fullName}</p>
@@ -810,7 +749,7 @@ function PrintTemplate({ ticket }: { ticket: any }) {
             </div>
 
             <div className="flex flex-col h-full">
-                <p className="mb-2 uppercase">{ticket.ticketType === 'INVENTORY_REPORT' ? 'THỦ KHO' : 'Thủ kho'}</p>
+                <p className="mb-2 uppercase">Thủ kho</p>
                 <p className="text-[10px] font-normal italic mb-4">(Ký, họ tên)</p>
                 <div className="mt-16 border-t border-dotted border-black w-[80%] mx-auto pt-2">
                    <p className="font-bold uppercase">{ticket.executedBy?.fullName || '....................'}</p>
@@ -818,22 +757,20 @@ function PrintTemplate({ ticket }: { ticket: any }) {
             </div>
             
             <div className="flex flex-col h-full">
-                <p className="mb-2 uppercase">{ticket.ticketType === 'INVENTORY_REPORT' ? 'QUẢN LÝ HCNS' : 'Người nhận hàng'}</p>
+                <p className="mb-2 uppercase">Người nhận hàng</p>
                 <p className="text-[10px] font-normal italic mb-4">(Ký, họ tên)</p>
                 <div className="mt-16 border-t border-dotted border-black w-[80%] mx-auto pt-2">
-                   <p className="font-bold uppercase">{ticket.ticketType === 'INVENTORY_REPORT' ? '....................' : (ticket.receiverName || '....................')}</p>
+                   <p className="font-bold uppercase">{ticket.receiverName || '....................'}</p>
                 </div>
             </div>
 
-            {ticket.ticketType !== 'INVENTORY_REPORT' && (
-              <div className="flex flex-col h-full">
-                  <p className="mb-2 uppercase text-slate-600">Người duyệt</p>
-                  <p className="text-[10px] font-normal italic mb-4">(Ký xác nhận)</p>
-                  <div className="mt-16 border-t border-dotted border-black w-[80%] mx-auto pt-2">
-                     <p className="font-bold uppercase">{ticket.approvedBy?.fullName || '....................'}</p>
-                  </div>
-              </div>
-            )}
+            <div className="flex flex-col h-full">
+                <p className="mb-2 uppercase text-slate-600">Người duyệt</p>
+                <p className="text-[10px] font-normal italic mb-4">(Ký xác nhận)</p>
+                <div className="mt-16 border-t border-dotted border-black w-[80%] mx-auto pt-2">
+                   <p className="font-bold uppercase">{ticket.approvedBy?.fullName || '....................'}</p>
+                </div>
+            </div>
         </div>
 
         {/* Audit & Detailed Info for Print (Pushed to bottom) */}
