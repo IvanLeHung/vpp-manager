@@ -464,14 +464,16 @@ const PurchasesDetail = ({ poId, onBack, showToast }: PurchasesDetailProps) => {
                                     const origPrice = Number(l.requestLine?.unitPrice || origItem?.price || 0);
                                     const origQty = Number(l.requestLine?.qtyApproved || l.requestLine?.qtyRequested || 0);
                                     const origTotal = origPrice * origQty;
-                                    const currentTotal = Number(l.unitPrice) * qtyReq;
-                                    const diff = currentTotal - origTotal;
-                                    const isExpensive = diff > 0;
+                                    
                                     const isPending = l.requestLine?.status === 'REPLACEMENT_PENDING_ADMIN';
-                                     const effectiveItem = isReplaced ? l.requestLine?.replacementItem : l.item;
-                                     const effectivePrice = isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0);
-                                     const effectiveQty = isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyReq;
-                                     const effectiveAmount = effectivePrice * effectiveQty;
+                                    const effectiveItem = isReplaced ? l.requestLine?.replacementItem : l.item;
+                                    const effectivePrice = isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0);
+                                    const effectiveQty = isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyReq;
+                                    const effectiveAmount = effectivePrice * effectiveQty;
+                                    
+                                    const diff = effectiveAmount - origTotal;
+                                    const isExpensive = diff > 0;
+                                    const isSavings = diff < 0;
 
                                     return (
                                     <React.Fragment key={l.id}>
@@ -569,21 +571,31 @@ const PurchasesDetail = ({ poId, onBack, showToast }: PurchasesDetailProps) => {
                                               </div>
                                             </div>
                                             <div className="text-right">
-                                               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Chênh lệch</p>
+                                               <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isSavings ? 'text-emerald-500' : 'text-slate-400'}`}>
+                                                  {isSavings ? 'Tiết kiệm' : 'Chênh lệch'}
+                                               </p>
                                                <span className={`text-[14px] font-black ${isExpensive ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                                  {isExpensive ? '+' : ''}{diff.toLocaleString('vi-VN')} đ
+                                                  {isExpensive ? '+' : ''}{Math.abs(diff).toLocaleString('vi-VN')} đ
                                                </span>
                                             </div>
                                           </div>
                                           
-                                          <div className="grid grid-cols-4 gap-4 mt-1 border-t border-slate-100 pt-2">
+                                          <div className="grid grid-cols-6 gap-4 mt-1 border-t border-slate-100 pt-2">
                                             <div>
                                               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Giá gốc</p>
-                                              <p className="text-[12px] font-bold text-slate-500">{origPrice.toLocaleString('vi-VN')} đ</p>
+                                              <p className="text-[12px] font-bold text-slate-500 line-through decoration-slate-300">{origPrice.toLocaleString('vi-VN')} đ</p>
                                             </div>
                                             <div>
                                               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tổng tiền cũ</p>
-                                              <p className="text-[12px] font-bold text-slate-500">{origTotal.toLocaleString('vi-VN')} đ</p>
+                                              <p className="text-[12px] font-bold text-slate-500 line-through decoration-slate-300">{origTotal.toLocaleString('vi-VN')} đ</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Giá mới</p>
+                                              <p className="text-[12px] font-bold text-emerald-600">{effectivePrice.toLocaleString('vi-VN')} đ</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Tổng tiền mới</p>
+                                              <p className="text-[12px] font-bold text-emerald-600">{effectiveAmount.toLocaleString('vi-VN')} đ</p>
                                             </div>
                                             <div className="col-span-2">
                                               <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Lý do thay thế</p>
