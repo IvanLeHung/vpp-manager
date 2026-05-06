@@ -69,7 +69,7 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
       setSupplier('');
       setIssueType(isOpen && type === 'RECEIVE' ? 'NEW_PURCHASE' : 'INTERNAL');
       setShowConfirm(false);
-      api.get('/users').then(res => setUsers(res.data)).catch(console.error);
+      api.get('/users').then(res => setUsers(Array.isArray(res.data) ? res.data : res.data?.data || [])).catch(console.error);
     }
   }, [isOpen]);
 

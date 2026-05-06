@@ -4,7 +4,7 @@ import {
   ClipboardList, Plus, Search, ChevronLeft, ChevronRight, RefreshCw,
   ArrowDownToLine, ArrowUpFromLine, Settings2, Eye, X, XCircle,
   CheckCircle2, Clock, FileX2, Zap, Ban, Package, Send, Check, ArrowLeft,
-  Download, FilePieChart
+  Download, FilePieChart, Printer
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAppContext } from '../context/AppContext';
