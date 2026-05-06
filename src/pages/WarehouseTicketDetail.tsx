@@ -271,9 +271,9 @@ export default function WarehouseTicketDetail({ basePath = '/warehouse-tickets' 
                    <Shield className="w-3.5 h-3.5 mr-1" /> REF: {ticket.sourceRef}
                 </span>
               )}
-              {ticket.totalAmount !== null && ticket.totalAmount > 0 && (
+              {Number(ticket.totalAmount) > 0 && (
                 <span className="text-sm text-emerald-700 font-black bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 flex items-center">
-                   <ShoppingCart className="w-3.5 h-3.5 mr-1" /> {ticket.totalAmount.toLocaleString('vi-VN')}₫
+                   <ShoppingCart className="w-3.5 h-3.5 mr-1" /> {Number(ticket.totalAmount).toLocaleString('vi-VN')}₫
                 </span>
               )}
             </div>
@@ -371,10 +371,10 @@ export default function WarehouseTicketDetail({ basePath = '/warehouse-tickets' 
                         {line.qtyApproved !== null ? (line.qtyApproved > 0 ? `+${line.qtyApproved}` : Math.abs(line.qtyApproved)) : '—'}
                       </td>
                       <td className="p-4 text-right font-bold text-slate-700">
-                        {line.unitPrice || line.item.price ? `${Number(line.unitPrice || line.item.price).toLocaleString('vi-VN')} đ` : '—'}
+                        {Number(line.unitPrice) > 0 || Number(line.item?.price) > 0 ? `${Number(line.unitPrice || line.item?.price).toLocaleString('vi-VN')} đ` : '—'}
                       </td>
                       <td className="p-4 text-right font-black text-indigo-600">
-                        {line.totalAmount || (line.item.price ? Number(line.item.price) * Math.abs(line.qtyApproved ?? line.qty) : null) ? `${Number(line.totalAmount || Number(line.item.price || 0) * Math.abs(line.qtyApproved ?? line.qty)).toLocaleString('vi-VN')} đ` : '—'}
+                        {Number(line.totalAmount) > 0 || Number(line.item?.price) > 0 ? `${(Number(line.totalAmount) > 0 ? Number(line.totalAmount) : Number(line.item?.price || 0) * Math.abs(line.qtyApproved ?? line.qty)).toLocaleString('vi-VN')} đ` : '—'}
                       </td>
                       <td className="p-4 text-right text-slate-400 font-medium">{line.beforeQty ?? '—'}</td>
                       <td className="p-4 text-right font-bold text-emerald-600">{line.afterQty ?? '—'}</td>
@@ -612,8 +612,8 @@ export default function WarehouseTicketDetail({ basePath = '/warehouse-tickets' 
                               <td className="border border-black p-2 font-medium">{line.item.name}</td>
                               <td className="border border-black p-2 text-center">{line.uom || line.item.unit}</td>
                               <td className="border border-black p-2 text-center font-black">{Math.abs(line.qtyApproved ?? line.qty)}</td>
-                              <td className="border border-black p-2 text-right">{Number(line.unitPrice || line.item.price || 0).toLocaleString('vi-VN')}₫</td>
-                              <td className="border border-black p-2 text-right font-black">{Number(line.totalAmount || (Number(line.item.price || 0) * Math.abs(line.qtyApproved ?? line.qty)) || 0).toLocaleString('vi-VN')}₫</td>
+                              <td className="border border-black p-2 text-right">{Number(line.unitPrice || line.item?.price || 0).toLocaleString('vi-VN')}₫</td>
+                              <td className="border border-black p-2 text-right font-black">{(Number(line.totalAmount) > 0 ? Number(line.totalAmount) : (Number(line.item?.price || 0) * Math.abs(line.qtyApproved ?? line.qty))).toLocaleString('vi-VN')}₫</td>
                           </tr>
                       ))}
                       <tr className="bg-slate-50 h-10 font-black">
@@ -625,10 +625,10 @@ export default function WarehouseTicketDetail({ basePath = '/warehouse-tickets' 
                               {/* Empty for unit price total */}
                           </td>
                           <td className="border border-black p-2 text-right">
-                              {(ticket.totalAmount || ticket.lines.reduce((sum, l) => sum + Number(l.totalAmount || (Number(l.item.price || 0) * Math.abs(l.qtyApproved ?? l.qty))), 0)).toLocaleString('vi-VN')}₫
+                              {(Number(ticket.totalAmount) > 0 ? Number(ticket.totalAmount) : ticket.lines.reduce((sum, l) => sum + (Number(l.totalAmount) > 0 ? Number(l.totalAmount) : (Number(l.item?.price || 0) * Math.abs(l.qtyApproved ?? l.qty))), 0)).toLocaleString('vi-VN')}₫
                           </td>
                       </tr>
-                      {(ticket.totalAmount || ticket.lines.reduce((sum, l) => sum + Number(l.totalAmount || (Number(l.item.price || 0) * Math.abs(l.qtyApproved ?? l.qty))), 0)) > 0 && (
+                      {(Number(ticket.totalAmount) > 0 ? Number(ticket.totalAmount) : ticket.lines.reduce((sum, l) => sum + (Number(l.totalAmount) > 0 ? Number(l.totalAmount) : (Number(l.item?.price || 0) * Math.abs(l.qtyApproved ?? l.qty))), 0)) > 0 && (
                         <tr className="h-10">
                             <td colSpan={7} className="border border-black p-2 text-right">
                                 <span className="font-bold uppercase text-[11px] mr-2 italic">Bằng chữ:</span>
