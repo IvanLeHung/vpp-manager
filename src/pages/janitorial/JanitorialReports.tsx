@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
-import { TrendingDown, AlertTriangle, ShieldCheck, FileText } from 'lucide-react';
+import { TrendingDown, AlertTriangle, ShieldCheck, FileText, Printer, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import api from '../../lib/api';
 
 export default function JanitorialReports() {
@@ -37,12 +38,51 @@ export default function JanitorialReports() {
       Ngưỡng: c.item.standardConsumption || 0
     })).slice(0, 10); // Display Top 10
 
+  const handleExportExcel = () => {
+    const wb = XLSX.utils.book_new();
+    const exportData = consumption.map((c, i) => ({
+       'STT': i + 1,
+       'Mã Vật Tư': c.item.mvpp,
+       'Tên Vật Tư': c.item.name,
+       'Đơn Vị Tính': c.item.unit,
+       'Số Lượng Tiêu Hao': c.totalQtyConsumed,
+       'Định Mức Chuẩn (Tháng)': c.item.standardConsumption || 0,
+       'Cảnh Báo': c.item.standardConsumption > 0 && c.totalQtyConsumed > c.item.standardConsumption ? 'Vượt định mức' : 'Bình thường'
+    }));
+    
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    ws['!cols'] = [{wch: 5}, {wch: 15}, {wch: 40}, {wch: 15}, {wch: 20}, {wch: 25}, {wch: 20}];
+    XLSX.utils.book_append_sheet(wb, ws, "Tieu_Hao_Do_Ve_Sinh");
+    XLSX.writeFile(wb, `Bao_Cao_Tieu_Hao_Ve_Sinh_${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
-    <div className="flex flex-col h-full bg-slate-50 relative">
-      <div className="bg-white px-8 pt-4 pb-4 border-b border-slate-200 shrink-0 sticky top-0 z-10 w-full shadow-sm">
+    <div className="flex flex-col h-full bg-slate-50 relative print-area">
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          .print-area, .print-area * { visibility: visible; }
+          .print-area { position: absolute; left: 0; top: 0; width: 100%; height: auto; overflow: visible !important; }
+          .no-print { display: none !important; }
+          .bg-white { background: transparent !important; border: none !important; box-shadow: none !important; }
+        }
+      `}</style>
+      <div className="bg-white px-8 pt-4 pb-4 border-b border-slate-200 shrink-0 sticky top-0 z-10 w-full shadow-sm flex justify-between items-center no-print">
         <h1 className="text-xl font-bold flex items-center text-rose-700">
            <TrendingDown className="w-5 h-5 mr-3" /> Báo cáo tiêu hao Đồ vệ sinh (30 ngày qua)
         </h1>
+        <div className="flex gap-3">
+          <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all shadow-sm">
+             <Printer className="w-4 h-4 mr-2" /> In Báo Cáo
+          </button>
+          <button onClick={handleExportExcel} className="flex items-center px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-sm">
+             <Download className="w-4 h-4 mr-2" /> Tải Excel
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 md:p-8 relative">
