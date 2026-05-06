@@ -2,9 +2,18 @@ import React, { useState, useEffect } from 'react';
 import api from '../../lib/api';
 import {
   ArrowLeft, CheckCircle, Package, AlertTriangle, Printer, Trash2, XCircle,
-  ChevronLeft, ChevronRight, User, Clock, AlertCircle,
-  Info, History
+  ChevronLeft, ChevronRight, User, Clock, AlertCircle, 
+  Info, History, Undo, FileText
 } from 'lucide-react';
+
+const AUDIT_ACTION_MAP: Record<string, { label: string, impact: string, color: string }> = {
+  'CREATE': { label: 'Khởi tạo phiếu', impact: 'Hệ thống', color: 'bg-slate-100 text-slate-500' },
+  'SAVE_DRAFT': { label: 'Lưu nháp đối chiếu', impact: 'Không đổi tồn', color: 'bg-blue-100 text-blue-600' },
+  'CONFIRM': { label: 'Xác nhận nhập kho', impact: 'Cập nhật tồn', color: 'bg-emerald-100 text-emerald-600' },
+  'CANCEL': { label: 'Hủy phiếu', impact: 'Không đổi tồn', color: 'bg-rose-100 text-rose-600' },
+  'CANCEL_AND_RESTORE': { label: 'Hủy & hoàn tồn', impact: 'Hoàn tồn', color: 'bg-rose-600 text-white' },
+  'ADJUST': { label: 'Điều chỉnh tồn', impact: 'Cập nhật tồn', color: 'bg-amber-100 text-amber-600' }
+};
 
 interface ReceiptsDetailProps {
   receiptId: string;
@@ -150,13 +159,29 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
   const totalOrdered = data.lines.reduce((s: number, l: any) => s + l.qtyOrdered, 0);
   const currentAccepted = reconcileValues.reduce((s: number, v: any) => s + (v.qtyAccepted || 0), 0);
   const currentDefective = reconcileValues.reduce((s: number, v: any) => s + (v.qtyDefective || 0), 0);
-  const hasDiscrepancy = currentAccepted < totalOrdered || currentDefective > 0;
+  const currentDelivered = reconcileValues.reduce((s: number, v: any) => s + (v.qtyDelivered || 0), 0);
+
+  // Breakdown stats
+  const totalMissing = data.lines.reduce((sum: number, l: any) => {
+    const v = reconcileValues.find(x => x.id === l.id);
+    const diff = l.qtyOrdered - (v?.qtyDelivered || 0);
+    return sum + (diff > 0 ? diff : 0);
+  }, 0);
+
+  const totalExtra = data.lines.reduce((sum: number, l: any) => {
+    const v = reconcileValues.find(x => x.id === l.id);
+    const diff = (v?.qtyDelivered || 0) - l.qtyOrdered;
+    return sum + (diff > 0 ? diff : 0);
+  }, 0);
+
+  const hasDiscrepancy = currentAccepted < totalOrdered || currentDefective > 0 || totalExtra > 0;
+
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden">
       <div className="h-20 bg-white border-b border-slate-200 flex justify-between items-center px-6 md:px-10 shrink-0 z-20 shadow-sm print:hidden">
         <div className="flex items-center gap-6">
-          <button onClick={onBack} className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition shadow-inner">
+          <button onClick={onBack} className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition shadow-inner" title="Quay lại danh sách">
             <ArrowLeft className="w-5 h-5" />
           </button>
           
@@ -164,19 +189,21 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
             <button 
               disabled={!canGoPrev}
               onClick={goPrev}
-              className="p-1.5 bg-white text-slate-400 hover:text-indigo-600 disabled:opacity-30 rounded-xl transition shadow-sm border border-slate-200"
+              className="p-1.5 bg-white text-slate-400 hover:text-indigo-600 disabled:opacity-30 rounded-xl transition shadow-sm border border-slate-200 group relative"
             >
               <ChevronLeft className="w-5 h-5" />
+              <span className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-slate-800 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap pointer-events-none">Phiếu trước</span>
             </button>
-            <div className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
-              {currentIndex + 1} / {navigationIds.length}
+            <div className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap" title={navigationIds.length > 0 ? `Vị trí ${currentIndex + 1} trong danh sách` : 'Không có danh sách điều hướng'}>
+              {currentIndex + 1} / {navigationIds.length || 1}
             </div>
             <button 
               disabled={!canGoNext}
               onClick={goNext}
-              className="p-1.5 bg-white text-slate-400 hover:text-indigo-600 disabled:opacity-30 rounded-xl transition shadow-sm border border-slate-200"
+              className="p-1.5 bg-white text-slate-400 hover:text-indigo-600 disabled:opacity-30 rounded-xl transition shadow-sm border border-slate-200 group relative"
             >
               <ChevronRight className="w-5 h-5" />
+              <span className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-slate-800 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap pointer-events-none">Phiếu sau</span>
             </button>
           </div>
 
@@ -229,7 +256,7 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                 onClick={() => setCancelModal({ open: true, reason: '' })}
                 className="px-4 py-2.5 bg-slate-50 text-slate-400 hover:bg-rose-600 hover:text-white rounded-xl transition flex items-center gap-2 text-xs font-black border border-slate-200"
               >
-                <XCircle className="w-4 h-4" /> HỦY & HOÀN TỒN
+                <Undo className="w-4 h-4" /> HỦY & HOÀN TỒN
               </button>
             )}
           </div>
@@ -257,16 +284,25 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200">
-            <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest mb-3 flex items-center"><AlertTriangle className="w-3 h-3 mr-1"/> Lệch / Lỗi</p>
-            <p className={`text-2xl font-black tracking-tighter ${currentDefective > 0 || (totalOrdered - currentAccepted) > 0 ? 'text-rose-600' : 'text-slate-300'}`}>
-              {(totalOrdered - currentAccepted) + currentDefective}
+          <div className={`p-5 rounded-3xl shadow-sm border transition-colors ${hasDiscrepancy ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-200'}`}>
+            <p className={`text-[9px] font-black uppercase tracking-widest mb-3 flex items-center ${hasDiscrepancy ? 'text-rose-500' : 'text-slate-400'}`}>
+               <AlertTriangle className="w-3 h-3 mr-1"/> Lệch / Lỗi
             </p>
+            {hasDiscrepancy ? (
+              <div className="flex flex-wrap gap-2">
+                 {totalMissing > 0 && <span className="text-[10px] font-black bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg">-{totalMissing} thiếu</span>}
+                 {totalExtra > 0 && <span className="text-[10px] font-black bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg">+{totalExtra} bù/dư</span>}
+                 {currentDefective > 0 && <span className="text-[10px] font-black bg-rose-100 text-rose-700 px-2 py-0.5 rounded-lg">{currentDefective} lỗi</span>}
+              </div>
+            ) : (
+              <p className="text-2xl font-black tracking-tighter text-slate-300">0</p>
+            )}
           </div>
 
           <div className={`p-5 rounded-3xl shadow-lg flex flex-col justify-center transition-all duration-500 ${hasDiscrepancy ? 'bg-amber-500 shadow-amber-500/20' : 'bg-indigo-600 shadow-indigo-600/20'}`}>
             <p className="text-[9px] font-black text-white/70 uppercase tracking-widest mb-1 flex items-center">
-              {hasDiscrepancy ? <AlertCircle className="w-3 h-3 mr-1"/> : <CheckCircle className="w-3 h-3 mr-1"/>} Tiến độ
+              {hasDiscrepancy ? <AlertCircle className="w-3 h-3 mr-1"/> : <CheckCircle className="w-3 h-3 mr-1"/>} 
+              {totalOrdered > 0 && currentAccepted === totalOrdered && currentDefective === 0 ? 'Hoàn tất' : 'Tiến độ'}
             </p>
             <div className="flex items-center justify-between">
               <p className="text-2xl font-black text-white">
@@ -280,6 +316,7 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
             </div>
           </div>
         </div>
+
 
         {isPending && (
           <div className="flex items-center justify-between bg-white px-8 py-4 rounded-3xl border border-indigo-100 shadow-xl shadow-indigo-500/5">
@@ -307,7 +344,7 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
             </h3>
           </div>
           
-          <div className="flex-1 overflow-auto custom-scrollbar relative">
+          <div className="flex-1 overflow-auto custom-scrollbar relative pb-[60px]">
             <table className="w-full text-left border-separate border-spacing-0">
               <thead className="sticky top-0 z-10">
                 <tr className="text-[9px] uppercase font-black text-slate-400 tracking-widest bg-white">
@@ -384,17 +421,29 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                             onChange={(e: any) => setReconcileValues(reconcileValues.map(a => a.id === l.id ? { ...a, note: e.target.value } : a))}
                             className="w-full px-3 py-1.5 bg-white border border-slate-200 outline-none rounded-xl focus:border-indigo-400 font-bold text-[11px] transition text-slate-700 shadow-sm"
                           />
-                        ) : <span className="text-[11px] font-bold text-slate-500 italic">{l.note || '---'}</span>}
+                        ) : (
+                          <div className="flex items-center gap-2">
+                             {l.note ? (
+                               <>
+                                 <div className="w-6 h-6 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500 shadow-sm border border-indigo-100"><FileText className="w-3.5 h-3.5"/></div>
+                                 <span className="text-[11px] font-bold text-slate-700 max-w-[200px] truncate">{l.note}</span>
+                               </>
+                             ) : (
+                               <span className="text-[11px] font-bold text-slate-300 italic">---</span>
+                             )}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   )
                 })}
               </tbody>
+
               <tfoot className="sticky bottom-0 z-10">
                 <tr className="bg-slate-900 text-white font-black text-xs uppercase tracking-widest">
                   <td colSpan={2} className="p-4 text-right">TỔNG CỘNG:</td>
                   <td className="p-4 text-center border-l border-white/10">{totalOrdered}</td>
-                  <td className="p-4 text-center bg-amber-600/50 border-l border-white/10">{reconcileValues.reduce((s,v)=>s+(v.qtyDelivered||0),0)}</td>
+                  <td className="p-4 text-center bg-amber-600/50 border-l border-white/10">{currentDelivered}</td>
                   <td className="p-4 text-center bg-emerald-600/50 border-l border-white/10">{currentAccepted}</td>
                   <td className="p-4 text-center bg-rose-600/50 border-l border-white/10">{currentDefective}</td>
                   {isPending && <td className="p-4 bg-slate-800 border-l border-white/10"></td>}
@@ -411,34 +460,40 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                 <History className="w-4 h-4 mr-2 text-indigo-500" /> Lịch sử thao tác mã phiếu (Audit Trail)
              </h3>
              <div className="relative pl-6 border-l-2 border-slate-100 space-y-10 ml-4">
-                 {data.auditLogs.map((audit:any) => (
-                    <div key={audit.id} className="relative group">
-                      <div className="absolute -left-[33px] top-1 w-4 h-4 rounded-full bg-white ring-4 ring-slate-50 border-2 border-slate-200 group-hover:border-indigo-500 group-hover:scale-125 transition-all flex items-center justify-center">
-                         <div className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-indigo-500"></div>
-                      </div>
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-                         <div>
-                            <p className="text-[11px] font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
-                               {audit.action}
-                               {audit.action.includes('Hủy') && <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>}
-                            </p>
-                            <div className="flex items-center gap-3 mt-1">
-                               <span className="flex items-center text-[9px] font-bold text-slate-400 uppercase"><User className="w-3 h-3 mr-1 text-slate-300"/> {audit.user?.fullName || 'Hệ thống'}</span>
-                               <span className="flex items-center text-[9px] font-bold text-slate-400 uppercase"><Clock className="w-3 h-3 mr-1 text-slate-300"/> {new Date(audit.createdAt).toLocaleString('vi-VN')}</span>
-                            </div>
-                         </div>
-                         <div className="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 text-[10px] font-bold text-slate-500">
-                            {audit.action.includes('Nhập') ? 'Cập nhật tồn kho' : audit.action.includes('Lưu') ? 'Ghi nhận biến động' : 'Thay đổi trạng thái'}
-                         </div>
-                      </div>
-                      {audit.newValues?.reason && (
-                        <div className="mt-3 bg-rose-50/50 p-4 rounded-2xl border border-rose-100 border-l-4 border-l-rose-500 relative">
-                           <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-1 flex items-center"><AlertCircle className="w-3 h-3 mr-1"/> Lý do hủy phiếu:</p>
-                           <p className="text-xs font-bold text-slate-700">{audit.newValues.reason}</p>
+                 {data.auditLogs.map((audit:any) => {
+                    const mapped = AUDIT_ACTION_MAP[audit.action] || { label: audit.action, impact: 'Thay đổi', color: 'bg-slate-100 text-slate-500' };
+                    return (
+                      <div key={audit.id} className="relative group">
+                        <div className="absolute -left-[33px] top-1 w-4 h-4 rounded-full bg-white ring-4 ring-slate-50 border-2 border-slate-200 group-hover:border-indigo-500 group-hover:scale-125 transition-all flex items-center justify-center">
+                           <div className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-indigo-500"></div>
                         </div>
-                      )}
-                    </div>
-                 ))}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                           <div>
+                              <p className="text-[11px] font-black text-slate-800 uppercase tracking-tighter flex items-center gap-2">
+                                 {mapped.label}
+                                 <span className="text-[8px] font-black text-slate-300 px-1 border border-slate-100 rounded">{audit.action}</span>
+                                 {audit.action.includes('CANCEL') && <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>}
+                              </p>
+                              <div className="flex items-center gap-3 mt-1">
+                                 <span className="flex items-center text-[9px] font-bold text-slate-400 uppercase"><User className="w-3 h-3 mr-1 text-slate-300"/> {audit.user?.fullName || 'Hệ thống'}</span>
+                                 <span className="flex items-center text-[9px] font-bold text-slate-400 uppercase"><Clock className="w-3 h-3 mr-1 text-slate-300"/> {new Date(audit.createdAt).toLocaleString('vi-VN')}</span>
+                              </div>
+                           </div>
+                           <div className={`px-3 py-1.5 rounded-xl border border-slate-100 text-[10px] font-black uppercase tracking-widest ${mapped.color}`}>
+                              {mapped.impact}
+                           </div>
+                        </div>
+                        {audit.newValues?.reason && (
+                          <div className={`mt-3 p-4 rounded-2xl border relative ${audit.action.includes('CANCEL') ? 'bg-rose-50/50 border-rose-100 border-l-4 border-l-rose-500' : 'bg-slate-50 border-slate-200 border-l-4 border-l-indigo-400'}`}>
+                             <p className={`text-[10px] font-black uppercase tracking-widest mb-1 flex items-center ${audit.action.includes('CANCEL') ? 'text-rose-500' : 'text-indigo-500'}`}>
+                                <AlertCircle className="w-3 h-3 mr-1"/> {audit.action.includes('CANCEL') ? 'Lý do hủy phiếu:' : 'Ghi chú thao tác:'}
+                             </p>
+                             <p className="text-xs font-bold text-slate-700">{audit.newValues.reason}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                 })}
              </div>
           </div>
         )}
@@ -450,14 +505,18 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
            <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
               <div className="p-8 bg-rose-600 text-white relative">
                  <div className="absolute top-0 right-0 p-8 opacity-10"><XCircle className="w-32 h-32" /></div>
-                 <h3 className="text-2xl font-black tracking-tight mb-2">Hủy Phiếu Nhập Kho?</h3>
+                 <h3 className="text-2xl font-black tracking-tight mb-2">
+                   {data.status === 'COMPLETED' || data.status === 'DISCREPANCY' ? 'Hủy & Hoàn Tồn Kho?' : 'Hủy Phiếu Nhập Kho?'}
+                 </h3>
                  <p className="text-rose-100 font-bold text-sm leading-relaxed">
-                   Hành động này sẽ hủy bỏ các kết quả đối chiếu và hoàn trả lại trạng thái cho Đơn mua hàng (PO). Nếu đã nhập kho, tồn kho sẽ bị trừ lại.
+                   {data.status === 'COMPLETED' || data.status === 'DISCREPANCY' 
+                     ? 'CẢNH BÁO: Hệ thống sẽ ĐẢO NGƯỢC số lượng đã nhập khỏi tồn kho MAIN. Hành động này sẽ được ghi nhận vào audit trail và không thể sửa sau khi hủy.'
+                     : 'Hành động này sẽ hủy bỏ các kết quả đối chiếu và hoàn trả lại trạng thái cho Đơn mua hàng (PO).'}
                  </p>
               </div>
               <div className="p-8 space-y-6">
                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Lý do hủy phiếu (Bắt buộc)</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Lý do thực hiện (Bắt buộc)</label>
                     <textarea 
                       placeholder="Nhập lý do chi tiết..."
                       value={cancelModal.reason}
@@ -476,13 +535,14 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                       onClick={handleCancelReceipt}
                       className="flex-2 py-4 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-2xl transition shadow-lg shadow-rose-500/30 uppercase tracking-widest text-xs"
                     >
-                      Xác nhận hủy phiếu
+                      Xác nhận {data.status === 'COMPLETED' || data.status === 'DISCREPANCY' ? 'Hủy & Hoàn tồn' : 'Hủy phiếu'}
                     </button>
                  </div>
               </div>
            </div>
         </div>
       )}
+
 
       {/* FORMAL PRINT-ONLY SECTION (A4 Standard) */}
       <div className="hidden print:block print-container">
