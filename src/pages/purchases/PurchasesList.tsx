@@ -288,7 +288,6 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
     targetData.forEach(po => {
         let poProposed = 0;
         let poActual = 0;
-        let poHasOptimization = false;
         let poHasReplacement = false;
         let poHasQtyAdj = false;
         let poHasPriceAdj = false;
@@ -330,7 +329,6 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
         const diff = poProposed - poActual;
         if (diff > 0) {
-            poHasOptimization = true;
             optimizedPoCount++;
         }
 
