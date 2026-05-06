@@ -267,6 +267,107 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
     return { vppCount, vsCount, otherCount, total: vppCount + vsCount + otherCount };
   }, [summaryGroups]);
 
+  const executiveData = useMemo(() => {
+    let deptStats = new Map<string, { proposed: number, actual: number, savings: number }>();
+    let optStats = {
+        replacement: { count: 0, savings: 0 },
+        qtyAdjustment: { count: 0, savings: 0 },
+        priceAdjustment: { count: 0, savings: 0 },
+        other: { count: 0, savings: 0 }
+    };
+
+    let totalProposed = 0;
+    let totalActual = 0;
+    let totalSavings = 0;
+    let optimizedPoCount = 0;
+
+    const targetData = selectedIds.length > 0 
+        ? data.filter(d => selectedIds.includes(d.id))
+        : data.filter(d => ['ORDERED', 'DELIVERING', 'PARTIALLY_DELIVERED', 'COMPLETED'].includes(d.status));
+
+    targetData.forEach(po => {
+        let poProposed = 0;
+        let poActual = 0;
+        let poHasOptimization = false;
+        let poHasReplacement = false;
+        let poHasQtyAdj = false;
+        let poHasPriceAdj = false;
+        let poHasOtherAdj = false;
+
+        const dept = po.department || po.requesterDepartment || po.requester?.department?.name || 'Khác';
+
+        po.lines.forEach((line: any) => {
+            const reqLine = line.requestLine;
+            
+            const originalPrice = Number(reqLine?.unitPrice || line.item?.price || line.unitPrice || 0);
+            const originalQty = Number(reqLine?.qtyRequested || line.qtyRequested || 0);
+            const lineProposed = originalPrice * originalQty;
+
+            const isReplaced = !!reqLine?.replacementItemId;
+            const actualPrice = isReplaced ? Number(reqLine?.replacementPrice || 0) : Number(line.unitPrice || 0);
+            const actualQty = isReplaced ? Number(reqLine?.replacementQty || 0) : Number(line.qtyRequested || 0);
+            const lineActual = actualPrice * actualQty;
+
+            poProposed += lineProposed;
+            poActual += lineActual;
+
+            const lineSavings = lineProposed - lineActual;
+
+            if (isReplaced) {
+                optStats.replacement.savings += lineSavings;
+                poHasReplacement = true;
+            } else if (actualQty < originalQty) {
+                optStats.qtyAdjustment.savings += lineSavings;
+                poHasQtyAdj = true;
+            } else if (actualPrice < originalPrice && actualPrice > 0) {
+                optStats.priceAdjustment.savings += lineSavings;
+                poHasPriceAdj = true;
+            } else if (lineSavings > 0) {
+                optStats.other.savings += lineSavings;
+                poHasOtherAdj = true;
+            }
+        });
+
+        const diff = poProposed - poActual;
+        if (diff > 0) {
+            poHasOptimization = true;
+            optimizedPoCount++;
+        }
+
+        totalProposed += poProposed;
+        totalActual += poActual;
+        totalSavings += diff;
+
+        if (poHasReplacement) optStats.replacement.count++;
+        if (poHasQtyAdj) optStats.qtyAdjustment.count++;
+        if (poHasPriceAdj) optStats.priceAdjustment.count++;
+        if (poHasOtherAdj) optStats.other.count++;
+
+        const currentDept = deptStats.get(dept) || { proposed: 0, actual: 0, savings: 0 };
+        currentDept.proposed += poProposed;
+        currentDept.actual += poActual;
+        currentDept.savings += diff;
+        deptStats.set(dept, currentDept);
+    });
+
+    const deptArray = Array.from(deptStats.entries())
+        .map(([name, stats]) => ({
+            name,
+            ...stats,
+            percentage: stats.proposed > 0 ? (stats.savings / stats.proposed) * 100 : 0
+        }))
+        .sort((a, b) => b.savings - a.savings);
+
+    return {
+        deptArray,
+        optStats,
+        totalProposed,
+        totalActual,
+        totalSavings,
+        optimizedPoCount
+    };
+  }, [data, selectedIds]);
+
   const handlePrintSummary = (type: 'ALL' | 'VPP' | 'VE_SINH' = 'ALL') => {
       setSelectedPrintType(type);
       setShowPrintMenu(false);
@@ -937,6 +1038,168 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                 </div>
             </div>
           ))}
+
+          {/* EXECUTIVE REPORT PAGE */}
+          {selectedPrintType === 'ALL' && (
+              <div className="print-sheet p-8 break-before-page">
+                  <div className="text-center mb-8">
+                     <h2 className="text-2xl font-black uppercase text-indigo-900 inline-block pb-1">BÁO CÁO PHÂN TÍCH HIỆU QUẢ MUA SẮM</h2>
+                     <p className="text-sm font-bold text-slate-500 mt-1 italic">Báo cáo Executive - Tổng hợp số liệu kiểm soát chi phí của Hành chính</p>
+                  </div>
+
+                  {/* BẢNG 1: PHÂN TÍCH THEO PHÒNG BAN */}
+                  <div className="mb-8">
+                      <div className="flex items-center gap-2 mb-3">
+                          <span className="bg-indigo-600 text-white w-6 h-6 flex items-center justify-center rounded-full font-black text-xs">1</span>
+                          <h3 className="text-sm font-black uppercase text-indigo-900">Phân tích theo phòng ban</h3>
+                      </div>
+                      <table className="w-full border-collapse border border-slate-300 text-[9pt]">
+                          <thead>
+                              <tr className="bg-indigo-50 text-indigo-900">
+                                  <th className="border border-slate-300 p-2 text-left">Phòng ban</th>
+                                  <th className="border border-slate-300 p-2 text-right">Đề xuất (đ)</th>
+                                  <th className="border border-slate-300 p-2 text-right">Mua thực tế (đ)</th>
+                                  <th className="border border-slate-300 p-2 text-right">Tối ưu (đ)</th>
+                                  <th className="border border-slate-300 p-2 text-right">%</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              {executiveData.deptArray.map(d => (
+                                  <tr key={d.name} className={d.savings > 0 ? "bg-emerald-50/30 font-bold" : ""}>
+                                      <td className="border border-slate-300 p-2">{d.name}</td>
+                                      <td className="border border-slate-300 p-2 text-right">{d.proposed.toLocaleString('vi-VN')}</td>
+                                      <td className="border border-slate-300 p-2 text-right">{d.actual.toLocaleString('vi-VN')}</td>
+                                      <td className="border border-slate-300 p-2 text-right text-emerald-700">{d.savings.toLocaleString('vi-VN')}</td>
+                                      <td className="border border-slate-300 p-2 text-right">{d.percentage.toFixed(1)}%</td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                          <tfoot>
+                              <tr className="bg-slate-100 font-black text-slate-800">
+                                  <td className="border border-slate-300 p-2">Tổng</td>
+                                  <td className="border border-slate-300 p-2 text-right">{executiveData.totalProposed.toLocaleString('vi-VN')}</td>
+                                  <td className="border border-slate-300 p-2 text-right">{executiveData.totalActual.toLocaleString('vi-VN')}</td>
+                                  <td className="border border-slate-300 p-2 text-right text-emerald-700">{executiveData.totalSavings.toLocaleString('vi-VN')}</td>
+                                  <td className="border border-slate-300 p-2 text-right">{executiveData.totalProposed > 0 ? ((executiveData.totalSavings / executiveData.totalProposed) * 100).toFixed(2) : 0}%</td>
+                              </tr>
+                          </tfoot>
+                      </table>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-8 mb-8">
+                      {/* BẢNG 2: VAI TRÒ HCNS */}
+                      <div>
+                          <div className="flex items-center gap-2 mb-3">
+                              <span className="bg-amber-500 text-white w-6 h-6 flex items-center justify-center rounded-full font-black text-xs">2</span>
+                              <h3 className="text-sm font-black uppercase text-amber-700">Hiệu quả kiểm soát mua sắm</h3>
+                          </div>
+                          <table className="w-full border-collapse border border-slate-300 text-[9pt]">
+                              <thead>
+                                  <tr className="bg-amber-50 text-amber-900">
+                                      <th className="border border-slate-300 p-2 text-left">Nội dung kiểm soát</th>
+                                      <th className="border border-slate-300 p-2 text-center">Số phiếu</th>
+                                      <th className="border border-slate-300 p-2 text-right">Giá trị tối ưu (đ)</th>
+                                  </tr>
+                              </thead>
+                              <tbody>
+                                  <tr>
+                                      <td className="border border-slate-300 p-2">Thay thế vật tư tương đương</td>
+                                      <td className="border border-slate-300 p-2 text-center">{executiveData.optStats.replacement.count}</td>
+                                      <td className="border border-slate-300 p-2 text-right text-emerald-700 font-bold">{executiveData.optStats.replacement.savings.toLocaleString('vi-VN')}</td>
+                                  </tr>
+                                  <tr>
+                                      <td className="border border-slate-300 p-2">Rà soát số lượng mua</td>
+                                      <td className="border border-slate-300 p-2 text-center">{executiveData.optStats.qtyAdjustment.count}</td>
+                                      <td className="border border-slate-300 p-2 text-right text-emerald-700 font-bold">{executiveData.optStats.qtyAdjustment.savings.toLocaleString('vi-VN')}</td>
+                                  </tr>
+                                  <tr>
+                                      <td className="border border-slate-300 p-2">Tối ưu đơn giá NCC</td>
+                                      <td className="border border-slate-300 p-2 text-center">{executiveData.optStats.priceAdjustment.count}</td>
+                                      <td className="border border-slate-300 p-2 text-right text-emerald-700 font-bold">{executiveData.optStats.priceAdjustment.savings.toLocaleString('vi-VN')}</td>
+                                  </tr>
+                              </tbody>
+                              <tfoot>
+                                  <tr className="bg-slate-100 font-black text-slate-800">
+                                      <td className="border border-slate-300 p-2">Tổng cộng</td>
+                                      <td className="border border-slate-300 p-2 text-center">{executiveData.optimizedPoCount}</td>
+                                      <td className="border border-slate-300 p-2 text-right text-emerald-700">{executiveData.totalSavings.toLocaleString('vi-VN')}</td>
+                                  </tr>
+                              </tfoot>
+                          </table>
+                      </div>
+
+                      {/* BẢNG 3: CƠ CẤU TỐI ƯU */}
+                      <div>
+                          <div className="flex items-center gap-2 mb-3">
+                              <span className="bg-emerald-600 text-white w-6 h-6 flex items-center justify-center rounded-full font-black text-xs">3</span>
+                              <h3 className="text-sm font-black uppercase text-emerald-800">Cơ cấu tối ưu chi phí</h3>
+                          </div>
+                          <table className="w-full border-collapse border border-slate-300 text-[9pt]">
+                              <thead>
+                                  <tr className="bg-emerald-50 text-emerald-900">
+                                      <th className="border border-slate-300 p-2 text-left">Hình thức tối ưu</th>
+                                      <th className="border border-slate-300 p-2 text-right">Giá trị (đ)</th>
+                                      <th className="border border-slate-300 p-2 text-right">Tỷ trọng</th>
+                                  </tr>
+                              </thead>
+                              <tbody>
+                                  <tr>
+                                      <td className="border border-slate-300 p-2">Thay thế vật tư</td>
+                                      <td className="border border-slate-300 p-2 text-right">{executiveData.optStats.replacement.savings.toLocaleString('vi-VN')}</td>
+                                      <td className="border border-slate-300 p-2 text-right">{executiveData.totalSavings > 0 ? ((executiveData.optStats.replacement.savings / executiveData.totalSavings) * 100).toFixed(1) : 0}%</td>
+                                  </tr>
+                                  <tr>
+                                      <td className="border border-slate-300 p-2">Điều chỉnh SL</td>
+                                      <td className="border border-slate-300 p-2 text-right">{executiveData.optStats.qtyAdjustment.savings.toLocaleString('vi-VN')}</td>
+                                      <td className="border border-slate-300 p-2 text-right">{executiveData.totalSavings > 0 ? ((executiveData.optStats.qtyAdjustment.savings / executiveData.totalSavings) * 100).toFixed(1) : 0}%</td>
+                                  </tr>
+                                  <tr>
+                                      <td className="border border-slate-300 p-2">Khác (Giá/…)</td>
+                                      <td className="border border-slate-300 p-2 text-right">{(executiveData.optStats.priceAdjustment.savings + executiveData.optStats.other.savings).toLocaleString('vi-VN')}</td>
+                                      <td className="border border-slate-300 p-2 text-right">{executiveData.totalSavings > 0 ? (((executiveData.optStats.priceAdjustment.savings + executiveData.optStats.other.savings) / executiveData.totalSavings) * 100).toFixed(1) : 0}%</td>
+                                  </tr>
+                              </tbody>
+                              <tfoot>
+                                  <tr className="bg-slate-100 font-black text-slate-800">
+                                      <td className="border border-slate-300 p-2">Tổng</td>
+                                      <td className="border border-slate-300 p-2 text-right text-emerald-700">{executiveData.totalSavings.toLocaleString('vi-VN')}</td>
+                                      <td className="border border-slate-300 p-2 text-right">100%</td>
+                                  </tr>
+                              </tfoot>
+                          </table>
+                      </div>
+                  </div>
+
+                  {/* BẢNG 4: XẾP HẠNG PHÒNG BAN */}
+                  <div>
+                      <div className="flex items-center gap-2 mb-3">
+                          <span className="bg-rose-500 text-white w-6 h-6 flex items-center justify-center rounded-full font-black text-xs">4</span>
+                          <h3 className="text-sm font-black uppercase text-rose-800">Top phòng ban tối ưu chi phí cao nhất</h3>
+                      </div>
+                      <table className="w-full border-collapse border border-slate-300 text-[9pt]">
+                          <thead>
+                              <tr className="bg-rose-50 text-rose-900">
+                                  <th className="border border-slate-300 p-2 w-16 text-center">Xếp hạng</th>
+                                  <th className="border border-slate-300 p-2 text-left">Phòng ban</th>
+                                  <th className="border border-slate-300 p-2 text-right">Giá trị tối ưu (đ)</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              {executiveData.deptArray.filter(d => d.savings > 0).slice(0, 5).map((d, idx) => (
+                                  <tr key={d.name}>
+                                      <td className="border border-slate-300 p-2 text-center font-black">{idx + 1}</td>
+                                      <td className="border border-slate-300 p-2 font-bold">{d.name}</td>
+                                      <td className="border border-slate-300 p-2 text-right text-emerald-700 font-bold">{d.savings.toLocaleString('vi-VN')}</td>
+                                  </tr>
+                              ))}
+                              {executiveData.deptArray.filter(d => d.savings > 0).length === 0 && (
+                                  <tr><td colSpan={3} className="border border-slate-300 p-4 text-center text-slate-400 italic">Chưa có dữ liệu tối ưu</td></tr>
+                              )}
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+          )}
         </div>
     </div>
   );
