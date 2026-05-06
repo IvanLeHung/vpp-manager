@@ -7,6 +7,7 @@ export type ViewMode = 'LIST' | 'DETAIL';
 const Receipts: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('LIST');
   const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
+  const [navigationIds, setNavigationIds] = useState<string[]>([]);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'warning'} | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
@@ -14,10 +15,12 @@ const Receipts: React.FC = () => {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleViewDetail = (id: string) => {
+  const handleViewDetail = (id: string, navIds?: string[]) => {
     setSelectedReceiptId(id);
+    if (navIds) setNavigationIds(navIds);
     setViewMode('DETAIL');
   };
+
 
   return (
     <div className="h-full bg-slate-50 relative">
@@ -40,6 +43,7 @@ const Receipts: React.FC = () => {
       {viewMode === 'DETAIL' && selectedReceiptId && (
         <ReceiptsDetail 
           receiptId={selectedReceiptId}
+          navigationIds={navigationIds}
           onBack={() => setViewMode('LIST')}
           showToast={showToast}
         />

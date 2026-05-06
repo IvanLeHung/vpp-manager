@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../lib/api';
 import { 
-  Search, Filter, Calendar, Package, 
-  CheckCircle, Clock, XCircle, ChevronRight, AlertTriangle, PlusCircle
+  Search, Calendar, Package, 
+  CheckCircle, Clock, ChevronRight, AlertTriangle, PlusCircle
 } from 'lucide-react';
 
 interface ReceiptsListProps {
-  onViewDetail: (id: string) => void;
+  onViewDetail: (id: string, navigationIds?: string[]) => void;
 }
 
 const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
@@ -14,6 +14,24 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('PENDING');
+
+  const filteredData = data.filter(d => {
+    const matchSearch = d.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                        (d.poId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        (d.supplier || '').toLowerCase().includes(searchTerm.toLowerCase());
+    
+    let matchTab = true;
+    if (activeTab === 'ALL') matchTab = true;
+    else matchTab = d.status === activeTab;
+
+    return matchSearch && matchTab;
+  });
+
+  const handleOpenDetail = (id: string) => {
+    const navIds = filteredData.map(d => d.id);
+    onViewDetail(id, navIds);
+  };
+
 
   useEffect(() => {
     fetchData();
@@ -40,17 +58,7 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
       }
   };
 
-  const filteredData = data.filter(d => {
-      const matchSearch = d.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          (d.poId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (d.supplier || '').toLowerCase().includes(searchTerm.toLowerCase());
-      
-      let matchTab = true;
-      if (activeTab === 'ALL') matchTab = true;
-      else matchTab = d.status === activeTab;
 
-      return matchSearch && matchTab;
-  });
 
   return (
     <div className="flex flex-col h-full bg-slate-50/50">
@@ -67,7 +75,7 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
                         api.post('/receipts/from_po', { poId })
                            .then(res => {
                                fetchData();
-                               onViewDetail(res.data.id);
+                               handleOpenDetail(res.data.id);
                            })
                            .catch(err => alert(err.response?.data?.error || 'Không thể tạo phiếu từ PO này'));
                     }
@@ -166,7 +174,7 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
                                 </tr>
                             )}
                             {filteredData.map(d => (
-                                <tr key={d.id} onClick={() => onViewDetail(d.id)} className="hover:bg-indigo-50/30 cursor-pointer transition group">
+                                <tr key={d.id} onClick={() => handleOpenDetail(d.id)} className="hover:bg-indigo-50/30 cursor-pointer transition group">
                                     <td className="p-4 border-l-2 border-transparent group-hover:border-indigo-500">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600 font-black shrink-0 border border-orange-100 shadow-sm">RC</div>
