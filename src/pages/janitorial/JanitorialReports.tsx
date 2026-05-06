@@ -215,7 +215,7 @@ export default function JanitorialReports() {
                            <span className={h.movementType === 'ISSUE' ? 'text-rose-600' : 'text-emerald-600'}>{h.movementType === 'ISSUE' ? '-' : '+'}</span>{Math.abs(h.qty)} <span className="text-xs font-normal text-slate-400">{h.item?.unit}</span>
                         </td>
                         <td className="py-3 px-4 text-slate-600">{h.createdBy?.fullName || h.createdBy?.username || 'Hệ thống'}</td>
-                        <td className="py-3 px-4 text-slate-500 italic text-xs max-w-[200px] truncate" title={h.note || ''}>{h.note || '-'}</td>
+                        <td className="py-3 px-4 text-slate-500 italic text-xs max-w-[200px] truncate" title={h.reason || ''}>{h.reason || '-'}</td>
                       </tr>
                     ))
                   )}
