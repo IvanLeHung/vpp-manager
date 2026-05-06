@@ -46,6 +46,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH'>('ALL');
   const [showPrintMenu, setShowPrintMenu] = useState(false);
   const [showPrintConfirm, setShowPrintConfirm] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
 
   useEffect(() => {
     fetchData();
@@ -109,7 +110,14 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       if (activeTab === 'DELIVERING') matchTab = ['DELIVERING', 'PARTIALLY_DELIVERED'].includes(d.status);
       if (activeTab === 'COMPLETED') matchTab = d.status === 'COMPLETED';
 
-      return matchSearch && matchTab;
+      let matchMonth = true;
+      if (selectedMonth) {
+          const poDate = new Date(d.createdAt || d.orderDate);
+          const poMonth = `${poDate.getFullYear()}-${String(poDate.getMonth() + 1).padStart(2, '0')}`;
+          matchMonth = poMonth === selectedMonth;
+      }
+
+      return matchSearch && matchTab && matchMonth;
   });
 
   // Summary aggregation logic - Optimized for original request tracking
@@ -420,6 +428,31 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
         XLSX.utils.book_append_sheet(wb, ws, group.label.slice(0, 31));
     });
 
+    // BÁO CÁO PHÒNG BAN SHEET
+    const deptExportData = executiveData.deptArray.map((d, index) => ({
+        'STT': index + 1,
+        'Phòng ban': d.name,
+        'Giá trị đề xuất': d.proposed,
+        'Giá trị mua thực tế': d.actual,
+        'Giá trị tối ưu': d.savings,
+        'Tỷ lệ tối ưu': d.proposed > 0 ? ((d.savings / d.proposed) * 100).toFixed(2) + '%' : '0%'
+    }));
+    
+    if (deptExportData.length > 0) {
+        deptExportData.push({
+            'STT': 'TỔNG CỘNG',
+            'Phòng ban': '',
+            'Giá trị đề xuất': executiveData.totalProposed,
+            'Giá trị mua thực tế': executiveData.totalActual,
+            'Giá trị tối ưu': executiveData.totalSavings,
+            'Tỷ lệ tối ưu': executiveData.totalProposed > 0 ? ((executiveData.totalSavings / executiveData.totalProposed) * 100).toFixed(2) + '%' : '0%'
+        } as any);
+
+        const wsDept = XLSX.utils.json_to_sheet(deptExportData);
+        wsDept['!cols'] = [{wch: 5}, {wch: 40}, {wch: 20}, {wch: 20}, {wch: 20}, {wch: 15}];
+        XLSX.utils.book_append_sheet(wb, wsDept, "Báo cáo Phòng ban");
+    }
+
     XLSX.writeFile(wb, `Tong_Hop_Mua_Sam_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
@@ -510,6 +543,13 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                     </div>
 
                     <div className="flex items-center gap-2 w-full md:w-auto mt-1.5 md:mt-0">
+                        <input 
+                            type="month"
+                            value={selectedMonth}
+                            onChange={(e) => setSelectedMonth(e.target.value)}
+                            className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/5 shadow-sm transition"
+                            title="Lọc theo tháng báo cáo"
+                        />
                         <div className="relative flex-1 md:w-72">
                             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                             <input 
