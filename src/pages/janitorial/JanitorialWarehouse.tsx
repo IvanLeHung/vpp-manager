@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Droplets, ArrowDownToLine, ArrowUpFromLine, X, Zap, Loader2, Download, SlidersHorizontal, Scale, AlertTriangle, Search, CheckSquare, Square } from 'lucide-react';
+import { Droplets, ArrowDownToLine, ArrowUpFromLine, X, Zap, Loader2, Download, SlidersHorizontal, Scale, AlertTriangle, Search, CheckSquare, Square, Printer } from 'lucide-react';
 import api from '../../lib/api';
 import WarehouseTicketModal from '../../components/warehouse/WarehouseTicketModal';
 import QuickHandoverModal from '../../components/warehouse/QuickHandoverModal';
 import { StockAdjustModal } from '../../components/warehouse/StockAdjustModal';
+import InventoryPrintModal from '../../components/warehouse/InventoryPrintModal';
 import * as XLSX from 'xlsx';
 
 type QuickActionModalProps = {
@@ -285,6 +286,7 @@ export default function JanitorialWarehouse() {
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [showMegaModal, setShowMegaModal] = useState(false);
   const [showHandoverModal, setShowHandoverModal] = useState(false);
+  const [showInventoryPrintModal, setShowInventoryPrintModal] = useState(false);
 
   // Filter & Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -436,6 +438,12 @@ export default function JanitorialWarehouse() {
           selectedStocks={stocks.filter(s => selectedIds.has(s.id))}
         />
 
+        <InventoryPrintModal
+          isOpen={showInventoryPrintModal}
+          onClose={() => setShowInventoryPrintModal(false)}
+          stocks={displayedStocks}
+        />
+
         {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 group hover:border-emerald-200 transition-colors">
@@ -497,18 +505,38 @@ export default function JanitorialWarehouse() {
                   </button>
                 ))}
               </div>
+              <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
+                 <FilterPill label="TẤT CẢ" active={activeFilter === 'ALL'} onClick={() => setActiveFilter('ALL')} color="emerald" />
+                 <FilterPill label="CÒN TỒN" active={activeFilter === 'IN_STOCK'} onClick={() => setActiveFilter('IN_STOCK')} color="emerald" />
+                 <FilterPill label="SẴN SÀNG CẤP" active={activeFilter === 'AVAILABLE'} onClick={() => setActiveFilter('AVAILABLE')} color="emerald" />
+                 <FilterPill label="SẮP HẾT" active={activeFilter === 'LOW'} onClick={() => setActiveFilter('LOW')} color="amber" />
+                 <FilterPill label="CÓ TẠM GIỮ" active={activeFilter === 'RESERVED'} onClick={() => setActiveFilter('RESERVED')} color="indigo" />
+                 <FilterPill label="CẦN MUA BỔ SUNG" active={activeFilter === 'NEED_BUY'} onClick={() => setActiveFilter('NEED_BUY')} color="rose" />
+                 <FilterPill label="HẾT HÀNG" active={activeFilter === 'OUT'} onClick={() => setActiveFilter('OUT')} color="rose" />
+                 
+                 <div className="w-px h-8 bg-slate-200 mx-2 hidden xl:block"></div>
+                 
+                 <button 
+                   onClick={() => setHideZeroStock(!hideZeroStock)}
+                   className={`flex items-center gap-2 px-4 py-3 rounded-xl font-black text-xs transition-all ${hideZeroStock ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-500 border-slate-200'} border`}
+                 >
+                   <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${hideZeroStock ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                      <div className={`w-3 h-3 bg-white rounded-full shadow-sm transition-transform ${hideZeroStock ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                   </div>
+                   Ẩn tồn 0
+                 </button>
 
-              <div className="flex items-center gap-3 shrink-0">
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <div 
-                    onClick={() => setHideZeroStock(!hideZeroStock)}
-                    className={`w-10 h-6 rounded-full p-1 transition-colors duration-300 ${hideZeroStock ? 'bg-emerald-600' : 'bg-slate-200'}`}
+                 <button
+                    onClick={() => setShowInventoryPrintModal(true)}
+                    className="flex items-center gap-2 px-4 py-3 rounded-xl font-black text-xs transition-all bg-indigo-50 text-indigo-700 border-indigo-200 border hover:bg-indigo-100 shadow-sm"
                   >
-                    <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 ${hideZeroStock ? 'translate-x-4' : 'translate-x-0'}`} />
-                  </div>
-                  <span className="text-xs font-black text-slate-500 uppercase tracking-widest group-hover:text-slate-700">Ẩn tồn 0</span>
-                </label>
-                <button className="p-3 bg-slate-50 text-slate-500 rounded-2xl hover:bg-slate-100 border border-slate-200 transition-all"><SlidersHorizontal className="w-5 h-5" /></button>
+                    <Printer className="w-4 h-4" />
+                    IN PHIẾU TỒN
+                 </button>
+                 
+                 <button className="p-3 bg-slate-50 text-slate-500 rounded-xl border border-slate-200 hover:bg-slate-100 hover:text-slate-800 transition-colors">
+                    <SlidersHorizontal className="w-5 h-5" />
+                 </button>
               </div>
            </div>
 
