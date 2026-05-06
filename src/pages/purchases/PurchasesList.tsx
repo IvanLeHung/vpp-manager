@@ -573,10 +573,15 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                             <p className="font-black text-indigo-700 text-xs">{Number(d.actualTotal || d.totalAmount).toLocaleString('vi-VN')} đ</p>
                                             {d.hasReplacement && (
                                               <div className="mt-0.5 text-right">
-                                                 <p className="text-[8px] font-bold text-slate-400 line-through">Duyệt: {Number(d.originalTotal).toLocaleString('vi-VN')} đ</p>
-                                                 <p className={`text-[8px] font-black uppercase tracking-widest ${d.savings >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                                    {d.savings >= 0 ? `Lãi ${d.savings.toLocaleString('vi-VN')}đ` : `Tăng ${(Math.abs(d.savings)).toLocaleString('vi-VN')}đ`}
-                                                 </p>
+                                                 <p className="text-[8px] font-bold text-slate-400 line-through">Đề xuất: {Number(d.originalTotal).toLocaleString('vi-VN')} đ</p>
+                                                 {(() => {
+                                                    const savings = Number(d.originalTotal) - Number(d.actualTotal || d.totalAmount);
+                                                    return (
+                                                      <p className={`text-[8px] font-black uppercase tracking-widest ${savings >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                         {savings >= 0 ? `Tiết kiệm ${savings.toLocaleString('vi-VN')}đ` : `Tăng ${(Math.abs(savings)).toLocaleString('vi-VN')}đ`}
+                                                      </p>
+                                                    );
+                                                 })()}
                                               </div>
                                             )}
                                         </div>
