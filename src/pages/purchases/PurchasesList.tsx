@@ -3,8 +3,9 @@ import api from '../../lib/api';
 import { 
   Search, Plus, DollarSign,
   ShoppingCart, Package, Clock, ChevronRight, Truck, User as UserIcon,
-  Printer, CheckSquare, ChevronDown, FileText, AlertTriangle, X, CheckCircle
+  Printer, CheckSquare, ChevronDown, FileText, AlertTriangle, X, CheckCircle, Download
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 interface PurchasesListProps {
   onCreateNew: () => void;
@@ -275,6 +276,54 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       }, 200);
   };
 
+  const handleExportExcel = () => {
+    if (summaryGroups.length === 0) {
+        return;
+    }
+    
+    const wb = XLSX.utils.book_new();
+    
+    summaryGroups.forEach(group => {
+        const exportData = group.items.map((item, index) => ({
+            'STT': index + 1,
+            'Mã Vật Tư': item.mvpp,
+            'Tên Vật Tư': item.name,
+            'Đơn Vị Tính': item.unit,
+            'Số Lượng': item.qty,
+            'Đơn Giá Thực Tế': item.price,
+            'Tổng Thực Tế': item.actualTotal,
+            'Tổng Đề Xuất': item.originalTotal,
+            'Tiết Kiệm': item.originalTotal - item.actualTotal,
+            'Phòng Ban/Đơn vị': item.deptEntries.map((d: any) => `${d.dept} (${d.qty})`).join('; '),
+            'Ghi chú': item.deptEntries.map((d: any) => d.note).filter(Boolean).join('; ')
+        }));
+        
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        // add total row
+        XLSX.utils.sheet_add_json(ws, [{
+            'STT': 'TỔNG CỘNG',
+            'Mã Vật Tư': '',
+            'Tên Vật Tư': '',
+            'Đơn Vị Tính': '',
+            'Số Lượng': group.items.reduce((s:number, i:any) => s + i.qty, 0),
+            'Đơn Giá Thực Tế': '',
+            'Tổng Thực Tế': group.actualTotal,
+            'Tổng Đề Xuất': group.approvedTotal,
+            'Tiết Kiệm': group.savings,
+            'Phòng Ban/Đơn vị': '',
+            'Ghi chú': ''
+        }], {skipHeader: true, origin: -1});
+
+        const wscols = [
+            {wch: 5}, {wch: 15}, {wch: 35}, {wch: 10}, {wch: 10}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 30}, {wch: 30}
+        ];
+        ws['!cols'] = wscols;
+        XLSX.utils.book_append_sheet(wb, ws, group.label.slice(0, 31));
+    });
+
+    XLSX.writeFile(wb, `Tong_Hop_Mua_Sam_${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+
   const toggleSelect = (id: string) => {
       setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
@@ -435,6 +484,10 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                 </>
                               )}
                            </div>
+
+                           <button onClick={handleExportExcel} className={`p-2.5 rounded-xl border transition flex items-center gap-1.5 text-[10px] font-black uppercase bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100`}>
+                              <Download className="w-4 h-4"/> Tải Excel
+                           </button>
 
                            <button onClick={() => setIsBulkMode(!isBulkMode)} className={`p-2.5 rounded-xl border transition flex items-center gap-1.5 text-[10px] font-black uppercase ${isBulkMode ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-slate-200 text-slate-500'}`}>
                               <CheckSquare className="w-4 h-4"/> {isBulkMode ? 'Ẩn ô chọn' : 'Chọn nhiều'}
