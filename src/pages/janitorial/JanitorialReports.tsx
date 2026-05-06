@@ -1,24 +1,27 @@
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
-import { TrendingDown, AlertTriangle, ShieldCheck, FileText, Printer, Download } from 'lucide-react';
+import { TrendingDown, AlertTriangle, ShieldCheck, FileText, Printer, Download, History, ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../../lib/api';
 
 export default function JanitorialReports() {
   const [metrics, setMetrics] = useState<any>({});
   const [consumption, setConsumption] = useState<any[]>([]);
+  const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Note: These APIs are specific to 'VE_SINH' warehouse.
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [resMetrics, resConsumption] = await Promise.all([
+      const [resMetrics, resConsumption, resHistory] = await Promise.all([
         api.get('/janitorial/metrics'),
-        api.get('/janitorial/consumption')
+        api.get('/janitorial/consumption'),
+        api.get('/janitorial/history')
       ]);
       setMetrics(resMetrics.data);
       setConsumption(resConsumption.data);
+      setHistory(resHistory.data);
     } catch (error) {
       console.error('Failed to fetch Janitorial reports', error);
     } finally {
@@ -170,6 +173,57 @@ export default function JanitorialReports() {
              </div>
           </div>
         </div>
+
+        {/* Lịch sử xuất nhập */}
+        <div className="mt-8 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+           <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center">
+              <History className="w-5 h-5 mr-2 text-indigo-500" /> Lịch sử Xuất/Nhập gần đây (30 Ngày)
+           </h2>
+           <div className="overflow-x-auto">
+             <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-left text-slate-500">
+                    <th className="pb-3 font-bold px-4">Thời gian</th>
+                    <th className="pb-3 font-bold px-4">Loại GD</th>
+                    <th className="pb-3 font-bold px-4">Vật tư</th>
+                    <th className="pb-3 font-bold text-right px-4">Số lượng</th>
+                    <th className="pb-3 font-bold px-4">Người thực hiện</th>
+                    <th className="pb-3 font-bold px-4">Ghi chú</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.length === 0 ? (
+                    <tr><td colSpan={6} className="text-center py-8 text-slate-400">Không có giao dịch nào</td></tr>
+                  ) : (
+                    history.map((h, i) => (
+                      <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50">
+                        <td className="py-3 px-4 text-slate-600">{new Date(h.createdAt).toLocaleString('vi-VN')}</td>
+                        <td className="py-3 px-4">
+                           {h.movementType === 'RECEIPT' ? (
+                             <span className="flex items-center text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded-md w-fit"><ArrowDownRight className="w-4 h-4 mr-1"/> Nhập kho</span>
+                           ) : h.movementType === 'ISSUE' ? (
+                             <span className="flex items-center text-rose-600 font-bold bg-rose-50 px-2 py-1 rounded-md w-fit"><ArrowUpRight className="w-4 h-4 mr-1"/> Xuất kho</span>
+                           ) : (
+                             <span className="flex items-center text-slate-600 font-bold bg-slate-100 px-2 py-1 rounded-md w-fit">Khác</span>
+                           )}
+                        </td>
+                        <td className="py-3 px-4">
+                           <p className="font-bold text-slate-800">{h.item?.name}</p>
+                           <p className="text-[10px] text-slate-400">{h.item?.mvpp}</p>
+                        </td>
+                        <td className="py-3 px-4 text-right font-black text-slate-700">
+                           <span className={h.movementType === 'ISSUE' ? 'text-rose-600' : 'text-emerald-600'}>{h.movementType === 'ISSUE' ? '-' : '+'}</span>{Math.abs(h.qty)} <span className="text-xs font-normal text-slate-400">{h.item?.unit}</span>
+                        </td>
+                        <td className="py-3 px-4 text-slate-600">{h.createdBy?.fullName || h.createdBy?.username || 'Hệ thống'}</td>
+                        <td className="py-3 px-4 text-slate-500 italic text-xs max-w-[200px] truncate" title={h.note || ''}>{h.note || '-'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+             </table>
+           </div>
+        </div>
+
       </div>
     </div>
   );
