@@ -195,6 +195,25 @@ export default function RequestsDetail({ requestId, setViewMode, setActiveReques
     return Math.min(100, Math.max(basePercent, deliveryPercent));
   };
 
+  const getActionLabel = (action: string) => {
+    if (!action) return '—';
+    switch(action.toUpperCase()) {
+      case 'SUBMIT': return 'Gửi trình duyệt';
+      case 'TBP_APPROVE': return 'Trưởng bộ phận Duyệt';
+      case 'ADMIN_APPROVE': return 'Hành chính Duyệt';
+      case 'RETURN_FOR_REVISION': case 'RETURN_FOR_EDIT': return 'Trả lại chỉnh sửa';
+      case 'REJECT': return 'Từ chối toàn bộ';
+      case 'CANCEL': return 'Hủy phiếu';
+      case 'ISSUE': case 'ISSUED': return 'Xuất kho / Giao hàng';
+      case 'CONFIRM_RECEIPT': return 'Đã nhận hàng';
+      case 'APPROVE': return 'Duyệt (Approve)';
+      case 'TBP_REJECT': return 'Trưởng bộ phận Từ chối';
+      case 'ADMIN_REJECT': return 'Hành chính Từ chối';
+      case 'WITHDRAW': return 'Rút phiếu';
+      default: return action;
+    }
+  };
+
   if (loading || !data) {
     return (
       <div className="flex flex-col h-full bg-slate-50 relative items-center justify-center">
@@ -703,19 +722,6 @@ export default function RequestsDetail({ requestId, setViewMode, setActiveReques
 
                           {/* Dynamic Histories (Limited in sidebar) */}
                           {data.approvalHistories?.slice(0, 8).map((audit:any) => {
-                              const getActionLabel = (action: string) => {
-                                switch(action) {
-                                  case 'SUBMIT': return 'Gửi trình duyệt';
-                                  case 'TBP_APPROVE': return 'Trưởng bộ phận Duyệt';
-                                  case 'ADMIN_APPROVE': return 'Hành chính Duyệt';
-                                  case 'RETURN_FOR_REVISION': case 'RETURN_FOR_EDIT': return 'Trả lại chỉnh sửa';
-                                  case 'REJECT': return 'Từ chối toàn bộ';
-                                  case 'CANCEL': return 'Hủy phiếu';
-                                  case 'ISSUE': return 'Kho đã xuất hàng';
-                                  case 'CONFIRM_RECEIPT': return 'Đã nhận hàng';
-                                  default: return action;
-                                }
-                              };
                               const getActionColor = (action: string) => {
                                 if (action.includes('REJECT') || action === 'CANCEL') return 'bg-rose-500';
                                 if (action.includes('APPROVE')) return 'bg-emerald-500';
@@ -1296,30 +1302,45 @@ export default function RequestsDetail({ requestId, setViewMode, setActiveReques
                       const type = l.item.itemType || (l.item.mvpp.startsWith('VPP') ? 'VPP' : 'VE_SINH');
                       return type === selectedPrintType;
                     })
-                    .map((l: any, idx: number) => (
+                    .map((l: any, idx: number) => {
+                      const displayItem = l.replacementItem || l.item;
+                      const isReplaced = !!l.replacementItemId;
+                      const displayQtyRequested = l.qtyRequested;
+                      const displayQtyApproved = l.replacementQty ?? l.qtyApproved;
+
+                      return (
                       <tr key={l.id} className="h-10">
                           <td className="border border-black p-2 text-center font-medium">{idx + 1}</td>
-                          <td className="border border-black p-2 text-center font-bold">{l.item.mvpp}</td>
-                          <td className="border border-black p-2 font-medium">{l.item.name}</td>
-                          <td className="border border-black p-2 text-center">{l.item.unit}</td>
+                          <td className="border border-black p-2 text-center font-bold">{displayItem.mvpp}</td>
+                          <td className="border border-black p-2 font-medium">
+                              <div className="flex flex-col">
+                                  <span>{displayItem.name}</span>
+                                  {isReplaced && (
+                                      <span className="text-[10px] text-slate-500 italic mt-0.5">
+                                          (Thay cho: {l.item.name})
+                                      </span>
+                                  )}
+                              </div>
+                          </td>
+                          <td className="border border-black p-2 text-center">{displayItem.unit}</td>
                           <td className="border border-black p-2 text-center font-black text-base">
-                              {l.qtyApproved !== null && (l.qtyApproved !== l.qtyRequested || l.qtyManagerApproved !== l.qtyRequested) ? (
+                              {displayQtyApproved !== null && (displayQtyApproved !== displayQtyRequested || l.qtyManagerApproved !== displayQtyRequested) ? (
                                   <div className="flex flex-col items-center leading-none">
-                                      <span className="text-[9px] text-slate-400 line-through mb-1">{l.qtyRequested}</span>
-                                      <span>{l.qtyApproved}</span>
-                                      {l.qtyManagerApproved !== null && l.qtyManagerApproved !== l.qtyApproved && (
+                                      <span className="text-[9px] text-slate-400 line-through mb-1">{displayQtyRequested}</span>
+                                      <span>{displayQtyApproved}</span>
+                                      {l.qtyManagerApproved !== null && l.qtyManagerApproved !== displayQtyApproved && !isReplaced && (
                                         <span className="text-[8px] font-bold text-slate-400 mt-1 italic">
                                           (TBP: {l.qtyManagerApproved})
                                         </span>
                                       )}
                                   </div>
                               ) : (
-                                  l.qtyApproved ?? l.qtyRequested
+                                  displayQtyApproved ?? displayQtyRequested
                               )}
                           </td>
                           <td className="border border-black p-2 text-[10px] italic leading-tight">{l.note || '—'}</td>
                       </tr>
-                  ))}
+                    )})}
                   <tr className="bg-slate-50 h-10 font-black">
                       <td colSpan={4} className="border border-black p-2 text-right uppercase text-xs">Tổng cộng số lượng thực cấp:</td>
                       <td className="border border-black p-2 text-center text-lg">
@@ -1446,6 +1467,26 @@ export default function RequestsDetail({ requestId, setViewMode, setActiveReques
                       </tr>
                   </thead>
                   <tbody>
+                      {/* Creation Event manually prepended to match the UI full audit trail */}
+                      <tr className="hover:bg-slate-50/50">
+                          <td className="border border-slate-300 p-1.5 whitespace-nowrap">
+                              {new Date(data.createdAt).toLocaleString('vi-VN', { 
+                                  day: '2-digit', month: '2-digit', year: 'numeric',
+                                  hour: '2-digit', minute: '2-digit'
+                              })}
+                          </td>
+                          <td className="border border-slate-300 p-1.5 font-bold uppercase text-slate-700">
+                              {data.requester?.fullName}
+                          </td>
+                          <td className="border border-slate-300 p-1.5">
+                              <span className="px-1.5 py-0.5 rounded-sm font-bold text-[9px] bg-slate-100 text-slate-600">
+                                  Tạo phiếu
+                              </span>
+                          </td>
+                          <td className="border border-slate-300 p-1.5 italic text-slate-600">
+                              Khởi tạo yêu cầu
+                          </td>
+                      </tr>
                       {data.approvalHistories?.map((h: any, idx: number) => (
                           <tr key={idx} className="hover:bg-slate-50/50">
                               <td className="border border-slate-300 p-1.5 whitespace-nowrap">
@@ -1463,7 +1504,7 @@ export default function RequestsDetail({ requestId, setViewMode, setActiveReques
                                       h.action.includes('APPROVE') ? 'bg-emerald-50 text-emerald-700' :
                                       'bg-slate-100 text-slate-600'
                                   }`}>
-                                      {h.action}
+                                      {getActionLabel(h.action)}
                                   </span>
                               </td>
                               <td className="border border-slate-300 p-1.5 italic text-slate-600">
@@ -1519,20 +1560,7 @@ export default function RequestsDetail({ requestId, setViewMode, setActiveReques
                           </div>
 
                           {/* Full History */}
-                          {data.approvalHistories?.map((audit: any) => {
-                               const getActionLabel = (action: string) => {
-                                switch(action) {
-                                  case 'SUBMIT': return 'Gửi trình duyệt';
-                                  case 'TBP_APPROVE': return 'Trưởng bộ phận Phê Duyệt';
-                                  case 'ADMIN_APPROVE': return 'Hành chính Phê Duyệt (Final)';
-                                  case 'RETURN_FOR_REVISION': case 'RETURN_FOR_EDIT': return 'Trả lại yêu cầu chỉnh sửa';
-                                  case 'REJECT': return 'Từ chối toàn bộ phiếu';
-                                  case 'CANCEL': return 'Hủy bỏ phiếu';
-                                  case 'ISSUE': return 'Kho hoàn tất xuất hàng';
-                                  case 'CONFIRM_RECEIPT': return 'Người dùng xác nhận nhận hàng';
-                                  default: return action;
-                                }
-                              };
+                           {data.approvalHistories?.map((audit: any) => {
                               const getActionColor = (action: string) => {
                                 if (action.includes('REJECT') || action === 'CANCEL') return 'bg-rose-500 text-white';
                                 if (action.includes('APPROVE')) return 'bg-emerald-500 text-white';
