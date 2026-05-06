@@ -40,7 +40,7 @@ function sortItemsForPrinting(items: any[]) {
 export default function RequestsList({ requests, currentUser, setViewMode, setActiveRequest, refreshData, showToast }: Props) {
   const { items: masterItems } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [deptFilter, setDeptFilter] = useState<string>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -65,6 +65,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
       case 'WAITING_HANDOVER': return 'bg-blue-100 text-blue-700 border-blue-200';
       case 'PENDING_MANAGER': case 'PENDING_ADMIN': return 'bg-amber-100 text-amber-700 border-amber-200';
       case 'TBP_APPROVED': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
+      case 'BACKORDER': return 'bg-slate-100 text-slate-800 border-slate-300 shadow-sm';
       default: return 'bg-slate-100 text-slate-700 border-slate-200';
     }
   };
@@ -77,18 +78,26 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         filtered = filtered.filter(req => req.requesterId === currentUid || req.requester?.fullName === currentUser.name);
     }
     
-    if (statusFilter !== 'ALL') {
-        if (statusFilter === 'MY_ACTION') {
-            if (currentUser.role === 'MANAGER') {
-                filtered = filtered.filter(r => r.currentApproverId === currentUid);
-            } else if (currentUser.role === 'ADMIN') {
-                filtered = filtered.filter(r => r.currentApproverId === currentUid || r.status === 'PENDING_ADMIN' || r.status === 'PENDING_MANAGER');
+    if (statusFilters.length > 0) {
+        if (statusFilters.includes('MY_ACTION')) {
+            // MY_ACTION logic
+            const myActionReqs = requests.filter(r => {
+                if (currentUser.role === 'MANAGER') return r.currentApproverId === currentUid;
+                if (currentUser.role === 'ADMIN') return r.currentApproverId === currentUid || r.status === 'PENDING_ADMIN' || r.status === 'PENDING_MANAGER';
+                if (currentUser.role === 'WAREHOUSE') return r.status === 'READY_TO_ISSUE';
+                return r.status === 'WAITING_HANDOVER';
+            });
+            
+            if (statusFilters.length === 1) {
+                filtered = myActionReqs;
+            } else {
+                // Combine MY_ACTION with other explicit status filters
+                const otherStatuses = statusFilters.filter(s => s !== 'MY_ACTION');
+                filtered = filtered.filter(r => otherStatuses.includes(r.status) || myActionReqs.some(mar => mar.id === r.id));
             }
-            else if (currentUser.role === 'WAREHOUSE') filtered = filtered.filter(r => r.status === 'READY_TO_ISSUE');
-            else filtered = filtered.filter(r => r.status === 'WAITING_HANDOVER'); // For Employee (Self-receipt)
+        } else {
+            filtered = filtered.filter(r => statusFilters.includes(r.status));
         }
-        else if (statusFilter === 'COMPLETED') filtered = filtered.filter(r => r.status === 'COMPLETED');
-        else filtered = filtered.filter(r => r.status === statusFilter);
     }
 
     if (deptFilter !== 'ALL') {
@@ -109,12 +118,12 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
       );
     }
     return filtered.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [requests, statusFilter, deptFilter, priorityFilter, searchTerm, currentUser]);
+  }, [requests, statusFilters, deptFilter, priorityFilter, searchTerm, currentUser]);
 
   // Handle row selection changes when data changes
   useEffect(() => {
     setSelectedIds([]);
-  }, [statusFilter, searchTerm]);
+  }, [statusFilters, searchTerm]);
 
   const stats = useMemo(() => {
     return {
@@ -480,10 +489,10 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         <div className="flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden" style={{width: previewReq ? '55%' : '100%', transition: 'width 0.3s'}}>
           <div className="p-3 border-b border-slate-200 bg-slate-50/50 flex flex-col xl:flex-row gap-3 justify-between items-center">
             <div className="flex flex-wrap gap-1.5 overflow-x-auto w-full xl:w-auto">
-               <button onClick={() => setStatusFilter('ALL')} className={`px-3 py-1.5 rounded-lg font-bold text-xs whitespace-nowrap transition ${statusFilter==='ALL'?'bg-indigo-600 text-white shadow-md':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>Tất cả</button>
-               <button onClick={() => setStatusFilter('MY_ACTION')} className={`px-3 py-1.5 rounded-lg font-bold text-xs whitespace-nowrap transition flex items-center relative ${statusFilter==='MY_ACTION'?'bg-amber-500 text-white shadow-md':'bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100'}`}>Cần xử lý <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full animate-ping"></span><span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full"></span></button>
-               <button onClick={() => setStatusFilter('COMPLETED')} className={`px-3 py-1.5 rounded-lg font-bold text-xs transition ${statusFilter==='COMPLETED'?'bg-emerald-600 text-white shadow-md':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>Hoàn tất</button>
-               <button onClick={() => setStatusFilter('DRAFT')} className={`px-3 py-1.5 rounded-lg font-bold text-xs transition ${statusFilter==='DRAFT'?'bg-slate-700 text-white shadow-md':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>Nháp</button>
+               <button onClick={() => setStatusFilters([])} className={`px-3 py-1.5 rounded-lg font-bold text-xs whitespace-nowrap transition ${statusFilters.length === 0 ? 'bg-indigo-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>Tất cả</button>
+               <button onClick={() => setStatusFilters(['MY_ACTION'])} className={`px-3 py-1.5 rounded-lg font-bold text-xs whitespace-nowrap transition flex items-center relative ${statusFilters.includes('MY_ACTION') ? 'bg-amber-500 text-white shadow-md' : 'bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100'}`}>Cần xử lý <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full animate-ping"></span><span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full"></span></button>
+               <button onClick={() => setStatusFilters(['COMPLETED'])} className={`px-3 py-1.5 rounded-lg font-bold text-xs transition ${statusFilters.includes('COMPLETED') && statusFilters.length === 1 ? 'bg-emerald-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>Hoàn tất</button>
+               <button onClick={() => setStatusFilters(['DRAFT'])} className={`px-3 py-1.5 rounded-lg font-bold text-xs transition ${statusFilters.includes('DRAFT') && statusFilters.length === 1 ? 'bg-slate-700 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>Nháp</button>
                <button onClick={() => setViewMode('WORKFLOW')} className="px-3 py-1.5 rounded-lg font-bold text-xs transition bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 flex items-center gap-1"><GitBranch className="w-3.5 h-3.5" /> QUY TRÌNH</button>
             </div>
             <div className="flex items-center gap-2 w-full xl:w-auto">
@@ -508,10 +517,66 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             </div>
           </div>
           {showAdvancedFilters && (
-             <div className="px-4 py-3 bg-white border-b border-slate-100 flex flex-wrap gap-4">
-                 <div className="flex flex-col gap-1"><label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Phòng ban</label><select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-700 outline-none min-w-[150px]"><option value="ALL">Tất cả</option>{Array.from(new Set(requests.map(r => r.department).filter(Boolean))).sort().map(d => <option key={d} value={d}>{d}</option>)}</select></div>
-                 <div className="flex flex-col gap-1"><label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Ưu tiên</label><select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-700 outline-none min-w-[120px]"><option value="ALL">Tất cả</option><option value="Bình thường">Bình thường</option><option value="Khẩn cấp">Khẩn cấp</option></select></div>
-                 <div className="flex items-end pb-0.5"><button onClick={() => { setDeptFilter('ALL'); setPriorityFilter('ALL'); setSearchTerm(''); setStatusFilter('ALL'); }} className="text-[9px] font-black text-rose-500 uppercase hover:text-rose-600 underline underline-offset-4">Xóa bộ lọc</button></div>
+             <div className="px-4 py-3 bg-white border-b border-slate-200 flex flex-col gap-4 animate-in slide-in-from-top-2 duration-200">
+                 <div className="flex flex-col gap-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Lọc theo trạng thái phiếu (Chọn nhiều)</label>
+                    <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1">
+                      {[
+                        { val: 'MY_ACTION', lab: '🚩 Cần xử lý', color: 'amber' },
+                        { val: 'BACKORDER', lab: '📦 Backorder (Nợ)', color: 'slate' },
+                        { val: 'PENDING_MANAGER', lab: '⏳ Chờ QL BP', color: 'amber' },
+                        { val: 'PENDING_ADMIN', lab: '⏳ Chờ Hành chính', color: 'amber' },
+                        { val: 'APPROVED', lab: '✅ Đã duyệt', color: 'emerald' },
+                        { val: 'READY_TO_ISSUE', lab: '🚚 Sẵn sàng xuất', color: 'emerald' },
+                        { val: 'COMPLETED', lab: '🏁 Hoàn thành', color: 'emerald' },
+                        { val: 'REJECTED', lab: '❌ Từ chối', color: 'rose' },
+                        { val: 'RETURNED', lab: '↩️ Trả lại', color: 'orange' },
+                        { val: 'DRAFT', lab: '📝 Bản nháp', color: 'slate' }
+                      ].map(st => (
+                        <button 
+                          key={st.val}
+                          onClick={() => {
+                            setStatusFilters(prev => 
+                              prev.includes(st.val) ? prev.filter(v => v !== st.val) : [...prev, st.val]
+                            );
+                            setCurrentPage(1);
+                          }}
+                          className={`px-3 py-1.5 rounded-xl border text-[11px] font-bold transition flex items-center gap-1.5 ${
+                            statusFilters.includes(st.val) 
+                              ? `bg-${st.color}-600 border-${st.color}-600 text-white shadow-md` 
+                              : `bg-white border-slate-200 text-slate-600 hover:bg-slate-50`
+                          }`}
+                        >
+                          {statusFilters.includes(st.val) && <CheckSquare className="w-3.5 h-3.5" />}
+                          {st.lab}
+                        </button>
+                      ))}
+                      {statusFilters.length > 0 && (
+                        <button 
+                          onClick={() => setStatusFilters([])}
+                          className="px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 text-[11px] font-black uppercase hover:bg-rose-100 transition"
+                        >
+                          Xóa chọn
+                        </button>
+                      )}
+                    </div>
+                 </div>
+                 
+                 <div className="flex flex-wrap gap-6 border-t border-slate-100 pt-3">
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Phòng ban</label>
+                        <select value={deptFilter} onChange={e => { setDeptFilter(e.target.value); setCurrentPage(1); }} className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-700 outline-none min-w-[200px] hover:bg-slate-100 transition"><option value="ALL">Tất cả phòng ban</option>{Array.from(new Set(requests.map(r => r.department).filter(Boolean))).sort().map(d => <option key={d} value={d}>{d}</option>)}</select>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Mức độ ưu tiên</label>
+                        <select value={priorityFilter} onChange={e => { setPriorityFilter(e.target.value); setCurrentPage(1); }} className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-700 outline-none min-w-[150px] hover:bg-slate-100 transition"><option value="ALL">Tất cả mức độ</option><option value="Bình thường">Bình thường</option><option value="Khẩn cấp">Khẩn cấp</option></select>
+                    </div>
+                    <div className="flex items-end pb-0.5 ml-auto">
+                        <button onClick={() => { setDeptFilter('ALL'); setPriorityFilter('ALL'); setSearchTerm(''); setStatusFilters([]); setCurrentPage(1); }} className="text-[10px] font-black text-rose-500 uppercase hover:text-rose-600 flex items-center gap-1">
+                          <RotateCcw className="w-3.5 h-3.5"/> Đặt lại tất cả
+                        </button>
+                    </div>
+                 </div>
              </div>
           )}
           {/* Batch actions redesigned */}
