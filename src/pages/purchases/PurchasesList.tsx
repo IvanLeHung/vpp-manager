@@ -774,7 +774,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               .total-label { font-weight: bold; min-width: 300px; text-align: right; }
               .total-value { font-weight: bold; min-width: 120px; text-align: right; }
               
-              .footer-sign { margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; text-align: center; font-size: 9pt; }
+              .footer-sign { margin-top: 40px; display: flex; justify-content: space-around; text-align: center; font-size: 9pt; }
               .sign-box { height: 80px; }
             }
           `}} />
@@ -925,26 +925,18 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                 <div className="footer-sign">
                    <div>
                       <p className="font-bold uppercase">Người lập phiếu</p>
-                      <p className="italic text-[8pt]">(Ký, ghi rõ họ tên)</p>
-                      <div className="sign-box"></div>
+                      <div className="border-2 border-dashed border-slate-300 rounded-lg p-3 inline-block mt-3 mb-2 min-w-[150px] bg-slate-50/50">
+                         <p className="text-[10pt] font-black text-indigo-600 uppercase">Đã ký số</p>
+                         <p className="text-[7pt] text-slate-500 italic mt-0.5">{new Date().toLocaleDateString('vi-VN')}</p>
+                      </div>
                       <p className="font-bold">..........................</p>
                    </div>
                    <div>
                       <p className="font-bold uppercase">Trưởng BP HCQT</p>
-                      <p className="italic text-[8pt]">(Ký, ghi rõ họ tên)</p>
-                      <div className="sign-box"></div>
-                      <p className="font-bold">..........................</p>
-                   </div>
-                   <div>
-                      <p className="font-bold uppercase">Kế toán / Tài chính</p>
-                      <p className="italic text-[8pt]">(Ký, ghi rõ họ tên)</p>
-                      <div className="sign-box"></div>
-                      <p className="font-bold">..........................</p>
-                   </div>
-                   <div>
-                      <p className="font-bold uppercase">TGĐ Phê duyệt</p>
-                      <p className="italic text-[8pt]">(Ký, đóng dấu)</p>
-                      <div className="sign-box"></div>
+                      <div className="border-2 border-dashed border-slate-300 rounded-lg p-3 inline-block mt-3 mb-2 min-w-[150px] bg-slate-50/50">
+                         <p className="text-[10pt] font-black text-indigo-600 uppercase">Đã ký số</p>
+                         <p className="text-[7pt] text-slate-500 italic mt-0.5">{new Date().toLocaleDateString('vi-VN')}</p>
+                      </div>
                       <p className="font-bold">..........................</p>
                    </div>
                 </div>
