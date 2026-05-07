@@ -1588,6 +1588,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                           {formatDigitalSignatureDate(data.createdAt)} (Đã ký số)
                       </p>
                   </div>
+              </div>
               <div className="text-center w-1/3">
                   <p className="font-black uppercase text-[12px] mb-1">TRƯỞNG BỘ PHẬN</p>
                   <div className="mt-16">
