@@ -319,6 +319,34 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
           };
       }).filter(g => g.items.length > 0);
   }, [data, filteredData, selectedIds]);
+  
+  const currentPrintGroups = useMemo(() => {
+    return summaryGroups.filter(
+      g => selectedPrintType === 'ALL' || g.type === selectedPrintType
+    );
+  }, [summaryGroups, selectedPrintType]);
+
+  const printDashboardSummary = useMemo(() => {
+    const proposed = currentPrintGroups.reduce(
+      (sum, g) => sum + Number(g.approvedTotal || 0),
+      0
+    );
+
+    const actual = currentPrintGroups.reduce(
+      (sum, g) => sum + Number(g.actualTotal || 0),
+      0
+    );
+
+    const diff = proposed - actual; // >0 tiết kiệm, <0 tăng chi
+
+    return {
+      proposed,
+      actual,
+      diff,
+      absDiff: Math.abs(diff),
+      rate: proposed > 0 ? (Math.abs(diff) / proposed) * 100 : 0,
+    };
+  }, [currentPrintGroups]);
 
   const printStats = useMemo(() => {
     const vppCount = summaryGroups.find(g => g.type === 'VPP')?.items.length || 0;
@@ -525,6 +553,35 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   const kpiOrdered = data.filter(d => d.status === 'ORDERED').length;
   const kpiDelivering = data.filter(d => ['DELIVERING', 'PARTIALLY_DELIVERED'].includes(d.status)).length;
   const totalAmount = data.filter(d => ['ORDERED', 'DELIVERING', 'PARTIALLY_DELIVERED', 'COMPLETED'].includes(d.status)).reduce((sum, d) => sum + Number(d.actualTotal || d.totalAmount || 0), 0);
+
+  // Dashboard Print Helpers
+  const dashboardDiffLabel =
+    printDashboardSummary.diff > 0
+      ? 'Giá trị tối ưu chi phí'
+      : printDashboardSummary.diff < 0
+        ? 'Chênh lệch chi phí tăng'
+        : 'Chênh lệch chi phí';
+
+  const dashboardRateLabel =
+    printDashboardSummary.diff > 0
+      ? 'Tỷ lệ tối ưu'
+      : printDashboardSummary.diff < 0
+        ? 'Tỷ lệ tăng chi'
+        : 'Tỷ lệ chênh lệch';
+
+  const dashboardDiffClass =
+    printDashboardSummary.diff > 0
+      ? 'text-emerald-600'
+      : printDashboardSummary.diff < 0
+        ? 'text-rose-600'
+        : 'text-slate-600';
+
+  const dashboardTitle =
+    selectedPrintType === 'VPP'
+      ? 'TÓM TẮT HIỆU QUẢ MUA SẮM - VĂN PHÒNG PHẨM'
+      : selectedPrintType === 'VE_SINH'
+        ? 'TÓM TẮT HIỆU QUẢ MUA SẮM - VẬT TƯ VỆ SINH'
+        : 'TÓM TẮT HIỆU QUẢ MUA SẮM';
 
   return (
     <div className="flex flex-col h-full bg-slate-50/50 print:bg-white print:h-auto print:block">
@@ -1218,43 +1275,44 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
           ))}
 
           {/* EXECUTIVE REPORT PAGE */}
-          {selectedPrintType === 'ALL' && (
-              <div className="print-sheet p-8 break-before-page flex flex-col justify-center min-h-[500px]">
-                  <div className="max-w-2xl mx-auto w-full">
-                      <div className="text-center mb-10">
-                         <h2 className="text-[16pt] font-black uppercase text-slate-800 tracking-wider">TÓM TẮT HIỆU QUẢ MUA SẮM</h2>
-                         <div className="w-16 h-1 bg-slate-800 mx-auto mt-4 mb-2"></div>
-                      </div>
-
-                      <table className="w-full border-collapse text-[11pt] mb-8">
-                          <tbody>
-                              <tr className="border-b border-slate-200">
-                                  <td className="py-4 pl-4 text-slate-600 font-medium">Tổng giá trị đề xuất</td>
-                                  <td className="py-4 pr-4 text-right font-bold text-slate-800">{executiveData.totalProposed.toLocaleString('vi-VN')} đ</td>
-                              </tr>
-                              <tr className="border-b border-slate-200">
-                                  <td className="py-4 pl-4 text-slate-600 font-medium">Tổng giá trị mua thực tế</td>
-                                  <td className="py-4 pr-4 text-right font-bold text-slate-800">{executiveData.totalActual.toLocaleString('vi-VN')} đ</td>
-                              </tr>
-                              <tr className="border-b border-slate-200">
-                                  <td className="py-4 pl-4 text-slate-600 font-medium">Giá trị tối ưu chi phí</td>
-                                  <td className="py-4 pr-4 text-right font-black text-emerald-700">{executiveData.totalSavings.toLocaleString('vi-VN')} đ</td>
-                              </tr>
-                              <tr className="border-b border-slate-200 bg-slate-50">
-                                  <td className="py-4 pl-4 text-slate-800 font-black">Tỷ lệ tối ưu</td>
-                                  <td className="py-4 pr-4 text-right font-black text-emerald-700">
-                                      {executiveData.totalProposed > 0 ? ((executiveData.totalSavings / executiveData.totalProposed) * 100).toFixed(2) : 0}%
-                                  </td>
-                              </tr>
-                          </tbody>
-                      </table>
-
-                      <div className="text-center italic text-slate-500 text-[10pt] px-12 mt-12">
-                          Các phương án mua sắm đã được Hành chính rà soát và tối ưu chi phí trước khi trình phê duyệt.
-                      </div>
+          {/* EXECUTIVE REPORT PAGE */}
+          <div className="print-sheet p-8 break-before-page flex flex-col justify-center min-h-[500px]">
+              <div className="max-w-2xl mx-auto w-full">
+                  <div className="text-center mb-10">
+                     <h2 className="text-[16pt] font-black uppercase text-slate-800 tracking-wider">{dashboardTitle}</h2>
+                     <div className="w-16 h-1 bg-slate-800 mx-auto mt-4 mb-2"></div>
+                  </div>
+  
+                  <table className="w-full border-collapse text-[11pt] mb-8">
+                      <tbody>
+                          <tr className="border-b border-slate-200">
+                              <td className="py-4 pl-4 text-slate-600 font-medium">Tổng giá trị đề xuất</td>
+                              <td className="py-4 pr-4 text-right font-bold text-slate-800">{printDashboardSummary.proposed.toLocaleString('vi-VN')} đ</td>
+                          </tr>
+                          <tr className="border-b border-slate-200">
+                              <td className="py-4 pl-4 text-slate-600 font-medium">Tổng giá trị mua thực tế</td>
+                              <td className="py-4 pr-4 text-right font-bold text-slate-800">{printDashboardSummary.actual.toLocaleString('vi-VN')} đ</td>
+                          </tr>
+                          <tr className="border-b border-slate-200">
+                              <td className="py-4 pl-4 text-slate-600 font-medium">{dashboardDiffLabel}</td>
+                              <td className={`py-4 pr-4 text-right font-black ${dashboardDiffClass}`}>
+                                {printDashboardSummary.absDiff.toLocaleString('vi-VN')} đ
+                              </td>
+                          </tr>
+                          <tr className="border-b border-slate-200 bg-slate-50">
+                              <td className="py-4 pl-4 text-slate-800 font-black">{dashboardRateLabel}</td>
+                              <td className={`py-4 pr-4 text-right font-black ${dashboardDiffClass}`}>
+                                  {printDashboardSummary.rate.toFixed(2)}%
+                              </td>
+                          </tr>
+                      </tbody>
+                  </table>
+  
+                  <div className="text-center italic text-slate-500 text-[10pt] px-12 mt-12">
+                      Các phương án mua sắm đã được Hành chính rà soát và tối ưu chi phí trước khi trình phê duyệt.
                   </div>
               </div>
-          )}
+          </div>
         </div>
     </div>
   );
