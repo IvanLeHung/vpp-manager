@@ -536,6 +536,100 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
     XLSX.writeFile(wb, `Tong_Hop_Mua_Sam_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
+  const handleExportExcelTemplate = () => {
+    if (summaryGroups.length === 0) {
+        return;
+    }
+    
+    const wb = XLSX.utils.book_new();
+    
+    summaryGroups.forEach(group => {
+        const rows: any[] = [];
+        
+        // Header
+        rows.push(["CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO"]);
+        rows.push(["Báo cáo tổng hợp đơn mua sắm"]);
+        rows.push(["Ban Hành chính Nhân sự"]);
+        rows.push([]);
+        
+        const printTitle = group.type === 'VPP' 
+            ? 'PHIẾU TỔNG HỢP MUA SẮM VĂN PHÒNG PHẨM' 
+            : group.type === 'VE_SINH' 
+                ? 'PHIẾU TỔNG HỢP MUA SẮM VẬT TƯ VỆ SINH' 
+                : `PHIẾU TỔNG HỢP MUA SẮM ${group.label}`;
+        
+        rows.push([printTitle]);
+        rows.push([`(Tổng hợp từ ${group.poCount} phiếu mua sắm / đề nghị đang lọc)`]);
+        rows.push([]);
+        
+        const groupCodeShort = group.type === 'VE_SINH' ? 'VS' : group.type;
+        const summaryCode = `THMS-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${groupCodeShort}`;
+        
+        rows.push(["Mã tổng hợp:", summaryCode, "", "", "Người lập:", "Quản lý Hành chính"]);
+        rows.push(["Kho áp dụng:", group.label, "", "", "Ngày in:", new Date().toLocaleDateString('vi-VN')]);
+        rows.push(["Tổng số phiếu:", `${group.poCount} phiếu`, "", "", "Số mặt hàng:", `${group.items.length} mặt hàng`]);
+        rows.push([]);
+        
+        // Table Headers
+        rows.push(["STT", "MÃ VT", "TÊN VẬT TƯ MUA", "ĐVT", "SL MUA", "ĐƠN GIÁ", "THÀNH TIỀN"]);
+        
+        group.items.forEach((item: any, idx: number) => {
+            // Main Item Row
+            rows.push([
+                idx + 1,
+                item.mvpp,
+                item.name.toUpperCase(),
+                item.unit,
+                item.qty,
+                item.price,
+                item.actualTotal
+            ]);
+            
+            // Allocation Rows
+            item.deptEntries.forEach((de: any) => {
+                rows.push([
+                    "",
+                    "",
+                    `  - ${de.dept} (${de.requestCode})`,
+                    de.unit,
+                    de.qty,
+                    "",
+                    de.note ? `Ghi chú: ${de.note}` : ""
+                ]);
+            });
+            
+            // Replacements
+            item.replacements?.forEach((rep: any) => {
+                rows.push([
+                    "",
+                    "",
+                    `  * Thay cho: ${rep.originalName} (Lý do: ${rep.reason || 'Điều chỉnh'})`,
+                    "",
+                    "",
+                    "",
+                    `Chênh lệch: ${rep.diff >= 0 ? 'Tiết kiệm' : 'Tăng'} ${Math.abs(rep.diff).toLocaleString('vi-VN')} đ`
+                ]);
+            });
+        });
+        
+        rows.push([]);
+        rows.push(["TỔNG CỘNG", "", "", "", group.items.reduce((s:number, i:any) => s + i.qty, 0), "", group.actualTotal]);
+        rows.push(["TỔNG GIÁ TRỊ ĐỀ XUẤT ĐÃ DUYỆT", "", "", "", "", "", group.approvedTotal]);
+        rows.push([group.savings >= 0 ? "HIỆU QUẢ TỐI ƯU CHI PHÍ" : "CHÊNH LỆCH CHI PHÍ TĂNG", "", "", "", "", "", Math.abs(group.savings)]);
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        
+        // Basic column widths
+        ws['!cols'] = [
+            {wch: 5}, {wch: 15}, {wch: 60}, {wch: 10}, {wch: 10}, {wch: 15}, {wch: 20}
+        ];
+        
+        XLSX.utils.book_append_sheet(wb, ws, group.label.slice(0, 31));
+    });
+    
+    XLSX.writeFile(wb, `Phieu_Tong_Hop_Mua_Sam_Mau_In_${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+
   const toggleSelect = (id: string) => {
       setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
@@ -724,6 +818,23 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                         <span className="text-[10px] font-black text-violet-500 bg-violet-50 px-2 py-0.5 rounded-full">{printStats.total}</span>
                                      </button>
 
+                                     <div className="mx-3 my-2 border-t border-slate-100"></div>
+                                     <div className="px-4 pb-1 mb-1">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Xuất Excel (Mẫu in)</p>
+                                     </div>
+                                     <button 
+                                       onClick={() => {
+                                         handleExportExcelTemplate();
+                                         setShowPrintMenu(false);
+                                       }}
+                                       className="w-full px-4 py-2.5 text-left flex items-center justify-between hover:bg-emerald-50 transition group"
+                                     >
+                                        <div className="flex items-center gap-3">
+                                           <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors"><Download className="w-3.5 h-3.5"/></div>
+                                           <span className="text-xs font-bold text-slate-700">Tải Excel theo Mẫu In</span>
+                                        </div>
+                                     </button>
+
                                      {printStats.otherCount > 0 && (
                                        <div className="px-4 mt-2 py-2 bg-amber-50 rounded-xl mx-3 border border-amber-100 flex items-center gap-2">
                                           <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0"/>
@@ -735,8 +846,12 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                               )}
                            </div>
 
-                           <button onClick={handleExportExcel} className={`p-2.5 rounded-xl border transition flex items-center gap-1.5 text-[10px] font-black uppercase bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100`}>
-                              <Download className="w-4 h-4"/> Tải Excel
+                           <button onClick={handleExportExcelTemplate} className={`px-4 py-2.5 rounded-xl border transition flex items-center gap-1.5 text-[10px] font-black uppercase bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-500/20`}>
+                              <FileText className="w-4 h-4"/> Tải Excel (Mẫu in)
+                           </button>
+
+                           <button onClick={handleExportExcel} className={`p-2.5 rounded-xl border transition flex items-center gap-1.5 text-[10px] font-black uppercase bg-white border-slate-200 text-slate-500 hover:bg-slate-50`}>
+                              <Download className="w-4 h-4"/>
                            </button>
 
                            <button onClick={() => setIsBulkMode(!isBulkMode)} className={`p-2.5 rounded-xl border transition flex items-center gap-1.5 text-[10px] font-black uppercase ${isBulkMode ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-slate-200 text-slate-500'}`}>
