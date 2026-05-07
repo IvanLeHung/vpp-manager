@@ -877,6 +877,9 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                  <span className="flex items-center gap-1.5 text-xs uppercase tracking-wider"><CheckSquare className="w-4 h-4"/> Duyệt & Chốt KL</span>
                                  <span className="text-[8px] font-bold text-emerald-100 opacity-60 uppercase tracking-widest">Xác nhận Số Lượng & Giá cuối</span>
                               </button>
+                              <button onClick={() => { if(window.confirm('Trả lại Đề nghị để chỉnh sửa?')) handleAction('/reject-to-draft', {reason: 'Yêu cầu chỉnh sửa lại'}, 'Đã trả lại') }} className="w-full py-2 bg-amber-50 text-amber-600 rounded-xl font-black hover:bg-amber-500 hover:text-white transition uppercase tracking-widest text-[9px] border border-amber-100 border-dashed">
+                                 Trả Lại Chỉnh Sửa
+                              </button>
                               <button onClick={() => { if(window.confirm('Từ chối Đề nghị?')) handleAction('/reject', {reason: 'Không hợp lệ'}, 'Đã từ chối') }} className="w-full py-2.5 bg-rose-50 text-rose-600 rounded-xl font-black hover:bg-rose-500 hover:text-white transition uppercase tracking-widest text-[10px] border border-rose-100 border-dashed">
                                  Từ Chối
                               </button>
