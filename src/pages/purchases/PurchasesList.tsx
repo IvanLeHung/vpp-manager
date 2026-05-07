@@ -658,6 +658,15 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
     }
 
     const doc = new docx.Document({
+        styles: {
+            default: {
+                document: {
+                    run: {
+                        font: "Times New Roman",
+                    },
+                },
+            },
+        },
         sections: [{
             properties: {
                 page: { margin: { top: 720, right: 720, bottom: 720, left: 720 } },
@@ -758,13 +767,35 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                     new docx.TableCell({ 
                                         columnSpan: 6,
                                         children: [
-                                            new docx.Paragraph({
-                                                indent: { left: 200 },
-                                                children: [
-                                                    new docx.TextRun({ text: `- ${de.dept}`, bold: true, size: 14 }),
-                                                    new docx.TextRun({ text: ` (${de.requestCode})`, size: 12, color: "555555" }),
-                                                    new docx.TextRun({ text: `  SL: ${de.qty} ${de.unit}`, bold: true, size: 14 }),
-                                                    new docx.TextRun({ text: de.note ? `  Ghi chú: ${de.note}` : "", size: 14, italics: true })
+                                            new docx.Table({
+                                                width: { size: 100, type: docx.WidthType.PERCENTAGE },
+                                                borders: docx.TableBorders.NONE,
+                                                rows: [
+                                                    new docx.TableRow({
+                                                        children: [
+                                                            new docx.TableCell({
+                                                                width: { size: 55, type: docx.WidthType.PERCENTAGE },
+                                                                children: [new docx.Paragraph({
+                                                                    children: [
+                                                                        new docx.TextRun({ text: `- ${de.dept}`, bold: true, size: 15 }),
+                                                                        new docx.TextRun({ text: ` (${de.requestCode})`, size: 13, color: "666666" })
+                                                                    ]
+                                                                })]
+                                                            }),
+                                                            new docx.TableCell({
+                                                                width: { size: 15, type: docx.WidthType.PERCENTAGE },
+                                                                children: [new docx.Paragraph({
+                                                                    children: [new docx.TextRun({ text: `SL: ${de.qty} ${de.unit}`, bold: true, italics: true, size: 15 })]
+                                                                })]
+                                                            }),
+                                                            new docx.TableCell({
+                                                                width: { size: 30, type: docx.WidthType.PERCENTAGE },
+                                                                children: [new docx.Paragraph({
+                                                                    children: [new docx.TextRun({ text: de.note ? `Ghi chú: ${de.note}` : "", size: 15, italics: true })]
+                                                                })]
+                                                            }),
+                                                        ]
+                                                    })
                                                 ]
                                             })
                                         ]
@@ -777,13 +808,13 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                     new docx.TableCell({ children: [] }),
                                     new docx.TableCell({
                                         columnSpan: 6,
-                                        shading: { fill: "F9F9F9" },
+                                        shading: { fill: "F8FAFC" },
                                         children: [
                                             new docx.Paragraph({
-                                                indent: { left: 400 },
+                                                indent: { left: 200 },
                                                 children: [
-                                                    new docx.TextRun({ text: `Thay cho: ${rep.originalName} | Lý do: ${rep.reason || 'Điều chỉnh'}`, italics: true, size: 14 }),
-                                                    new docx.TextRun({ text: ` | Chênh lệch: ${rep.diff >= 0 ? 'Tiết kiệm' : 'Tăng'} ${Math.abs(rep.diff).toLocaleString('vi-VN')} đ`, bold: true, color: "4F46E5", size: 14 })
+                                                    new docx.TextRun({ text: `Thay cho: ${rep.originalName} | Lý do: ${rep.reason || 'Điều chỉnh'}`, italics: true, size: 15, color: "475569" }),
+                                                    new docx.TextRun({ text: ` | Chênh lệch: ${rep.diff >= 0 ? 'Tiết kiệm' : 'Tăng'} ${Math.abs(rep.diff).toLocaleString('vi-VN')} đ`, bold: true, color: "4F46E5", size: 15 })
                                                 ]
                                             })
                                         ]
