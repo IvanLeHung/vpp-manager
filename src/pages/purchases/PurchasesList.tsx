@@ -153,7 +153,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               const typeMap = groups.get(type)!;
               
               const key = effectiveItem.mvpp;
-              const effectiveQty = Number(isReplaced ? (line.requestLine?.replacementQty || line.qtyRequested || 0) : (line.qtyOrdered ?? line.qtyApproved ?? line.qtyRequested ?? 0));
+              const effectiveQty = Number(isReplaced ? (line.requestLine?.replacementQty || line.qtyRequested || 0) : (line.qtyOrdered || line.qtyApproved || line.qtyRequested || 0));
               const effectivePrice = Number(isReplaced ? (line.requestLine?.replacementPrice || line.unitPrice || line.item?.price || 0) : (line.unitPrice || line.item?.price || 0));
               const effectiveItemName = effectiveItem.name || line.item?.name || '';
 
@@ -199,7 +199,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               if (!specificNote) specificNote = line.note || '';
 
               const originalUnit = originalRequestLine?.item?.unit || line.item?.unit || effectiveItem.unit;
-              const allocationQty = isReplaced ? (originalRequestLine?.qtyRequested || line.qtyRequested) : line.qtyRequested;
+              const allocationQty = isReplaced ? (originalRequestLine?.qtyRequested || line.qtyRequested) : (line.qtyOrdered || line.qtyApproved || line.qtyRequested);
 
               const allocationKey = `${deptName || 'UNLINKED'}-${requestCode}-${specificNote}`;
               const existingDept = current.deptBreakdown.get(allocationKey) || { 
@@ -325,7 +325,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
             const isReplaced = !!reqLine?.replacementItemId;
             const actualPrice = isReplaced ? Number(reqLine?.replacementPrice || 0) : Number(line.unitPrice || 0);
-            const actualQty = isReplaced ? Number(reqLine?.replacementQty || 0) : Number(line.qtyRequested || 0);
+            const actualQty = isReplaced ? Number(reqLine?.replacementQty || 0) : Number(line.qtyOrdered || line.qtyApproved || line.qtyRequested || 0);
             const lineActual = actualPrice * actualQty;
 
             poProposed += lineProposed;
@@ -867,7 +867,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{line.item?.mvpp || '—'}</span>
                             </td>
                             <td className="px-5 py-4 text-center">
-                              <span className="font-black text-sm text-indigo-600">{line.qtyRequested || line.qtyOrdered}</span>
+                              <span className="font-black text-sm text-indigo-600">{line.qtyOrdered || line.qtyApproved || line.qtyRequested}</span>
                               <p className="text-[9px] font-bold text-slate-400 uppercase">{line.item?.unit}</p>
                             </td>
                             <td className="px-5 py-4 text-right">
