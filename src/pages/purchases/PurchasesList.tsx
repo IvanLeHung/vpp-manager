@@ -6,6 +6,8 @@ import {
   Printer, CheckSquare, ChevronDown, FileText, AlertTriangle, X, CheckCircle, Download, Eye
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import * as docx from 'docx';
+import { saveAs } from 'file-saver';
 
 interface PurchasesListProps {
   onCreateNew: () => void;
@@ -55,6 +57,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH'>('ALL');
   const [showPrintMenu, setShowPrintMenu] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [showPrintConfirm, setShowPrintConfirm] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [previewPO, setPreviewPO] = useState<any | null>(null);
@@ -630,6 +633,228 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
     XLSX.writeFile(wb, `Phieu_Tong_Hop_Mua_Sam_Mau_In_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
+  const handleExportWordTemplate = async (type: 'VPP' | 'VE_SINH') => {
+    const group = summaryGroups.find(g => g.type === type);
+    if (!group) return;
+
+    const groupCodeShort = group.type === 'VE_SINH' ? 'VS' : group.type;
+    const summaryCode = `THMS-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${groupCodeShort}`;
+    const printTitle = group.type === 'VPP' 
+        ? 'PHIẾU TỔNG HỢP MUA SẮM VĂN PHÒNG PHẨM' 
+        : 'PHIẾU TỔNG HỢP MUA SẮM VẬT TƯ VỆ SINH';
+
+    // Fetch QR code
+    let qrImage;
+    try {
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(summaryCode)}`;
+        const resp = await fetch(qrUrl);
+        const buffer = await resp.arrayBuffer();
+        qrImage = new docx.ImageRun({
+            data: buffer,
+            transformation: { width: 60, height: 60 },
+        });
+    } catch (e) {
+        console.error("Could not load QR code", e);
+    }
+
+    const doc = new docx.Document({
+        sections: [{
+            properties: {
+                page: { margin: { top: 720, right: 720, bottom: 720, left: 720 } },
+            },
+            children: [
+                // Header Table
+                new docx.Table({
+                    width: { size: 100, type: docx.WidthType.PERCENTAGE },
+                    borders: docx.TableBorders.NONE,
+                    rows: [
+                        new docx.TableRow({
+                            children: [
+                                new docx.TableCell({
+                                    width: { size: 35, type: docx.WidthType.PERCENTAGE },
+                                    children: [
+                                        new docx.Paragraph({ children: [new docx.TextRun({ text: "CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO", bold: true, size: 20 })] }),
+                                        new docx.Paragraph({ children: [new docx.TextRun({ text: "Báo cáo tổng hợp đơn mua sắm", bold: true, italic: true, size: 18 })] }),
+                                        new docx.Paragraph({ children: [new docx.TextRun({ text: "Ban Hành chính Nhân sự", size: 18 })] }),
+                                    ]
+                                }),
+                                new docx.TableCell({
+                                    width: { size: 15, type: docx.WidthType.PERCENTAGE },
+                                    verticalAlign: docx.VerticalAlign.CENTER,
+                                    children: qrImage ? [new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [qrImage] })] : []
+                                }),
+                                new docx.TableCell({
+                                    width: { size: 50, type: docx.WidthType.PERCENTAGE },
+                                    children: [
+                                        new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", bold: true, size: 20 })] }),
+                                        new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: "Độc lập - Tự do - Hạnh phúc", bold: true, underline: {}, size: 20 })] }),
+                                        new docx.Paragraph({ alignment: docx.AlignmentType.RIGHT, children: [new docx.TextRun({ text: `Hà Nội, ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}`, italic: true, size: 18 })] }),
+                                    ]
+                                }),
+                            ]
+                        })
+                    ]
+                }),
+                new docx.Paragraph({ spacing: { before: 400, after: 200 }, alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: printTitle, bold: true, size: 32 })] }),
+                new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: `(Tổng hợp từ ${group.poCount} phiếu mua sắm / đề nghị đang lọc)`, italic: true, size: 20 })] }),
+                new docx.Paragraph({ spacing: { before: 400 } }),
+                
+                // Info Grid Table
+                new docx.Table({
+                    width: { size: 100, type: docx.WidthType.PERCENTAGE },
+                    borders: docx.TableBorders.NONE,
+                    rows: [
+                        new docx.TableRow({
+                            children: [
+                                new docx.TableCell({ children: [new docx.Paragraph({ children: [new docx.TextRun({ text: "Mã tổng hợp: ", bold: true }), new docx.TextRun(summaryCode)] })] }),
+                                new docx.TableCell({ children: [new docx.Paragraph({ children: [new docx.TextRun({ text: "Người lập: ", bold: true }), new docx.TextRun("Quản lý Hành chính")] })] }),
+                            ]
+                        }),
+                        new docx.TableRow({
+                            children: [
+                                new docx.TableCell({ children: [new docx.Paragraph({ children: [new docx.TextRun({ text: "Kho áp dụng: ", bold: true }), new docx.TextRun(group.label)] })] }),
+                                new docx.TableCell({ children: [new docx.Paragraph({ children: [new docx.TextRun({ text: "Ngày in: ", bold: true }), new docx.TextRun(new Date().toLocaleDateString('vi-VN'))] })] }),
+                            ]
+                        }),
+                        new docx.TableRow({
+                            children: [
+                                new docx.TableCell({ children: [new docx.Paragraph({ children: [new docx.TextRun({ text: "Tổng số phiếu: ", bold: true }), new docx.TextRun(`${group.poCount} phiếu`)] })] }),
+                                new docx.TableCell({ children: [new docx.Paragraph({ children: [new docx.TextRun({ text: "Số mặt hàng: ", bold: true }), new docx.TextRun(`${group.items.length} mặt hàng`)] })] }),
+                            ]
+                        })
+                    ]
+                }),
+                new docx.Paragraph({ spacing: { before: 400 } }),
+
+                // Main Table
+                new docx.Table({
+                    width: { size: 100, type: docx.WidthType.PERCENTAGE },
+                    rows: [
+                        new docx.TableRow({
+                            tableHeader: true,
+                            children: [
+                                "STT", "MÃ VT", "TÊN VẬT TƯ MUA", "ĐVT", "SL MUA", "ĐƠN GIÁ", "THÀNH TIỀN"
+                            ].map(text => new docx.TableCell({
+                                shading: { fill: "F1F5F9" },
+                                children: [new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text, bold: true, size: 16 })] })]
+                            }))
+                        }),
+                        ...group.items.flatMap((item: any, idx: number) => {
+                            const mainRow = new docx.TableRow({
+                                children: [
+                                    new docx.TableCell({ children: [new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: String(idx + 1), size: 16 })] })] }),
+                                    new docx.TableCell({ children: [new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: item.mvpp, size: 16 })] })] }),
+                                    new docx.TableCell({ children: [new docx.Paragraph({ children: [new docx.TextRun({ text: item.name.toUpperCase(), bold: true, size: 16 })] })] }),
+                                    new docx.TableCell({ children: [new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: item.unit, size: 16 })] })] }),
+                                    new docx.TableCell({ children: [new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: String(item.qty), size: 16 })] })] }),
+                                    new docx.TableCell({ children: [new docx.Paragraph({ alignment: docx.AlignmentType.RIGHT, children: [new docx.TextRun({ text: Number(item.price).toLocaleString('vi-VN'), size: 16 })] })] }),
+                                    new docx.TableCell({ children: [new docx.Paragraph({ alignment: docx.AlignmentType.RIGHT, children: [new docx.TextRun({ text: Number(item.actualTotal).toLocaleString('vi-VN'), size: 16 })] })] }),
+                                ]
+                            });
+
+                            const deptRows = item.deptEntries.map((de: any) => new docx.TableRow({
+                                children: [
+                                    new docx.TableCell({ children: [] }),
+                                    new docx.TableCell({ 
+                                        columnSpan: 6,
+                                        children: [
+                                            new docx.Paragraph({
+                                                indent: { left: 200 },
+                                                children: [
+                                                    new docx.TextRun({ text: `- ${de.dept}`, bold: true, size: 14 }),
+                                                    new docx.TextRun({ text: ` (${de.requestCode})`, size: 12, color: "555555" }),
+                                                    new docx.TextRun({ text: `  SL: ${de.qty} ${de.unit}`, bold: true, size: 14 }),
+                                                    new docx.TextRun({ text: de.note ? `  Ghi chú: ${de.note}` : "", size: 14, italic: true })
+                                                ]
+                                            })
+                                        ]
+                                    })
+                                ]
+                            }));
+
+                            const replacementRows = (item.replacements || []).map((rep: any) => new docx.TableRow({
+                                children: [
+                                    new docx.TableCell({ children: [] }),
+                                    new docx.TableCell({
+                                        columnSpan: 6,
+                                        shading: { fill: "F9F9F9" },
+                                        children: [
+                                            new docx.Paragraph({
+                                                indent: { left: 400 },
+                                                children: [
+                                                    new docx.TextRun({ text: `Thay cho: ${rep.originalName} | Lý do: ${rep.reason || 'Điều chỉnh'}`, italic: true, size: 14 }),
+                                                    new docx.TextRun({ text: ` | Chênh lệch: ${rep.diff >= 0 ? 'Tiết kiệm' : 'Tăng'} ${Math.abs(rep.diff).toLocaleString('vi-VN')} đ`, bold: true, color: "4F46E5", size: 14 })
+                                                ]
+                                            })
+                                        ]
+                                    })
+                                ]
+                            }));
+
+                            return [mainRow, ...deptRows, ...replacementRows];
+                        })
+                    ]
+                }),
+
+                // Totals
+                new docx.Paragraph({ spacing: { before: 400 }, border: { top: { style: docx.BorderStyle.SINGLE, size: 12 } } }),
+                new docx.Paragraph({
+                    alignment: docx.AlignmentType.RIGHT,
+                    children: [
+                        new docx.TextRun({ text: `TỔNG CỘNG (${group.items.length} MẶT HÀNG):  `, bold: true, size: 18 }),
+                        new docx.TextRun({ text: `${group.items.reduce((s:number, i:any) => s + i.qty, 0).toLocaleString('vi-VN')}  `, bold: true, size: 18 }),
+                        new docx.TextRun({ text: `${Number(group.actualTotal).toLocaleString('vi-VN')} đ`, bold: true, size: 20, color: "4F46E5" })
+                    ]
+                }),
+                new docx.Paragraph({
+                    alignment: docx.AlignmentType.RIGHT,
+                    children: [
+                        new docx.TextRun({ text: `TỔNG GIÁ TRỊ ĐỀ XUẤT ĐÃ DUYỆT:  `, size: 16 }),
+                        new docx.TextRun({ text: `${Number(group.approvedTotal).toLocaleString('vi-VN')} đ`, size: 16 })
+                    ]
+                }),
+                new docx.Paragraph({
+                    alignment: docx.AlignmentType.RIGHT,
+                    children: [
+                        new docx.TextRun({ text: group.savings >= 0 ? "HIỆU QUẢ TỐI ƯU CHI PHÍ:  " : "CHÊNH LỆCH CHI PHÍ TĂNG:  ", bold: true, size: 18 }),
+                        new docx.TextRun({ text: `${Number(Math.abs(group.savings)).toLocaleString('vi-VN')} đ`, bold: true, size: 18, color: group.savings >= 0 ? "059669" : "E11D48" })
+                    ]
+                }),
+
+                // Signatures
+                new docx.Paragraph({ spacing: { before: 800 } }),
+                new docx.Table({
+                    width: { size: 100, type: docx.WidthType.PERCENTAGE },
+                    borders: docx.TableBorders.NONE,
+                    rows: [
+                        new docx.TableRow({
+                            children: [
+                                new docx.TableCell({
+                                    children: [
+                                        new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: "Người lập phiếu", bold: true, uppercase: true })] }),
+                                        new docx.Paragraph({ spacing: { before: 1200 }, alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: "..........................", bold: true })] }),
+                                        new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: "(Đã ký số)", size: 14, color: "2563EB" })] }),
+                                    ]
+                                }),
+                                new docx.TableCell({
+                                    children: [
+                                        new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: "Trưởng bộ phận", bold: true, uppercase: true })] }),
+                                        new docx.Paragraph({ spacing: { before: 1200 }, alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: "..........................", bold: true })] }),
+                                        new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: "(Đã ký số)", size: 14, color: "2563EB" })] }),
+                                    ]
+                                }),
+                            ]
+                        })
+                    ]
+                })
+            ]
+        }]
+    });
+
+    const blob = await docx.Packer.toBlob(doc);
+    saveAs(blob, `Phieu_Tong_Hop_Mua_Sam_${group.type}_${new Date().toISOString().slice(0,10)}.docx`);
+  };
+
   const toggleSelect = (id: string) => {
       setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
@@ -846,13 +1071,71 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                               )}
                            </div>
 
-                           <button onClick={handleExportExcelTemplate} className={`px-4 py-2.5 rounded-xl border transition flex items-center gap-1.5 text-[10px] font-black uppercase bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-500/20`}>
-                              <FileText className="w-4 h-4"/> Tải Excel (Mẫu in)
-                           </button>
+                           <div className="relative">
+                              <button 
+                                onClick={() => setShowExportMenu(!showExportMenu)}
+                                className={`flex items-center px-4 py-2.5 rounded-xl border transition-all font-black text-[10px] uppercase shadow-sm ${showExportMenu ? 'bg-emerald-600 text-white border-emerald-600 shadow-emerald-500/30' : 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'}`}
+                              >
+                                 <Download className={`w-4 h-4 mr-2 ${showExportMenu ? 'text-white' : 'text-emerald-500'}`}/> Tải Mẫu in <ChevronDown className={`w-3.5 h-3.5 ml-2 transition-transform ${showExportMenu ? 'rotate-180' : ''}`}/>
+                              </button>
 
-                           <button onClick={handleExportExcel} className={`p-2.5 rounded-xl border transition flex items-center gap-1.5 text-[10px] font-black uppercase bg-white border-slate-200 text-slate-500 hover:bg-slate-50`}>
-                              <Download className="w-4 h-4"/>
-                           </button>
+                              {showExportMenu && (
+                                <>
+                                  <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)}></div>
+                                  <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 py-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                                     <div className="px-4 pb-2 mb-2 border-b border-slate-100">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Định dạng Excel</p>
+                                     </div>
+                                     <button 
+                                       onClick={() => { handleExportExcelTemplate(); setShowExportMenu(false); }}
+                                       className="w-full px-4 py-2.5 text-left flex items-center justify-between hover:bg-emerald-50 transition group"
+                                     >
+                                        <div className="flex items-center gap-3">
+                                           <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors"><FileText className="w-3.5 h-3.5"/></div>
+                                           <span className="text-xs font-bold text-slate-700">Tải Excel (Mẫu in tổng hợp)</span>
+                                        </div>
+                                     </button>
+
+                                     <div className="mx-3 my-2 border-t border-slate-100"></div>
+                                     <div className="px-4 pb-2 mb-1">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Định dạng Word (.docx)</p>
+                                     </div>
+                                     <button 
+                                       disabled={printStats.vppCount === 0}
+                                       onClick={() => { handleExportWordTemplate('VPP'); setShowExportMenu(false); }}
+                                       className={`w-full px-4 py-2.5 text-left flex items-center justify-between transition ${printStats.vppCount === 0 ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-blue-50 group'}`}
+                                     >
+                                        <div className="flex items-center gap-3">
+                                           <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors"><FileText className="w-3.5 h-3.5"/></div>
+                                           <span className="text-xs font-bold text-slate-700">Tải Word (Mẫu in) - VPP</span>
+                                        </div>
+                                     </button>
+                                     
+                                     <button 
+                                       disabled={printStats.vsCount === 0}
+                                       onClick={() => { handleExportWordTemplate('VE_SINH'); setShowExportMenu(false); }}
+                                       className={`w-full px-4 py-2.5 text-left flex items-center justify-between transition ${printStats.vsCount === 0 ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-blue-50 group'}`}
+                                     >
+                                        <div className="flex items-center gap-3">
+                                           <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors"><FileText className="w-3.5 h-3.5"/></div>
+                                           <span className="text-xs font-bold text-slate-700">Tải Word (Mẫu in) - Vệ sinh</span>
+                                        </div>
+                                     </button>
+
+                                     <div className="mx-3 my-2 border-t border-slate-100"></div>
+                                     <button 
+                                       onClick={() => { handleExportExcel(); setShowExportMenu(false); }}
+                                       className="w-full px-4 py-2.5 text-left flex items-center justify-between hover:bg-slate-50 transition group"
+                                     >
+                                        <div className="flex items-center gap-3">
+                                           <div className="p-1.5 bg-slate-50 text-slate-500 rounded-lg group-hover:bg-slate-500 group-hover:text-white transition-colors"><Download className="w-3.5 h-3.5"/></div>
+                                           <span className="text-xs font-bold text-slate-500">Tải Excel (Dữ liệu thô)</span>
+                                        </div>
+                                     </button>
+                                  </div>
+                                </>
+                              )}
+                           </div>
 
                            <button onClick={() => setIsBulkMode(!isBulkMode)} className={`p-2.5 rounded-xl border transition flex items-center gap-1.5 text-[10px] font-black uppercase ${isBulkMode ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-slate-200 text-slate-500'}`}>
                               <CheckSquare className="w-4 h-4"/> {isBulkMode ? 'Ẩn ô chọn' : 'Chọn nhiều'}

@@ -12,6 +12,8 @@
   "dependencies": {
     "axios": "^1.13.6",
     "clsx": "^2.1.1",
+    "docx": "^9.6.1",
+    "file-saver": "^2.0.5",
     "lucide-react": "^0.577.0",
     "pptxgenjs": "^4.0.1",
     "react": "^19.2.4",
