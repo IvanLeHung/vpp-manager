@@ -559,12 +559,13 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                    <tr key={l.id} className={`hover:bg-slate-50 transition border-l-4 ${outOfStock && data.status.startsWith('PENDING') ? 'border-l-rose-500 bg-rose-50/30' : 'border-l-transparent'}`}>
                                        <td className="px-2 py-2 text-center font-bold text-slate-400 border-r border-slate-100">{idx+1}</td>
                                        <td className="px-2 py-2 min-w-[150px]">
-                                           <p className="font-bold text-slate-800 text-sm whitespace-normal">{l.item.name}</p>
-                                           <div className="flex items-center gap-2 mt-1">
-                                              <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-black tracking-widest">{l.item.mvpp}</span>
-                                              <span className="text-[10px] font-bold text-indigo-500 flex items-center gap-1"><Archive className="w-3 h-3"/> Kho: {data.warehouseCode}</span>
-                                           </div>
-                                       </td>
+                                            <p className="font-bold text-slate-800 text-sm whitespace-normal">{l.replacementItem?.name || l.item.name}</p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                               <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-black tracking-widest">{l.replacementItem?.mvpp || l.item.mvpp}</span>
+                                               {l.replacementItemId && <span className="text-[9px] font-black bg-indigo-100 text-indigo-600 px-1 py-0.5 rounded uppercase">Đã thay thế</span>}
+                                               <span className="text-[10px] font-bold text-indigo-500 flex items-center gap-1"><Archive className="w-3 h-3"/> Kho: {data.warehouseCode}</span>
+                                            </div>
+                                        </td>
                                        <td className="px-2 py-2">
                                            <div className="flex flex-col items-center gap-1">
                                               <div className="flex gap-1">
@@ -604,13 +605,16 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                             )}
                                         </td>
                                         <td className="px-2 py-2 text-center bg-emerald-50/30 border-r border-slate-100">
-                                            {l.qtyAdminApproved !== null || l.qtyApproved !== null ? (
+                                            {l.qtyAdminApproved !== null || l.qtyApproved !== null || l.replacementQty !== null ? (
                                                 <div className="flex flex-col items-center">
-                                                    <span className="font-black text-base text-emerald-600">{l.qtyAdminApproved ?? l.qtyApproved}</span>
-                                                    { (l.qtyAdminApproved ?? l.qtyApproved) !== (l.qtyManagerApproved ?? l.qtyRequested) && (
-                                                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${ (l.qtyAdminApproved ?? l.qtyApproved) < (l.qtyManagerApproved ?? l.qtyRequested) ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-700'}`}>
-                                                        {(l.qtyAdminApproved ?? l.qtyApproved) < (l.qtyManagerApproved ?? l.qtyRequested) ? `-${(l.qtyManagerApproved ?? l.qtyRequested) - (l.qtyAdminApproved ?? l.qtyApproved)}` : `+${(l.qtyAdminApproved ?? l.qtyApproved) - (l.qtyManagerApproved ?? l.qtyRequested)}`}
+                                                    <span className="font-black text-base text-emerald-600">{l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved}</span>
+                                                    { (l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved) !== (l.qtyManagerApproved ?? l.qtyRequested) && (
+                                                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${ (l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved) < (l.qtyManagerApproved ?? l.qtyRequested) ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-700'}`}>
+                                                        {(l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved) < (l.qtyManagerApproved ?? l.qtyRequested) ? `-${(l.qtyManagerApproved ?? l.qtyRequested) - (l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved)}` : `+${(l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved) - (l.qtyManagerApproved ?? l.qtyRequested)}`}
                                                       </span>
+                                                    )}
+                                                    {l.replacementQty !== null && (l.qtyAdminApproved ?? l.qtyApproved) !== l.replacementQty && (
+                                                      <span className="text-[9px] font-bold text-slate-400 line-through">({l.qtyAdminApproved ?? l.qtyApproved})</span>
                                                     )}
                                                 </div>
                                             ) : (

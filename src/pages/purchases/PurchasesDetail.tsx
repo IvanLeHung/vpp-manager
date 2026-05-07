@@ -520,7 +520,6 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                 .filter((l: any) => l.item.name.toLowerCase().includes(searchTerm.toLowerCase()) || l.item.mvpp.toLowerCase().includes(searchTerm.toLowerCase()))
                                   .map((l:any, idx:number) => {
                                     const qtyReq = l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested;
-                                    const progress = qtyReq > 0 ? Math.min(100, Math.round((l.qtyReceived / qtyReq) * 100)) : 0;
                                     
                                     // Replacement Info from RequestLine
                                     const isReplaced = !!l.requestLine?.replacementItemId;
@@ -533,6 +532,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                     const effectiveItem = isReplaced ? l.requestLine?.replacementItem : l.item;
                                     const effectivePrice = isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0);
                                     const effectiveQty = isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyReq;
+                                    const progress = effectiveQty > 0 ? Math.min(100, Math.round((l.qtyReceived / effectiveQty) * 100)) : 0;
                                     const effectiveAmount = effectivePrice * effectiveQty;
                                     
                                     const diff = effectiveAmount - origTotal;
@@ -575,7 +575,10 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                       </td>
                                       <td className="p-2.5 text-center bg-indigo-50/20">
                                           <div className="flex flex-col items-center">
-                                            <span className="font-black text-lg text-indigo-700">{qtyReq}</span>
+                                            <span className="font-black text-lg text-indigo-700">{effectiveQty}</span>
+                                            {isReplaced && effectiveQty !== qtyReq && (
+                                              <span className="text-[9px] font-bold text-slate-400 line-through">({qtyReq})</span>
+                                            )}
                                           </div>
                                       </td>
                                       <td className="p-2.5 text-center border-l border-slate-50">
