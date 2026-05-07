@@ -1044,36 +1044,51 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
             .filter(g => selectedPrintType === 'ALL' || g.type === selectedPrintType)
             .map((group) => (
             <div key={group.type} className="print-sheet p-4">
-                {/* HEADER SECTION */}
-                <div className="flex justify-between items-start w-full border-b pb-4 mb-4">
-                    <div className="w-[35%] text-left header-text">
-                        <p className="font-bold uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
-                        <p className="font-bold italic">Báo cáo tổng hợp đơn mua sắm</p>
-                        <p>Ban Hành chính Nhân sự</p>
-                    </div>
-                    <div className="w-[15%] flex flex-col items-center">
-                         <img src={`https://api.qrserver.com/v1/create-qr-code/?size=65x65&data=${encodeURIComponent('PURCHASING-SUMMARY-' + group.type + '-' + new Date().getTime())}`} alt="QR" className="w-12 h-12 border border-slate-100" />
-                     </div>
-                    <div className="w-[50%] text-center header-text">
-                        <p className="font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
-                        <p className="font-bold underline underline-offset-[4px] mt-1">Độc lập - Tự do - Hạnh phúc</p>
-                        <p className="mt-3 italic text-right mr-10">Hà Nội, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
-                    </div>
-                </div>
+                {(() => {
+                    const printTitle = group.type === 'VPP' 
+                        ? 'PHIẾU TỔNG HỢP MUA SẮM VĂN PHÒNG PHẨM' 
+                        : group.type === 'VE_SINH' 
+                            ? 'PHIẾU TỔNG HỢP MUA SẮM VẬT TƯ VỆ SINH' 
+                            : `PHIẾU TỔNG HỢP MUA SẮM ${group.label}`;
+                    
+                    const groupCodeShort = group.type === 'VE_SINH' ? 'VS' : group.type;
+                    const summaryCode = `THMS-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${groupCodeShort}`;
 
-                {/* TITLE */}
-                <h2 className="title-main">PHIẾU TỔNG HỢP MUA SẮM</h2>
-                <p className="title-sub">(Tổng hợp từ {group.poCount} phiếu mua sắm / đề nghị đang lọc)</p>
+                    return (
+                        <>
+                            {/* HEADER SECTION */}
+                            <div className="flex justify-between items-start w-full border-b pb-4 mb-4">
+                                <div className="w-[35%] text-left header-text">
+                                    <p className="font-bold uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
+                                    <p className="font-bold italic">Báo cáo tổng hợp đơn mua sắm</p>
+                                    <p>Ban Hành chính Nhân sự</p>
+                                </div>
+                                <div className="w-[15%] flex flex-col items-center">
+                                     <img src={`https://api.qrserver.com/v1/create-qr-code/?size=65x65&data=${encodeURIComponent(summaryCode)}`} alt="QR" className="w-12 h-12 border border-slate-100" />
+                                 </div>
+                                <div className="w-[50%] text-center header-text">
+                                    <p className="font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+                                    <p className="font-bold underline underline-offset-[4px] mt-1">Độc lập - Tự do - Hạnh phúc</p>
+                                    <p className="mt-3 italic text-right mr-10">Hà Nội, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
+                                </div>
+                            </div>
 
-                {/* OVERVIEW INFO BLOCK */}
-                <div className="info-grid">
-                   <div className="info-item"><span className="info-label">Mã tổng hợp:</span> <span>THMS-{new Date().toISOString().slice(0,10).replace(/-/g,'')}-{group.type}</span></div>
-                   <div className="info-item"><span className="info-label">Người lập:</span> <span>Quản lý Hành chính</span></div>
-                   <div className="info-item"><span className="info-label">Kho áp dụng:</span> <span>{group.label}</span></div>
-                   <div className="info-item"><span className="info-label">Ngày in:</span> <span>{new Date().toLocaleDateString('vi-VN')}</span></div>
-                   <div className="info-item"><span className="info-label">Tổng số phiếu:</span> <span>{group.poCount} phiếu</span></div>
-                   <div className="info-item"><span className="info-label">Số mặt hàng:</span> <span>{group.items.length} mặt hàng</span></div>
-                </div>
+                            {/* TITLE */}
+                            <h2 className="title-main">{printTitle}</h2>
+                            <p className="title-sub">(Tổng hợp từ {group.poCount} phiếu mua sắm / đề nghị đang lọc)</p>
+
+                            {/* OVERVIEW INFO BLOCK */}
+                            <div className="info-grid">
+                               <div className="info-item"><span className="info-label">Mã tổng hợp:</span> <span>{summaryCode}</span></div>
+                               <div className="info-item"><span className="info-label">Người lập:</span> <span>Quản lý Hành chính</span></div>
+                               <div className="info-item"><span className="info-label">Kho áp dụng:</span> <span>{group.label}</span></div>
+                               <div className="info-item"><span className="info-label">Ngày in:</span> <span>{new Date().toLocaleDateString('vi-VN')}</span></div>
+                               <div className="info-item"><span className="info-label">Tổng số phiếu:</span> <span>{group.poCount} phiếu</span></div>
+                               <div className="info-item"><span className="info-label">Số mặt hàng:</span> <span>{group.items.length} mặt hàng</span></div>
+                            </div>
+                        </>
+                    );
+                })()}
 
                 {/* MAIN TABLE */}
                 <table className="print-table">
