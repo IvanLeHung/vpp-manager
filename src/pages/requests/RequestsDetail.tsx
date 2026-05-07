@@ -1422,10 +1422,9 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                   <p className="mb-2 uppercase">Người đề xuất</p>
                   <p className="text-[11px] font-normal italic mb-4">(Ký và ghi họ tên)</p>
                   <div className="mt-20 border-t border-dotted border-black w-[80%] mx-auto pt-2 relative">
-                      <p className="text-[10px] font-bold text-blue-600 mb-1">(Đã ký số)</p>
                       <p className="font-black text-xs uppercase">{data.requester?.fullName}</p>
-                      <p className="text-[9px] font-normal text-slate-500 mt-1">
-                        {new Date(data.createdAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      <p className="text-[9px] font-bold text-blue-600 mt-1">
+                        {new Date(data.createdAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} (Đã ký số)
                       </p>
                   </div>
               </div>
