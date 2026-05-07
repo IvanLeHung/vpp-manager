@@ -1527,7 +1527,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                          {(() => {
                             const approvedTotal = data.lines.reduce((sum: number, l: any) => {
                                const origPrice = Number(l.requestLine?.unitPrice || l.requestLine?.item?.price || 0);
-                               const origQty = Number(l.qtyRequested || 0);
+                               const origQty = Number(l.requestLine?.qtyRequested || l.qtyRequested || 0);
                                return sum + (origPrice * origQty);
                             }, 0);
                             return approvedTotal.toLocaleString('vi-VN');
@@ -1555,7 +1555,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                          {(() => {
                             const approvedTotal = data.lines.reduce((sum: number, l: any) => {
                                const origPrice = Number(l.requestLine?.unitPrice || l.requestLine?.item?.price || 0);
-                               const origQty = Number(l.qtyRequested || 0);
+                               const origQty = Number(l.requestLine?.qtyRequested || l.qtyRequested || 0);
                                return sum + (origPrice * origQty);
                             }, 0);
                             const actualTotal = data.lines.reduce((sum: number, l: any) => {

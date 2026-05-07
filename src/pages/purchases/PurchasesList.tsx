@@ -330,7 +330,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
             const reqLine = line.requestLine;
             
             const originalPrice = Number(reqLine?.unitPrice || reqLine?.item?.price || line.unitPrice || line.item?.price || 0);
-            const originalQty = Number(line.qtyRequested || 0); // Use the portion of the request in this PO line
+            const originalQty = Number(reqLine?.qtyRequested || line.qtyRequested || 0); // Use the original request quantity as baseline
             const lineProposed = originalPrice * originalQty;
 
             const isReplaced = !!reqLine?.replacementItemId;
