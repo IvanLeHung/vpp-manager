@@ -1020,7 +1020,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                     <div className="w-[35%] text-left header-text">
                         <p className="font-bold uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
                         <p className="font-bold italic">Báo cáo tổng hợp đơn mua sắm</p>
-                        <p>Ban Hành chính - Quản trị</p>
+                        <p>Ban Hành chính Nhân sự</p>
                     </div>
                     <div className="w-[15%] flex flex-col items-center">
                          <img src={`https://api.qrserver.com/v1/create-qr-code/?size=65x65&data=${encodeURIComponent('PURCHASING-SUMMARY-' + group.type + '-' + new Date().getTime())}`} alt="QR" className="w-12 h-12 border border-slate-100" />

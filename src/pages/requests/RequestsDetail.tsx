@@ -1317,7 +1317,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                   <div className="w-[35%] text-left">
                       <p className="font-bold text-[13px] uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
                       <p className="text-[10px] italic mt-1 font-bold">Số phiếu: {data.id}</p>
-                      <p className="text-[9px] text-slate-500 mt-1">Ban Hành chính - Quản trị</p>
+                      <p className="text-[9px] text-slate-500 mt-1">Ban Hành chính Nhân sự</p>
                   </div>
                   <div className="w-[20%] flex flex-col items-center text-center">
                       <img 

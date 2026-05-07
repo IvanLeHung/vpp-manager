@@ -873,7 +873,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                   <div className="w-[40%] text-left">
                       <p className="font-bold text-[11pt] uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
                       <p className="text-[9pt] italic mt-1 font-bold">Báo cáo tổng hợp tồn đọng cấp phát</p>
-                      <p className="text-[8pt] text-black mt-1">Ban Hành chính - Quản trị</p>
+                      <p className="text-[8pt] text-black mt-1">Ban Hành chính Nhân sự</p>
                   </div>
                   <div className="w-[10%] flex flex-col items-center text-center">
                        <img 

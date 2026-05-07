@@ -346,7 +346,7 @@ function PrintInventoryTemplate({ stocks, allStocks, warehouseLabel, warehouseCo
             <div className="w-[40%] text-left">
                 <p className="font-bold text-[13px] uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
                 <p className="text-[10px] italic mt-1 font-bold">Kho: {warehouseCode}</p>
-                <p className="text-[9px] text-slate-500 mt-1">Ban Hành chính - Quản trị</p>
+                <p className="text-[9px] text-slate-500 mt-1">Ban Hành chính Nhân sự</p>
             </div>
             <div className="w-[60%] text-right">
                 <p className="text-[14px] font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
