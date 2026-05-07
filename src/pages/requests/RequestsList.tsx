@@ -291,7 +291,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             const isReplaced = !!line.replacementItemId && !!line.replacementItem;
             const effectiveItem = isReplaced ? line.replacementItem : line.item;
             const effectiveQty = isReplaced ? (line.replacementQty || line.qtyApproved || line.qtyRequested) : (line.qtyApproved ?? line.qtyRequested);
-            const effectivePrice = isReplaced ? (line.replacementPrice || line.item.price) : line.item.price;
+            const effectivePrice = isReplaced ? (line.replacementPrice || line.unitPrice || line.item?.price || 0) : (line.unitPrice || line.item?.price || 0);
 
             if (!effectiveItem) return; // Safeguard against deleted items
 
@@ -349,7 +349,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             }
 
             const originalQtyForTotal = line.qtyApproved || line.qtyRequested;
-            const originalPriceForTotal = line.item.price || 0;
+            const originalPriceForTotal = line.unitPrice || line.item?.price || 0;
 
             current.qtyRequested += effectiveQty;
             current.qtyDelivered += (line.qtyDelivered || 0);
