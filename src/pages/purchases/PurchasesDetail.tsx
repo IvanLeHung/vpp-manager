@@ -1579,7 +1579,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                   </p>
               </div>
               <div className="text-center w-1/3">
-                  <p className="font-black uppercase text-[12px] mb-1">TRƯỞNG BP HCQT</p>
+                  <p className="font-black uppercase text-[12px] mb-1">TRƯỞNG BỘ PHẬN</p>
                   <p className="text-[10px] italic text-slate-500 mb-16">(Ký xác nhận)</p>
                   <div className="w-32 h-px bg-slate-300 mx-auto mb-2 border-dashed"></div>
                   <p className="font-black uppercase text-[13px]">{data.approver?.fullName || '..........................'}</p>
