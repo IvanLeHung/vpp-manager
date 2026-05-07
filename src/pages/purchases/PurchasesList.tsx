@@ -169,7 +169,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
               // For Totals comparison
               const originalQty = Number(line.qtyRequested || 0);
-              const originalPrice = Number(line.requestLine?.unitPrice || line.item?.price || line.unitPrice || 0);
+              const originalPrice = Number(line.requestLine?.unitPrice || line.requestLine?.item?.price || line.unitPrice || line.item?.price || 0);
 
               const current = typeMap.get(key) || {
                   mvpp: effectiveItem.mvpp,
@@ -329,7 +329,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
         po.lines.forEach((line: any) => {
             const reqLine = line.requestLine;
             
-            const originalPrice = Number(reqLine?.unitPrice || line.item?.price || line.unitPrice || 0);
+            const originalPrice = Number(reqLine?.unitPrice || reqLine?.item?.price || line.unitPrice || line.item?.price || 0);
             const originalQty = Number(reqLine?.qtyRequested || line.qtyRequested || 0);
             const lineProposed = originalPrice * originalQty;
 
