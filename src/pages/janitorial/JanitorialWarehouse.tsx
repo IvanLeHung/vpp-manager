@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Droplets, ArrowDownToLine, ArrowUpFromLine, X, Zap, Loader2, Download, SlidersHorizontal, Scale, AlertTriangle, Search, CheckSquare, Square, Printer } from 'lucide-react';
+import { Droplets, ArrowDownToLine, ArrowUpFromLine, X, Zap, Loader2, Download, SlidersHorizontal, Scale, AlertTriangle, Search, CheckSquare, Square, Printer, ArrowRight } from 'lucide-react';
 import api from '../../lib/api';
 import { useAppContext } from '../../context/AppContext';
 import WarehouseTicketModal from '../../components/warehouse/WarehouseTicketModal';
@@ -29,6 +29,9 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
   const [users, setUsers] = useState<any[]>([]);
   const [sourceRef, setSourceRef] = useState('');
   const [supplier, setSupplier] = useState('');
+  const [otherLocation, setOtherLocation] = useState('');
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+
 
 
 
@@ -55,7 +58,8 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
   ];
 
   const LOCATIONS = [
-    'VPBH Danko Avenue', 'VPBH Sông Công', 'VPBH Thái Nguyên', 'Mặt trước C6-I', 'Mặt sau C6-I', 'Tầng 9 C6-I',
+    'VPBH Danko Avenue', 'Mặt trước C6-I', 'Mặt sau C6-I', 'Tầng 9 C6-I', 
+    'Mặt trước C6-II', 'Mặt sau C6-II', 'Tầng 2 C6-II',
     'TTTM Danko City', 'VPBH Danko Sun River', 'VPBH Danko Riverside', 'VPBH Danko Center', 'VPBH Danko Royal',
     'VPBH Danko The Country', 'Khác (Ghi chú)'
   ];
@@ -68,6 +72,8 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
       setReceiverDept('');
       setSourceRef('');
       setSupplier('');
+      setOtherLocation('');
+      setShowUserDropdown(false);
       setIssueType(isOpen && type === 'RECEIVE' ? 'NEW_PURCHASE' : 'INTERNAL');
       setShowConfirm(false);
       api.get('/users').then(res => setUsers(Array.isArray(res.data) ? res.data : res.data?.data || [])).catch(console.error);
@@ -86,6 +92,7 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
     if (type === 'RECEIVE' && ['NEW_PURCHASE', 'RETURN', 'TRANSFER'].includes(issueType) && !supplier.trim()) return alert('Vui lòng điền các thông tin nhập nguồn phụ trợ bắt buộc');
     if (!reason.trim()) return alert('Vui lòng nhập mô tả chi tiết');
     if (type === 'ISSUE' && !location) return alert('Vui lòng chọn địa điểm/khu vực nhận');
+    if (type === 'ISSUE' && location === 'Khác (Ghi chú)' && !otherLocation.trim()) return alert('Vui lòng nhập vị trí cụ thể');
 
     if (!showConfirm) {
       setShowConfirm(true);
@@ -106,7 +113,7 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
         lines: [{ 
           itemId: stock.item.id, 
           qty: type === 'ISSUE' ? -Math.abs(qty) : Math.abs(qty),
-          location: type === 'ISSUE' ? location : null,
+          location: type === 'ISSUE' ? (location === 'Khác (Ghi chú)' ? `Khác: ${otherLocation}` : location) : null,
           gender: type === 'ISSUE' ? gender : null
         }]
       });
@@ -156,19 +163,49 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1.5">
                   <label className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Người nhận</label>
-                  <select 
-                    value={receiverName} 
-                    onChange={e => {
-                       const u = users.find(x => x.fullName === e.target.value);
-                       setReceiverName(e.target.value);
-                       if (u && u.department) {
-                         setReceiverDept(u.department.name);
-                       }
-                    }} 
-                    className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700">
-                    <option value="">-- Chọn người nhận --</option>
-                    {users.map(u => <option key={u.id} value={u.fullName}>{u.fullName} {u.department?.name ? `(${u.department.name})` : ''}</option>)}
-                  </select>
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input 
+                      type="text" 
+                      placeholder="Tìm nhân sự..." 
+                      value={receiverName} 
+                      onChange={e => {
+                        setReceiverName(e.target.value);
+                        setShowUserDropdown(true);
+                      }}
+                      onFocus={() => setShowUserDropdown(true)}
+                      className="w-full pl-11 pr-4 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all" 
+                    />
+                    {showUserDropdown && (
+                      <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 z-[70] max-h-60 overflow-y-auto">
+                        {users
+                          .filter(u => 
+                            u.fullName.toLowerCase().includes(receiverName.toLowerCase()) || 
+                            (u.username && u.username.toLowerCase().includes(receiverName.toLowerCase()))
+                          )
+                          .map(u => (
+                            <button 
+                              key={u.id} 
+                              onClick={() => {
+                                setReceiverName(u.fullName);
+                                setReceiverDept(u.department?.name || u.departmentName || '');
+                                setShowUserDropdown(false);
+                              }}
+                              className="w-full flex items-center justify-between p-4 hover:bg-indigo-50 border-b border-slate-50 last:border-0 text-left transition-colors"
+                            >
+                              <div>
+                                <p className="font-black text-slate-800 uppercase tracking-tight text-xs">{u.fullName}</p>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                                  {u.department?.name || u.departmentName || 'N/A'}
+                                </p>
+                              </div>
+                              <ArrowRight className="w-4 h-4 text-indigo-200" />
+                            </button>
+                          ))
+                        }
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <label className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Phòng ban người nhận</label>
@@ -184,6 +221,18 @@ function QuickActionModal({ isOpen, onClose, stock, type, onSuccess }: QuickActi
                     {LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
                   </select>
                 </div>
+                {location === 'Khác (Ghi chú)' && (
+                  <div className="col-span-2 space-y-1.5 animate-in slide-in-from-top-2">
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Ghi chú vị trí cụ thể *</label>
+                    <input 
+                      type="text" 
+                      value={otherLocation} 
+                      onChange={e => setOtherLocation(e.target.value)} 
+                      placeholder="Nhập vị trí cụ thể (Vd: Tầng 5, Sảnh...)"
+                      className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-700 shadow-inner"
+                    />
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <label className="block text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Loại xuất *</label>
                   <select value={issueType} onChange={e => setIssueType(e.target.value)} className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700">
