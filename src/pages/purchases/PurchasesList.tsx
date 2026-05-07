@@ -1157,13 +1157,17 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                 <div className="footer-sign">
                    <div>
                       <p className="font-bold uppercase">Người lập phiếu</p>
-                      <p className="text-[10pt] font-black text-blue-600 mt-3">{formatDigitalSignatureDate()} (Đã ký số)</p>
-                      <p className="font-bold">..........................</p>
+                      <div className="mt-16">
+                         <p className="font-bold">..........................</p>
+                         <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
+                      </div>
                    </div>
                    <div>
                       <p className="font-bold uppercase">Trưởng bộ phận</p>
-                      <p className="text-[10pt] font-black text-blue-600 mt-3">{formatDigitalSignatureDate()} (Đã ký số)</p>
-                      <p className="font-bold">..........................</p>
+                      <div className="mt-16">
+                         <p className="font-bold">..........................</p>
+                         <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
+                      </div>
                    </div>
                 </div>
             </div>
