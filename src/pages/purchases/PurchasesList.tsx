@@ -652,7 +652,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
         qrImage = new docx.ImageRun({
             data: buffer,
             transformation: { width: 60, height: 60 },
-        });
+        } as any);
     } catch (e) {
         console.error("Could not load QR code", e);
     }
@@ -674,7 +674,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                     width: { size: 35, type: docx.WidthType.PERCENTAGE },
                                     children: [
                                         new docx.Paragraph({ children: [new docx.TextRun({ text: "CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO", bold: true, size: 20 })] }),
-                                        new docx.Paragraph({ children: [new docx.TextRun({ text: "Báo cáo tổng hợp đơn mua sắm", bold: true, italic: true, size: 18 })] }),
+                                        new docx.Paragraph({ children: [new docx.TextRun({ text: "Báo cáo tổng hợp đơn mua sắm", bold: true, italics: true, size: 18 })] }),
                                         new docx.Paragraph({ children: [new docx.TextRun({ text: "Ban Hành chính Nhân sự", size: 18 })] }),
                                     ]
                                 }),
@@ -688,7 +688,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                     children: [
                                         new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", bold: true, size: 20 })] }),
                                         new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: "Độc lập - Tự do - Hạnh phúc", bold: true, underline: {}, size: 20 })] }),
-                                        new docx.Paragraph({ alignment: docx.AlignmentType.RIGHT, children: [new docx.TextRun({ text: `Hà Nội, ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}`, italic: true, size: 18 })] }),
+                                        new docx.Paragraph({ alignment: docx.AlignmentType.RIGHT, children: [new docx.TextRun({ text: `Hà Nội, ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}`, italics: true, size: 18 })] }),
                                     ]
                                 }),
                             ]
@@ -696,7 +696,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                     ]
                 }),
                 new docx.Paragraph({ spacing: { before: 400, after: 200 }, alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: printTitle, bold: true, size: 32 })] }),
-                new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: `(Tổng hợp từ ${group.poCount} phiếu mua sắm / đề nghị đang lọc)`, italic: true, size: 20 })] }),
+                new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: `(Tổng hợp từ ${group.poCount} phiếu mua sắm / đề nghị đang lọc)`, italics: true, size: 20 })] }),
                 new docx.Paragraph({ spacing: { before: 400 } }),
                 
                 // Info Grid Table
@@ -764,7 +764,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                                     new docx.TextRun({ text: `- ${de.dept}`, bold: true, size: 14 }),
                                                     new docx.TextRun({ text: ` (${de.requestCode})`, size: 12, color: "555555" }),
                                                     new docx.TextRun({ text: `  SL: ${de.qty} ${de.unit}`, bold: true, size: 14 }),
-                                                    new docx.TextRun({ text: de.note ? `  Ghi chú: ${de.note}` : "", size: 14, italic: true })
+                                                    new docx.TextRun({ text: de.note ? `  Ghi chú: ${de.note}` : "", size: 14, italics: true })
                                                 ]
                                             })
                                         ]
@@ -782,7 +782,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                             new docx.Paragraph({
                                                 indent: { left: 400 },
                                                 children: [
-                                                    new docx.TextRun({ text: `Thay cho: ${rep.originalName} | Lý do: ${rep.reason || 'Điều chỉnh'}`, italic: true, size: 14 }),
+                                                    new docx.TextRun({ text: `Thay cho: ${rep.originalName} | Lý do: ${rep.reason || 'Điều chỉnh'}`, italics: true, size: 14 }),
                                                     new docx.TextRun({ text: ` | Chênh lệch: ${rep.diff >= 0 ? 'Tiết kiệm' : 'Tăng'} ${Math.abs(rep.diff).toLocaleString('vi-VN')} đ`, bold: true, color: "4F46E5", size: 14 })
                                                 ]
                                             })
@@ -831,14 +831,14 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                             children: [
                                 new docx.TableCell({
                                     children: [
-                                        new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: "Người lập phiếu", bold: true, uppercase: true })] }),
+                                        new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: "Người lập phiếu".toUpperCase(), bold: true })] }),
                                         new docx.Paragraph({ spacing: { before: 1200 }, alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: "..........................", bold: true })] }),
                                         new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: "(Đã ký số)", size: 14, color: "2563EB" })] }),
                                     ]
                                 }),
                                 new docx.TableCell({
                                     children: [
-                                        new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: "Trưởng bộ phận", bold: true, uppercase: true })] }),
+                                        new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: "Trưởng bộ phận".toUpperCase(), bold: true })] }),
                                         new docx.Paragraph({ spacing: { before: 1200 }, alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: "..........................", bold: true })] }),
                                         new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: "(Đã ký số)", size: 14, color: "2563EB" })] }),
                                     ]
