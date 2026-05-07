@@ -20,6 +20,17 @@ interface PurchasesDetailProps {
   showToast: (message: string, type: 'success' | 'error' | 'warning') => void;
 }
 
+const formatDigitalSignatureDate = (date: string | Date) => {
+    if (!date) return '';
+    const d = new Date(date);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
+};
+
 const formatAuditAction = (action: string) => {
   switch (action) {
     case 'CREATE': return 'Tạo mới';
@@ -1575,10 +1586,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                   <div className="w-32 h-px bg-slate-300 mx-auto mb-2 border-dashed"></div>
                   <p className="font-black uppercase text-[13px]">{data.requester?.fullName}</p>
                   <p className="text-[9px] font-bold text-blue-600 mt-1">
-                      {new Date(data.createdAt).toLocaleString('vi-VN', { 
-                          day: '2-digit', month: '2-digit', year: 'numeric', 
-                          hour: '2-digit', minute: '2-digit' 
-                      })} (Đã ký số)
+                      {formatDigitalSignatureDate(data.createdAt)} (Đã ký số)
                   </p>
               </div>
               <div className="text-center w-1/3">
@@ -1588,10 +1596,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                   <p className="font-black uppercase text-[13px]">{data.approver?.fullName || '..........................'}</p>
                   {data.approvedAt && (
                       <p className="text-[9px] font-bold text-blue-600 mt-1">
-                          {new Date(data.approvedAt).toLocaleString('vi-VN', { 
-                              day: '2-digit', month: '2-digit', year: 'numeric', 
-                              hour: '2-digit', minute: '2-digit' 
-                          })} (Đã ký số)
+                          {formatDigitalSignatureDate(data.approvedAt)} (Đã ký số)
                       </p>
                   )}
                   {!data.approvedAt && <p className="text-[10px] text-slate-400">.../.../...</p>}

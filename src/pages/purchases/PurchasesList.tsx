@@ -24,6 +24,16 @@ function getItemSortGroupName(itemName: string) {
     .trim();
 }
 
+const formatDigitalSignatureDate = (date?: string | Date) => {
+    const d = date ? new Date(date) : new Date();
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
+};
+
 function sortItemsForPrinting(items: any[]) {
   return [...items].sort((a, b) => {
     const groupA = a.printSortGroup || getItemSortGroupName(a.name || '');
@@ -867,7 +877,9 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{line.item?.mvpp || '—'}</span>
                             </td>
                             <td className="px-5 py-4 text-center">
-                              <span className="font-black text-sm text-indigo-600">{line.qtyOrdered || line.qtyApproved || line.qtyRequested}</span>
+                              <span className="font-black text-sm text-indigo-600">
+                                {line.effectiveQty ?? (line.qtyOrdered || line.qtyApproved || line.qtyRequested)}
+                              </span>
                               <p className="text-[9px] font-bold text-slate-400 uppercase">{line.item?.unit}</p>
                             </td>
                             <td className="px-5 py-4 text-right">
@@ -1145,18 +1157,12 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                 <div className="footer-sign">
                    <div>
                       <p className="font-bold uppercase">Người lập phiếu</p>
-                      <div className="border-2 border-dashed border-slate-300 rounded-lg p-3 inline-block mt-3 mb-2 min-w-[150px] bg-slate-50/50">
-                         <p className="text-[10pt] font-black text-indigo-600 uppercase">Đã ký số</p>
-                         <p className="text-[7pt] text-slate-500 italic mt-0.5">{new Date().toLocaleDateString('vi-VN')}</p>
-                      </div>
+                      <p className="text-[10pt] font-black text-blue-600 mt-3">{formatDigitalSignatureDate()} (Đã ký số)</p>
                       <p className="font-bold">..........................</p>
                    </div>
                    <div>
-                      <p className="font-bold uppercase">Trưởng BP HCQT</p>
-                      <div className="border-2 border-dashed border-slate-300 rounded-lg p-3 inline-block mt-3 mb-2 min-w-[150px] bg-slate-50/50">
-                         <p className="text-[10pt] font-black text-indigo-600 uppercase">Đã ký số</p>
-                         <p className="text-[7pt] text-slate-500 italic mt-0.5">{new Date().toLocaleDateString('vi-VN')}</p>
-                      </div>
+                      <p className="font-bold uppercase">Trưởng bộ phận</p>
+                      <p className="text-[10pt] font-black text-blue-600 mt-3">{formatDigitalSignatureDate()} (Đã ký số)</p>
                       <p className="font-bold">..........................</p>
                    </div>
                 </div>
