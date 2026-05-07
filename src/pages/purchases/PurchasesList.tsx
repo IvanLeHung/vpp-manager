@@ -134,6 +134,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   // Summary aggregation logic - Optimized for original request tracking
   const summaryGroups = useMemo(() => {
       const groups = new Map<string, Map<string, any>>();
+      const processedReqLineIds = new Set();
       const targetData = selectedIds.length > 0 
         ? data.filter(d => selectedIds.includes(d.id))
         : filteredData;
@@ -163,7 +164,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               const typeMap = groups.get(type)!;
               
               const key = effectiveItem.mvpp;
-              const effectiveQty = Number(isReplaced ? (line.requestLine?.replacementQty || line.qtyRequested || 0) : (line.qtyOrdered || line.qtyApproved || line.qtyRequested || 0));
+              const effectiveQty = Number(line.qtyOrdered || line.qtyApproved || line.qtyRequested || 0);
               const effectivePrice = Number(isReplaced ? (line.requestLine?.replacementPrice || line.unitPrice || line.item?.price || 0) : (line.unitPrice || line.item?.price || 0));
               const effectiveItemName = effectiveItem.name || line.item?.name || '';
 
@@ -209,7 +210,26 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               if (!specificNote) specificNote = line.note || '';
 
               const originalUnit = originalRequestLine?.item?.unit || line.item?.unit || effectiveItem.unit;
-              const allocationQty = isReplaced ? (originalRequestLine?.qtyRequested || line.qtyRequested) : (line.qtyOrdered || line.qtyApproved || line.qtyRequested);
+               const allocationQty = Number(
+                 isReplaced
+                   ? (
+                       originalRequestLine?.replacementQty ??
+                       originalRequestLine?.qtyApproved ??
+                       originalRequestLine?.qtyRequested ??
+                       line.qtyRequested ??
+                       line.qtyApproved ??
+                       line.qtyOrdered ??
+                       0
+                     )
+                   : (
+                       originalRequestLine?.qtyApproved ??
+                       originalRequestLine?.qtyRequested ??
+                       line.qtyRequested ??
+                       line.qtyApproved ??
+                       line.qtyOrdered ??
+                       0
+                     )
+               );
 
               const allocationKey = `${deptName || 'UNLINKED'}-${requestCode}-${specificNote}`;
               const existingDept = current.deptBreakdown.get(allocationKey) || { 
@@ -225,7 +245,16 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               if (specificNote && !existingDept.notes.includes(specificNote)) existingDept.notes.push(specificNote);
               
               current.qty += effectiveQty;
-              current.originalTotal += (originalQty * originalPrice);
+              
+              // De-duplicate originalTotal calculation across all PO lines in the summary
+              if (line.requestLineId && !processedReqLineIds.has(line.requestLineId)) {
+                  processedReqLineIds.add(line.requestLineId);
+                  const fullOriginalQty = Number(line.requestLine?.qtyRequested || line.qtyRequested || 0);
+                  current.originalTotal += (fullOriginalQty * originalPrice);
+              } else if (!line.requestLineId) {
+                  current.originalTotal += (originalQty * originalPrice);
+              }
+
               current.actualTotal += (effectiveQty * effectivePrice);
               
               // Ensure the displayed price is consistent with the total if possible
