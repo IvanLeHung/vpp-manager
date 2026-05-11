@@ -31,7 +31,7 @@ export default function MainLayout() {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans text-slate-900 print:h-auto print:bg-white print:block">
+    <div className="flex h-screen bg-slate-50 font-sans text-slate-900 print:h-auto print:bg-white print:block app-container">
       {/* Sidebar */}
       <aside className="no-print print:hidden w-72 bg-white border-r border-slate-200 flex flex-col shadow-sm hidden md:flex shrink-0 z-20">
         <div className="h-16 flex items-center px-6 border-b border-slate-100 mt-2">

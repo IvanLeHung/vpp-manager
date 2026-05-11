@@ -64,10 +64,12 @@
   .app-container,
   main,
   .RequestsDetail,
+  .RequestsList,
   .flex-1 {
     height: auto !important;
     min-height: auto !important;
     overflow: visible !important;
+    display: block !important;
     background-color: white !important;
     margin: 0 !important;
     padding: 0 !important;

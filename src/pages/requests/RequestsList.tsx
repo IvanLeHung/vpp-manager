@@ -428,7 +428,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
 
 
   return (
-    <div className="flex flex-col h-full p-4 md:p-8 relative print:p-0 print:h-auto print:block">
+    <div className="flex flex-col h-full p-4 md:p-8 relative print:p-0 print:h-auto print:block RequestsList">
       <div className="no-print flex justify-between items-center mb-6 shrink-0">
         <div>
            <h2 className="text-2xl font-bold text-slate-800">
