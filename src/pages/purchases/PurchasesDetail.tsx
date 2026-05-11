@@ -98,6 +98,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
   const [cancelReason, setCancelReason] = useState('');
   const [cancelFiles, setCancelFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH'>('ALL');
 
   const [showReplaceModal, setShowReplaceModal] = useState(false);
   const [activeReplaceLine, setActiveReplaceLine] = useState<any>(null);
@@ -339,8 +340,10 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
 
   return (
     <div className="flex flex-col min-h-screen bg-[#f8fafc] relative print:bg-white print:overflow-auto">
-      {/* HEADER BAR */}
-      <div className="bg-white border-b border-slate-200 flex flex-col pt-3 shrink-0 z-20 shadow-sm print:hidden">
+      {/* WEB UI ONLY - HIDDEN ON PRINT */}
+      <div className="no-print flex flex-col flex-1 print:hidden">
+          {/* HEADER BAR */}
+          <div className="bg-white border-b border-slate-200 flex flex-col pt-3 shrink-0 z-20 shadow-sm">
           <div className="flex justify-between items-center px-6 md:px-8 pb-3">
               <div className="flex items-center gap-4">
                   <button onClick={onBack} className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition shadow-inner">
@@ -386,24 +389,6 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                   </div>
               </div>
               <div className="flex items-center gap-2">
-                  {(() => {
-                      const hasPendingReplacement = data.lines.some((l: any) => l.requestLine?.status === 'REPLACEMENT_PENDING_ADMIN');
-                      return (
-                        <button 
-                            onClick={() => {
-                                if (hasPendingReplacement) {
-                                    showToast('Không thể in: Có vật tư đang chờ Admin duyệt thay thế.', 'warning');
-                                    return;
-                                }
-                                window.print();
-                            }} 
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs transition shadow-sm ${hasPendingReplacement ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
-                            title={hasPendingReplacement ? "Đang chờ Admin duyệt thay thế" : "In phiếu"}
-                        >
-                            <Printer className="w-3.5 h-3.5"/> In
-                        </button>
-                      );
-                  })()}
                   <div className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider shadow-lg transform hover:scale-105 transition-all ${getStatusColor(status)}`}>
                      {status.replace(/_/g, ' ')}
                   </div>
@@ -421,7 +406,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
           </div>
       </div>
 
-      <div key={data.id} className="flex-1 p-4 md:p-6 flex flex-col xl:flex-row gap-4 w-full max-w-[1600px] mx-auto print:hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div key={data.id} className="flex-1 p-4 md:p-6 flex flex-col xl:flex-row gap-4 w-full max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
           
           <div className="flex-1 flex flex-col gap-4 min-w-0">
               
@@ -913,6 +898,42 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                           </button>
                       )}
 
+                      {/* PRINT OPTIONS GROUP */}
+                      <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-slate-700">
+                          <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1 text-center">Tùy chọn in mua sắm</p>
+                          
+                          {(() => {
+                            const hasPendingReplacement = data.lines.some((l: any) => l.requestLine?.status === 'REPLACEMENT_PENDING_ADMIN');
+                            return (
+                              <div className="space-y-2">
+                                <button 
+                                  onClick={() => { setSelectedPrintType('VPP'); setTimeout(() => window.print(), 100); }} 
+                                  disabled={hasPendingReplacement}
+                                  className={`w-full py-3 flex items-center justify-center rounded-xl font-black transition shadow-sm border ${hasPendingReplacement ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-white text-indigo-600 hover:bg-indigo-50 border-indigo-100 hover:border-indigo-200'}`}
+                                >
+                                  <Printer className="w-4 h-4 mr-2"/> In Mua Sắm VPP
+                                </button>
+                                
+                                <button 
+                                  onClick={() => { setSelectedPrintType('VE_SINH'); setTimeout(() => window.print(), 100); }} 
+                                  disabled={hasPendingReplacement}
+                                  className={`w-full py-3 flex items-center justify-center rounded-xl font-black transition shadow-sm border ${hasPendingReplacement ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-white text-cyan-600 hover:bg-cyan-50 border-cyan-100 hover:border-cyan-200'}`}
+                                >
+                                  <Printer className="w-4 h-4 mr-2"/> In Mua Sắm Vệ Sinh
+                                </button>
+
+                                <button 
+                                  onClick={() => { setSelectedPrintType('ALL'); setTimeout(() => window.print(), 100); }} 
+                                  disabled={hasPendingReplacement}
+                                  className={`w-full py-3.5 flex items-center justify-center rounded-xl font-black transition shadow-lg border ${hasPendingReplacement ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-slate-800 text-white hover:bg-slate-900 border-slate-900'}`}
+                                >
+                                  <Printer className="w-5 h-5 mr-2 text-indigo-400"/> IN CẢ PHIẾU (A4 FULL)
+                                </button>
+                              </div>
+                            );
+                          })()}
+                      </div>
+
                       {/* Cancel PO */}
                       {canCancel && (
                         <div className="mt-2 pt-4 border-t border-slate-100">
@@ -1403,8 +1424,10 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
         </div>
       )}
 
+      </div> {/* END NO-PRINT WEB UI */}
+
       {/* FORMAL PRINT-ONLY SECTION (A4 Standard) */}
-      <div className="hidden print:block print-container p-4">
+      <div className="hidden print:block print-area print-container p-4">
           {/* TOP HEADER WITH BRANDING & QR */}
           <div className="flex justify-between items-start mb-6 border-b-2 border-slate-900 pb-4">
               <div className="flex flex-col">
@@ -1456,22 +1479,28 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
           <table className="print-table w-full mb-8 border-collapse border-2 border-slate-900">
               <thead className="bg-slate-100">
                   <tr className="text-[10px] font-black uppercase text-center border-b-2 border-slate-900">
-                      <th className="p-2 border-r border-slate-900" style={{width: '4%'}}>STT</th>
+                      <th className="p-2 border-r border-slate-900 whitespace-nowrap" style={{width: '6%'}}>STT</th>
                       <th className="p-2 border-r border-slate-900" style={{width: '10%'}}>MÃ VT</th>
                       <th className="p-2 border-r border-slate-900 text-left" style={{width: '30%'}}>TÊN VẬT TƯ / LINH KIỆN</th>
-                      <th className="p-2 border-r border-slate-900" style={{width: '6%'}}>ĐVT</th>
-                      <th className="p-2 border-r border-slate-900" style={{width: '7%'}}>SL</th>
+                      <th className="p-2 border-r border-slate-900" style={{width: '7%'}}>ĐVT</th>
+                      <th className="p-2 border-r border-slate-900" style={{width: '6%'}}>SL</th>
                       <th className="p-2 border-r border-slate-900" style={{width: '15%'}}>ĐƠN GIÁ</th>
                       <th className="p-2 border-r border-slate-900" style={{width: '15%'}}>THÀNH TIỀN</th>
-                      <th className="p-2" style={{width: '13%'}}>GHI CHÚ</th>
+                      <th className="p-2" style={{width: '11%'}}>GHI CHÚ</th>
                   </tr>
               </thead>
-              <tbody>
+               <tbody>
                   {(() => {
                     let totalPoAmount = 0;
+                    const filteredLines = data.lines.filter((l: any) => {
+                        if (selectedPrintType === 'ALL') return true;
+                        const type = l.item.itemType || (l.item.mvpp.startsWith('VPP') ? 'VPP' : 'VE_SINH');
+                        return type === selectedPrintType;
+                    });
+
                     return (
                       <>
-                        {data.lines.map((l: any, idx: number) => {
+                        {filteredLines.map((l: any, idx: number) => {
                             const isReplaced = !!l.requestLine?.replacementItemId;
                             const effectiveItem = isReplaced ? l.requestLine?.replacementItem : l.item;
                             const effectivePrice = isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0);
@@ -1483,7 +1512,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                             const origItem = l.requestLine?.item;
                             
                             return (
-                            <tr key={l.id} className="text-[11px] border-b border-slate-400">
+                            <tr key={l.id} className="text-[11px] border-b border-slate-400 h-10">
                                 <td className="text-center p-2 border-r border-slate-400 font-bold">{idx + 1}</td>
                                 <td className="text-center p-2 border-r border-slate-400 font-medium">{effectiveItem?.mvpp || l.item.mvpp}</td>
                                 <td className="p-2 border-r border-slate-400">
@@ -1504,11 +1533,25 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                             </tr>
                         )})}
                         <tr className="font-black bg-slate-100 uppercase text-[12px] border-t-2 border-slate-900">
-                            <td colSpan={6} className="text-right p-3 border-r border-slate-900">TỔNG CỘNG TRƯỚC THUẾ/CK:</td>
-                            <td className="text-right p-3 border-r border-slate-900 text-[14px]">
-                                {totalPoAmount.toLocaleString('vi-VN')}
+                            <td colSpan={4} className="p-3 text-right">Tổng cộng (Đã bao gồm VAT {data.vat}%):</td>
+                            <td className="text-center p-3 border-x border-slate-900">{filteredLines.reduce((sum: number, l: any) => {
+                                const qtyActual = l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested;
+                                return sum + (!!l.requestLine?.replacementItemId ? Number(l.requestLine?.replacementQty || 0) : qtyActual);
+                            }, 0)}</td>
+                            <td className="p-3 text-right" colSpan={2}>
+                                {(() => {
+                                    const subTotal = filteredLines.reduce((sum: number, l: any) => {
+                                        const isReplaced = !!l.requestLine?.replacementItemId;
+                                        const effectivePrice = isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0);
+                                        const qtyActual = l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested;
+                                        const effectiveQty = isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyActual;
+                                        return sum + (effectivePrice * effectiveQty);
+                                    }, 0);
+                                    const vatAmount = subTotal * (data.vat / 100);
+                                    return (subTotal + vatAmount).toLocaleString('vi-VN');
+                                })()} VNĐ
                             </td>
-                            <td className="p-3">VNĐ</td>
+                            <td></td>
                         </tr>
                       </>
                     );
@@ -1579,10 +1622,10 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
              </div>
           )}
 
-          <div className="flex justify-between items-start mt-12 px-6">
+          <div className="flex justify-between items-start mt-2 px-6">
               <div className="text-center w-1/3">
                   <p className="font-black uppercase text-[12px] mb-1">NGƯỜI LẬP PHIẾU</p>
-                  <div className="mt-16">
+                  <div className="mt-6">
                       <p className="font-black uppercase text-[13px]">{data.requester?.fullName}</p>
                       <p className="text-[9px] font-bold text-blue-600 mt-1">
                           {formatDigitalSignatureDate(data.createdAt)} (Đã ký số)
@@ -1591,7 +1634,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
               </div>
               <div className="text-center w-1/3">
                   <p className="font-black uppercase text-[12px] mb-1">TRƯỞNG BỘ PHẬN</p>
-                  <div className="mt-16">
+                  <div className="mt-10">
                       <p className="font-black uppercase text-[13px]">{data.approver?.fullName || '..........................'}</p>
                       {data.approvedAt && (
                           <p className="text-[9px] font-bold text-blue-600 mt-1">

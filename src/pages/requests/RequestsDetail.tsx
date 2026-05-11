@@ -316,19 +316,6 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
               </div>
           </div>
           <div className="flex items-center gap-3">
-              {(() => {
-                const hasPendingReplacement = data.lines.some((l: any) => l.status === 'REPLACEMENT_PENDING_ADMIN');
-                return (
-                  <button 
-                    onClick={() => { setSelectedPrintType('ALL'); setTimeout(() => printDocument(), 100); }} 
-                    disabled={hasPendingReplacement}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs transition shadow-sm border ${hasPendingReplacement ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'}`}
-                    title={hasPendingReplacement ? "Đang chờ Admin duyệt thay thế" : "In phiếu A4"}
-                  >
-                    <Printer className={`w-4 h-4 ${hasPendingReplacement ? 'text-slate-300' : 'text-indigo-500'}`}/> In Phiếu
-                  </button>
-                );
-              })()}
               <span className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg ${getStatusColor(data.status)}`}>{data.status.replace(/_/g, ' ')}</span>
           </div>
       </div>
@@ -754,46 +741,48 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                       
                       {canCancel && <button onClick={() => handleAction('/cancel', {reason: prompt('Nhập lý do hủy phiếu:')}, 'Đã Hủy phiếu')} className="w-full py-2.5 bg-transparent text-slate-400 hover:text-rose-500 flex items-center justify-center rounded-xl font-bold transition"><Trash2 className="w-4 h-4 mr-2"/> Hủy Bỏ Phiếu Này</button>}
                       
-                      {(() => {
-                        const hasPendingReplacement = data.lines.some((l: any) => l.status === 'REPLACEMENT_PENDING_ADMIN');
-                        return (
-                          <button 
-                            onClick={() => { setSelectedPrintType('ALL'); setTimeout(() => printDocument(), 100); }} 
-                            disabled={hasPendingReplacement}
-                            className={`w-full py-3.5 flex items-center justify-center rounded-xl font-black transition shadow-sm border ${hasPendingReplacement ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-slate-100 text-slate-800 hover:bg-slate-200 border-slate-200'}`}
-                            title={hasPendingReplacement ? "Đang chờ Admin duyệt thay thế" : "In Phiếu Đề Xuất"}
-                          >
-                            <Printer className={`w-5 h-5 mr-2 ${hasPendingReplacement ? 'text-slate-300' : 'text-indigo-500'}`}/> IN PHIẾU ĐỀ XUẤT (A4)
-                          </button>
-                        );
-                      })()}
+                      {/* PRINT OPTIONS GROUP */}
+                      <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-slate-700">
+                          <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1 text-center">Tùy chọn in đề xuất</p>
+                          
+                          {(() => {
+                            const hasPendingReplacement = data.lines.some((l: any) => l.status === 'REPLACEMENT_PENDING_ADMIN');
+                            return (
+                              <div className="space-y-2">
+                                <button 
+                                  onClick={() => { setSelectedPrintType('VPP'); setTimeout(() => printDocument(), 100); }} 
+                                  disabled={hasPendingReplacement}
+                                  className={`w-full py-3 flex items-center justify-center rounded-xl font-black transition shadow-sm border ${hasPendingReplacement ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-white text-indigo-600 hover:bg-indigo-50 border-indigo-100 hover:border-indigo-200'}`}
+                                >
+                                  <Printer className="w-4 h-4 mr-2"/> In Đề Xuất Văn Phòng Phẩm
+                                </button>
+                                
+                                <button 
+                                  onClick={() => { setSelectedPrintType('VE_SINH'); setTimeout(() => printDocument(), 100); }} 
+                                  disabled={hasPendingReplacement}
+                                  className={`w-full py-3 flex items-center justify-center rounded-xl font-black transition shadow-sm border ${hasPendingReplacement ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-white text-cyan-600 hover:bg-cyan-50 border-cyan-100 hover:border-cyan-200'}`}
+                                >
+                                  <Printer className="w-4 h-4 mr-2"/> In Đề Xuất Vệ Sinh
+                                </button>
+
+                                <button 
+                                  onClick={() => { setSelectedPrintType('ALL'); setTimeout(() => printDocument(), 100); }} 
+                                  disabled={hasPendingReplacement}
+                                  className={`w-full py-3.5 flex items-center justify-center rounded-xl font-black transition shadow-lg border ${hasPendingReplacement ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-slate-800 text-white hover:bg-slate-900 border-slate-900'}`}
+                                >
+                                  <Printer className="w-5 h-5 mr-2 text-indigo-400"/> IN CẢ PHIẾU (A4 FULL)
+                                </button>
+                              </div>
+                            );
+                          })()}
+                      </div>
 
                       <button 
                         onClick={handleExportExcel}
-                        className="w-full py-2.5 bg-white text-slate-800 hover:bg-slate-100 flex items-center justify-center rounded-xl font-bold transition shadow-sm"
+                        className="w-full py-2.5 bg-white text-slate-800 hover:bg-slate-100 flex items-center justify-center rounded-xl font-bold transition shadow-sm mt-4"
                       >
                         <FileSpreadsheet className="w-4 h-4 mr-2 text-emerald-500"/> Xuất File Excel
                       </button>
-
-                      {['PENDING_MANAGER', 'PENDING_ADMIN', 'APPROVED', 'READY_TO_ISSUE', 'WAITING_HANDOVER', 'COMPLETED', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED', 'PARTIAL_TBP_APPROVED', 'PARTIAL_ADMIN_APPROVED'].includes(data.status) && (
-                          <div className="flex flex-col gap-2 bg-white/5 p-3 rounded-xl border border-white/10 mt-2">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Tùy chọn In nâng cao</p>
-                            <div className="flex gap-2">
-                              <button 
-                                onClick={() => { setSelectedPrintType('VPP'); setTimeout(() => printDocument(), 100); }} 
-                                className="flex-1 py-2 bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600 hover:text-white border border-indigo-500/30 flex items-center justify-center rounded-lg font-bold transition shadow-sm text-[10px]"
-                              >
-                                <Printer className="w-3 h-3 mr-1.5"/> IN VPP
-                              </button>
-                              <button 
-                                onClick={() => { setSelectedPrintType('VE_SINH'); setTimeout(() => printDocument(), 100); }} 
-                                className="flex-1 py-2 bg-cyan-600/20 text-cyan-300 hover:bg-cyan-600 hover:text-white border border-cyan-500/30 flex items-center justify-center rounded-lg font-bold transition shadow-sm text-[10px]"
-                              >
-                                <Printer className="w-3 h-3 mr-1.5"/> IN VỆ SINH
-                              </button>
-                            </div>
-                          </div>
-                      )}
 
                       <div className="mt-4 pt-4 border-t border-white/10">
                           <div className="flex justify-between items-center mb-2">
@@ -1414,7 +1403,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
               </h1>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-2 gap-y-2 gap-x-12 mb-6 text-sm">
+              <div className="grid grid-cols-2 lg:grid-cols-2 gap-y-2 gap-x-12 mb-6 text-sm">
               <div className="flex items-end"><span className="w-40 font-bold shrink-0">Người đề xuất:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{data.requester?.fullName}</span></div>
               <div className="flex items-end"><span className="w-40 font-bold shrink-0">Phòng ban:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{data.department}</span></div>
               <div className="flex items-end"><span className="w-40 font-bold shrink-0">Ngày lập phiếu:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{new Date(data.createdAt).toLocaleDateString('vi-VN')}</span></div>
@@ -1435,80 +1424,86 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                       <th className="border border-black p-2 text-left font-bold uppercase" style={{width: '14%'}}>Ghi chú</th>
                   </tr>
               </thead>
-               <tbody>
-                  {sortLinesForPrinting(data.lines)
-                    .filter((l: any) => {
+                              <tbody>
+                  {(() => {
+                    const filteredLines = sortLinesForPrinting(data.lines).filter((l: any) => {
                       if (selectedPrintType === 'ALL') return true;
                       const type = l.item.itemType || (l.item.mvpp.startsWith('VPP') ? 'VPP' : 'VE_SINH');
                       return type === selectedPrintType;
-                    })
-                    .map((l: any, idx: number) => {
-                      const displayItem = l.replacementItem || l.item;
-                      const isReplaced = !!l.replacementItemId;
-                      const displayQtyRequested = l.qtyRequested;
-                      const displayQtyApproved = l.replacementQty ?? l.qtyApproved;
+                    });
 
-                      return (
-                      <tr key={l.id} className="h-10">
-                          <td className="border border-black p-2 text-center font-medium">{idx + 1}</td>
-                          <td className="border border-black p-2 text-center font-bold">{displayItem.mvpp}</td>
-                          <td className="border border-black p-2 font-medium">
-                              <div className="flex flex-col">
-                                  <span>{displayItem.name}</span>
-                                  {isReplaced && (
-                                      <span className="text-[10px] text-slate-500 italic mt-0.5">
-                                          (Thay cho: {l.item.name})
-                                      </span>
-                                  )}
-                              </div>
-                          </td>
-                          <td className="border border-black p-2 text-center">{displayItem.unit}</td>
-                          <td className="border border-black p-2 text-center font-black text-base">
-                              {displayQtyApproved !== null && (displayQtyApproved !== displayQtyRequested || l.qtyManagerApproved !== displayQtyRequested) ? (
-                                  <div className="flex flex-col items-center leading-none">
-                                      <span className="text-[9px] text-slate-400 line-through mb-1">{displayQtyRequested}</span>
-                                      <span>{displayQtyApproved}</span>
-                                      {l.qtyManagerApproved !== null && l.qtyManagerApproved !== displayQtyApproved && !isReplaced && (
-                                        <span className="text-[8px] font-bold text-slate-400 mt-1 italic">
-                                          (TBP: {l.qtyManagerApproved})
-                                        </span>
-                                      )}
-                                  </div>
-                              ) : (
-                                  displayQtyApproved ?? displayQtyRequested
-                              )}
-                          </td>
-                          <td className="border border-black p-2 text-right font-medium">
-                              {(displayItem.price || 0).toLocaleString('vi-VN')}
-                          </td>
-                          <td className="border border-black p-2 text-right font-bold">
-                              {((displayItem.price || 0) * (displayQtyApproved ?? displayQtyRequested)).toLocaleString('vi-VN')}
-                          </td>
-                          <td className="border border-black p-2 text-[10px] italic leading-tight">{l.note || '—'}</td>
-                      </tr>
-                    )})}
-                  <tr className="bg-slate-50 h-10 font-black">
-                      <td colSpan={4} className="border border-black p-2 text-right uppercase text-xs">Tổng cộng:</td>
-                      <td className="border border-black p-2 text-center text-lg">
-                          {data.lines.reduce((sum: number, line: any) => sum + (line.qtyApproved ?? line.qtyRequested), 0)}
-                      </td>
-                      <td className="border border-black p-2 text-right" colSpan={2}>
-                          {data.lines.reduce((sum: number, line: any) => {
-                            const item = line.replacementItem || line.item;
-                            const qty = line.qtyApproved ?? line.qtyRequested;
-                            return sum + ((item.price || 0) * qty);
-                          }, 0).toLocaleString('vi-VN')} VNĐ
-                      </td>
-                      <td className="border border-black p-2"></td>
-                  </tr>
-              </tbody>
+                    return (
+                      <>
+                        {filteredLines.map((l: any, idx: number) => {
+                          const displayItem = l.replacementItem || l.item;
+                           const isReplaced = !!l.replacementItemId;
+                           const displayQtyRequested = l.qtyRequested;
+                           const displayQtyApproved = l.replacementQty ?? l.qtyApproved;
+
+                           return (
+                           <tr key={l.id} className="h-10">
+                               <td className="border border-black p-2 text-center font-medium">{idx + 1}</td>
+                               <td className="border border-black p-2 text-center font-bold">{displayItem.mvpp}</td>
+                               <td className="border border-black p-2 font-medium">
+                                   <div className="flex flex-col">
+                                       <span>{displayItem.name}</span>
+                                       {isReplaced && (
+                                           <span className="text-[10px] text-slate-500 italic mt-0.5">
+                                               (Thay cho: {l.item.name})
+                                           </span>
+                                       )}
+                                   </div>
+                               </td>
+                               <td className="border border-black p-2 text-center">{displayItem.unit}</td>
+                               <td className="border border-black p-2 text-center font-black text-base">
+                                   {displayQtyApproved !== null && (displayQtyApproved !== displayQtyRequested || l.qtyManagerApproved !== displayQtyRequested) ? (
+                                       <div className="flex flex-col items-center leading-none">
+                                           <span className="text-[9px] text-slate-400 line-through mb-1">{displayQtyRequested}</span>
+                                           <span>{displayQtyApproved}</span>
+                                           {l.qtyManagerApproved !== null && l.qtyManagerApproved !== displayQtyApproved && !isReplaced && (
+                                             <span className="text-[8px] font-bold text-slate-400 mt-1 italic">
+                                               (TBP: {l.qtyManagerApproved})
+                                             </span>
+                                           )}
+                                       </div>
+                                   ) : (
+                                       displayQtyApproved ?? displayQtyRequested
+                                   )}
+                               </td>
+                               <td className="border border-black p-2 text-right font-medium">
+                                   {(displayItem.price || 0).toLocaleString('vi-VN')}
+                               </td>
+                               <td className="border border-black p-2 text-right font-bold">
+                                   {((displayItem.price || 0) * (displayQtyApproved ?? displayQtyRequested)).toLocaleString('vi-VN')}
+                               </td>
+                               <td className="border border-black p-2 text-[10px] italic leading-tight">{l.note || '—'}</td>
+                           </tr>
+                         )})}
+                        <tr className="bg-slate-50 h-10 font-black">
+                            <td colSpan={4} className="border border-black p-2 text-right uppercase text-xs">Tổng cộng:</td>
+                            <td className="border border-black p-2 text-center text-lg">
+                                {filteredLines.reduce((sum: number, line: any) => sum + (line.replacementQty ?? line.qtyApproved ?? line.qtyRequested), 0)}
+                            </td>
+                            <td className="border border-black p-2 text-right" colSpan={2}>
+                                {filteredLines.reduce((sum: number, line: any) => {
+                                  const item = line.replacementItem || line.item;
+                                  const qty = line.replacementQty ?? line.qtyApproved ?? line.qtyRequested;
+                                  return sum + ((item.price || 0) * qty);
+                                }, 0).toLocaleString('vi-VN')} VNĐ
+                            </td>
+                            <td className="border border-black p-2"></td>
+                        </tr>
+                      </>
+                    );
+                  })()}
+               </tbody>
           </table>
 
           <div className="grid grid-cols-3 gap-y-12 gap-x-4 text-center text-[12px] font-bold mt-2 print-signatures">
               <div className="print-signature-block">
                   <p className="mb-2 uppercase">Người đề xuất</p>
                   <p className="text-[11px] font-normal italic mb-4">(Ký và ghi họ tên)</p>
-                  <div className="mt-20 border-t border-dotted border-black w-[80%] mx-auto pt-2 relative">
+                  <div className="mt-12 border-t border-dotted border-black w-[80%] mx-auto pt-2 relative">
                       <p className="font-black text-xs uppercase">{data.requester?.fullName}</p>
                       <p className="text-[9px] font-bold text-blue-600 mt-1">
                         {new Date(data.createdAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} (Đã ký số)
@@ -1519,7 +1514,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
               <div className="print-signature-block">
                   <p className="mb-2 uppercase text-slate-600">Trưởng bộ phận</p>
                   <p className="text-[11px] font-normal italic mb-4">(Ký xác nhận)</p>
-                  <div className="mt-20 border-t border-dotted border-black w-[80%] mx-auto pt-2">
+                  <div className="mt-12 border-t border-dotted border-black w-[80%] mx-auto pt-2">
                      {(() => {
                         const h = data.approvalHistories?.slice().reverse().find((x:any) => 
                           (x.action.includes('APPROVE') || x.action === 'APPROVED') && 
@@ -1543,7 +1538,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
               <div className="print-signature-block">
                   <p className="mb-2 uppercase">Người duyệt</p>
                   <p className="text-[11px] font-normal italic mb-4">(Hành chính/Lãnh đạo)</p>
-                  <div className="mt-20 border-t border-dotted border-black w-[80%] mx-auto pt-2">
+                  <div className="mt-12 border-t border-dotted border-black w-[80%] mx-auto pt-2">
                      {(() => {
                         const h = data.approvalHistories?.slice().reverse().find((x:any) => 
                           (x.action.includes('APPROVE') || x.action === 'APPROVED') && 
@@ -1567,7 +1562,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
               <div className="print-signature-block">
                   <p className="mb-2 uppercase">Thủ kho / Xuất</p>
                   <p className="text-[11px] font-normal italic mb-4">(Ký và ghi tên)</p>
-                  <div className="mt-20 border-t border-dotted border-black w-[80%] mx-auto pt-2">
+                  <div className="mt-12 border-t border-dotted border-black w-[80%] mx-auto pt-2">
                      {(() => {
                         const h = data.approvalHistories?.slice().reverse().find((x:any) => x.action === 'ISSUE' || x.action === 'ISSUED');
                         return (
@@ -1588,7 +1583,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
               <div className="print-signature-block">
                   <p className="mb-2 uppercase text-indigo-700">Người nhận</p>
                   <p className="text-[11px] font-normal italic mb-4">(Ký nhận đủ hàng)</p>
-                  <div className="mt-24 border-t border-dotted border-black w-[70%] mx-auto pt-2">
+                  <div className="mt-14 border-t border-dotted border-black w-[70%] mx-auto pt-2">
                      <p className="font-black text-xs uppercase">
                         {data.status === 'COMPLETED' ? data.requester?.fullName : '............................'}
                      </p>
