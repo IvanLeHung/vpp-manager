@@ -23,31 +23,19 @@
     box-shadow: none !important;
   }
 
-  /*
-    PRINT HARD ISOLATION
-    Chỉ cho phép vùng .print-area / .print-sheet xuất hiện khi in.
-    Toàn bộ UI web, header bar, summary card, panel thao tác... bị ẩn khỏi bản in.
+  /* 
+    CLEAN PRINT ISOLATION
+    Đảm bảo chỉ có vùng in hiển thị, không bị ảnh hưởng bởi layout web.
   */
-  body * {
-    visibility: hidden !important;
-  }
-
-  .print-area,
-  .print-area *,
-  .print-sheet,
-  .print-sheet * {
-    visibility: visible !important;
-  }
-
   .print-area {
-    position: absolute !important;
-    inset: 0 auto auto 0 !important;
+    display: block !important;
+    visibility: visible !important;
+    position: relative !important;
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
-    display: block !important;
-    overflow: visible !important;
     background: white !important;
+    overflow: visible !important;
     transform: none !important;
     zoom: 1 !important;
   }
@@ -55,7 +43,6 @@
   /* Ẩn mọi thứ nằm trước header chính trong trang in */
   .print-sheet > :not(.print-header):has(~ .print-header) {
     display: none !important;
-    visibility: hidden !important;
   }
 
   html,
@@ -193,7 +180,6 @@
   .print-hidden,
   .print-hidden * {
     display: none !important;
-    visibility: hidden !important;
   }
 }
 
