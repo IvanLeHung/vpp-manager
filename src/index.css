@@ -24,10 +24,7 @@
     box-shadow: none !important;
   }
 
-  /* Ẩn triệt để bằng display none thay vì visibility hidden để giải phóng không gian */
-  .no-print, [print-hidden] {
-    display: none !important;
-  }
+
   
   /* Reset lại trạng thái cao của body để nội dung không bị giới hạn chiều cao gây mất chữ */
   html, body, #root, .app-container, main, .RequestsDetail, .flex-1 {
@@ -154,6 +151,12 @@
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  /* Ẩn triệt để bằng display none thay vì visibility hidden để giải phóng không gian */
+  /* Đặt ở cuối media print để đảm bảo ghi đè mọi thiết lập layout block/flex khác */
+  .no-print, [print-hidden], .print-hidden {
+    display: none !important;
   }
 }
 
