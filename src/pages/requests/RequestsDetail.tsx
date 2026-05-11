@@ -1397,9 +1397,11 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
           <div className="text-center mb-6">
               <h1 className="text-[22px] font-black uppercase tracking-widest break-words leading-tight underline underline-offset-8 decoration-slate-300">
-                  {['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'WAITING_HANDOVER', 'COMPLETED', 'PARTIALLY_APPROVED'].includes(data.status) 
-                      ? 'PHIẾU CẤP PHÁT VĂN PHÒNG PHẨM' 
-                      : 'PHIẾU ĐỀ XUẤT VĂN PHÒNG PHẨM'}
+                  {(() => {
+                    if (selectedPrintType === 'VE_SINH') return 'PHIẾU ĐỀ XUẤT VỆ SINH';
+                    if (selectedPrintType === 'VPP') return 'PHIẾU ĐỀ XUẤT VĂN PHÒNG PHẨM';
+                    return 'PHIẾU ĐỀ XUẤT TỔNG HỢP VĂN PHÒNG PHẨM VÀ ĐỒ VỆ SINH';
+                  })()}
               </h1>
           </div>
 

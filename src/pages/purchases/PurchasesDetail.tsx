@@ -1448,7 +1448,13 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
           </div>
 
           <div className="text-center mb-8">
-              <h2 className="text-[24px] font-black uppercase tracking-widest mb-1">PHIẾU ĐỀ NGHỊ MUA SẮM (PO)</h2>
+              <h2 className="text-[24px] font-black uppercase tracking-widest mb-1">
+                  {(() => {
+                    if (selectedPrintType === 'VE_SINH') return 'PHIẾU ĐỀ XUẤT VỆ SINH';
+                    if (selectedPrintType === 'VPP') return 'PHIẾU ĐỀ XUẤT VĂN PHÒNG PHẨM';
+                    return 'PHIẾU ĐỀ XUẤT TỔNG HỢP VĂN PHÒNG PHẨM VÀ ĐỒ VỆ SINH';
+                  })()}
+                </h2>
               <div className="w-32 h-1 bg-slate-900 mx-auto mb-2"></div>
               <p className="text-[11px] font-bold text-slate-600">Số phiếu: {data.id}</p>
           </div>
