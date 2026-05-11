@@ -19,19 +19,55 @@
 }
 
 @media print {
-  /* Tắt shadow */
   * {
     box-shadow: none !important;
   }
 
+  /*
+    PRINT HARD ISOLATION
+    Chỉ cho phép vùng .print-area / .print-sheet xuất hiện khi in.
+    Toàn bộ UI web, header bar, summary card, panel thao tác... bị ẩn khỏi bản in.
+  */
+  body * {
+    visibility: hidden !important;
+  }
 
-  
-  /* Reset lại trạng thái cao của body để nội dung không bị giới hạn chiều cao gây mất chữ */
-  html, body, #root, .app-container, main, .RequestsDetail, .flex-1 {
-    height: auto !important; 
+  .print-area,
+  .print-area *,
+  .print-sheet,
+  .print-sheet * {
+    visibility: visible !important;
+  }
+
+  .print-area {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: block !important;
+    overflow: visible !important;
+    background: white !important;
+    transform: none !important;
+    zoom: 1 !important;
+  }
+
+  /* Ẩn mọi thứ nằm trước header chính trong trang in */
+  .print-sheet > :not(.print-header):has(~ .print-header) {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  html,
+  body,
+  #root,
+  .app-container,
+  main,
+  .RequestsDetail,
+  .flex-1 {
+    height: auto !important;
     min-height: auto !important;
     overflow: visible !important;
-    display: block !important;
     background-color: white !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -43,19 +79,32 @@
     print-color-adjust: exact;
   }
 
-  /* Kích thước khổ giấy A4 chuẩn */
   .print-sheet {
-    width: 210mm;
+    width: 210mm !important;
     min-height: 297mm;
-    margin: 0 auto;
-    padding: 15mm 20mm;
+    margin: 0 auto !important;
+    padding: 15mm 20mm !important;
     font-size: 13px;
-    display: block;
-    position: relative;
+    display: block !important;
+    position: relative !important;
     background-color: white !important;
     box-sizing: border-box;
     overflow: visible !important;
     page-break-inside: auto !important;
+    counter-reset: sheet-page;
+  }
+
+  .print-header {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
+
+  .print-container {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: block !important;
+    overflow: visible !important;
   }
 
   .print-signature-block {
@@ -63,15 +112,6 @@
     text-align: center;
   }
 
-  /* Đảm bảo print-area nằm trong luồng mặc định */
-  .print-area {
-    position: relative !important;
-    display: block !important;
-    transform: none !important;
-    zoom: 1 !important;
-  }
-
-  /* Chặn ngắt trang giữa chừng bảng hoặc chữ ký */
   .print-header,
   .print-info,
   .print-signature-block,
@@ -80,9 +120,8 @@
     break-inside: avoid;
   }
 
-  /* Chống bật sang trang khi vừa chạm đến chữ ký 
-     bằng cách neo cứng khoảng cách và bảo vệ khối này */
-  .signature-section, .print-signatures {
+  .signature-section,
+  .print-signatures {
     margin-top: 24px !important;
     display: grid;
     gap: 40px;
@@ -96,22 +135,18 @@
     margin-top: 24px !important;
   }
 
-  /* Support both 2 and 3 columns depending on Tailwind classes or use default 2 */
   .print-signatures:not(.grid-cols-3) {
     grid-template-columns: 1fr 1fr !important;
   }
-  
+
   .print-signatures.grid-cols-3 {
     grid-template-columns: 1fr 1fr 1fr !important;
   }
 
-  .print-container {
-    width: 100%;
-    margin: 0;
+  thead {
+    display: table-header-group;
   }
 
-  thead { display: table-header-group; }
-  
   .page-break-before {
     page-break-before: always !important;
     break-before: page !important;
@@ -122,24 +157,20 @@
     break-inside: avoid !important;
   }
 
-  /* Dynamic Page Numbering per Sheet */
-  .print-sheet {
-    counter-reset: sheet-page;
-  }
-
   .sheet-page-number::after {
     counter-increment: sheet-page;
     content: counter(sheet-page);
   }
 
-  table.print-table { 
-    width: 100% !important; 
-    border-collapse: collapse !important; 
+  table.print-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
     table-layout: fixed !important;
     margin-top: 12px;
   }
-  
-  table.print-table th, table.print-table td {
+
+  table.print-table th,
+  table.print-table td {
     border: 1px solid #000 !important;
     padding: 6px 8px !important;
     vertical-align: top;
@@ -153,10 +184,14 @@
     print-color-adjust: exact !important;
   }
 
-  /* Ẩn triệt để bằng display none thay vì visibility hidden để giải phóng không gian */
-  /* Đặt ở cuối media print để đảm bảo ghi đè mọi thiết lập layout block/flex khác */
-  .no-print, [print-hidden], .print-hidden {
+  .no-print,
+  .no-print *,
+  [print-hidden],
+  [print-hidden] *,
+  .print-hidden,
+  .print-hidden * {
     display: none !important;
+    visibility: hidden !important;
   }
 }
 
