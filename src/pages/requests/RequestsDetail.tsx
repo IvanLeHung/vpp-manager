@@ -277,7 +277,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
   const isFutureApprover = currentUser.role === 'MANAGER' && data.approvalSteps?.some((s: any) => s.approverId === currentUid) && data.status === 'PENDING_MANAGER' && data.currentApproverId !== currentUid;
 
   return (
-    <div className="flex flex-col h-full bg-slate-100 overflow-hidden relative print:bg-white print:overflow-auto">
+    <div className="flex flex-col h-full bg-slate-100 overflow-hidden relative print:bg-white print:overflow-visible print:h-auto RequestsDetail">
       {/* HEADER BAR */}
       <div className="no-print h-20 bg-white border-b border-slate-200 flex justify-between items-center px-6 md:px-10 shrink-0 z-20 shadow-sm">
           <div className="flex items-center gap-6">
@@ -1505,7 +1505,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
           </table>
 
           <div className="grid grid-cols-3 gap-y-12 gap-x-4 text-center text-[12px] font-bold mt-8 print-signatures">
-              <div className="flex flex-col h-full">
+              <div className="print-signature-block">
                   <p className="mb-2 uppercase">Người đề xuất</p>
                   <p className="text-[11px] font-normal italic mb-4">(Ký và ghi họ tên)</p>
                   <div className="mt-20 border-t border-dotted border-black w-[80%] mx-auto pt-2 relative">
@@ -1516,7 +1516,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                   </div>
               </div>
               
-              <div className="flex flex-col h-full">
+              <div className="print-signature-block">
                   <p className="mb-2 uppercase text-slate-600">Trưởng bộ phận</p>
                   <p className="text-[11px] font-normal italic mb-4">(Ký xác nhận)</p>
                   <div className="mt-20 border-t border-dotted border-black w-[80%] mx-auto pt-2">
@@ -1540,7 +1540,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                   </div>
               </div>
 
-              <div className="flex flex-col h-full">
+              <div className="print-signature-block">
                   <p className="mb-2 uppercase">Người duyệt</p>
                   <p className="text-[11px] font-normal italic mb-4">(Hành chính/Lãnh đạo)</p>
                   <div className="mt-20 border-t border-dotted border-black w-[80%] mx-auto pt-2">
@@ -1564,7 +1564,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                   </div>
               </div>
 
-              <div className="flex flex-col h-full">
+              <div className="print-signature-block">
                   <p className="mb-2 uppercase">Thủ kho / Xuất</p>
                   <p className="text-[11px] font-normal italic mb-4">(Ký và ghi tên)</p>
                   <div className="mt-20 border-t border-dotted border-black w-[80%] mx-auto pt-2">
@@ -1585,7 +1585,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                   </div>
               </div>
 
-              <div className="flex flex-col h-full">
+              <div className="print-signature-block">
                   <p className="mb-2 uppercase text-indigo-700">Người nhận</p>
                   <p className="text-[11px] font-normal italic mb-4">(Ký nhận đủ hàng)</p>
                   <div className="mt-24 border-t border-dotted border-black w-[70%] mx-auto pt-2">
@@ -1598,9 +1598,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                   </div>
               </div>
               
-              <div className="flex flex-col h-full">
-                  {/* Empty Spacer */}
-              </div>
+              
           </div>
 
           {/* Audit Trail Section for Print */}

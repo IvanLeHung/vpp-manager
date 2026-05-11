@@ -30,9 +30,11 @@
   }
   
   /* Reset lại trạng thái cao của body để nội dung không bị giới hạn chiều cao gây mất chữ */
-  html, body {
+  html, body, #root, .app-container, main, .RequestsDetail, .flex-1 {
     height: auto !important; 
+    min-height: auto !important;
     overflow: visible !important;
+    display: block !important;
     background-color: white !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -55,6 +57,13 @@
     position: relative;
     background-color: white !important;
     box-sizing: border-box;
+    overflow: visible !important;
+    page-break-inside: auto !important;
+  }
+
+  .print-signature-block {
+    display: block;
+    text-align: center;
   }
 
   /* Đảm bảo print-area nằm trong luồng mặc định */
@@ -66,9 +75,9 @@
   }
 
   /* Chặn ngắt trang giữa chừng bảng hoặc chữ ký */
-  .print-signatures,
   .print-header,
   .print-info,
+  .print-signature-block,
   tr {
     page-break-inside: avoid;
     break-inside: avoid;
@@ -84,13 +93,19 @@
     break-inside: avoid;
   }
 
+  .print-signatures {
+    display: grid !important;
+    gap: 40px;
+    margin-top: 24px !important;
+  }
+
   /* Support both 2 and 3 columns depending on Tailwind classes or use default 2 */
-  .signature-section:not(.grid-cols-3) {
-    grid-template-columns: 1fr 1fr;
+  .print-signatures:not(.grid-cols-3) {
+    grid-template-columns: 1fr 1fr !important;
   }
   
-  .signature-section.grid-cols-3 {
-    grid-template-columns: 1fr 1fr 1fr;
+  .print-signatures.grid-cols-3 {
+    grid-template-columns: 1fr 1fr 1fr !important;
   }
 
   .print-container {
