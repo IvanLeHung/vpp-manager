@@ -544,6 +544,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                    <th className="px-2 py-3 text-center text-amber-600 bg-amber-50/30 border-r border-slate-100">TBP Duyệt</th>
                                    <th className="px-2 py-3 text-center text-emerald-600 bg-emerald-50/30 border-r border-slate-100">Admin Duyệt</th>
                                    <th className="px-2 py-3 text-center text-blue-600 bg-blue-50/30">Lấy thực</th>
+                                    <th className="px-2 py-3 text-right">Đơn giá</th>
+                                    <th className="px-2 py-3 text-right">Thành tiền</th>
                                    <th className="px-2 py-3 text-center">Trạng thái</th>
                                    <th className="px-2 py-3 text-center">Ghi chú</th>
                                </tr>
@@ -644,6 +646,18 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                            {l.qtyDelivered > 0 && l.qtyDelivered < (l.qtyApproved ?? l.qtyRequested) && (
                                                <p className="text-[9px] font-bold text-rose-500 bg-rose-50 rounded px-1 mt-1">Còn nợ: {(l.qtyApproved ?? l.qtyRequested) - l.qtyDelivered}</p>
                                            )}
+                                       </td>
+
+                                       <td className="px-2 py-2 text-right">
+
+                                           <span className="text-xs font-bold text-slate-500">{(l.item.price || 0).toLocaleString('vi-VN')}</span>
+
+                                       </td>
+
+                                       <td className="px-2 py-2 text-right">
+
+                                           <span className="text-xs font-black text-slate-800">{((l.item.price || 0) * (l.qtyApproved ?? l.qtyRequested)).toLocaleString('vi-VN')}</span>
+
                                        </td>
                                        <td className="px-2 py-2 text-center">
                                            <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest border ${getLineStatusColor(l.status)}`}>
@@ -964,6 +978,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                   <th className="p-4 text-center">Tồn Kho</th>
                                   <th className="p-4 text-center">SL Yêu cầu</th>
                                   <th className="p-4 text-center">SL Duyệt</th>
+                                   <th className="p-4 text-right">Đơn giá</th>
+                                   <th className="p-4 text-right">Thành tiền</th>
                                   <th className="p-4 rounded-tr-xl text-center">Trạng Thái</th>
                                </tr>
                             </thead>
@@ -1054,6 +1070,18 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                             </div>
                                             {overStock && <p className="text-[9px] font-bold text-rose-500 text-center mt-1 animate-pulse">Duyệt vượt tồn!</p>}
                                             {isChanged && <p className="text-[9px] font-bold text-amber-500 text-center mt-1">Đã điều chỉnh</p>}
+                                        </td>
+
+                                        <td className="p-4 text-right font-medium align-top pt-5">
+
+                                            {(l.item.price || 0).toLocaleString('vi-VN')}
+
+                                        </td>
+
+                                        <td className="p-4 text-right font-black text-slate-800 align-top pt-5">
+
+                                            {((l.item.price || 0) * (approval.selected ? approval.qtyApproved : 0)).toLocaleString('vi-VN')}
+
                                         </td>
                                         <td className="px-3 py-3 text-center align-top pt-5">
                                             {getStatusBadge()}
@@ -1397,11 +1425,13 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
           <table className="w-full border-collapse border border-black text-[13px] mb-12 print-table">
               <thead className="bg-slate-100">
                   <tr>
-                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '8%'}}>STT</th>
-                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '16%'}}>Mã VT</th>
-                      <th className="border border-black p-2 text-left font-bold uppercase" style={{width: '40%'}}>Tên Văn Phòng Phẩm</th>
-                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '10%'}}>ĐVT</th>
-                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '12%'}}>S.Lượng</th>
+                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '5%'}}>STT</th>
+                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '10%'}}>Mã VT</th>
+                      <th className="border border-black p-2 text-left font-bold uppercase" style={{width: '30%'}}>Tên Văn Phòng Phẩm</th>
+                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '7%'}}>ĐVT</th>
+                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '8%'}}>S.Lượng</th>
+                      <th className="border border-black p-2 text-right font-bold uppercase" style={{width: '12%'}}>Đơn giá</th>
+                      <th className="border border-black p-2 text-right font-bold uppercase" style={{width: '14%'}}>Thành tiền</th>
                       <th className="border border-black p-2 text-left font-bold uppercase" style={{width: '14%'}}>Ghi chú</th>
                   </tr>
               </thead>
@@ -1448,13 +1478,26 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                   displayQtyApproved ?? displayQtyRequested
                               )}
                           </td>
+                          <td className="border border-black p-2 text-right font-medium">
+                              {(displayItem.price || 0).toLocaleString('vi-VN')}
+                          </td>
+                          <td className="border border-black p-2 text-right font-bold">
+                              {((displayItem.price || 0) * (displayQtyApproved ?? displayQtyRequested)).toLocaleString('vi-VN')}
+                          </td>
                           <td className="border border-black p-2 text-[10px] italic leading-tight">{l.note || '—'}</td>
                       </tr>
                     )})}
                   <tr className="bg-slate-50 h-10 font-black">
-                      <td colSpan={4} className="border border-black p-2 text-right uppercase text-xs">Tổng cộng số lượng thực cấp:</td>
+                      <td colSpan={4} className="border border-black p-2 text-right uppercase text-xs">Tổng cộng:</td>
                       <td className="border border-black p-2 text-center text-lg">
                           {data.lines.reduce((sum: number, line: any) => sum + (line.qtyApproved ?? line.qtyRequested), 0)}
+                      </td>
+                      <td className="border border-black p-2 text-right" colSpan={2}>
+                          {data.lines.reduce((sum: number, line: any) => {
+                            const item = line.replacementItem || line.item;
+                            const qty = line.qtyApproved ?? line.qtyRequested;
+                            return sum + ((item.price || 0) * qty);
+                          }, 0).toLocaleString('vi-VN')} VNĐ
                       </td>
                       <td className="border border-black p-2"></td>
                   </tr>
@@ -1478,7 +1521,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                   <p className="text-[11px] font-normal italic mb-4">(Ký xác nhận)</p>
                   <div className="mt-20 border-t border-dotted border-black w-[80%] mx-auto pt-2">
                      {(() => {
-                        const h = data.approvalHistories?.find((x:any) => 
+                        const h = data.approvalHistories?.slice().reverse().find((x:any) => 
                           (x.action.includes('APPROVE') || x.action === 'APPROVED') && 
                           (x.approver?.role === 'MANAGER' || x.action.includes('TBP') || x.reason?.toLowerCase().includes('quản lý'))
                         );
