@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { XCircle, Printer, CheckCircle, RefreshCw, ArrowLeft, Archive, CheckSquare, Trash2, StopCircle, AlertTriangle, ShoppingCart, Minus, Plus, Check, FileSpreadsheet, ChevronLeft, ChevronRight } from 'lucide-react';
+import { XCircle, Printer, CheckCircle, RefreshCw, ArrowLeft, Archive, CheckSquare, Trash2, StopCircle, AlertTriangle, ShoppingCart, Minus, Plus, Check, FileSpreadsheet, ChevronLeft, ChevronRight, Shield } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../../lib/api';
 import type { User } from '../../context/AppContext';
@@ -167,6 +167,11 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
   };
 
   const printDocument = async () => {
+      const hasPendingReplacement = data.lines.some((l: any) => l.status === 'REPLACEMENT_PENDING_ADMIN');
+      if (hasPendingReplacement) {
+          showToast('Không thể in: Có vật tư đang chờ Admin duyệt thay thế.', 'warning');
+          return;
+      }
       window.print();
       try { await api.post(`/requests/${requestId}/print`, { printType: 'FOR_RECORDS' }); } catch(e) {}
   };
@@ -311,6 +316,19 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
               </div>
           </div>
           <div className="flex items-center gap-3">
+              {(() => {
+                const hasPendingReplacement = data.lines.some((l: any) => l.status === 'REPLACEMENT_PENDING_ADMIN');
+                return (
+                  <button 
+                    onClick={() => { setSelectedPrintType('ALL'); setTimeout(() => printDocument(), 100); }} 
+                    disabled={hasPendingReplacement}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs transition shadow-sm border ${hasPendingReplacement ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'}`}
+                    title={hasPendingReplacement ? "Đang chờ Admin duyệt thay thế" : "In phiếu A4"}
+                  >
+                    <Printer className={`w-4 h-4 ${hasPendingReplacement ? 'text-slate-300' : 'text-indigo-500'}`}/> In Phiếu
+                  </button>
+                );
+              })()}
               <span className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg ${getStatusColor(data.status)}`}>{data.status.replace(/_/g, ' ')}</span>
           </div>
       </div>
@@ -662,7 +680,12 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
               {/* Box 3: Action Toolbar (Role-based) */}
               <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl shadow-2xl p-6 border border-slate-700 relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500 rounded-full blur-[80px] opacity-20 transform translate-x-1/2 -translate-y-1/2"></div>
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-2 animate-pulse"></div>Thao tác Role: {currentUser.role}</h3>
+                  <div className="flex items-center justify-between mb-6 relative z-10">
+                      <h3 className="text-sm font-black text-white uppercase tracking-tight flex items-center gap-2">
+                          <Shield className="w-5 h-5 text-indigo-400"/> TRUNG TÂM LỆNH
+                      </h3>
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] bg-white/5 px-2 py-1 rounded border border-white/10">ROLE: {currentUser.role}</span>
+                  </div>
                   <div className="flex flex-col gap-3 relative z-10">
                       
                       {/* --- THAO TÁC CỦA NGƯỜI LẬP --- */}
@@ -717,6 +740,20 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                       
                       {canCancel && <button onClick={() => handleAction('/cancel', {reason: prompt('Nhập lý do hủy phiếu:')}, 'Đã Hủy phiếu')} className="w-full py-2.5 bg-transparent text-slate-400 hover:text-rose-500 flex items-center justify-center rounded-xl font-bold transition"><Trash2 className="w-4 h-4 mr-2"/> Hủy Bỏ Phiếu Này</button>}
                       
+                      {(() => {
+                        const hasPendingReplacement = data.lines.some((l: any) => l.status === 'REPLACEMENT_PENDING_ADMIN');
+                        return (
+                          <button 
+                            onClick={() => { setSelectedPrintType('ALL'); setTimeout(() => printDocument(), 100); }} 
+                            disabled={hasPendingReplacement}
+                            className={`w-full py-3.5 flex items-center justify-center rounded-xl font-black transition shadow-sm border ${hasPendingReplacement ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-slate-100 text-slate-800 hover:bg-slate-200 border-slate-200'}`}
+                            title={hasPendingReplacement ? "Đang chờ Admin duyệt thay thế" : "In Phiếu Đề Xuất"}
+                          >
+                            <Printer className={`w-5 h-5 mr-2 ${hasPendingReplacement ? 'text-slate-300' : 'text-indigo-500'}`}/> IN PHIẾU ĐỀ XUẤT (A4)
+                          </button>
+                        );
+                      })()}
+
                       <button 
                         onClick={handleExportExcel}
                         className="w-full py-2.5 bg-white text-slate-800 hover:bg-slate-100 flex items-center justify-center rounded-xl font-bold transition shadow-sm"
@@ -725,30 +762,39 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                       </button>
 
                       {['PENDING_MANAGER', 'PENDING_ADMIN', 'APPROVED', 'READY_TO_ISSUE', 'WAITING_HANDOVER', 'COMPLETED', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED', 'PARTIAL_TBP_APPROVED', 'PARTIAL_ADMIN_APPROVED'].includes(data.status) && (
-                          <div className="flex flex-col gap-2 bg-white/5 p-3 rounded-xl border border-white/10">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Tùy chọn In phiếu</p>
+                          <div className="flex flex-col gap-2 bg-white/5 p-3 rounded-xl border border-white/10 mt-2">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Tùy chọn In nâng cao</p>
                             <div className="flex gap-2">
                               <button 
                                 onClick={() => { setSelectedPrintType('VPP'); setTimeout(() => printDocument(), 100); }} 
-                                className="flex-1 py-2 bg-indigo-600 text-white hover:bg-indigo-700 flex items-center justify-center rounded-lg font-bold transition shadow-sm text-xs"
+                                className="flex-1 py-2 bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600 hover:text-white border border-indigo-500/30 flex items-center justify-center rounded-lg font-bold transition shadow-sm text-[10px]"
                               >
-                                <Printer className="w-3.5 h-3.5 mr-1.5"/> In VPP
+                                <Printer className="w-3 h-3 mr-1.5"/> IN VPP
                               </button>
                               <button 
                                 onClick={() => { setSelectedPrintType('VE_SINH'); setTimeout(() => printDocument(), 100); }} 
-                                className="flex-1 py-2 bg-cyan-600 text-white hover:bg-cyan-700 flex items-center justify-center rounded-lg font-bold transition shadow-sm text-xs"
+                                className="flex-1 py-2 bg-cyan-600/20 text-cyan-300 hover:bg-cyan-600 hover:text-white border border-cyan-500/30 flex items-center justify-center rounded-lg font-bold transition shadow-sm text-[10px]"
                               >
-                                <Printer className="w-3.5 h-3.5 mr-1.5"/> In VS
+                                <Printer className="w-3 h-3 mr-1.5"/> IN VỆ SINH
                               </button>
                             </div>
-                            <button 
-                              onClick={() => { setSelectedPrintType('ALL'); setTimeout(() => printDocument(), 100); }} 
-                              className="w-full py-1.5 bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center rounded-lg font-bold transition text-[10px]"
-                            >
-                              In Tất cả
-                            </button>
                           </div>
                       )}
+
+                      <div className="mt-4 pt-4 border-t border-white/10">
+                          <div className="flex justify-between items-center mb-2">
+                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tiến độ xử lý</p>
+                             <span className="text-xs font-black text-emerald-400">{getWorkflowProgress()}%</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                             <div 
+                               className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-1000 shadow-[0_0_10px_rgba(99,102,241,0.5)]" 
+                               style={{width: `${getWorkflowProgress()}%`}}
+                             ></div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
 
                       {isFutureApprover && (
                           <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/50 rounded-xl">
@@ -758,8 +804,6 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                               <p className="text-[10px] text-amber-200/70 mt-1">Bạn có tên trong danh sách duyệt nhưng hiện tại chưa đến lượt của bạn.</p>
                           </div>
                       )}
-                  </div>
-              </div>
 
               {/* Box 4: Approval Timeline (Audit Trail) */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden max-h-[600px] shrink-0">
