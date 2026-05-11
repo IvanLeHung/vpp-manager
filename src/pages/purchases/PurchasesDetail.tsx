@@ -1427,7 +1427,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
       </div> {/* END NO-PRINT WEB UI */}
 
       {/* FORMAL PRINT-ONLY SECTION (A4 Standard) */}
-      <div className="hidden print:block print-area print-container p-4">
+            <div className="hidden print:block print-area print-container p-4">
           {/* TOP HEADER WITH BRANDING & QR */}
           <div className="flex justify-between items-start mb-6 border-b-2 border-slate-900 pb-4">
               <div className="flex flex-col">
@@ -1497,7 +1497,6 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
               </thead>
                <tbody>
                   {(() => {
-                    let totalPoAmount = 0;
                     const filteredLines = data.lines.filter((l: any) => {
                         if (selectedPrintType === 'ALL') return true;
                         const type = l.item.itemType || (l.item.mvpp.startsWith('VPP') ? 'VPP' : 'VE_SINH');
@@ -1508,25 +1507,22 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                       <>
                         {filteredLines.map((l: any, idx: number) => {
                             const isReplaced = !!l.requestLine?.replacementItemId;
-                            const effectiveItem = isReplaced ? l.requestLine?.replacementItem : l.item;
-                            const effectivePrice = isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0);
+                            const effectiveItem = isReplaced ? l.requestLine.replacementItem : l.item;
                             const qtyActual = l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested;
                             const effectiveQty = isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyActual;
+                            const effectivePrice = isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0);
                             const effectiveAmount = effectivePrice * effectiveQty;
-                            totalPoAmount += effectiveAmount;
-                            
-                            const origItem = l.requestLine?.item;
-                            
+
                             return (
-                            <tr key={l.id} className="text-[11px] border-b border-slate-400 h-10">
+                            <tr key={l.id} className="text-[10px] border-b border-slate-300 h-10">
                                 <td className="text-center p-2 border-r border-slate-400 font-bold">{idx + 1}</td>
-                                <td className="text-center p-2 border-r border-slate-400 font-medium">{effectiveItem?.mvpp || l.item.mvpp}</td>
+                                <td className="text-center p-2 border-r border-slate-400 font-black">{effectiveItem?.mvpp || l.item.mvpp}</td>
                                 <td className="p-2 border-r border-slate-400">
                                     <div className="flex flex-col">
-                                        <span className="font-bold uppercase">{effectiveItem?.name || l.item.name}</span>
+                                        <span className="font-bold text-[11px] uppercase">{effectiveItem?.name || l.item.name}</span>
                                         {isReplaced && (
-                                            <span className="text-[9px] text-slate-500 italic mt-0.5">
-                                                (Thay cho: {origItem?.name})
+                                            <span className="text-[8px] text-slate-500 italic mt-0.5">
+                                                (Thay cho: {l.item.name})
                                             </span>
                                         )}
                                     </div>
@@ -1566,67 +1562,56 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
           </table>
 
           {/* REPLACEMENT SUMMARY FOR TGĐ */}
-          {data.lines.some((l:any) => !!l.requestLine?.replacementItemId) && (
-             <div className="mb-8 p-4 border-2 border-dashed border-slate-400 rounded-xl bg-slate-50/30">
-                <h4 className="text-[12px] font-black uppercase mb-3 border-b border-slate-300 pb-2">BÁO CÁO THAY THẾ VẬT TƯ THỰC TẾ</h4>
-                <div className="grid grid-cols-3 gap-8">
-                   <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase">TỔNG GIÁ TRỊ ĐỀ XUẤT ĐÃ DUYỆT</p>
-                      <p className="text-[14px] font-bold text-slate-700">
-                         {(() => {
-                            const approvedTotal = data.lines.reduce((sum: number, l: any) => {
-                               const origPrice = Number(l.requestLine?.unitPrice || l.requestLine?.item?.price || 0);
-                               const origQty = Number(l.requestLine?.qtyRequested || l.qtyRequested || 0);
-                               return sum + (origPrice * origQty);
-                            }, 0);
-                            return approvedTotal.toLocaleString('vi-VN');
-                         })()} đ
-                      </p>
-                   </div>
-                   <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase">TỔNG GIÁ TRỊ MUA THỰC TẾ SAU RÀ SOÁT</p>
-                      <p className="text-[14px] font-black text-indigo-700">
-                        {(() => {
-                           const actualTotal = data.lines.reduce((sum: number, l: any) => {
-                             const isReplaced = !!l.requestLine?.replacementItemId;
-                             const effectivePrice = isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0);
-                             const qtyActual = l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested;
-                             const effectiveQty = isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyActual;
-                             return sum + (effectivePrice * effectiveQty);
-                           }, 0);
-                           return actualTotal.toLocaleString('vi-VN');
-                        })()} đ
-                      </p>
-                   </div>
-                   <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase">HIỆU QUẢ TỐI ƯU CHI PHÍ MUA SẮM</p>
-                      <p className="text-[14px] font-black">
-                         {(() => {
-                            const approvedTotal = data.lines.reduce((sum: number, l: any) => {
-                               const origPrice = Number(l.requestLine?.unitPrice || l.requestLine?.item?.price || 0);
-                               const origQty = Number(l.requestLine?.qtyRequested || l.qtyRequested || 0);
-                               return sum + (origPrice * origQty);
-                            }, 0);
-                            const actualTotal = data.lines.reduce((sum: number, l: any) => {
-                              const isReplaced = !!l.requestLine?.replacementItemId;
-                              const effectivePrice = isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0);
-                              const qtyActual = l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested;
-                              const effectiveQty = isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyActual;
-                              return sum + (effectivePrice * effectiveQty);
-                            }, 0);
-                            const diff = actualTotal - approvedTotal;
-                            return (
-                               <span className={diff <= 0 ? 'text-emerald-600' : 'text-rose-600'}>
-                                  {diff <= 0 ? 'Tiết kiệm: ' : 'Tăng thêm: '}
-                                  {Math.abs(diff).toLocaleString('vi-VN')} đ
-                                </span>
-                            );
-                         })()}
-                      </p>
-                   </div>
-                </div>
-             </div>
-          )}
+          {(() => {
+              const filteredLines = data.lines.filter((l: any) => {
+                  if (selectedPrintType === 'ALL') return true;
+                  const type = l.item.itemType || (l.item.mvpp.startsWith('VPP') ? 'VPP' : 'VE_SINH');
+                  return type === selectedPrintType;
+              });
+
+              if (!filteredLines.some((l: any) => !!l.requestLine?.replacementItemId)) return null;
+
+              const approvedTotal = filteredLines.reduce((sum: number, l: any) => {
+                  const origPrice = Number(l.requestLine?.unitPrice || l.requestLine?.item?.price || 0);
+                  const origQty = Number(l.requestLine?.qtyRequested || l.qtyRequested || 0);
+                  return sum + (origPrice * origQty);
+              }, 0);
+
+              const actualTotal = filteredLines.reduce((sum: number, l: any) => {
+                  const isReplaced = !!l.requestLine?.replacementItemId;
+                  const effectivePrice = isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0);
+                  const qtyActual = l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested;
+                  const effectiveQty = isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyActual;
+                  return sum + (effectivePrice * effectiveQty);
+              }, 0);
+
+              const diff = actualTotal - approvedTotal;
+
+              return (
+                  <div className="mb-8 p-4 border-2 border-dashed border-slate-400 rounded-xl bg-slate-50/30">
+                      <h4 className="text-[12px] font-black uppercase mb-3 border-b border-slate-300 pb-2">BÁO CÁO THAY THẾ VẬT TƯ THỰC TẾ</h4>
+                      <div className="grid grid-cols-3 gap-8">
+                          <div>
+                              <p className="text-[10px] font-bold text-slate-500 uppercase">TỔNG GIÁ TRỊ ĐỀ XUẤT ĐÃ DUYỆT</p>
+                              <p className="text-[14px] font-bold text-slate-700">{approvedTotal.toLocaleString('vi-VN')} đ</p>
+                          </div>
+                          <div>
+                              <p className="text-[10px] font-bold text-slate-500 uppercase">TỔNG GIÁ TRỊ MUA THỰC TẾ SAU RÀ SOÁT</p>
+                              <p className="text-[14px] font-black text-indigo-700">{actualTotal.toLocaleString('vi-VN')} đ</p>
+                          </div>
+                          <div>
+                              <p className="text-[10px] font-bold text-slate-500 uppercase">HIỆU QUẢ TỐI ƯU CHI PHÍ MUA SẮM</p>
+                              <p className="text-[14px] font-black">
+                                  <span className={diff <= 0 ? 'text-emerald-600' : 'text-rose-600'}>
+                                      {diff <= 0 ? 'Tiết kiệm: ' : 'Tăng thêm: '}
+                                      {Math.abs(diff).toLocaleString('vi-VN')} đ
+                                  </span>
+                              </p>
+                          </div>
+                      </div>
+                  </div>
+              );
+          })()}
 
           <div className="flex justify-between items-start mt-2 px-6">
               <div className="text-center w-1/3">
