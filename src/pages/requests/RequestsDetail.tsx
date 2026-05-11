@@ -1406,7 +1406,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                   </div>
               </div>
 
-          <div className="text-center mb-10">
+          <div className="text-center mb-6">
               <h1 className="text-[22px] font-black uppercase tracking-widest break-words leading-tight underline underline-offset-8 decoration-slate-300">
                   {['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'WAITING_HANDOVER', 'COMPLETED', 'PARTIALLY_APPROVED'].includes(data.status) 
                       ? 'PHIẾU CẤP PHÁT VĂN PHÒNG PHẨM' 
@@ -1414,7 +1414,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
               </h1>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-2 gap-y-4 gap-x-12 mb-10 text-sm">
+          <div className="grid grid-cols-2 lg:grid-cols-2 gap-y-2 gap-x-12 mb-6 text-sm">
               <div className="flex items-end"><span className="w-40 font-bold shrink-0">Người đề xuất:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{data.requester?.fullName}</span></div>
               <div className="flex items-end"><span className="w-40 font-bold shrink-0">Phòng ban:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{data.department}</span></div>
               <div className="flex items-end"><span className="w-40 font-bold shrink-0">Ngày lập phiếu:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{new Date(data.createdAt).toLocaleDateString('vi-VN')}</span></div>
@@ -1422,14 +1422,14 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
               <div className="col-span-2 flex items-end"><span className="w-40 font-bold shrink-0">Lý do / Mục đích:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5 italic">"{data.purpose || 'Không có ghi chú'}"</span></div>
           </div>
 
-          <table className="w-full border-collapse border border-black text-[13px] mb-12 print-table">
+          <table className="w-full border-collapse border border-black text-[13px] mb-2 print-table">
               <thead className="bg-slate-100">
                   <tr>
-                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '5%'}}>STT</th>
+                      <th className="border border-black p-2 text-center font-bold uppercase whitespace-nowrap" style={{width: '6%'}}>STT</th>
                       <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '10%'}}>Mã VT</th>
                       <th className="border border-black p-2 text-left font-bold uppercase" style={{width: '30%'}}>Tên Văn Phòng Phẩm</th>
                       <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '7%'}}>ĐVT</th>
-                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '8%'}}>S.Lượng</th>
+                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '6%'}}>SL</th>
                       <th className="border border-black p-2 text-right font-bold uppercase" style={{width: '12%'}}>Đơn giá</th>
                       <th className="border border-black p-2 text-right font-bold uppercase" style={{width: '14%'}}>Thành tiền</th>
                       <th className="border border-black p-2 text-left font-bold uppercase" style={{width: '14%'}}>Ghi chú</th>
@@ -1504,7 +1504,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
               </tbody>
           </table>
 
-          <div className="grid grid-cols-3 gap-y-12 gap-x-4 text-center text-[12px] font-bold mt-8 print-signatures">
+          <div className="grid grid-cols-3 gap-y-12 gap-x-4 text-center text-[12px] font-bold mt-2 print-signatures">
               <div className="print-signature-block">
                   <p className="mb-2 uppercase">Người đề xuất</p>
                   <p className="text-[11px] font-normal italic mb-4">(Ký và ghi họ tên)</p>

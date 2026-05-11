@@ -111,7 +111,7 @@
 
   .signature-section,
   .print-signatures {
-    margin-top: 24px !important;
+    margin-top: 8px !important;
     display: grid;
     gap: 40px;
     page-break-inside: avoid;
@@ -121,7 +121,7 @@
   .print-signatures {
     display: grid !important;
     gap: 40px;
-    margin-top: 24px !important;
+    margin-top: 8px !important;
   }
 
   .print-signatures:not(.grid-cols-3) {
