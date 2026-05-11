@@ -36,9 +36,9 @@
     background-color: white !important;
     margin: 0 !important;
     padding: 0 !important;
-    width: 210mm;
+    width: auto !important;
     color: #000 !important;
-    font-family: "Times New Roman", serif;
+    font-family: "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     font-size: 13px;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
@@ -46,12 +46,15 @@
 
   /* Kích thước khổ giấy A4 chuẩn */
   .print-sheet {
-    width: 190mm;
+    width: 210mm;
+    min-height: 297mm;
     margin: 0 auto;
+    padding: 15mm 20mm;
     font-size: 13px;
     display: block;
     position: relative;
     background-color: white !important;
+    box-sizing: border-box;
   }
 
   /* Đảm bảo print-area nằm trong luồng mặc định */
@@ -91,8 +94,8 @@
   }
 
   .print-container {
-    width: 190mm;
-    margin: 0 auto;
+    width: 100%;
+    margin: 0;
   }
 
   thead { display: table-header-group; }
@@ -141,7 +144,7 @@
 
 @page {
   size: A4 portrait;
-  margin: 10mm 12mm 12mm 12mm;
+  margin: 0mm !important;
 }
 
 /* Custom Scrollbar */

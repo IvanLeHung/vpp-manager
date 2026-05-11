@@ -1383,7 +1383,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
           </div>
       )}
       {/* FORMAL PRINT-ONLY SECTION (A4 Standard) */}
-      <div className="hidden print:block print-area mb-8">
+      <div className="hidden print:block print-area">
           <div className="print-sheet text-black font-sans leading-tight">
               <div className="flex justify-between items-start mb-8 w-full print-header">
                   <div className="w-[35%] text-left">
@@ -1609,7 +1609,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                   <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full mr-2"></span>
                   Lịch sử Xử lý (Audit Trail)
               </h3>
-              <table className="w-full border-collapse text-[10px]">
+              <table className="w-full border-collapse text-[10px] print-table">
                   <thead>
                       <tr className="bg-slate-50">
                           <th className="border border-slate-300 p-1.5 text-left font-bold uppercase w-32">Thời gian</th>
