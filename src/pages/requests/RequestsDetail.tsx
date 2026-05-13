@@ -1230,6 +1230,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                             className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 transition mb-6"
                           >
                             <option value="MAIN">Kho Chính (MAIN)</option>
+                            <option value="VE_SINH">Kho Vệ Sinh (VS)</option>
                             <option value="SUPPLY">Kho Vật Tư (SUPPLY)</option>
                             <option value="SCRAP">Kho Phế Liệu (SCRAP)</option>
                           </select>
