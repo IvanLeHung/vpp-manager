@@ -1407,9 +1407,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                         className="w-full bg-slate-50 border-2 border-slate-100 px-5 py-4 rounded-3xl outline-none focus:border-purple-400 transition font-black text-slate-800 appearance-none"
                       >
                          <option value="MAIN">Kho Chính (MAIN)</option>
-                         <option value="VE_SINH">Kho Vệ Sinh (VS)</option>
-                         <option value="SUPPLY">Kho Vật Tư (SUPPLY)</option>
-                         <option value="SCRAP">Kho Phế Liệu (SCRAP)</option>
+                         <option value="VE_SINH">Kho Đồ Vệ Sinh (VE_SINH)</option>
                       </select>
                   </div>
 
