@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { XCircle, Printer, CheckCircle, RefreshCw, ArrowLeft, Archive, CheckSquare, Trash2, StopCircle, AlertTriangle, ShoppingCart, Minus, Plus, Check, FileSpreadsheet, ChevronLeft, ChevronRight, Shield } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../../lib/api';
@@ -103,7 +103,10 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
         selected: l.status !== 'REJECTED',
         note: l.approvalNote || ''
       })));
-      setIssues(res.data.lines.map((l:any) => ({ lineId: l.id, qtyDelivered: l.qtyApproved ?? l.qtyRequested })));
+      setIssues(res.data.lines.map((l:any) => ({ 
+        lineId: l.id, 
+        qtyDelivered: l.replacementQty ?? l.qtyApproved ?? l.qtyRequested 
+      })));
       setSelectedWarehouse(res.data.warehouseCode || 'MAIN');
       // Load comparison for Admin Level 2
       if (currentUser.role === 'ADMIN' && res.data.status === 'PENDING_ADMIN') {
@@ -156,6 +159,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       if (canGoNext && nextActions.includes(actionPath)) {
           goNext();
       } else {
+          await fetchDetail();
           await refreshData();
           if (['/submit', '/withdraw'].includes(actionPath)) {
             setViewMode('LIST');
@@ -191,16 +195,18 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       ];
 
       const lineData = data.lines.map((l: any, idx: number) => {
+          const effectiveItem = l.replacementItem || l.item;
+          const isReplaced = !!l.replacementItemId;
           return [
               idx + 1,
-              l.item.mvpp,
-              l.item.name,
-              l.item.unit,
+              effectiveItem.mvpp,
+              isReplaced ? `${effectiveItem.name} (Thay thế)` : effectiveItem.name,
+              effectiveItem.unit,
               l.qtyRequested,
               l.qtyManagerApproved ?? "—",
-              l.qtyAdminApproved ?? l.qtyApproved ?? "Chưa duyệt",
+              l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved ?? "Chưa duyệt",
               l.qtyDelivered,
-              l.approvalNote || ""
+              l.approvalNote || l.replacementReason || ""
           ];
       });
 
@@ -531,8 +537,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                    <th className="px-2 py-3 text-center text-amber-600 bg-amber-50/30 border-r border-slate-100">TBP Duyệt</th>
                                    <th className="px-2 py-3 text-center text-emerald-600 bg-emerald-50/30 border-r border-slate-100">Admin Duyệt</th>
                                    <th className="px-2 py-3 text-center text-blue-600 bg-blue-50/30">Lấy thực</th>
-                                    <th className="px-2 py-3 text-right">Đơn giá</th>
-                                    <th className="px-2 py-3 text-right">Thành tiền</th>
+                                   <th className="px-2 py-3 text-right">Đơn giá</th>
+                                   <th className="px-2 py-3 text-right">Thành tiền</th>
                                    <th className="px-2 py-3 text-center">Trạng thái</th>
                                    <th className="px-2 py-3 text-center">Ghi chú</th>
                                </tr>
@@ -540,11 +546,19 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                            <tbody className="divide-y divide-slate-100">
                                {data.lines.map((l:any, idx:number) => {
                                    
-                                   const stocks = l.item.stocks || [];
+                                   const effectiveItem = l.replacementItem || l.item;
+                                   const effectivePrice = Number(l.replacementPrice ?? l.item.price ?? 0);
+                                   const effectiveQty = l.replacementQty ?? l.qtyApproved ?? l.qtyRequested;
+                                   const finalAmount = effectivePrice * (l.replacementQty ?? l.qtyApproved ?? l.qtyRequested);
+                                   
+                                   const stocks = effectiveItem.stocks || [];
                                    const reqStock = stocks.find((s:any) => s.warehouseCode === data.warehouseCode) || { quantityOnHand: 0, quantityReserved: 0 };
                                    const totalOnHand = stocks.reduce((sum:number, s:any) => sum + s.quantityOnHand, 0);
                                    const available = reqStock.quantityOnHand - reqStock.quantityReserved;
-                                   const outOfStock = l.qtyRequested > available;
+                                   const outOfStock = effectiveQty > available;
+                                   
+                                   const isReplaced = !!l.replacementItemId;
+                                   const isPending = l.status === 'REPLACEMENT_PENDING_ADMIN';
                                    
                                    const getLineStatusColor = (status: string) => {
                                         switch(status) {
@@ -563,13 +577,18 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                    };
 
                                    return (
-                                   <tr key={l.id} className={`hover:bg-slate-50 transition border-l-4 ${outOfStock && data.status.startsWith('PENDING') ? 'border-l-rose-500 bg-rose-50/30' : 'border-l-transparent'}`}>
+                                   <React.Fragment key={l.id}>
+                                   <tr className={`hover:bg-slate-50 transition border-l-4 ${outOfStock && data.status.startsWith('PENDING') ? 'border-l-rose-500 bg-rose-50/30' : 'border-l-transparent'} ${isReplaced ? 'bg-indigo-50/5' : ''}`}>
                                        <td className="px-2 py-2 text-center font-bold text-slate-400 border-r border-slate-100">{idx+1}</td>
                                        <td className="px-2 py-2 min-w-[150px]">
-                                            <p className="font-bold text-slate-800 text-sm whitespace-normal">{l.replacementItem?.name || l.item.name}</p>
+                                            <p className="font-bold text-slate-800 text-sm whitespace-normal">{effectiveItem.name}</p>
                                             <div className="flex items-center gap-2 mt-1">
-                                               <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-black tracking-widest">{l.replacementItem?.mvpp || l.item.mvpp}</span>
-                                               {l.replacementItemId && <span className="text-[9px] font-black bg-indigo-100 text-indigo-600 px-1 py-0.5 rounded uppercase">Đã thay thế</span>}
+                                               <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-black tracking-widest">{effectiveItem.mvpp}</span>
+                                               {isReplaced && (
+                                                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase ${isPending ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                                                     {isPending ? 'Chờ duyệt thay thế' : 'Đã thay thế'}
+                                                  </span>
+                                               )}
                                                <span className="text-[10px] font-bold text-indigo-500 flex items-center gap-1"><Archive className="w-3 h-3"/> Kho: {data.warehouseCode}</span>
                                             </div>
                                         </td>
@@ -584,10 +603,6 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                                     <p className="text-[7px] font-black text-emerald-400 uppercase">Khả dụng</p>
                                                     <p className="text-[10px] font-black text-emerald-700">{available}</p>
                                                  </div>
-                                                 <div className="text-center px-1 py-0.5 bg-amber-50 border border-amber-100 rounded">
-                                                    <p className="text-[7px] font-black text-amber-400 uppercase">Đã giữ</p>
-                                                    <p className="text-[10px] font-black text-amber-700">{reqStock.quantityReserved}</p>
-                                                 </div>
                                               </div>
                                               {totalOnHand > reqStock.quantityOnHand && (
                                                  <p className="text-[9px] font-bold text-slate-400 italic">Tổng tồn: {totalOnHand}</p>
@@ -601,11 +616,6 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                             {l.qtyManagerApproved !== null ? (
                                                 <div className="flex flex-col items-center">
                                                     <span className="font-black text-base text-amber-600">{l.qtyManagerApproved}</span>
-                                                    {l.qtyManagerApproved !== l.qtyRequested && (
-                                                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${l.qtyManagerApproved < l.qtyRequested ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-700'}`}>
-                                                        {l.qtyManagerApproved < l.qtyRequested ? `-${l.qtyRequested - l.qtyManagerApproved}` : `+${l.qtyManagerApproved - l.qtyRequested}`}
-                                                      </span>
-                                                    )}
                                                 </div>
                                             ) : (
                                                 <span className="text-[9px] font-bold text-slate-400 uppercase">Chờ TBP</span>
@@ -614,13 +624,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                         <td className="px-2 py-2 text-center bg-emerald-50/30 border-r border-slate-100">
                                             {l.qtyAdminApproved !== null || l.qtyApproved !== null || l.replacementQty !== null ? (
                                                 <div className="flex flex-col items-center">
-                                                    <span className="font-black text-base text-emerald-600">{l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved}</span>
-                                                    { (l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved) !== (l.qtyManagerApproved ?? l.qtyRequested) && (
-                                                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${ (l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved) < (l.qtyManagerApproved ?? l.qtyRequested) ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-700'}`}>
-                                                        {(l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved) < (l.qtyManagerApproved ?? l.qtyRequested) ? `-${(l.qtyManagerApproved ?? l.qtyRequested) - (l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved)}` : `+${(l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved) - (l.qtyManagerApproved ?? l.qtyRequested)}`}
-                                                      </span>
-                                                    )}
-                                                    {l.replacementQty !== null && (l.qtyAdminApproved ?? l.qtyApproved) !== l.replacementQty && (
+                                                    <span className="font-black text-base text-emerald-600">{effectiveQty}</span>
+                                                    {isReplaced && effectiveQty !== (l.qtyAdminApproved ?? l.qtyApproved) && (
                                                       <span className="text-[9px] font-bold text-slate-400 line-through">({l.qtyAdminApproved ?? l.qtyApproved})</span>
                                                     )}
                                                 </div>
@@ -630,35 +635,19 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                         </td>
                                        <td className="px-2 py-2 text-center bg-blue-50/30">
                                            <span className="font-black text-base text-blue-600">{l.qtyDelivered ?? 0}</span>
-                                           {l.qtyDelivered > 0 && l.qtyDelivered < (l.qtyApproved ?? l.qtyRequested) && (
-                                               <p className="text-[9px] font-bold text-rose-500 bg-rose-50 rounded px-1 mt-1">Còn nợ: {(l.qtyApproved ?? l.qtyRequested) - l.qtyDelivered}</p>
-                                           )}
                                        </td>
 
                                        <td className="px-2 py-2 text-right">
-
-                                           <span className="text-xs font-bold text-slate-500">{(l.item.price || 0).toLocaleString('vi-VN')}</span>
-
+                                           <span className="text-xs font-bold text-slate-500">{effectivePrice.toLocaleString('vi-VN')}</span>
                                        </td>
 
                                        <td className="px-2 py-2 text-right">
-
-                                           <span className="text-xs font-black text-slate-800">{((l.item.price || 0) * (l.qtyApproved ?? l.qtyRequested)).toLocaleString('vi-VN')}</span>
-
+                                           <span className="text-xs font-black text-slate-800">{finalAmount.toLocaleString('vi-VN')}</span>
                                        </td>
                                        <td className="px-2 py-2 text-center">
                                            <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest border ${getLineStatusColor(l.status)}`}>
                                                {l.status.replace(/_/g, ' ')}
                                            </span>
-                                           {l.approvalNote && (
-                                              <div className="mt-1 flex items-start gap-1 justify-center">
-                                                 <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0 mt-0.5"/>
-                                                 <p className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded italic whitespace-normal max-w-[120px] leading-tight">
-                                                    {l.approvalNote}
-                                                 </p>
-                                              </div>
-                                           )}
-                                           {l.issueNote && <p className="text-[10px] italic text-slate-400 mt-1 truncate max-w-[100px]" title={l.issueNote}>{l.issueNote}</p>}
                                        </td>
                                        <td className="px-2 py-2">
                                            <div className="max-w-[180px] whitespace-normal">
@@ -668,6 +657,57 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                            </div>
                                         </td>
                                    </tr>
+
+                                   {/* REPLACEMENT INFO BLOCK (Synchronized Design) */}
+                                   {isReplaced && (
+                                     <tr className="bg-slate-50/30">
+                                       <td className="border-r border-slate-100"></td>
+                                       <td colSpan={10} className="px-4 py-3">
+                                          <div className="bg-white border border-indigo-100 border-l-4 border-l-indigo-500 rounded-r-xl p-4 shadow-sm flex flex-col gap-3">
+                                             <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                   <div className="w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-500">
+                                                      <RefreshCw className="w-4 h-4"/>
+                                                   </div>
+                                                   <div>
+                                                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Thay thế cho vật tư gốc</p>
+                                                      <div className="flex items-center gap-2">
+                                                         <span className="text-[13px] font-bold text-slate-600">{l.item.name}</span>
+                                                         <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-black">{l.item.mvpp}</span>
+                                                      </div>
+                                                   </div>
+                                                </div>
+                                                <div className="text-right">
+                                                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Chênh lệch tài chính</p>
+                                                   <p className={`text-sm font-black ${(effectivePrice * effectiveQty) - (Number(l.item.price || 0) * (l.qtyApproved ?? l.qtyRequested)) > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                                                      {((effectivePrice * effectiveQty) - (Number(l.item.price || 0) * (l.qtyApproved ?? l.qtyRequested))).toLocaleString('vi-VN')} đ
+                                                   </p>
+                                                </div>
+                                             </div>
+
+                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-slate-50">
+                                                <div className="space-y-1">
+                                                   <p className="text-[8px] font-black text-slate-400 uppercase">Giá gốc (Hệ thống)</p>
+                                                   <p className="text-xs font-bold text-slate-400 line-through decoration-slate-300">{Number(l.item.price || 0).toLocaleString('vi-VN')} đ</p>
+                                                </div>
+                                                <div className="space-y-1 border-l border-slate-100 pl-4">
+                                                   <p className="text-[8px] font-black text-indigo-500 uppercase">Giá thay thế</p>
+                                                   <p className="text-xs font-black text-indigo-600">{effectivePrice.toLocaleString('vi-VN')} đ</p>
+                                                </div>
+                                                <div className="space-y-1 border-l border-slate-100 pl-4">
+                                                   <p className="text-[8px] font-black text-slate-400 uppercase">SL Xin/Duyệt cũ</p>
+                                                   <p className="text-xs font-bold text-slate-500">{(l.qtyApproved ?? l.qtyRequested)} {l.item.unit}</p>
+                                                </div>
+                                                <div className="space-y-1 border-l border-slate-100 pl-4">
+                                                   <p className="text-[8px] font-black text-emerald-500 uppercase">Lý do thay thế</p>
+                                                   <p className="text-[11px] font-bold text-slate-600 italic leading-tight">"{l.replacementReason || 'Không có lý do chi tiết'}"</p>
+                                                </div>
+                                             </div>
+                                          </div>
+                                       </td>
+                                     </tr>
+                                   )}
+                                   </React.Fragment>
                                )})}
                            </tbody>
                        </table>
@@ -1247,29 +1287,33 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                           <div className="mt-auto pt-6 space-y-3">
                              <button 
                                disabled={data.lines.some((l:any) => {
-                                 const qtyIssue = issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? (l.qtyApproved ?? l.qtyRequested);
-                                 const stock = l.item.stocks?.find((s:any) => s.warehouseCode === selectedWarehouse)?.quantityOnHand ?? 0;
+                                 const effectiveItem = l.replacementItem || l.item;
+                                 const qtyIssue = issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? (l.replacementQty ?? l.qtyApproved ?? l.qtyRequested);
+                                 const stock = effectiveItem.stocks?.find((s:any) => s.warehouseCode === selectedWarehouse)?.quantityOnHand ?? 0;
                                  return qtyIssue > stock;
                                })}
                                onClick={() => setIsConfirmingIssue(true)}
                                className={`w-full py-4 rounded-2xl font-black shadow-xl transition transform hover:scale-[1.02] ${
                                   data.lines.some((l:any) => {
-                                    const qtyIssue = issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? (l.qtyApproved ?? l.qtyRequested);
-                                    const stock = l.item.stocks?.find((s:any) => s.warehouseCode === selectedWarehouse)?.quantityOnHand ?? 0;
+                                    const effectiveItem = l.replacementItem || l.item;
+                                    const qtyIssue = issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? (l.replacementQty ?? l.qtyApproved ?? l.qtyRequested);
+                                    const stock = effectiveItem.stocks?.find((s:any) => s.warehouseCode === selectedWarehouse)?.quantityOnHand ?? 0;
                                     return qtyIssue > stock;
                                   }) ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' : 'bg-indigo-600 text-white shadow-indigo-500/30 hover:bg-indigo-700'
                                }`}
                              >
                                {data.lines.some((l:any) => {
-                                    const qtyIssue = issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? (l.qtyApproved ?? l.qtyRequested);
-                                    const stock = l.item.stocks?.find((s:any) => s.warehouseCode === selectedWarehouse)?.quantityOnHand ?? 0;
+                                    const effectiveItem = l.replacementItem || l.item;
+                                    const qtyIssue = issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? (l.replacementQty ?? l.qtyApproved ?? l.qtyRequested);
+                                    const stock = effectiveItem.stocks?.find((s:any) => s.warehouseCode === selectedWarehouse)?.quantityOnHand ?? 0;
                                     return qtyIssue > stock;
                                   }) ? 'KHÔNG ĐỦ TỒN ĐỂ XUẤT' : 'XÁC NHẬN XUẤT'}
                              </button>
                              
                              {data.lines.some((l:any) => {
-                                const target = l.qtyApproved ?? l.qtyRequested;
-                                const stock = l.item.stocks?.find((s:any) => s.warehouseCode === selectedWarehouse)?.quantityOnHand ?? 0;
+                                const effectiveItem = l.replacementItem || l.item;
+                                const target = l.replacementQty ?? l.qtyApproved ?? l.qtyRequested;
+                                const stock = effectiveItem.stocks?.find((s:any) => s.warehouseCode === selectedWarehouse)?.quantityOnHand ?? 0;
                                 return target > stock;
                              }) && (
                                 <button 
@@ -1301,22 +1345,31 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {data.lines.map((l:any) => {
-                                    const qtyIssue = issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? (l.qtyApproved ?? l.qtyRequested);
-                                    const stock = l.item.stocks?.find((s:any) => s.warehouseCode === selectedWarehouse) || { quantityOnHand: 0 };
+                                    const effectiveItem = l.replacementItem || l.item;
+                                    const qtyIssue = issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? (l.replacementQty ?? l.qtyApproved ?? l.qtyRequested);
+                                    const stock = effectiveItem.stocks?.find((s:any) => s.warehouseCode === selectedWarehouse) || { quantityOnHand: 0 };
                                     const overStock = qtyIssue > stock.quantityOnHand;
-                                    const isDone = l.qtyDelivered >= (l.qtyApproved ?? l.qtyRequested);
+                                    const isDone = l.qtyDelivered >= (l.replacementQty ?? l.qtyApproved ?? l.qtyRequested);
 
                                     return (
                                     <tr key={l.id} className={isDone ? 'opacity-40 bg-slate-50' : ''}>
                                         <td className="p-4">
-                                            <p className="font-bold text-slate-800 text-sm whitespace-normal max-w-[250px]">{l.item.name}</p>
-                                            <p className="text-[10px] font-black text-slate-400 mt-1 uppercase">{l.item.mvpp}</p>
+                                            <p className="font-bold text-slate-800 text-sm whitespace-normal max-w-[250px]">{effectiveItem.name}</p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                               <p className="text-[10px] font-black text-slate-400 uppercase">{effectiveItem.mvpp}</p>
+                                               {l.replacementItemId && (
+                                                 <div className="flex flex-col mt-0.5">
+                                                   <span className="text-[8px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded uppercase w-fit">Đã thay thế</span>
+                                                   <span className="text-[9px] text-slate-400 italic mt-0.5">Thay cho: {l.item.name} ({l.item.mvpp})</span>
+                                                 </div>
+                                               )}
+                                            </div>
                                         </td>
                                         <td className="px-3 py-3 text-center">
                                             <span className={`font-black text-sm ${stock.quantityOnHand === 0 ? 'text-rose-500' : 'text-slate-600'}`}>{stock.quantityOnHand}</span>
                                         </td>
                                         <td className="p-4 text-center bg-indigo-50/20">
-                                            <span className="font-black text-indigo-600">{l.qtyApproved ?? l.qtyRequested}</span>
+                                            <span className="font-black text-indigo-600">{l.replacementQty ?? l.qtyApproved ?? l.qtyRequested}</span>
                                         </td>
                                         <td className="p-4 bg-emerald-50/10 border-x border-emerald-50">
                                             <input 
@@ -1326,7 +1379,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                             />
                                             {overStock && <p className="text-[9px] font-bold text-rose-500 text-center mt-1 animate-pulse">Vượt tồn kho {selectedWarehouse}!</p>}
                                         </td>
-                                        <td className="p-4 font-bold text-[10px] text-slate-400 uppercase">{l.item.unit}</td>
+                                        <td className="p-4 font-bold text-[10px] text-slate-400 uppercase">{effectiveItem.unit}</td>
                                     </tr>
                                 )})}
                             </tbody>
@@ -1349,7 +1402,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                            onClick={() => {
                               const hasErr = data.lines.some((l:any) => {
                                  const qtyIssue = issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? 0;
-                                 const stock = l.item.stocks?.find((s:any) => s.warehouseCode === selectedWarehouse)?.quantityOnHand ?? 0;
+                                 const effectiveItem = l.replacementItem || l.item; const stock = effectiveItem.stocks?.find((s:any) => s.warehouseCode === selectedWarehouse)?.quantityOnHand ?? 0;
                                  return qtyIssue > stock;
                               });
                               if (hasErr) {
@@ -1357,7 +1410,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                  setIsConfirmingIssue(false);
                                  return;
                               }
-                              handleAction('/issue', { warehouseCode: selectedWarehouse, lineIssues: issues }, 'CẤP PHÁT VẬT TƯ THÀNH CÔNG! ĐANG CHỜ NHÂN SỰ XÁC NHẬN.');
+                              handleAction('/issue', { warehouseCode: selectedWarehouse, items: issues.map(i => ({ lineId: i.lineId, quantity: i.qtyDelivered, autoBackorder: autoCreateBackorder })) }, 'CẤP PHÁT VẬT TƯ THÀNH CÔNG! ĐANG CHỜ NHÂN SỰ XÁC NHẬN.');
                               setIsConfirmingIssue(false);
                               setShowIssueModal(false);
                            }}
@@ -1437,11 +1490,12 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
                     return (
                       <>
-                        {filteredLines.map((l: any, idx: number) => {
-                          const displayItem = l.replacementItem || l.item;
+                         {filteredLines.map((l: any, idx: number) => {
+                           const displayItem = l.replacementItem || l.item;
                            const isReplaced = !!l.replacementItemId;
                            const displayQtyRequested = l.qtyRequested;
-                           const displayQtyApproved = l.replacementQty ?? l.qtyApproved;
+                           const displayQtyApproved = l.replacementQty ?? l.qtyApproved ?? l.qtyRequested;
+                           const displayPrice = Number(l.replacementPrice ?? displayItem.price ?? 0);
 
                            return (
                            <tr key={l.id} className="h-10">
@@ -1474,10 +1528,10 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                    )}
                                </td>
                                <td className="border border-black p-2 text-right font-medium">
-                                   {(displayItem.price || 0).toLocaleString('vi-VN')}
+                                   {displayPrice.toLocaleString('vi-VN')}
                                </td>
                                <td className="border border-black p-2 text-right font-bold">
-                                   {((displayItem.price || 0) * (displayQtyApproved ?? displayQtyRequested)).toLocaleString('vi-VN')}
+                                   {(displayPrice * (displayQtyApproved ?? displayQtyRequested)).toLocaleString('vi-VN')}
                                </td>
                                <td className="border border-black p-2 text-[10px] italic leading-tight">{l.note || '—'}</td>
                            </tr>
@@ -1491,7 +1545,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                 {filteredLines.reduce((sum: number, line: any) => {
                                   const item = line.replacementItem || line.item;
                                   const qty = line.replacementQty ?? line.qtyApproved ?? line.qtyRequested;
-                                  return sum + ((item.price || 0) * qty);
+                                  const price = Number(line.replacementPrice ?? item.price ?? 0);
+                                  return sum + (price * qty);
                                 }, 0).toLocaleString('vi-VN')} VNĐ
                             </td>
                             <td className="border border-black p-2"></td>
