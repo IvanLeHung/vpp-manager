@@ -85,7 +85,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
   // Custom approvals
   const [approvals, setApprovals] = useState<{lineId: string, qtyApproved: number, selected: boolean, note: string}[]>([]);
   // Custom issues
-  const [issues, setIssues] = useState<{lineId: string, qtyDelivered: number, warehouseCode?: string}[]>([]);
+  const [issues, setIssues] = useState<{lineId: string, qtyDelivered: number, warehouseCode?: string, selected?: boolean}[]>([]);
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
   const [selectedWarehouse, setSelectedWarehouse] = useState('MAIN');
   const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH'>('ALL');
@@ -112,11 +112,15 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
         const hasStockPrimary = l.issue_item?.stocks?.find((s:any) => s.warehouseCode === primaryWh)?.quantityOnHand > 0;
         // Find first warehouse with stock if primary has 0
         const firstWhWithStock = l.issue_item?.stocks?.find((s:any) => s.quantityOnHand > 0)?.warehouseCode;
+        const wh = hasStockPrimary ? primaryWh : (firstWhWithStock || primaryWh);
+        const stock = l.issue_item?.stocks?.find((s: any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
+        const remaining = (l.qtyApproved ?? l.qtyRequested) - (l.qtyDelivered || 0);
 
         return { 
           lineId: l.id, 
-          qtyDelivered: l.qtyApproved ?? l.qtyRequested,
-          warehouseCode: hasStockPrimary ? primaryWh : (firstWhWithStock || primaryWh)
+          qtyDelivered: Math.min(remaining, stock),
+          warehouseCode: wh,
+          selected: remaining > 0 && stock > 0
         };
       }));
       setSelectedWarehouse(res.data.warehouseCode || 'MAIN');
@@ -1342,6 +1346,72 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                              </ul>
                           </div>
 
+                          <div className="flex flex-col gap-2 mb-6">
+                               <button 
+                                 onClick={autoSelectWarehouses}
+                                 className="w-full py-2.5 bg-white border border-indigo-200 text-indigo-600 rounded-xl font-bold text-xs hover:bg-indigo-50 transition flex items-center justify-center gap-2"
+                               >
+                                 <Search className="w-4 h-4"/> TỰ ĐỘNG CHỌN KHO
+                               </button>
+                               <button 
+                                 onClick={() => {
+                                   const newIssues = data.lines.map((l: any) => {
+                                     const issue = issues.find((a: any) => a.lineId === l.id);
+                                     const wh = issue?.warehouseCode || selectedWarehouse;
+                                     const stock = l.issue_item?.stocks?.find((s: any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
+                                     const remaining = (l.qtyApproved ?? l.qtyRequested) - (l.qtyDelivered || 0);
+                                     return {
+                                       ...issue,
+                                       lineId: l.id,
+                                       qtyDelivered: Math.min(remaining, stock),
+                                       selected: remaining > 0 && stock > 0,
+                                       warehouseCode: wh
+                                     };
+                                   });
+                                   setIssues(newIssues);
+                                   showToast('Đã tự động điền số lượng theo tồn thực tế', 'success');
+                                 }}
+                                 className="w-full py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-600 rounded-xl font-bold text-xs hover:bg-emerald-100 transition flex items-center justify-center gap-2"
+                               >
+                                 <CheckCircle className="w-4 h-4"/> TỰ ĐIỀN THEO TỒN
+                               </button>
+                               
+                               <div className="grid grid-cols-2 gap-2 mt-2">
+                                  <button 
+                                    onClick={() => {
+                                      const newIssues = issues.map(i => {
+                                        const line = data.lines.find((l: any) => l.id === i.lineId);
+                                        const stock = line?.issue_item?.stocks?.find((s: any) => s.warehouseCode === i.warehouseCode)?.quantityOnHand ?? 0;
+                                        const remaining = (line?.qtyApproved ?? line?.qtyRequested) - (line?.qtyDelivered || 0);
+                                        return { ...i, selected: remaining > 0 && stock >= remaining };
+                                      });
+                                      setIssues(newIssues);
+                                    }}
+                                    className="py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-[9px] hover:bg-slate-200"
+                                  >CHỌN DÒNG ĐỦ TỒN</button>
+                                  <button 
+                                    onClick={() => {
+                                      const newIssues = issues.map(i => {
+                                        const line = data.lines.find((l: any) => l.id === i.lineId);
+                                        const stock = line?.issue_item?.stocks?.find((s: any) => s.warehouseCode === i.warehouseCode)?.quantityOnHand ?? 0;
+                                        return { ...i, selected: stock > 0 };
+                                      });
+                                      setIssues(newIssues);
+                                    }}
+                                    className="py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-[9px] hover:bg-slate-200"
+                                  >CHỈ DÒNG CÓ TỒN</button>
+                                  <button onClick={() => setIssues(issues.map(i => ({...i, selected: true})))} className="py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-[9px] hover:bg-slate-200">CHỌN TẤT CẢ</button>
+                                  <button onClick={() => setIssues(issues.map(i => ({...i, selected: false})))} className="py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-[9px] hover:bg-slate-200">BỎ CHỌN HẾT</button>
+                               </div>
+
+                               <button 
+                                 onClick={() => setShowOnlyErrors(!showOnlyErrors)}
+                                 className={`w-full mt-4 py-2.5 border rounded-xl font-bold text-xs transition flex items-center justify-center gap-2 ${showOnlyErrors ? 'bg-rose-600 border-rose-600 text-white shadow-lg shadow-rose-500/30' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                               >
+                                 <Filter className="w-4 h-4"/> {showOnlyErrors ? 'LỌC DÒNG THIẾU TỒN' : 'HIỆN TẤT CẢ'}
+                               </button>
+                           </div>
+
                           <div className="mb-6 p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
                               <p className="text-[10px] font-black text-slate-400 uppercase mb-3 flex items-center">
                                 <Archive className="w-3 h-3 mr-1 text-indigo-500"/> Kho xuất chính (Áp dụng nhanh)
@@ -1351,7 +1421,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                   <button
                                     key={wh}
                                     onClick={() => {
-                                      setSelectedWarehouse(wh);
+                                  setSelectedWarehouse(wh);
                                       setIssues(issues.map(i => ({...i, warehouseCode: wh})));
                                     }}
                                     className={`py-2 rounded-xl text-[10px] font-black transition border ${selectedWarehouse === wh ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200' : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100'}`}
@@ -1361,50 +1431,34 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                 ))}
                               </div>
                           </div>
-
-                          <div className="flex flex-col gap-2 mb-6">
-                              <button 
-                                onClick={autoSelectWarehouses}
-                                className="w-full py-2.5 bg-white border border-indigo-200 text-indigo-600 rounded-xl font-bold text-xs hover:bg-indigo-50 transition flex items-center justify-center gap-2"
-                              >
-                                <Search className="w-4 h-4"/> TỰ ĐỘNG CHỌN KHO
-                              </button>
-                              <button 
-                                onClick={() => {
-                                  const newIssues = data.lines.map((l: any) => {
-                                    const issue = issues.find((a: any) => a.lineId === l.id);
-                                    const wh = issue?.warehouseCode || selectedWarehouse;
-                                    const stock = l.issue_item?.stocks?.find((s: any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
-                                    const remaining = (l.qtyApproved ?? l.qtyRequested) - (l.qtyDelivered || 0);
-                                    return {
-                                      ...issue,
-                                      lineId: l.id,
-                                      qtyDelivered: Math.min(remaining, stock),
-                                      warehouseCode: wh
-                                    };
-                                  });
-                                  setIssues(newIssues);
-                                }}
-                                className="w-full py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-600 rounded-xl font-bold text-xs hover:bg-emerald-100 transition flex items-center justify-center gap-2"
-                              >
-                                <CheckCircle className="w-4 h-4"/> TỰ ĐIỀN THEO TỒN
-                              </button>
-                              <button 
-                                onClick={() => setShowOnlyErrors(!showOnlyErrors)}
-                                className={`w-full py-2.5 border rounded-xl font-bold text-xs transition flex items-center justify-center gap-2 ${showOnlyErrors ? 'bg-rose-600 border-rose-600 text-white shadow-lg shadow-rose-500/30' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                              >
-                                <Filter className="w-4 h-4"/> {showOnlyErrors ? 'LỌC DÒNG THIẾU TỒN' : 'HIỆN TẤT CẢ'}
-                              </button>
-                          </div>
-
+                          
                           <div className="space-y-3">
                               <button 
                                 onClick={() => {
-                                  const hasAnyToIssue = issues.some(i => (i.qtyDelivered || 0) > 0);
-                                  if (!hasAnyToIssue) {
-                                    showToast('Chưa có vật tư nào được nhập số lượng để giao!', 'warning');
+                                  const selectedIssues = issues.filter(i => i.selected);
+                                  if (selectedIssues.length === 0) {
+                                    showToast('Vui lòng chọn ít nhất một dòng để giao!', 'warning');
                                     return;
                                   }
+
+                                  const hasAnyToIssue = selectedIssues.some(i => (i.qtyDelivered || 0) > 0);
+                                  if (!hasAnyToIssue) {
+                                    showToast('Các dòng đã chọn không có tồn khả dụng để giao. Vui lòng chọn dòng khác hoặc tạo backorder.', 'warning');
+                                    return;
+                                  }
+
+                                  // Auto-fix qtyDelivered for selected items based on stock just in case
+                                  const fixedIssues = issues.map(i => {
+                                    if (!i.selected) return {...i, qtyDelivered: 0};
+                                    const line = data.lines.find((l: any) => l.id === i.lineId);
+                                    const stock = line?.issue_item?.stocks?.find((s: any) => s.warehouseCode === i.warehouseCode)?.quantityOnHand ?? 0;
+                                    const remaining = (line?.qtyApproved ?? line?.qtyRequested) - (line?.qtyDelivered || 0);
+                                    return {
+                                      ...i,
+                                      qtyDelivered: Math.min(i.qtyDelivered, stock, remaining)
+                                    };
+                                  });
+                                  setIssues(fixedIssues);
                                   setIsConfirmingIssue(true);
                                 }}
                                 className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-xl shadow-indigo-500/30 hover:bg-indigo-700 transition transform hover:scale-[1.02] flex items-center justify-center"
@@ -1439,7 +1493,15 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                          <table className="w-full text-left whitespace-nowrap min-w-[600px]">
                             <thead className="bg-slate-100 text-[10px] uppercase font-black text-slate-400 sticky top-0 z-10">
                                <tr>
-                                  <th className="p-4 rounded-tl-xl">Vật tư / Kho xuất</th>
+                                  <th className="p-4 rounded-tl-xl w-10">
+                                      <input 
+                                        type="checkbox" 
+                                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                        checked={issues.length > 0 && issues.every(i => i.selected)}
+                                        onChange={(e) => setIssues(issues.map(i => ({...i, selected: e.target.checked})))}
+                                      />
+                                   </th>
+                                  <th className="p-4">Vật tư / Kho xuất</th>
                                   <th className="p-4 text-center">SL Duyệt</th>
                                   <th className="p-4 text-center">Đã Giao</th>
                                   <th className="p-4 text-center bg-indigo-50/50">Cần Giao</th>
@@ -1476,6 +1538,14 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
                                     return (
                                     <tr key={l.id} className={`${isDone ? 'opacity-40 bg-slate-50' : ''} ${overStock ? 'bg-rose-50/30' : ''}`}>
+                                        <td className="p-4">
+                                          <input 
+                                            type="checkbox"
+                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                            checked={issue?.selected || false}
+                                            onChange={(e) => setIssues(issues.map(a => a.lineId === l.id ? {...a, selected: e.target.checked} : a))}
+                                          />
+                                        </td>
                                         <td className="p-4">
                                             <div className="flex flex-col">
                                               <p className="font-bold text-slate-800 text-sm whitespace-normal max-w-[250px]">{l.issue_item.name}</p>
@@ -1542,24 +1612,25 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                       <p className="text-sm text-slate-500 mb-8 font-medium">Bạn đang thực hiện cấp phát hàng từ kho <b>{selectedWarehouse}</b>. Hành động này không thể hoàn tác.</p>
                       <div className="flex flex-col gap-3">
                          <button 
-                           onClick={() => {
-                              const hasErr = data.lines.some((l:any) => {
-                                 const qtyIssue = issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? 0;
-                                 const issue = issues.find((a:any)=>a.lineId===l.id);
-                                 const wh = issue?.warehouseCode || selectedWarehouse;
-                                 const stock = l.issue_item?.stocks?.find((s:any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
-                                 return qtyIssue > stock;
-                              });
-                              if (hasErr) {
-                                 showToast('Có dòng vượt tồn kho. Vui lòng kiểm tra lại!', 'error');
-                                 setIsConfirmingIssue(false);
-                                 return;
-                              }
-                              handleAction('/issue', { warehouseCode: selectedWarehouse, lineIssues: issues }, 'CẤP PHÁT VẬT TƯ THÀNH CÔNG! ĐANG CHỜ NHÂN SỰ XÁC NHẬN.');
-                              setIsConfirmingIssue(false);
-                              setShowIssueModal(false);
-                           }}
-                           className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-500/30"
+                            onClick={() => {
+                               const selectedIssues = issues.filter(i => i.selected);
+                               const hasErr = data.lines.some((l:any) => {
+                                  const issue = issues.find((a:any)=>a.lineId===l.id);
+                                  if (!issue?.selected) return false;
+                                  const qtyIssue = issue?.qtyDelivered ?? 0;
+                                  const wh = issue?.warehouseCode || selectedWarehouse;
+                                  const stock = l.issue_item?.stocks?.find((s:any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
+                                  return qtyIssue > stock;
+                               });
+                               if (hasErr) {
+                                  showToast('Có dòng vượt tồn kho ở các mục đã chọn. Vui lòng kiểm tra lại!', 'error');
+                                  setIsConfirmingIssue(false);
+                                  return;
+                               }
+                               handleAction('/issue', { warehouseCode: selectedWarehouse, lineIssues: selectedIssues }, 'CẤP PHÁT VẬT TƯ THÀNH CÔNG! ĐANG CHỜ NHÂN SỰ XÁC NHẬN.');
+                               setIsConfirmingIssue(false);
+                               setShowIssueModal(false);
+                            }}
                          >
                            XÁC NHẬN CẤP PHÁT
                          </button>
