@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { XCircle, Printer, CheckCircle, RefreshCw, ArrowLeft, Archive, CheckSquare, Trash2, StopCircle, AlertTriangle, ShoppingCart, Minus, Plus, Check, FileSpreadsheet, ChevronLeft, ChevronRight, Shield } from 'lucide-react';
+import { XCircle, Printer, CheckCircle, RefreshCw, ArrowLeft, Archive, CheckSquare, Trash2, StopCircle, AlertTriangle, ShoppingCart, Minus, Plus, Check, FileSpreadsheet, ChevronLeft, ChevronRight, Shield, Search, Filter } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../../lib/api';
 import type { User } from '../../context/AppContext';
@@ -85,7 +85,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
   // Custom approvals
   const [approvals, setApprovals] = useState<{lineId: string, qtyApproved: number, selected: boolean, note: string}[]>([]);
   // Custom issues
-  const [issues, setIssues] = useState<{lineId: string, qtyDelivered: number}[]>([]);
+  const [issues, setIssues] = useState<{lineId: string, qtyDelivered: number, warehouseCode?: string}[]>([]);
+  const [showOnlyErrors, setShowOnlyErrors] = useState(false);
   const [selectedWarehouse, setSelectedWarehouse] = useState('MAIN');
   const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH'>('ALL');
   const [isConfirmingIssue, setIsConfirmingIssue] = useState(false);
@@ -103,7 +104,18 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
         selected: l.status !== 'REJECTED',
         note: l.approvalNote || ''
       })));
-      setIssues(res.data.lines.map((l:any) => ({ lineId: l.id, qtyDelivered: l.qtyApproved ?? l.qtyRequested })));
+      setIssues(res.data.lines.map((l:any) => {
+        const primaryWh = res.data.warehouseCode || 'MAIN';
+        const hasStockPrimary = l.issue_item?.stocks?.find((s:any) => s.warehouseCode === primaryWh)?.quantityOnHand > 0;
+        // Find first warehouse with stock if primary has 0
+        const firstWhWithStock = l.issue_item?.stocks?.find((s:any) => s.quantityOnHand > 0)?.warehouseCode;
+
+        return { 
+          lineId: l.id, 
+          qtyDelivered: l.qtyApproved ?? l.qtyRequested,
+          warehouseCode: hasStockPrimary ? primaryWh : (firstWhWithStock || primaryWh)
+        };
+      }));
       setSelectedWarehouse(res.data.warehouseCode || 'MAIN');
       // Load comparison for Admin Level 2
       if (currentUser.role === 'ADMIN' && res.data.status === 'PENDING_ADMIN') {
@@ -129,6 +141,38 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
   useEffect(() => {
     fetchDetail();
   }, [requestId]);
+
+  const autoSelectWarehouses = () => {
+    const updatedIssues = issues.map(issue => {
+      const line = data.lines.find((l: any) => l.id === issue.lineId);
+      if (!line) return issue;
+
+      const qtyNeeded = issue.qtyDelivered;
+      const stocks = line.issue_item?.stocks || [];
+
+      // Try current selection first
+      const currentWh = issue.warehouseCode || selectedWarehouse;
+      const currentStock = stocks.find((s: any) => s.warehouseCode === currentWh)?.quantityOnHand ?? 0;
+      if (currentStock >= qtyNeeded) return issue;
+
+      // Try MAIN
+      const mainStock = stocks.find((s: any) => s.warehouseCode === 'MAIN')?.quantityOnHand ?? 0;
+      if (mainStock >= qtyNeeded) return { ...issue, warehouseCode: 'MAIN' };
+
+      // Try SUPPLY
+      const supplyStock = stocks.find((s: any) => s.warehouseCode === 'SUPPLY')?.quantityOnHand ?? 0;
+      if (supplyStock >= qtyNeeded) return { ...issue, warehouseCode: 'SUPPLY' };
+
+      // Try SCRAP
+      const scrapStock = stocks.find((s: any) => s.warehouseCode === 'SCRAP')?.quantityOnHand ?? 0;
+      if (scrapStock >= qtyNeeded) return { ...issue, warehouseCode: 'SCRAP' };
+
+      return issue; // Keep original if nowhere has enough
+    });
+
+    setIssues(updatedIssues);
+    showToast('Đã tự động tối ưu kho xuất hàng', 'success');
+  };
 
   const getStatusColor = (status: string) => {
     switch(status) {
@@ -1243,7 +1287,22 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                              </ul>
                           </div>
 
-                          <div className="mt-auto pt-6 space-y-3">
+                          <div className="flex flex-col gap-2 mb-6 mt-auto">
+                              <button 
+                                onClick={autoSelectWarehouses}
+                                className="w-full py-2.5 bg-white border border-indigo-200 text-indigo-600 rounded-xl font-bold text-xs hover:bg-indigo-50 transition flex items-center justify-center gap-2"
+                              >
+                                <Search className="w-4 h-4"/> TỰ ĐỘNG CHỌN KHO
+                              </button>
+                              <button 
+                                onClick={() => setShowOnlyErrors(!showOnlyErrors)}
+                                className={`w-full py-2.5 border rounded-xl font-bold text-xs transition flex items-center justify-center gap-2 ${showOnlyErrors ? 'bg-rose-600 border-rose-600 text-white shadow-lg shadow-rose-500/30' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                              >
+                                <Filter className="w-4 h-4"/> {showOnlyErrors ? 'HIỆN TẤT CẢ' : 'LỌC DÒNG THIẾU TỒN'}
+                              </button>
+                          </div>
+
+                          <div className="space-y-3">
                              <button 
                                disabled={data.lines.some((l:any) => {
                                  const qtyIssue = issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? (l.qtyApproved ?? l.qtyRequested);
@@ -1299,20 +1358,54 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {data.lines.map((l:any) => {
-                                    const qtyIssue = issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? (l.qtyApproved ?? l.qtyRequested);
-                                    const stock = l.item.stocks?.find((s:any) => s.warehouseCode === selectedWarehouse) || { quantityOnHand: 0 };
-                                    const overStock = qtyIssue > stock.quantityOnHand;
+                                {data.lines
+                                  .filter((l: any) => {
+                                    if (!showOnlyErrors) return true;
+                                    const issue = issues.find((a: any) => a.lineId === l.id);
+                                    const qtyIssue = issue?.qtyDelivered ?? (l.qtyApproved ?? l.qtyRequested);
+                                    const wh = issue?.warehouseCode || selectedWarehouse;
+                                    const stock = l.issue_item.stocks?.find((s: any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
+                                    return qtyIssue > stock;
+                                  })
+                                  .map((l:any) => {
+                                    const issue = issues.find((a:any)=>a.lineId===l.id);
+                                    const qtyIssue = issue?.qtyDelivered ?? (l.qtyApproved ?? l.qtyRequested);
+                                    const wh = issue?.warehouseCode || selectedWarehouse;
+                                    const stock = l.issue_item.stocks?.find((s: any) => s.warehouseCode === wh) || { quantityOnHand: 0 };
+
+
+                                    const isReplaced = l.is_replaced;
+                                    const overStock = qtyIssue > (stock?.quantityOnHand ?? 0);
                                     const isDone = l.qtyDelivered >= (l.qtyApproved ?? l.qtyRequested);
 
                                     return (
-                                    <tr key={l.id} className={isDone ? 'opacity-40 bg-slate-50' : ''}>
+                                    <tr key={l.id} className={`${isDone ? 'opacity-40 bg-slate-50' : ''} ${overStock ? 'bg-rose-50/30' : ''}`}>
                                         <td className="p-4">
-                                            <p className="font-bold text-slate-800 text-sm whitespace-normal max-w-[250px]">{l.item.name}</p>
-                                            <p className="text-[10px] font-black text-slate-400 mt-1 uppercase">{l.item.mvpp}</p>
+                                            <div className="flex flex-col">
+                                              <p className="font-bold text-slate-800 text-sm whitespace-normal max-w-[250px]">{l.issue_item.name}</p>
+                                              <p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-tighter">
+                                                {l.issue_item.mvpp} • {l.issue_item.unit}
+                                              </p>
+                                              {isReplaced && (
+                                                <p className="text-[9px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full w-fit mt-2">
+                                                  Thay thế cho: {l.original_item.name} ({l.original_item.mvpp})
+                                                </p>
+                                              )}
+                                            </div>
                                         </td>
                                         <td className="px-3 py-3 text-center">
-                                            <span className={`font-black text-sm ${stock.quantityOnHand === 0 ? 'text-rose-500' : 'text-slate-600'}`}>{stock.quantityOnHand}</span>
+                                            <div className="flex flex-col items-center gap-1">
+                                              <select 
+                                                value={wh}
+                                                onChange={(e) => setIssues(issues.map(a => a.lineId === l.id ? {...a, warehouseCode: e.target.value} : a))}
+                                                className={`text-[10px] font-black p-1 rounded border ${overStock ? 'border-rose-300 bg-rose-50 text-rose-600' : 'border-slate-200 bg-white text-slate-500'}`}
+                                              >
+                                                <option value="MAIN">MAIN</option>
+                                                <option value="SUPPLY">SUPPLY</option>
+                                                <option value="SCRAP">SCRAP</option>
+                                              </select>
+                                              <span className={`font-black text-xs ${stock.quantityOnHand === 0 ? 'text-rose-500' : 'text-slate-600'}`}>Tồn: {stock.quantityOnHand}</span>
+                                            </div>
                                         </td>
                                         <td className="p-4 text-center bg-indigo-50/20">
                                             <span className="font-black text-indigo-600">{l.qtyApproved ?? l.qtyRequested}</span>
@@ -1321,11 +1414,13 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                             <input 
                                                type="number" min="0" value={qtyIssue} disabled={isDone}
                                                onChange={(e:any) => setIssues(issues.map((a:any) => a.lineId === l.id ? {...a, qtyDelivered: Math.max(0, parseInt(e.target.value)||0)} : a))}
-                                               className={`w-28 text-center mx-auto block py-2.5 bg-white border-2 outline-none rounded-xl font-black text-lg transition ${overStock ? 'text-rose-600 border-rose-400 ring-4 ring-rose-50 shadow-inner' : 'text-emerald-700 border-emerald-100 focus:border-emerald-400 focus:ring-emerald-50 shadow-sm'}`}
+                                               className={`w-24 text-center mx-auto block py-2.5 bg-white border-2 outline-none rounded-xl font-black text-lg transition ${overStock ? 'text-rose-600 border-rose-400 ring-4 ring-rose-50 shadow-inner' : 'text-emerald-700 border-emerald-100 focus:border-emerald-400 focus:ring-emerald-50 shadow-sm'}`}
                                             />
-                                            {overStock && <p className="text-[9px] font-bold text-rose-500 text-center mt-1 animate-pulse">Vượt tồn kho {selectedWarehouse}!</p>}
+                                            {overStock && <p className="text-[9px] font-bold text-rose-500 text-center mt-1 animate-pulse italic">Thiếu {qtyIssue - stock.quantityOnHand}</p>}
                                         </td>
-                                        <td className="p-4 font-bold text-[10px] text-slate-400 uppercase">{l.item.unit}</td>
+                                        <td className="p-4 font-bold text-[10px] text-slate-400 uppercase text-center">
+                                          {(l.issue_item.price * qtyIssue).toLocaleString('vi-VN')}
+                                        </td>
                                     </tr>
                                 )})}
                             </tbody>
