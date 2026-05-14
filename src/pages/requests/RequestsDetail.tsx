@@ -167,9 +167,9 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       const scrapStock = stocks.find((s: any) => s.warehouseCode === 'SCRAP')?.quantityOnHand ?? 0;
       if (scrapStock >= qtyNeeded) return { ...issue, warehouseCode: 'SCRAP' };
 
-      // Try VS
-      const vsStock = stocks.find((s: any) => s.warehouseCode === 'VS')?.quantityOnHand ?? 0;
-      if (vsStock >= qtyNeeded) return { ...issue, warehouseCode: 'VS' };
+      // Try VE_SINH
+      const veSinhStock = stocks.find((s: any) => s.warehouseCode === 'VE_SINH')?.quantityOnHand ?? 0;
+      if (veSinhStock >= qtyNeeded) return { ...issue, warehouseCode: 'VE_SINH' };
 
       return issue; // Keep original if nowhere has enough
     });
@@ -1280,7 +1280,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                             <option value="MAIN">Kho Chính (MAIN)</option>
                             <option value="SUPPLY">Kho Vật Tư (SUPPLY)</option>
                             <option value="SCRAP">Kho Phế Liệu (SCRAP)</option>
-                            <option value="VS">Kho Vệ Sinh (VS)</option>
+                            <option value="VE_SINH">Kho Vệ Sinh (VE_SINH)</option>
                           </select>
 
                           <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl mb-6">
@@ -1408,7 +1408,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                                 <option value="MAIN">MAIN</option>
                                                 <option value="SUPPLY">SUPPLY</option>
                                                 <option value="SCRAP">SCRAP</option>
-                                                <option value="VS">VS</option>
+                                                <option value="VE_SINH">VE_SINH</option>
                                               </select>
                                               <span className={`font-black text-xs ${stock.quantityOnHand === 0 ? 'text-rose-500' : 'text-slate-600'}`}>Tồn: {stock.quantityOnHand}</span>
                                             </div>
