@@ -1271,17 +1271,9 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                   <div className="flex-1 overflow-y-auto p-0 flex flex-col lg:flex-row">
                       {/* Left: Settings & Meta */}
                       <div className="w-full lg:w-72 bg-slate-50 border-r border-slate-200 p-6 shrink-0">
-                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Chọn Kho Xuất Hàng</label>
-                          <select 
-                            value={selectedWarehouse}
-                            onChange={(e) => setSelectedWarehouse(e.target.value)}
-                            className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 transition mb-6"
-                          >
-                            <option value="MAIN">Kho Chính (MAIN)</option>
-                            <option value="SUPPLY">Kho Vật Tư (SUPPLY)</option>
-                            <option value="SCRAP">Kho Phế Liệu (SCRAP)</option>
-                            <option value="VE_SINH">Kho Vệ Sinh (VE_SINH)</option>
-                          </select>
+                          <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl mb-4 text-center">
+                              <p className="text-[10px] font-black text-indigo-600 uppercase">Xuất kho theo từng dòng</p>
+                          </div>
 
                           <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl mb-6">
                              <p className="text-[10px] font-black text-amber-600 uppercase mb-2 flex items-center"><AlertTriangle className="w-3.5 h-3.5 mr-1"/> Lưu ý vận hành</p>
@@ -1311,28 +1303,36 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                              <button 
                                disabled={data.lines.some((l:any) => {
                                  const qtyIssue = issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? (l.qtyApproved ?? l.qtyRequested);
-                                 const stock = l.item.stocks?.find((s:any) => s.warehouseCode === selectedWarehouse)?.quantityOnHand ?? 0;
+                                 const issue = issues.find((a:any)=>a.lineId===l.id);
+                                 const wh = issue?.warehouseCode || selectedWarehouse;
+                                 const stock = l.issue_item?.stocks?.find((s:any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
                                  return qtyIssue > stock;
                                })}
                                onClick={() => setIsConfirmingIssue(true)}
                                className={`w-full py-4 rounded-2xl font-black shadow-xl transition transform hover:scale-[1.02] ${
                                   data.lines.some((l:any) => {
                                     const qtyIssue = issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? (l.qtyApproved ?? l.qtyRequested);
-                                    const stock = l.item.stocks?.find((s:any) => s.warehouseCode === selectedWarehouse)?.quantityOnHand ?? 0;
+                                    const issue = issues.find((a:any)=>a.lineId===l.id);
+                                 const wh = issue?.warehouseCode || selectedWarehouse;
+                                 const stock = l.issue_item?.stocks?.find((s:any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
                                     return qtyIssue > stock;
                                   }) ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' : 'bg-indigo-600 text-white shadow-indigo-500/30 hover:bg-indigo-700'
                                }`}
                              >
                                {data.lines.some((l:any) => {
                                     const qtyIssue = issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? (l.qtyApproved ?? l.qtyRequested);
-                                    const stock = l.item.stocks?.find((s:any) => s.warehouseCode === selectedWarehouse)?.quantityOnHand ?? 0;
+                                    const issue = issues.find((a:any)=>a.lineId===l.id);
+                                 const wh = issue?.warehouseCode || selectedWarehouse;
+                                 const stock = l.issue_item?.stocks?.find((s:any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
                                     return qtyIssue > stock;
                                   }) ? 'KHÔNG ĐỦ TỒN ĐỂ XUẤT' : 'XÁC NHẬN XUẤT'}
                              </button>
                              
                              {data.lines.some((l:any) => {
                                 const target = l.qtyApproved ?? l.qtyRequested;
-                                const stock = l.item.stocks?.find((s:any) => s.warehouseCode === selectedWarehouse)?.quantityOnHand ?? 0;
+                                 const issue = issues.find((a:any)=>a.lineId===l.id);
+                                 const wh = issue?.warehouseCode || selectedWarehouse;
+                                 const stock = l.issue_item?.stocks?.find((s:any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
                                 return target > stock;
                              }) && (
                                 <button 
@@ -1449,7 +1449,9 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                            onClick={() => {
                               const hasErr = data.lines.some((l:any) => {
                                  const qtyIssue = issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? 0;
-                                 const stock = l.item.stocks?.find((s:any) => s.warehouseCode === selectedWarehouse)?.quantityOnHand ?? 0;
+                                 const issue = issues.find((a:any)=>a.lineId===l.id);
+                                 const wh = issue?.warehouseCode || selectedWarehouse;
+                                 const stock = l.issue_item?.stocks?.find((s:any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
                                  return qtyIssue > stock;
                               });
                               if (hasErr) {
