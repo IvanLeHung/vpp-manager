@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { XCircle, Printer, CheckCircle, RefreshCw, ArrowLeft, Archive, CheckSquare, Trash2, StopCircle, AlertTriangle, ShoppingCart, Minus, Plus, Check, FileSpreadsheet, ChevronLeft, ChevronRight, Shield, Search, Filter } from 'lucide-react';
+import { XCircle, Printer, CheckCircle, RefreshCw, ArrowLeft, Archive, CheckSquare, Trash2, StopCircle, AlertTriangle, ShoppingCart, Minus, Plus, Check, FileSpreadsheet, ChevronLeft, ChevronRight, Shield, Search, Filter, Package, History as HistoryIcon } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../../lib/api';
 import type { User } from '../../context/AppContext';
@@ -91,6 +91,9 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
   const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH'>('ALL');
   const [isConfirmingIssue, setIsConfirmingIssue] = useState(false);
   const [autoCreateBackorder, setAutoCreateBackorder] = useState(true);
+  const [activeTab, setActiveTab] = useState<'items' | 'deliveries' | 'history'>('items');
+  const [batchToPrint, setBatchToPrint] = useState<any>(null);
+
 
   const fetchDetail = async () => {
     try {
@@ -224,6 +227,14 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       try { await api.post(`/requests/${requestId}/print`, { printType: 'FOR_RECORDS' }); } catch(e) {}
   };
 
+  const handlePrintBatch = (batch: any) => {
+      setBatchToPrint(batch);
+      setTimeout(() => {
+          window.print();
+          setBatchToPrint(null);
+      }, 300);
+  };
+
   const handleExportExcel = () => {
       if (!data) return;
 
@@ -297,6 +308,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       case 'REJECT': return 'Từ chối toàn bộ';
       case 'CANCEL': return 'Hủy phiếu';
       case 'ISSUE': case 'ISSUED': return 'Xuất kho / Giao hàng';
+      case 'PARTIAL_DELIVERY_CONFIRMED': return 'Xác nhận Giao hàng Một phần';
       case 'CONFIRM_RECEIPT': return 'Đã nhận hàng';
       case 'APPROVE': return 'Duyệt (Approve)';
       case 'TBP_REJECT': return 'Trưởng bộ phận Từ chối';
@@ -562,166 +574,284 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                    </div>
                )}
 
-              {/* Box 2: Lines Grid */}
-               <div className="no-print bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden relative">
-                   <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-                      <h3 className="text-[11px] font-black text-indigo-700 uppercase tracking-widest">Chi tiết Vật tư Xin Cấp</h3>
-                      {data.lines.some((l:any) => l.qtyRequested > (l.item.stocks?.find((s:any)=>s.warehouseCode===data.warehouseCode)?.quantityOnHand||0)) && <span className="text-[10px] font-bold text-rose-600 bg-rose-100 px-3 py-1 rounded border border-rose-200 flex items-center print:hidden"><AlertTriangle className="w-3.5 h-3.5 mr-1"/> Cảnh báo thiếu Tồn Kho (Kho yêu cầu)</span>}
-                   </div>
-                   <div className="overflow-x-auto">
-                       <table className="w-full text-left whitespace-nowrap min-w-full">
-                           <thead className="bg-white border-b border-slate-200">
-                               <tr className="text-[9px] uppercase font-black text-slate-400 tracking-wider bg-slate-50/50">
-                                   <th className="px-2 py-3 text-center w-10 border-r border-slate-100">STT</th>
-                                   <th className="px-2 py-3">Vật tư / Hàng hóa</th>
-                                   <th className="px-2 py-3 text-center">Tồn / Khả dụng</th>
-                                   <th className="px-2 py-3 text-center border-x border-slate-100">SL Xin</th>
-                                   <th className="px-2 py-3 text-center text-amber-600 bg-amber-50/30 border-r border-slate-100">TBP Duyệt</th>
-                                   <th className="px-2 py-3 text-center text-emerald-600 bg-emerald-50/30 border-r border-slate-100">Admin Duyệt</th>
-                                   <th className="px-2 py-3 text-center text-blue-600 bg-blue-50/30">Lấy thực</th>
-                                    <th className="px-2 py-3 text-right">Đơn giá</th>
-                                    <th className="px-2 py-3 text-right">Thành tiền</th>
-                                   <th className="px-2 py-3 text-center">Trạng thái</th>
-                                   <th className="px-2 py-3 text-center">Ghi chú</th>
-                               </tr>
-                           </thead>
-                           <tbody className="divide-y divide-slate-100">
-                               {data.lines.map((l:any, idx:number) => {
-                                   
-                                   const stocks = l.item.stocks || [];
-                                   const reqStock = stocks.find((s:any) => s.warehouseCode === data.warehouseCode) || { quantityOnHand: 0, quantityReserved: 0 };
-                                   const totalOnHand = stocks.reduce((sum:number, s:any) => sum + s.quantityOnHand, 0);
-                                   const available = reqStock.quantityOnHand - reqStock.quantityReserved;
-                                   const outOfStock = l.qtyRequested > available;
-                                   
-                                   const getLineStatusColor = (status: string) => {
-                                        switch(status) {
-                                            case 'COMPLETED': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-                                            case 'PARTIALLY_ISSUED': return 'bg-blue-100 text-blue-700 border-blue-200';
-                                            case 'READY_TO_ISSUE': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
-                                            case 'TBP_APPROVED': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
-                                            case 'TBP_PARTIAL': return 'bg-amber-50 text-amber-600 border-amber-100';
-                                            case 'TBP_REJECTED': return 'bg-rose-50 text-rose-600 border-rose-100';
-                                            case 'ADMIN_APPROVED': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-                                            case 'ADMIN_PARTIAL': return 'bg-teal-50 text-teal-700 border-teal-100';
-                                            case 'ADMIN_REJECTED': return 'bg-rose-100 text-rose-700 border-rose-200';
-                                            case 'NEED_REVISION': return 'bg-orange-100 text-orange-700 border-orange-200';
-                                            default: return 'bg-slate-100 text-slate-500 border-slate-200';
-                                        }
-                                   };
+               {/* Box 2: Tabbed Content */}
+                <div className="no-print bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden relative">
+                    <div className="p-1 border-b border-slate-200 bg-slate-50 flex items-center gap-1">
+                        {[
+                            { id: 'items', label: 'Vật tư yêu cầu', icon: Archive },
+                            { id: 'deliveries', label: 'Lịch sử giao hàng', icon: Package },
+                            { id: 'history', label: 'Lịch sử xử lý', icon: HistoryIcon }
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id as any)}
+                                className={`flex items-center gap-2 px-6 py-3 text-[11px] font-black uppercase tracking-widest transition-all ${
+                                    activeTab === tab.id 
+                                    ? 'bg-white text-indigo-600 border-b-2 border-indigo-600 shadow-sm' 
+                                    : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100/50'
+                                }`}
+                            >
+                                <tab.icon className="w-4 h-4" />
+                                {tab.label}
+                                {tab.id === 'deliveries' && data.deliveryBatches?.length > 0 && (
+                                    <span className="ml-1 bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full text-[9px]">{data.deliveryBatches.length}</span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                    
+                    {activeTab === 'items' && (
+                        <>
+                            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white">
+                                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Chi tiết Vật tư Xin Cấp</h3>
+                                {data.lines.some((l:any) => (l.qtyApproved ?? l.qtyRequested) > (l.item.stocks?.find((s:any)=>s.warehouseCode===data.warehouseCode)?.quantityOnHand||0)) && <span className="text-[10px] font-bold text-rose-600 bg-rose-100 px-3 py-1 rounded border border-rose-200 flex items-center print:hidden"><AlertTriangle className="w-3.5 h-3.5 mr-1"/> Cảnh báo thiếu Tồn Kho (Kho yêu cầu)</span>}
+                            </div>
+                           <div className="overflow-x-auto">
+                               <table className="w-full text-left whitespace-nowrap min-w-full">
+                                   <thead className="bg-white border-b border-slate-200">
+                                       <tr className="text-[9px] uppercase font-black text-slate-400 tracking-wider bg-slate-50/50">
+                                           <th className="px-2 py-3 text-center w-10 border-r border-slate-100">STT</th>
+                                           <th className="px-2 py-3">Vật tư / Hàng hóa</th>
+                                           <th className="px-2 py-3 text-center">Tồn / Khả dụng</th>
+                                           <th className="px-2 py-3 text-center border-x border-slate-100">SL Xin</th>
+                                           <th className="px-2 py-3 text-center text-amber-600 bg-amber-50/30 border-r border-slate-100">TBP Duyệt</th>
+                                           <th className="px-2 py-3 text-center text-emerald-600 bg-emerald-50/30 border-r border-slate-100">Admin Duyệt</th>
+                                           <th className="px-2 py-3 text-center text-blue-600 bg-blue-50/30">Lấy thực</th>
+                                            <th className="px-2 py-3 text-right">Đơn giá</th>
+                                            <th className="px-2 py-3 text-right">Thành tiền</th>
+                                           <th className="px-2 py-3 text-center">Trạng thái</th>
+                                           <th className="px-2 py-3 text-center">Ghi chú</th>
+                                       </tr>
+                                   </thead>
+                                   <tbody className="divide-y divide-slate-100">
+                                       {data.lines.map((l:any, idx:number) => {
+                                           const stocks = l.item.stocks || [];
+                                           const reqStock = stocks.find((s:any) => s.warehouseCode === data.warehouseCode) || { quantityOnHand: 0, quantityReserved: 0 };
+                                           const totalOnHand = stocks.reduce((sum:number, s:any) => sum + s.quantityOnHand, 0);
+                                           const available = reqStock.quantityOnHand - reqStock.quantityReserved;
+                                           const outOfStock = (l.qtyApproved ?? l.qtyRequested) > available;
+                                           
+                                           const getLineStatusColor = (status: string) => {
+                                                switch(status) {
+                                                    case 'COMPLETED': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+                                                    case 'PARTIALLY_ISSUED': return 'bg-blue-100 text-blue-700 border-blue-200';
+                                                    case 'READY_TO_ISSUE': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
+                                                    case 'TBP_APPROVED': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+                                                    case 'TBP_PARTIAL': return 'bg-amber-50 text-amber-600 border-amber-100';
+                                                    case 'TBP_REJECTED': return 'bg-rose-50 text-rose-600 border-rose-100';
+                                                    case 'ADMIN_APPROVED': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                                                    case 'ADMIN_PARTIAL': return 'bg-teal-50 text-teal-700 border-teal-100';
+                                                    case 'ADMIN_REJECTED': return 'bg-rose-100 text-rose-700 border-rose-200';
+                                                    case 'NEED_REVISION': return 'bg-orange-100 text-orange-700 border-orange-200';
+                                                    default: return 'bg-slate-100 text-slate-500 border-slate-200';
+                                                }
+                                           };
 
-                                   return (
-                                   <tr key={l.id} className={`hover:bg-slate-50 transition border-l-4 ${outOfStock && data.status.startsWith('PENDING') ? 'border-l-rose-500 bg-rose-50/30' : 'border-l-transparent'}`}>
-                                       <td className="px-2 py-2 text-center font-bold text-slate-400 border-r border-slate-100">{idx+1}</td>
-                                       <td className="px-2 py-2 min-w-[150px]">
-                                            <p className="font-bold text-slate-800 text-sm whitespace-normal">{l.replacementItem?.name || l.item.name}</p>
-                                            <div className="flex items-center gap-2 mt-1">
-                                               <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-black tracking-widest">{l.replacementItem?.mvpp || l.item.mvpp}</span>
-                                               {l.replacementItemId && <span className="text-[9px] font-black bg-indigo-100 text-indigo-600 px-1 py-0.5 rounded uppercase">Đã thay thế</span>}
-                                               <span className="text-[10px] font-bold text-indigo-500 flex items-center gap-1"><Archive className="w-3 h-3"/> Kho: {data.warehouseCode}</span>
+                                           return (
+                                           <tr key={l.id} className={`hover:bg-slate-50 transition border-l-4 ${outOfStock && data.status.startsWith('PENDING') ? 'border-l-rose-500 bg-rose-50/30' : 'border-l-transparent'}`}>
+                                               <td className="px-2 py-2 text-center font-bold text-slate-400 border-r border-slate-100">{idx+1}</td>
+                                               <td className="px-2 py-2 min-w-[150px]">
+                                                    <p className="font-bold text-slate-800 text-sm whitespace-normal">{l.replacementItem?.name || l.item.name}</p>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                       <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-black tracking-widest">{l.replacementItem?.mvpp || l.item.mvpp}</span>
+                                                       {l.replacementItemId && <span className="text-[9px] font-black bg-indigo-100 text-indigo-600 px-1 py-0.5 rounded uppercase">Đã thay thế</span>}
+                                                       <span className="text-[10px] font-bold text-indigo-500 flex items-center gap-1"><Archive className="w-3 h-3"/> Kho: {data.warehouseCode}</span>
+                                                    </div>
+                                                </td>
+                                               <td className="px-2 py-2">
+                                                   <div className="flex flex-col items-center gap-1">
+                                                      <div className="flex gap-1">
+                                                         <div className="text-center px-1 py-0.5 bg-slate-50 border border-slate-200 rounded">
+                                                            <p className="text-[7px] font-black text-slate-400 uppercase">Tồn</p>
+                                                            <p className="text-[10px] font-black text-slate-700">{reqStock.quantityOnHand}</p>
+                                                         </div>
+                                                         <div className="text-center px-1 py-0.5 bg-emerald-50 border border-emerald-100 rounded">
+                                                            <p className="text-[7px] font-black text-emerald-400 uppercase">Khả dụng</p>
+                                                            <p className="text-[10px] font-black text-emerald-700">{available}</p>
+                                                         </div>
+                                                         <div className="text-center px-1 py-0.5 bg-amber-50 border border-amber-100 rounded">
+                                                            <p className="text-[7px] font-black text-amber-400 uppercase">Đã giữ</p>
+                                                            <p className="text-[10px] font-black text-amber-700">{reqStock.quantityReserved}</p>
+                                                         </div>
+                                                      </div>
+                                                      {totalOnHand > reqStock.quantityOnHand && (
+                                                         <p className="text-[9px] font-bold text-slate-400 italic">Tổng tồn: {totalOnHand}</p>
+                                                      )}
+                                                   </div>
+                                               </td>
+                                               <td className="px-2 py-2 text-center border-x border-slate-100">
+                                                   <span className="font-black text-base text-slate-700">{l.qtyRequested}</span> <span className="text-[9px] font-bold text-slate-400 uppercase">{l.item.unit}</span>
+                                               </td>
+                                                <td className="px-2 py-2 text-center bg-amber-50/30 border-r border-slate-100">
+                                                    {l.qtyManagerApproved !== null ? (
+                                                        <div className="flex flex-col items-center">
+                                                            <span className="font-black text-base text-amber-600">{l.qtyManagerApproved}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-[9px] font-bold text-slate-400 uppercase">Chờ TBP</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-2 py-2 text-center bg-emerald-50/30 border-r border-slate-100">
+                                                    {l.qtyAdminApproved !== null || l.qtyApproved !== null || l.replacementQty !== null ? (
+                                                        <div className="flex flex-col items-center">
+                                                            <span className="font-black text-base text-emerald-600">{l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-[9px] font-bold text-slate-400 uppercase">Chờ Admin</span>
+                                                    )}
+                                                </td>
+                                               <td className="px-2 py-2 text-center bg-blue-50/30">
+                                                   <span className="font-black text-base text-blue-600">{l.qtyDelivered ?? 0}</span>
+                                                   {l.qtyDelivered > 0 && l.qtyDelivered < (l.qtyApproved ?? l.qtyRequested) && (
+                                                       <p className="text-[9px] font-bold text-rose-500 bg-rose-50 rounded px-1 mt-1">Còn nợ: {(l.qtyApproved ?? l.qtyRequested) - l.qtyDelivered}</p>
+                                                   )}
+                                               </td>
+
+                                               <td className="px-2 py-2 text-right">
+                                                   <span className="text-xs font-bold text-slate-500">{(l.item.price || 0).toLocaleString('vi-VN')}</span>
+                                               </td>
+
+                                               <td className="px-2 py-2 text-right">
+                                                   <span className="text-xs font-black text-slate-800">{((l.item.price || 0) * (l.qtyApproved ?? l.qtyRequested)).toLocaleString('vi-VN')}</span>
+                                               </td>
+                                               <td className="px-2 py-2 text-center">
+                                                   <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest border ${getLineStatusColor(l.status)}`}>
+                                                       {l.status.replace(/_/g, ' ')}
+                                                   </span>
+                                               </td>
+                                               <td className="px-2 py-2">
+                                                   <div className="max-w-[180px] whitespace-normal">
+                                                      <p className="text-[11px] font-medium text-slate-600 italic leading-tight">
+                                                         {l.note || '—'}
+                                                      </p>
+                                                   </div>
+                                                </td>
+                                           </tr>
+                                       )})}
+                                   </tbody>
+                               </table>
+                           </div>
+                        </>
+                    )}
+
+                    {activeTab === 'deliveries' && (
+                        <div className="p-6">
+                            {(!data.deliveryBatches || data.deliveryBatches.length === 0) ? (
+                                <div className="text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+                                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                                        <Package className="w-8 h-8 text-slate-300" />
+                                    </div>
+                                    <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Chưa có dữ liệu giao hàng</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-6">
+                                    {data.deliveryBatches.map((batch: any) => (
+                                        <div key={batch.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition">
+                                            <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="bg-indigo-600 text-white px-3 py-1 rounded-lg text-xs font-black uppercase">Lần {batch.batchNo}</div>
+                                                    <div>
+                                                        <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">{batch.deliveryCode}</h4>
+                                                        <p className="text-[10px] text-slate-400 font-bold uppercase">{new Date(batch.createdAt).toLocaleString('vi-VN')} • Giao bởi: {batch.createdBy?.fullName}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => handlePrintBatch(batch)} className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase hover:bg-slate-50 transition flex items-center gap-1.5">
+                                                        <Printer className="w-3.5 h-3.5" /> In Phiếu
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </td>
-                                       <td className="px-2 py-2">
-                                           <div className="flex flex-col items-center gap-1">
-                                              <div className="flex gap-1">
-                                                 <div className="text-center px-1 py-0.5 bg-slate-50 border border-slate-200 rounded">
-                                                    <p className="text-[7px] font-black text-slate-400 uppercase">Tồn</p>
-                                                    <p className="text-[10px] font-black text-slate-700">{reqStock.quantityOnHand}</p>
-                                                 </div>
-                                                 <div className="text-center px-1 py-0.5 bg-emerald-50 border border-emerald-100 rounded">
-                                                    <p className="text-[7px] font-black text-emerald-400 uppercase">Khả dụng</p>
-                                                    <p className="text-[10px] font-black text-emerald-700">{available}</p>
-                                                 </div>
-                                                 <div className="text-center px-1 py-0.5 bg-amber-50 border border-amber-100 rounded">
-                                                    <p className="text-[7px] font-black text-amber-400 uppercase">Đã giữ</p>
-                                                    <p className="text-[10px] font-black text-amber-700">{reqStock.quantityReserved}</p>
-                                                 </div>
-                                              </div>
-                                              {totalOnHand > reqStock.quantityOnHand && (
-                                                 <p className="text-[9px] font-bold text-slate-400 italic">Tổng tồn: {totalOnHand}</p>
-                                              )}
-                                           </div>
-                                       </td>
-                                       <td className="px-2 py-2 text-center border-x border-slate-100">
-                                           <span className="font-black text-base text-slate-700">{l.qtyRequested}</span> <span className="text-[9px] font-bold text-slate-400 uppercase">{l.item.unit}</span>
-                                       </td>
-                                        <td className="px-2 py-2 text-center bg-amber-50/30 border-r border-slate-100">
-                                            {l.qtyManagerApproved !== null ? (
-                                                <div className="flex flex-col items-center">
-                                                    <span className="font-black text-base text-amber-600">{l.qtyManagerApproved}</span>
-                                                    {l.qtyManagerApproved !== l.qtyRequested && (
-                                                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${l.qtyManagerApproved < l.qtyRequested ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-700'}`}>
-                                                        {l.qtyManagerApproved < l.qtyRequested ? `-${l.qtyRequested - l.qtyManagerApproved}` : `+${l.qtyManagerApproved - l.qtyRequested}`}
-                                                      </span>
-                                                    )}
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left whitespace-nowrap">
+                                                    <thead className="bg-white border-b border-slate-100">
+                                                        <tr className="text-[9px] uppercase font-black text-slate-400 tracking-wider">
+                                                            <th className="px-4 py-2">Vật tư</th>
+                                                            <th className="px-4 py-2 text-center">Duyệt</th>
+                                                            <th className="px-4 py-2 text-center">Đã giao trước</th>
+                                                            <th className="px-4 py-2 text-center text-indigo-600 bg-indigo-50/30">Giao lần này</th>
+                                                            <th className="px-4 py-2 text-center">Còn lại sau đó</th>
+                                                            <th className="px-4 py-2">Ghi chú</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-50">
+                                                        {batch.items.map((bi: any) => {
+                                                            const line = data.lines.find((l: any) => l.id === bi.requestLineId);
+                                                            return (
+                                                                <tr key={bi.id} className="text-xs">
+                                                                    <td className="px-4 py-2 font-bold text-slate-700">{line?.issue_item?.name || 'Vật tư đã xóa'}</td>
+                                                                    <td className="px-4 py-2 text-center font-bold">{bi.approvedQty}</td>
+                                                                    <td className="px-4 py-2 text-center text-slate-400">{bi.deliveredBeforeQty}</td>
+                                                                    <td className="px-4 py-2 text-center font-black text-indigo-600 bg-indigo-50/10">{bi.issueQty}</td>
+                                                                    <td className="px-4 py-2 text-center font-bold text-slate-600">{bi.remainingAfterQty}</td>
+                                                                    <td className="px-4 py-2 text-[10px] text-slate-400 italic">{bi.note || '—'}</td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'history' && (
+                        <div className="p-8">
+                            <div className="relative pl-8 border-l-2 border-slate-100 space-y-8">
+                                <div className="relative">
+                                    <div className="absolute -left-[41px] top-1 w-5 h-5 rounded-full bg-slate-300 ring-4 ring-white shadow-sm flex items-center justify-center">
+                                        <Plus className="w-3 h-3 text-white" />
+                                    </div>
+                                    <p className="text-sm font-black text-slate-800 uppercase tracking-tighter">Tạo đề xuất</p>
+                                    <p className="text-[11px] font-bold text-slate-400 mt-1 tracking-tight">
+                                        {new Date(data.createdAt).toLocaleString('vi-VN')} • <span className="text-slate-600 font-black italic">{data.requester?.fullName}</span>
+                                    </p>
+                                </div>
+
+                                {data.approvalHistories?.map((audit: any) => {
+                                    const getActionColor = (action: string) => {
+                                        if (action.includes('REJECT') || action === 'CANCEL') return 'bg-rose-500';
+                                        if (action.includes('APPROVE')) return 'bg-emerald-500';
+                                        if (action.includes('RETURN')) return 'bg-orange-500';
+                                        if (action === 'ISSUE' || action === 'PARTIAL_DELIVERY_CONFIRMED') return 'bg-blue-500';
+                                        if (action === 'SUBMIT') return 'bg-indigo-500';
+                                        return 'bg-slate-400';
+                                    };
+                                    return (
+                                        <div key={audit.id} className="relative group">
+                                            <div className={`absolute -left-[41px] top-1 w-5 h-5 rounded-full ring-4 ring-white shadow-sm transition-transform group-hover:scale-125 flex items-center justify-center ${getActionColor(audit.action)}`}>
+                                                <HistoryIcon className="w-3 h-3 text-white" />
+                                            </div>
+                                            <p className="text-sm font-black text-slate-800 uppercase tracking-tighter">{getActionLabel(audit.action)}</p>
+                                            <p className="text-[11px] font-bold text-slate-400 mt-1 tracking-tight">
+                                                {new Date(audit.createdAt).toLocaleString('vi-VN')} • <span className="text-slate-600 font-black italic">{audit.approver?.fullName}</span>
+                                            </p>
+                                            {audit.reason && (
+                                                <div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-100 relative max-w-2xl">
+                                                    <p className="text-xs font-bold text-slate-500 italic leading-relaxed break-words">
+                                                        "{audit.reason}"
+                                                    </p>
                                                 </div>
-                                            ) : (
-                                                <span className="text-[9px] font-bold text-slate-400 uppercase">Chờ TBP</span>
                                             )}
-                                        </td>
-                                        <td className="px-2 py-2 text-center bg-emerald-50/30 border-r border-slate-100">
-                                            {l.qtyAdminApproved !== null || l.qtyApproved !== null || l.replacementQty !== null ? (
-                                                <div className="flex flex-col items-center">
-                                                    <span className="font-black text-base text-emerald-600">{l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved}</span>
-                                                    { (l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved) !== (l.qtyManagerApproved ?? l.qtyRequested) && (
-                                                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${ (l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved) < (l.qtyManagerApproved ?? l.qtyRequested) ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-700'}`}>
-                                                        {(l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved) < (l.qtyManagerApproved ?? l.qtyRequested) ? `-${(l.qtyManagerApproved ?? l.qtyRequested) - (l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved)}` : `+${(l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved) - (l.qtyManagerApproved ?? l.qtyRequested)}`}
-                                                      </span>
-                                                    )}
-                                                    {l.replacementQty !== null && (l.qtyAdminApproved ?? l.qtyApproved) !== l.replacementQty && (
-                                                      <span className="text-[9px] font-bold text-slate-400 line-through">({l.qtyAdminApproved ?? l.qtyApproved})</span>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <span className="text-[9px] font-bold text-slate-400 uppercase">Chờ Admin</span>
-                                            )}
-                                        </td>
-                                       <td className="px-2 py-2 text-center bg-blue-50/30">
-                                           <span className="font-black text-base text-blue-600">{l.qtyDelivered ?? 0}</span>
-                                           {l.qtyDelivered > 0 && l.qtyDelivered < (l.qtyApproved ?? l.qtyRequested) && (
-                                               <p className="text-[9px] font-bold text-rose-500 bg-rose-50 rounded px-1 mt-1">Còn nợ: {(l.qtyApproved ?? l.qtyRequested) - l.qtyDelivered}</p>
-                                           )}
-                                       </td>
+                                        </div>
+                                    );
+                                })}
 
-                                       <td className="px-2 py-2 text-right">
-
-                                           <span className="text-xs font-bold text-slate-500">{(l.item.price || 0).toLocaleString('vi-VN')}</span>
-
-                                       </td>
-
-                                       <td className="px-2 py-2 text-right">
-
-                                           <span className="text-xs font-black text-slate-800">{((l.item.price || 0) * (l.qtyApproved ?? l.qtyRequested)).toLocaleString('vi-VN')}</span>
-
-                                       </td>
-                                       <td className="px-2 py-2 text-center">
-                                           <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest border ${getLineStatusColor(l.status)}`}>
-                                               {l.status.replace(/_/g, ' ')}
-                                           </span>
-                                           {l.approvalNote && (
-                                              <div className="mt-1 flex items-start gap-1 justify-center">
-                                                 <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0 mt-0.5"/>
-                                                 <p className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded italic whitespace-normal max-w-[120px] leading-tight">
-                                                    {l.approvalNote}
-                                                 </p>
-                                              </div>
-                                           )}
-                                           {l.issueNote && <p className="text-[10px] italic text-slate-400 mt-1 truncate max-w-[100px]" title={l.issueNote}>{l.issueNote}</p>}
-                                       </td>
-                                       <td className="px-2 py-2">
-                                           <div className="max-w-[180px] whitespace-normal">
-                                              <p className="text-[11px] font-medium text-slate-600 italic leading-tight">
-                                                 {l.note || '—'}
-                                              </p>
-                                           </div>
-                                        </td>
-                                   </tr>
-                               )})}
-                           </tbody>
-                       </table>
-                   </div>
-               </div>
-          </div>
+                                {data.status === 'COMPLETED' && (
+                                    <div className="relative">
+                                        <div className="absolute -left-[41px] top-1 w-5 h-5 rounded-full bg-emerald-500 ring-4 ring-emerald-50 shadow-sm animate-pulse flex items-center justify-center">
+                                            <CheckCircle className="w-3 h-3 text-white" />
+                                        </div>
+                                        <p className="text-sm font-black text-emerald-600 uppercase tracking-widest italic">Phiếu Đã Đóng (Hoàn tất toàn bộ)</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
 
           {/* RIGHT COLUMN: Actions & History */}
           <div className="no-print w-full xl:w-96 flex flex-col gap-6 shrink-0">
@@ -760,7 +890,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                       )}
 
                       {/* --- THAO TÁC CỦA KHO --- */}
-                      {(isWarehouse || currentUser.role === 'ADMIN') && ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED', 'PARTIAL_ADMIN_APPROVED', 'BACKORDER'].includes(data.status) && (
+                      {(isWarehouse || currentUser.role === 'ADMIN' || currentUser.role === 'WAREHOUSE') && ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED', 'PARTIAL_ADMIN_APPROVED', 'BACKORDER', 'PARTIALLY_DELIVERED', 'PENDING_REMAINING_DELIVERY'].includes(data.status) && (
                            <button onClick={() => setShowIssueModal(true)} className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/40 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-emerald-500"><Archive className="w-6 h-6 mr-2"/> CẤP PHÁT CHO NHÂN SỰ</button>
                       )}
 
@@ -856,79 +986,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                           </div>
                       )}
 
-              {/* Box 4: Approval Timeline (Audit Trail) */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden max-h-[600px] shrink-0">
-                  <div className="p-6 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center sticky top-0 z-10">
-                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Lịch sử Xử lý (Audit Trail)</h3>
-                      {data.approvalHistories?.length > 5 && (
-                          <button 
-                            onClick={() => setShowFullHistory(true)}
-                            className="text-[10px] font-black text-indigo-600 hover:text-indigo-700 uppercase tracking-widest flex items-center gap-1 transition-colors"
-                          >
-                             Xem tất cả ({data.approvalHistories.length + 1})
-                          </button>
-                      )}
-                  </div>
-                  
-                  <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
-                      <div className="relative pl-3 border-l-2 border-slate-100 space-y-6">
-                          {/* Entry 1: Creation */}
-                          <div className="relative">
-                              <div className="absolute -left-[18px] top-1 w-3 h-3 rounded-full bg-slate-300 ring-4 ring-white shadow-sm"></div>
-                              <p className="text-xs font-black text-slate-800 uppercase tracking-tighter">Tạo đề xuất</p>
-                              <p className="text-[10px] font-bold text-slate-400 mt-0.5 tracking-tight">
-                                  {new Date(data.createdAt).toLocaleString('vi-VN')} • <span className="text-slate-600 font-black italic">{data.requester?.fullName}</span>
-                              </p>
-                          </div>
 
-                          {/* Dynamic Histories (Limited in sidebar) */}
-                          {data.approvalHistories?.slice(0, 8).map((audit:any) => {
-                              const getActionColor = (action: string) => {
-                                if (action.includes('REJECT') || action === 'CANCEL') return 'bg-rose-500';
-                                if (action.includes('APPROVE')) return 'bg-emerald-500';
-                                if (action.includes('RETURN')) return 'bg-orange-500';
-                                if (action === 'ISSUE') return 'bg-blue-500';
-                                if (action === 'SUBMIT') return 'bg-indigo-500';
-                                return 'bg-slate-400';
-                              };
-                              
-                              return (
-                                <div key={audit.id} className="relative group">
-                                    <div className={`absolute -left-[18px] top-1 w-3 h-3 rounded-full ring-4 ring-white shadow-sm transition-transform group-hover:scale-125 ${getActionColor(audit.action)}`}></div>
-                                    <p className="text-xs font-black text-slate-800 uppercase tracking-tighter">{getActionLabel(audit.action)}</p>
-                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5 tracking-tight">
-                                        {new Date(audit.createdAt).toLocaleString('vi-VN')} • <span className="text-slate-600 font-black italic">{audit.approver?.fullName}</span>
-                                    </p>
-                                    {audit.reason && (
-                                        <div className="mt-2 p-2 bg-slate-50 rounded-lg border border-slate-100 relative">
-                                            <p className="text-[10px] font-bold text-slate-500 italic line-clamp-2 leading-relaxed break-words" title={audit.reason}>
-                                                "{audit.reason}"
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                              );
-                           })}
-
-                          {/* Final State */}
-                          {data.status === 'COMPLETED' && (
-                              <div className="relative">
-                                  <div className="absolute -left-[18px] top-1 w-3 h-3 rounded-full bg-emerald-500 ring-4 ring-emerald-50 shadow-sm animate-pulse"></div>
-                                  <p className="text-xs font-black text-emerald-600 uppercase tracking-widest italic">Phiếu Đã Đóng</p>
-                              </div>
-                          )}
-                      </div>
-
-                      {data.approvalHistories?.length > 8 && (
-                          <button 
-                             onClick={() => setShowFullHistory(true)}
-                             className="w-full mt-6 py-2 border-2 border-dashed border-slate-100 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:bg-slate-50 hover:border-slate-200 transition-all"
-                          >
-                             + {data.approvalHistories.length - 8} bước xử lý khác
-                          </button>
-                      )}
-                  </div>
-              </div>
 
               {/* Box 5: Approval Steps (Config) */}
               {data.approvalSteps && data.approvalSteps.length > 0 && (
@@ -1284,7 +1342,27 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                              </ul>
                           </div>
 
-                          <div className="flex flex-col gap-2 mb-6 mt-auto">
+                          <div className="mb-6 p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
+                              <p className="text-[10px] font-black text-slate-400 uppercase mb-3 flex items-center">
+                                <Archive className="w-3 h-3 mr-1 text-indigo-500"/> Kho xuất chính (Áp dụng nhanh)
+                              </p>
+                              <div className="grid grid-cols-2 gap-2">
+                                {['MAIN', 'SUPPLY', 'SCRAP', 'VE_SINH'].map(wh => (
+                                  <button
+                                    key={wh}
+                                    onClick={() => {
+                                      setSelectedWarehouse(wh);
+                                      setIssues(issues.map(i => ({...i, warehouseCode: wh})));
+                                    }}
+                                    className={`py-2 rounded-xl text-[10px] font-black transition border ${selectedWarehouse === wh ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200' : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100'}`}
+                                  >
+                                    {wh}
+                                  </button>
+                                ))}
+                              </div>
+                          </div>
+
+                          <div className="flex flex-col gap-2 mb-6">
                               <button 
                                 onClick={autoSelectWarehouses}
                                 className="w-full py-2.5 bg-white border border-indigo-200 text-indigo-600 rounded-xl font-bold text-xs hover:bg-indigo-50 transition flex items-center justify-center gap-2"
@@ -1292,61 +1370,67 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                 <Search className="w-4 h-4"/> TỰ ĐỘNG CHỌN KHO
                               </button>
                               <button 
+                                onClick={() => {
+                                  const newIssues = data.lines.map((l: any) => {
+                                    const issue = issues.find((a: any) => a.lineId === l.id);
+                                    const wh = issue?.warehouseCode || selectedWarehouse;
+                                    const stock = l.issue_item?.stocks?.find((s: any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
+                                    const remaining = (l.qtyApproved ?? l.qtyRequested) - (l.qtyDelivered || 0);
+                                    return {
+                                      ...issue,
+                                      lineId: l.id,
+                                      qtyDelivered: Math.min(remaining, stock),
+                                      warehouseCode: wh
+                                    };
+                                  });
+                                  setIssues(newIssues);
+                                }}
+                                className="w-full py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-600 rounded-xl font-bold text-xs hover:bg-emerald-100 transition flex items-center justify-center gap-2"
+                              >
+                                <CheckCircle className="w-4 h-4"/> TỰ ĐIỀN THEO TỒN
+                              </button>
+                              <button 
                                 onClick={() => setShowOnlyErrors(!showOnlyErrors)}
                                 className={`w-full py-2.5 border rounded-xl font-bold text-xs transition flex items-center justify-center gap-2 ${showOnlyErrors ? 'bg-rose-600 border-rose-600 text-white shadow-lg shadow-rose-500/30' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                               >
-                                <Filter className="w-4 h-4"/> {showOnlyErrors ? 'HIỆN TẤT CẢ' : 'LỌC DÒNG THIẾU TỒN'}
+                                <Filter className="w-4 h-4"/> {showOnlyErrors ? 'LỌC DÒNG THIẾU TỒN' : 'HIỆN TẤT CẢ'}
                               </button>
                           </div>
 
                           <div className="space-y-3">
-                             <button 
-                               disabled={data.lines.some((l:any) => {
-                                 const qtyIssue = issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? (l.qtyApproved ?? l.qtyRequested);
-                                 const issue = issues.find((a:any)=>a.lineId===l.id);
-                                 const wh = issue?.warehouseCode || selectedWarehouse;
-                                 const stock = l.issue_item?.stocks?.find((s:any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
-                                 return qtyIssue > stock;
-                               })}
-                               onClick={() => setIsConfirmingIssue(true)}
-                               className={`w-full py-4 rounded-2xl font-black shadow-xl transition transform hover:scale-[1.02] ${
-                                  data.lines.some((l:any) => {
-                                    const qtyIssue = issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? (l.qtyApproved ?? l.qtyRequested);
-                                    const issue = issues.find((a:any)=>a.lineId===l.id);
-                                 const wh = issue?.warehouseCode || selectedWarehouse;
-                                 const stock = l.issue_item?.stocks?.find((s:any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
-                                    return qtyIssue > stock;
-                                  }) ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' : 'bg-indigo-600 text-white shadow-indigo-500/30 hover:bg-indigo-700'
-                               }`}
-                             >
-                               {data.lines.some((l:any) => {
-                                    const qtyIssue = issues.find((a:any)=>a.lineId===l.id)?.qtyDelivered ?? (l.qtyApproved ?? l.qtyRequested);
-                                    const issue = issues.find((a:any)=>a.lineId===l.id);
-                                 const wh = issue?.warehouseCode || selectedWarehouse;
-                                 const stock = l.issue_item?.stocks?.find((s:any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
-                                    return qtyIssue > stock;
-                                  }) ? 'KHÔNG ĐỦ TỒN ĐỂ XUẤT' : 'XÁC NHẬN XUẤT'}
-                             </button>
+                              <button 
+                                onClick={() => {
+                                  const hasAnyToIssue = issues.some(i => (i.qtyDelivered || 0) > 0);
+                                  if (!hasAnyToIssue) {
+                                    showToast('Chưa có vật tư nào được nhập số lượng để giao!', 'warning');
+                                    return;
+                                  }
+                                  setIsConfirmingIssue(true);
+                                }}
+                                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-xl shadow-indigo-500/30 hover:bg-indigo-700 transition transform hover:scale-[1.02] flex items-center justify-center"
+                              >
+                                <Package className="w-5 h-5 mr-2"/> GIAO PHẦN CÓ SẴN
+                              </button>
+
                              
-                             {data.lines.some((l:any) => {
-                                const target = l.qtyApproved ?? l.qtyRequested;
-                                 const issue = issues.find((a:any)=>a.lineId===l.id);
-                                 const wh = issue?.warehouseCode || selectedWarehouse;
-                                 const stock = l.issue_item?.stocks?.find((s:any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
-                                return target > stock;
-                             }) && (
-                                <button 
-                                  onClick={() => {
-                                    if(window.confirm('Hệ thống sẽ tạo Đơn mua sắm (PO) cho các mặt hàng thiếu và chuyển trạng thái phiếu sang BACKORDER. Tiếp tục?')) {
-                                      handleAction('/create_po', {}, 'Đã tạo yêu cầu Backorder thành công!');
-                                      setShowIssueModal(false);
-                                    }
-                                  }}
-                                  className="w-full py-3 bg-amber-500 text-white rounded-2xl font-black shadow-lg shadow-amber-500/30 hover:bg-amber-600 transition flex items-center justify-center"
-                                >
-                                  <ShoppingCart className="w-4 h-4 mr-2"/> TẠO BACKORDER
-                                </button>
-                             )}
+                              {data.lines.some((l: any) => {
+                                 const target = l.qtyApproved ?? l.qtyRequested;
+                                 const delivered = l.qtyDelivered || 0;
+                                 return target > delivered;
+                              }) && (
+                                 <button 
+                                   onClick={() => {
+                                     if(window.confirm('Hệ thống sẽ tạo Đơn mua sắm (PO) cho phần còn thiếu và chuyển trạng thái phiếu sang BACKORDER. Tiếp tục?')) {
+                                       handleAction('/create_po', {}, 'Đã tạo yêu cầu Backorder thành công!');
+                                       setShowIssueModal(false);
+                                     }
+                                   }}
+                                   className="w-full py-3 bg-amber-500 text-white rounded-2xl font-black shadow-lg shadow-amber-500/30 hover:bg-amber-600 transition flex items-center justify-center"
+                                 >
+                                   <ShoppingCart className="w-4 h-4 mr-2"/> TẠO BACKORDER PHẦN THIẾU
+                                 </button>
+                              )}
+
                           </div>
                       </div>
 
@@ -1355,11 +1439,13 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                          <table className="w-full text-left whitespace-nowrap min-w-[600px]">
                             <thead className="bg-slate-100 text-[10px] uppercase font-black text-slate-400 sticky top-0 z-10">
                                <tr>
-                                  <th className="p-4 rounded-tl-xl">Vật tư</th>
-                                  <th className="p-4 text-center">Tồn Kho</th>
-                                  <th className="p-4 text-center bg-indigo-50/50">SL Duyệt</th>
+                                  <th className="p-4 rounded-tl-xl">Vật tư / Kho xuất</th>
+                                  <th className="p-4 text-center">SL Duyệt</th>
+                                  <th className="p-4 text-center">Đã Giao</th>
+                                  <th className="p-4 text-center bg-indigo-50/50">Cần Giao</th>
                                   <th className="p-4 text-center bg-emerald-50/50 border-x border-emerald-100">THỰC XUẤT</th>
-                                  <th className="p-4 rounded-tr-xl">ĐVT</th>
+                                  <th className="p-4 text-center">Còn Thiếu</th>
+                                  <th className="p-4 rounded-tr-xl">Trạng thái</th>
                                </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -1381,51 +1467,61 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
                                     const isReplaced = l.is_replaced;
                                     const overStock = qtyIssue > (stock?.quantityOnHand ?? 0);
-                                    const isDone = l.qtyDelivered >= (l.qtyApproved ?? l.qtyRequested);
+                                    const targetQty = l.qtyApproved ?? l.qtyRequested;
+                                    const deliveredBefore = l.qtyDelivered || 0;
+                                    const remaining = targetQty - deliveredBefore;
+                                    const shortAfter = remaining - qtyIssue;
+                                    
+                                    const isDone = deliveredBefore >= targetQty;
 
                                     return (
                                     <tr key={l.id} className={`${isDone ? 'opacity-40 bg-slate-50' : ''} ${overStock ? 'bg-rose-50/30' : ''}`}>
                                         <td className="p-4">
                                             <div className="flex flex-col">
                                               <p className="font-bold text-slate-800 text-sm whitespace-normal max-w-[250px]">{l.issue_item.name}</p>
-                                              <p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-tighter">
-                                                {l.issue_item.mvpp} • {l.issue_item.unit}
-                                              </p>
+                                              <div className="flex items-center gap-4 mt-2">
+                                                <select 
+                                                  value={wh}
+                                                  onChange={(e) => setIssues(issues.map(a => a.lineId === l.id ? {...a, warehouseCode: e.target.value} : a))}
+                                                  className={`text-[10px] font-black p-1 rounded border ${overStock ? 'border-rose-300 bg-rose-50 text-rose-600' : 'border-slate-200 bg-white text-slate-500'}`}
+                                                >
+                                                  <option value="MAIN">MAIN</option>
+                                                  <option value="SUPPLY">SUPPLY</option>
+                                                  <option value="SCRAP">SCRAP</option>
+                                                  <option value="VE_SINH">VE_SINH</option>
+                                                </select>
+                                                <span className={`font-black text-[10px] uppercase ${stock.quantityOnHand === 0 ? 'text-rose-500' : 'text-slate-400'}`}>Tồn: {stock.quantityOnHand} {l.issue_item.unit}</span>
+                                              </div>
                                               {isReplaced && (
                                                 <p className="text-[9px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full w-fit mt-2">
-                                                  Thay thế cho: {l.original_item.name} ({l.original_item.mvpp})
+                                                  Thay cho: {l.original_item.name}
                                                 </p>
                                               )}
                                             </div>
                                         </td>
-                                        <td className="px-3 py-3 text-center">
-                                            <div className="flex flex-col items-center gap-1">
-                                              <select 
-                                                value={wh}
-                                                onChange={(e) => setIssues(issues.map(a => a.lineId === l.id ? {...a, warehouseCode: e.target.value} : a))}
-                                                className={`text-[10px] font-black p-1 rounded border ${overStock ? 'border-rose-300 bg-rose-50 text-rose-600' : 'border-slate-200 bg-white text-slate-500'}`}
-                                              >
-                                                <option value="MAIN">MAIN</option>
-                                                <option value="SUPPLY">SUPPLY</option>
-                                                <option value="SCRAP">SCRAP</option>
-                                                <option value="VE_SINH">VE_SINH</option>
-                                              </select>
-                                              <span className={`font-black text-xs ${stock.quantityOnHand === 0 ? 'text-rose-500' : 'text-slate-600'}`}>Tồn: {stock.quantityOnHand}</span>
-                                            </div>
-                                        </td>
-                                        <td className="p-4 text-center bg-indigo-50/20">
-                                            <span className="font-black text-indigo-600">{l.qtyApproved ?? l.qtyRequested}</span>
-                                        </td>
+                                        <td className="p-4 text-center font-bold text-slate-600">{targetQty}</td>
+                                        <td className="p-4 text-center font-bold text-slate-400">{deliveredBefore}</td>
+                                        <td className="p-4 text-center bg-indigo-50/20 font-black text-indigo-600">{remaining}</td>
                                         <td className="p-4 bg-emerald-50/10 border-x border-emerald-50">
                                             <input 
-                                               type="number" min="0" value={qtyIssue} disabled={isDone}
-                                               onChange={(e:any) => setIssues(issues.map((a:any) => a.lineId === l.id ? {...a, qtyDelivered: Math.max(0, parseInt(e.target.value)||0)} : a))}
-                                               className={`w-24 text-center mx-auto block py-2.5 bg-white border-2 outline-none rounded-xl font-black text-lg transition ${overStock ? 'text-rose-600 border-rose-400 ring-4 ring-rose-50 shadow-inner' : 'text-emerald-700 border-emerald-100 focus:border-emerald-400 focus:ring-emerald-50 shadow-sm'}`}
+                                               type="number" min="0" max={remaining} value={qtyIssue} disabled={isDone}
+                                               onChange={(e:any) => setIssues(issues.map((a:any) => a.lineId === l.id ? {...a, qtyDelivered: Math.min(remaining, Math.max(0, parseInt(e.target.value)||0))} : a))}
+                                               className={`w-20 text-center mx-auto block py-2 bg-white border-2 outline-none rounded-lg font-black text-base transition ${overStock ? 'text-rose-600 border-rose-400 ring-2 ring-rose-50' : 'text-emerald-700 border-emerald-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-50'}`}
                                             />
-                                            {overStock && <p className="text-[9px] font-bold text-rose-500 text-center mt-1 animate-pulse italic">Thiếu {qtyIssue - stock.quantityOnHand}</p>}
                                         </td>
-                                        <td className="p-4 font-bold text-[10px] text-slate-400 uppercase text-center">
-                                          {(l.issue_item.price * qtyIssue).toLocaleString('vi-VN')}
+                                        <td className="p-4 text-center">
+                                          <span className={`font-black text-xs ${shortAfter > 0 ? 'text-rose-500' : 'text-slate-300'}`}>
+                                            {shortAfter > 0 ? `Thiếu ${shortAfter}` : 'Đủ'}
+                                          </span>
+                                        </td>
+                                        <td className="p-4">
+                                          {isDone ? (
+                                            <span className="px-2 py-1 bg-slate-100 text-slate-400 text-[9px] font-black rounded-full uppercase">Hoàn tất</span>
+                                          ) : qtyIssue > 0 ? (
+                                            <span className="px-2 py-1 bg-emerald-100 text-emerald-600 text-[9px] font-black rounded-full uppercase">Giao {qtyIssue}</span>
+                                          ) : (
+                                            <span className="px-2 py-1 bg-amber-100 text-amber-600 text-[9px] font-black rounded-full uppercase">Chờ tồn</span>
+                                          )}
                                         </td>
                                     </tr>
                                 )})}
@@ -1865,7 +1961,75 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                   </div>
               </div>
           </div>
-      )}
-      </div>
-    );
-}
+       )}
+       
+       {/* BATCH PRINT TEMPLATE (Only visible during batch printing) */}
+       {batchToPrint && (
+         <div className="hidden print:block fixed inset-0 bg-white z-[9999] p-10 text-black">
+           <div className="flex justify-between items-start border-b-2 border-black pb-6 mb-8">
+             <div>
+               <h1 className="text-2xl font-black uppercase">PHIẾU XUẤT KHO</h1>
+               <p className="text-lg font-bold">Lần giao: {batchToPrint.batchNo}</p>
+               <p className="text-sm font-medium">Mã vận đơn: {batchToPrint.deliveryCode}</p>
+             </div>
+             <div className="text-right">
+               <p className="text-sm font-bold">Mã phiếu: {data.id}</p>
+               <p className="text-sm">Ngày giao: {new Date(batchToPrint.createdAt).toLocaleString('vi-VN')}</p>
+             </div>
+           </div>
+           
+           <div className="mb-8">
+             <p className="mb-2"><strong>Người yêu cầu:</strong> {data.requester?.fullName} ({data.department})</p>
+             <p className="mb-2"><strong>Người xuất kho:</strong> {batchToPrint.createdBy?.fullName}</p>
+             <p><strong>Ghi chú:</strong> {batchToPrint.note || '—'}</p>
+           </div>
+ 
+           <table className="w-full border-collapse border border-black text-sm">
+             <thead>
+               <tr className="bg-slate-100">
+                 <th className="border border-black p-2 text-center w-10">STT</th>
+                 <th className="border border-black p-2 text-left">Vật tư / Hàng hóa</th>
+                 <th className="border border-black p-2 text-center">ĐVT</th>
+                 <th className="border border-black p-2 text-center">Duyệt</th>
+                 <th className="border border-black p-2 text-center">Đã giao trước</th>
+                 <th className="border border-black p-2 text-center font-bold">GIAO LẦN NÀY</th>
+                 <th className="border border-black p-2 text-center">Còn lại</th>
+               </tr>
+             </thead>
+             <tbody>
+               {batchToPrint.items.map((bi: any, idx: number) => {
+                 const line = data.lines.find((l: any) => l.id === bi.requestLineId);
+                 return (
+                   <tr key={bi.id}>
+                     <td className="border border-black p-2 text-center">{idx + 1}</td>
+                     <td className="border border-black p-2 font-bold">{line?.issue_item?.name || 'Vật tư'}</td>
+                     <td className="border border-black p-2 text-center">{line?.issue_item?.unit}</td>
+                     <td className="border border-black p-2 text-center">{bi.approvedQty}</td>
+                     <td className="border border-black p-2 text-center">{bi.deliveredBeforeQty}</td>
+                     <td className="border border-black p-2 text-center font-bold">{bi.issueQty}</td>
+                     <td className="border border-black p-2 text-center">{bi.remainingAfterQty}</td>
+                   </tr>
+                 );
+               })}
+             </tbody>
+           </table>
+ 
+           <div className="mt-12 grid grid-cols-3 gap-8 text-center">
+             <div>
+               <p className="font-bold uppercase mb-16 text-xs">Người nhận hàng</p>
+               <p className="text-xs italic">(Ký, họ tên)</p>
+             </div>
+             <div>
+               <p className="font-bold uppercase mb-16 text-xs">Người giao hàng</p>
+               <p className="text-xs italic">(Ký, họ tên)</p>
+             </div>
+             <div>
+               <p className="font-bold uppercase mb-16 text-xs">Thủ kho</p>
+               <p className="text-xs italic">(Ký, họ tên)</p>
+             </div>
+           </div>
+         </div>
+       )}
+     </div>
+   );
+ }
