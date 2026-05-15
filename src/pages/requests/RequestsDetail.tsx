@@ -192,6 +192,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       case 'DRAFT': return 'bg-slate-400 text-white shadow-slate-400/30';
       case 'PARTIALLY_ISSUED': case 'PARTIALLY_APPROVED': 
       case 'PARTIAL_TBP_APPROVED': case 'PARTIAL_ADMIN_APPROVED':
+      case 'PARTIALLY_DELIVERED': case 'PENDING_REMAINING_DELIVERY':
         return 'bg-teal-500 text-white shadow-teal-500/30';
       case 'RETURNED': case 'NEED_REVISION': return 'bg-orange-500 text-white shadow-orange-500/30';
       case 'WAITING_HANDOVER': return 'bg-blue-500 text-white shadow-blue-500/30';
@@ -288,10 +289,12 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       case 'PARTIAL_ADMIN_APPROVED':
       case 'BACKORDER':
         basePercent = 75; break;
-      case 'COMPLETED':
+      case 'COMPLETED': basePercent = 100; break;
       case 'PARTIALLY_ISSUED':
+      case 'PARTIALLY_DELIVERED':
+      case 'PENDING_REMAINING_DELIVERY':
       case 'WAITING_HANDOVER':
-        basePercent = 100; break;
+        basePercent = 85; break;
       default: basePercent = 0;
     }
 
@@ -318,6 +321,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       case 'TBP_REJECT': return 'Trưởng bộ phận Từ chối';
       case 'ADMIN_REJECT': return 'Hành chính Từ chối';
       case 'WITHDRAW': return 'Rút phiếu';
+      case 'URGE_DELIVERY': return 'Hối thúc giao hàng';
       default: return action;
     }
   };
@@ -339,6 +343,9 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
   const canCancel = ['DRAFT', 'PENDING_MANAGER', 'PENDING_ADMIN', 'RETURNED', 'NEED_REVISION', 'APPROVED', 'READY_TO_ISSUE'].includes(data.status) && (currentUser.role !== 'EMPLOYEE' || currentUid === data.requesterId);
   const isHandover = (currentUid === data.requesterId || currentUser.role === 'ADMIN') && data.status === 'WAITING_HANDOVER';
   const isFutureApprover = currentUser.role === 'MANAGER' && data.approvalSteps?.some((s: any) => s.approverId === currentUid) && data.status === 'PENDING_MANAGER' && data.currentApproverId !== currentUid;
+
+  const hasRemaining = data?.lines?.some((l: any) => (l.qtyApproved ?? l.qtyRequested) > (l.qtyDelivered || 0));
+  const canUrge = (['PARTIALLY_ISSUED', 'APPROVED', 'READY_TO_ISSUE', 'BACKORDER'].includes(data.status)) && currentUid === data.requesterId && hasRemaining;
 
   return (
     <div className="flex flex-col h-full bg-slate-100 overflow-hidden relative print:bg-white print:overflow-visible print:h-auto RequestsDetail">
@@ -917,6 +924,13 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                   handleAction('/confirm_receipt', {}, 'Bàn giao thành công. Phiếu đã được đóng!');
                               }
                           }} className="w-full py-4 bg-indigo-500 text-white rounded-xl font-black hover:bg-indigo-600 transition shadow-lg shadow-indigo-500/40 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-indigo-500"><CheckCircle className="w-6 h-6 mr-2"/> XÁC NHẬN ĐÃ NHẬN HÀNG</button>
+                      )}
+
+                      {/* --- HỐI THÚC GIAO HÀNG --- */}
+                      {canUrge && (
+                          <button onClick={() => handleAction('/urge_delivery', {}, 'Đã gửi yêu cầu hối thúc giao hàng')} className="w-full py-4 bg-amber-500 text-white rounded-xl font-black hover:bg-amber-600 transition shadow-lg shadow-amber-500/40 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-amber-400">
+                             <RefreshCw className="w-6 h-6 mr-2 animate-spin-slow"/> HỐI THÚC GIAO HÀNG
+                          </button>
                       )}
 
                       <hr className="border-slate-700 my-2" />
