@@ -12,10 +12,13 @@ export default function InventoryReport({ warehouseCode = 'MAIN' }: { warehouseC
    const [searchTerm, setSearchTerm] = useState('');
    const [filterType, setFilterType] = useState('ALL'); // ALL, RECEIVE, ISSUE, ADJUSTMENT
 
-   const fetchMovements = async () => {
+   const fetchMovements = async (selectedWarehouse?: string) => {
       try {
          setLoading(true);
-         const typeQuery = filterType !== 'ALL' ? `?type=${filterType}&warehouseCode=${warehouseCode}` : `?warehouseCode=${warehouseCode}`;
+         const targetWarehouse = selectedWarehouse || warehouseCode;
+         const typeQuery = filterType !== 'ALL' 
+            ? `?type=${filterType}&warehouseCode=${targetWarehouse}` 
+            : `?warehouseCode=${targetWarehouse}`;
          const res = await api.get(`/inventory/movements${typeQuery}`);
          setMovements(res.data);
       } catch (err) {
@@ -27,7 +30,12 @@ export default function InventoryReport({ warehouseCode = 'MAIN' }: { warehouseC
    };
 
    useEffect(() => {
-      fetchMovements();
+      // If warehouseCode is not explicitly 'MAIN' or 'VE_SINH' and user is admin, default to ALL
+      if (warehouseCode === 'MAIN' && currentUser?.role === 'ADMIN') {
+         fetchMovements('ALL');
+      } else {
+         fetchMovements();
+      }
    }, [filterType]);
 
    const filteredMovements = movements.filter(m => {
@@ -99,17 +107,35 @@ export default function InventoryReport({ warehouseCode = 'MAIN' }: { warehouseC
 
          {/* Filters */}
          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row gap-4 shrink-0 justify-between items-center">
-            <div className="flex bg-slate-100 p-1 rounded-lg">
+            <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
                {['ALL', 'RECEIVE', 'ISSUE', 'ADJUSTMENT'].map(type => (
                  <button 
                    key={type}
                    onClick={() => setFilterType(type)}
-                   className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center ${filterType === type ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                   className={`px-4 py-2 rounded-md text-[10px] font-black uppercase tracking-wider transition flex items-center whitespace-nowrap ${filterType === type ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                  >
-                   {type === 'ALL' ? 'Tất cả' : type === 'RECEIVE' ? 'Phiếu Nhập' : type === 'ISSUE' ? 'Phiếu Xuất' : 'Kiểm kê'}
+                   {type === 'ALL' ? 'Tất cả GD' : type === 'RECEIVE' ? 'Phiếu Nhập' : type === 'ISSUE' ? 'Phiếu Xuất' : 'Kiểm kê'}
                  </button>
                ))}
             </div>
+
+            {currentUser?.role === 'ADMIN' && (
+               <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
+                  {[
+                     { id: 'ALL', label: 'Tất cả Kho' },
+                     { id: 'MAIN', label: 'Văn phòng phẩm' },
+                     { id: 'VE_SINH', label: 'Đồ vệ sinh' }
+                  ].map(w => (
+                     <button
+                        key={w.id}
+                        onClick={() => fetchMovements(w.id)}
+                        className={`px-4 py-2 rounded-md text-[10px] font-black uppercase tracking-wider transition flex items-center whitespace-nowrap ${(movements.length > 0 && movements[0].warehouseCode === w.id) || (movements.length === 0 && w.id === 'ALL') ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                     >
+                        {w.label}
+                     </button>
+                  ))}
+               </div>
+            )}
             
             <div className="flex gap-4 w-full md:w-auto">
                <div className="relative flex-1 min-w-[250px]">

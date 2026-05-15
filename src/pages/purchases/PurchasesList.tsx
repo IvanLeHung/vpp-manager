@@ -82,9 +82,11 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       switch(status) {
           case 'DRAFT': badge = <span className="px-2 py-1 rounded-lg bg-slate-100 text-slate-500 font-black text-[9px] uppercase border border-slate-200">Nháp</span>; break;
           case 'PENDING_APPROVAL': badge = <span className="px-2 py-1 rounded-lg bg-amber-50 text-amber-600 font-black text-[9px] uppercase border border-amber-200">Chờ Duyệt</span>; break;
+          case 'PARTIALLY_APPROVED': badge = <span className="px-2 py-1 rounded-lg bg-amber-100 text-amber-700 font-black text-[9px] uppercase border border-amber-300">Duyệt Một Phần</span>; break;
           case 'APPROVED': badge = <span className="px-2 py-1 rounded-lg bg-indigo-50 text-indigo-600 font-black text-[9px] uppercase border border-indigo-200">Chờ Mua Sắm</span>; break;
           case 'ORDERED': badge = <span className="px-2 py-1 rounded-lg bg-blue-50 text-blue-600 font-black text-[9px] uppercase border border-blue-200">Chờ Giao Hàng</span>; break;
           case 'DELIVERING': badge = <span className="px-2 py-1 rounded-lg bg-cyan-50 text-cyan-600 font-black text-[9px] uppercase border border-cyan-200">Đang Giao</span>; break;
+          case 'PARTIALLY_DELIVERED': badge = <span className="px-2 py-1 rounded-lg bg-blue-100 text-blue-700 font-black text-[9px] uppercase border border-blue-300">Giao Một Phần</span>; break;
           case 'COMPLETED': badge = <span className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 font-black text-[9px] uppercase border border-emerald-200">Hoàn Tất</span>; break;
           case 'REJECTED': badge = <span className="px-2 py-1 rounded-lg bg-rose-50 text-rose-600 font-black text-[9px] uppercase border border-rose-200">Từ Chối</span>; break;
           case 'CANCELLED': badge = <span className="px-2 py-1 rounded-lg bg-slate-50 text-slate-400 font-black text-[9px] uppercase border border-slate-200 line-through">Đã Hủy</span>; break;
