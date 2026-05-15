@@ -131,6 +131,8 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
               supplier: l.supplier || res.data.supplier || '',
               location: l.location || '',
               gender: l.gender || '',
+              status: l.status || 'PENDING',
+              selected: l.status === 'PENDING' || !l.status,
               isDeleted: false,
               isNew: false
           })));
@@ -225,7 +227,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
 
   const status = data.status;
   const isDRAFT = status === 'DRAFT';
-  const isPENDING = status === 'PENDING_APPROVAL';
+  const isPENDING = status === 'PENDING_APPROVAL' || status === 'PARTIALLY_APPROVED';
   const isAPPROVED = status === 'APPROVED';
   const isORDERED = status === 'ORDERED';
   const isDELIVERING = status === 'DELIVERING' || status === 'PARTIALLY_DELIVERED';
@@ -287,6 +289,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
     switch(s) {
       case 'DRAFT': return 'bg-slate-400 text-white shadow-slate-400/30';
       case 'PENDING_APPROVAL': return 'bg-amber-500 text-white shadow-amber-500/30';
+      case 'PARTIALLY_APPROVED': return 'bg-orange-500 text-white shadow-orange-500/30';
       case 'APPROVED': return 'bg-emerald-500 text-white shadow-emerald-500/30';
       case 'ORDERED': return 'bg-indigo-500 text-white shadow-indigo-500/30';
       case 'DELIVERING': case 'PARTIALLY_DELIVERED': return 'bg-blue-500 text-white shadow-blue-500/30';
@@ -300,6 +303,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
     switch(s) {
       case 'DRAFT': return 'Đề nghị này chưa được gửi duyệt. Bạn có thể chỉnh sửa trước khi gửi.';
       case 'PENDING_APPROVAL': return 'Đề nghị đang chờ cấp trên hoặc Admin phê duyệt.';
+      case 'PARTIALLY_APPROVED': return 'Một số mặt hàng đã được phê duyệt. Đang chờ phê duyệt các mặt hàng còn lại.';
       case 'APPROVED': return 'Đề nghị đã được duyệt. Sẵn sàng để phát hành PO.';
       case 'ORDERED': return 'Đơn đặt hàng đã được chốt và gửi cho Nhà cung cấp.';
       case 'DELIVERING': return 'Nhà cung cấp đang trong quá trình giao hàng.';
@@ -548,6 +552,16 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                                     {isPending ? 'Đang chờ duyệt' : 'Đã thay thế'}
                                                  </span>
                                               )}
+                                              {!isReplaced && l.status && l.status !== 'PENDING' && (
+                                                 <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter ${l.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                                                    {l.status === 'APPROVED' ? 'Đã duyệt' : 'Từ chối'}
+                                                 </span>
+                                               )}
+                                               {!isReplaced && (!l.status || l.status === 'PENDING') && isPENDING && (
+                                                 <span className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter bg-amber-100 text-amber-700">
+                                                    Đang chờ duyệt
+                                                 </span>
+                                               )}
                                             </div>
                                             <div className="flex items-center gap-2 mt-1 flex-wrap">
                                                <span className="text-[9px] bg-white border border-slate-200 text-slate-500 px-1.5 py-0.5 rounded-md font-black tracking-widest uppercase">
@@ -834,7 +848,11 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                  unitPrice: l.unitPrice,
                                  supplier: l.supplier || '',
                                  location: l.location || '',
-                                 gender: l.gender || ''
+                                 gender: l.gender || '',
+                                 status: l.status || 'PENDING',
+                                 selected: true,
+                                 isDeleted: false,
+                                 isNew: false
                              })));
                              setShowApproveModal(true);
                          }} className="w-full py-2.5 bg-white text-indigo-600 rounded-xl font-black hover:bg-indigo-50 transition border border-indigo-100 flex items-center justify-center gap-1.5 uppercase tracking-widest text-[10px]">
@@ -866,7 +884,11 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                       unitPrice: l.unitPrice,
                                       supplier: l.supplier || '',
                                       location: l.location || '',
-                                      gender: l.gender || ''
+                                      gender: l.gender || '',
+                                      status: l.status || 'PENDING',
+                                      selected: l.status === 'PENDING' || !l.status,
+                                      isDeleted: false,
+                                      isNew: false
                                   })));
                                   setShowApproveModal(true);
                               }} className="w-full py-3 bg-emerald-500 text-white rounded-xl font-black hover:bg-emerald-600 transition shadow-lg shadow-emerald-500/30 flex flex-col items-center gap-0.5 group-active:scale-95 transform">
@@ -1077,6 +1099,19 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                               <table className="w-full text-left whitespace-nowrap min-w-max">
                                   <thead className="bg-slate-50/80 sticky top-0 z-10">
                                      <tr className="text-[10px] uppercase font-black text-slate-400 tracking-widest border-b border-slate-100">
+                                        {!canEdit && (
+                                            <th className="p-5 w-12 text-center">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                    checked={approvals.filter(a => !a.isDeleted && a.status === 'PENDING').length > 0 && approvals.filter(a => !a.isDeleted && a.status === 'PENDING').every(a => a.selected)}
+                                                    onChange={(e) => {
+                                                        const isChecked = e.target.checked;
+                                                        setApprovals(approvals.map(a => (a.status === 'PENDING' && !a.isDeleted) ? { ...a, selected: isChecked } : a));
+                                                    }}
+                                                />
+                                            </th>
+                                        )}
                                         <th className="p-5 w-12 text-center">STT</th>
                                         <th className="p-5">Mặt Hàng</th>
                                         <th className="p-5 w-24 text-center">Gốc</th>
@@ -1092,7 +1127,18 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                           const lineTotal = (a.qtyApproved || a.qtyRequested || 0) * (a.unitPrice || 0);
                                           
                                           return (
-                                          <tr key={a.lineId} className={`transition-all ${a.isDeleted ? 'bg-slate-100 opacity-50 grayscale italic' : 'hover:bg-slate-50/50'}`}>
+                                          <tr key={a.lineId} className={`transition-all ${a.isDeleted ? 'bg-slate-100 opacity-50 grayscale italic' : 'hover:bg-slate-50/50'} ${!a.selected && a.status === 'PENDING' && !canEdit ? 'opacity-60' : ''}`}>
+                                              {!canEdit && (
+                                                <td className="p-5 text-center">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        disabled={a.isDeleted || a.status !== 'PENDING'}
+                                                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-30"
+                                                        checked={a.selected || a.status !== 'PENDING'}
+                                                        onChange={(e) => setApprovals(approvals.map(x => x.lineId === a.lineId ? { ...x, selected: e.target.checked } : x))}
+                                                    />
+                                                </td>
+                                              )}
                                               <td className="p-5 text-center font-bold text-slate-400 text-xs">{idx + 1}</td>
                                               <td className="p-5">
                                                   <p className="font-bold text-slate-800 text-sm whitespace-normal leading-tight">{a.item?.name}</p>
@@ -1100,13 +1146,18 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                                       <span className="text-[9px] font-black bg-slate-100 px-1 py-0.5 rounded text-slate-500">{a.item?.mvpp}</span>
                                                       <span className={`text-[9px] font-black px-1 py-0.5 rounded ${a.item?.stock > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>Tồn: {a.item?.stock || 0}</span>
                                                       {a.isNew && <span className="text-[9px] font-black bg-indigo-100 text-indigo-600 px-1 py-0.5 rounded">NEW</span>}
+                                                      {a.status && a.status !== 'PENDING' && (
+                                                         <span className={`text-[9px] font-black px-1 py-0.5 rounded ${a.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                                                            {a.status === 'APPROVED' ? 'Đã duyệt' : 'Đã từ chối'}
+                                                         </span>
+                                                      )}
                                                   </div>
                                               </td>
                                               <td className="p-5 text-center font-black text-slate-400 text-lg bg-slate-50/30">{a.qtyRequested}</td>
                                               <td className={`p-5 border-x border-slate-100 bg-white`}>
                                                   <input 
                                                       type="number" min="0" 
-                                                      disabled={a.isDeleted}
+                                                      disabled={a.isDeleted || (a.status !== 'PENDING' && !canEdit)}
                                                       value={a.qtyApproved || ''} 
                                                       onChange={(e) => {
                                                           const val = parseInt(e.target.value) || 0;
@@ -1118,7 +1169,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                               <td className="p-5 bg-white relative group/price">
                                                   <input 
                                                       type="number" min="0" 
-                                                      disabled={a.isDeleted}
+                                                      disabled={a.isDeleted || (a.status !== 'PENDING' && !canEdit)}
                                                       value={a.unitPrice || ''} 
                                                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApprovals(approvals.map((x:any) => x.lineId === a.lineId ? {...x, unitPrice: parseInt(e.target.value)||0} : x))}
                                                       className={`w-full pr-3 pl-3 text-right py-2 bg-slate-50 border-2 border-slate-100 outline-none rounded-xl focus:bg-white font-bold transition text-slate-700 shadow-inner ${canEdit ? 'focus:border-indigo-400' : 'focus:border-emerald-400'}`}
@@ -1136,7 +1187,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                               <td className="p-5 border-l border-slate-100 bg-white">
                                                   <div className="flex flex-col gap-1.5 min-w-[140px]">
                                                       <select 
-                                                          disabled={a.isDeleted}
+                                                          disabled={a.isDeleted || (a.status !== 'PENDING' && !canEdit)}
                                                           value={a.gender || ''} 
                                                           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setApprovals(approvals.map((x:any) => x.lineId === a.lineId ? {...x, gender: e.target.value} : x))}
                                                           className="w-full px-2 py-1.5 bg-slate-50 border border-slate-100 outline-none rounded-lg focus:bg-white font-bold text-[9px] transition"
@@ -1148,7 +1199,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                                       </select>
                                                       <input 
                                                           type="text" placeholder="NCC..." 
-                                                          disabled={a.isDeleted}
+                                                          disabled={a.isDeleted || (a.status !== 'PENDING' && !canEdit)}
                                                           value={a.supplier || ''} 
                                                           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApprovals(approvals.map((x:any) => x.lineId === a.lineId ? {...x, supplier: e.target.value} : x))}
                                                           className="w-full px-2 py-1.5 bg-slate-50 border border-slate-100 outline-none rounded-lg focus:bg-white font-bold text-[10px] transition placeholder:text-slate-300"
@@ -1156,12 +1207,14 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                                   </div>
                                               </td>
                                               <td className="p-5 text-center">
-                                                  <button 
-                                                      onClick={() => toggleDeleteLine(a.lineId)}
-                                                      className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${a.isDeleted ? 'bg-indigo-100 text-indigo-600' : 'bg-rose-50 text-rose-400 hover:bg-rose-100 hover:text-rose-600'}`}
-                                                  >
-                                                      {a.isDeleted ? <ArrowLeft className="w-4 h-4 rotate-180"/> : <Trash2 className="w-4 h-4"/>}
-                                                  </button>
+                                                   {(canEdit || a.status === 'PENDING') && (
+                                                      <button 
+                                                          onClick={() => toggleDeleteLine(a.lineId)}
+                                                          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${a.isDeleted ? 'bg-indigo-100 text-indigo-600' : 'bg-rose-50 text-rose-400 hover:bg-rose-100 hover:text-rose-600'}`}
+                                                      >
+                                                          {a.isDeleted ? <ArrowLeft className="w-4 h-4 rotate-180"/> : <Trash2 className="w-4 h-4"/>}
+                                                      </button>
+                                                   )}
                                               </td>
                                           </tr>
                                    )})}
@@ -1192,26 +1245,29 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                           <button 
                               onClick={async () => {
                                  const activeLines = approvals.filter(a => !a.isDeleted);
-                                 if (activeLines.length === 0) {
-                                     showToast('Cần ít nhất 1 mặt hàng trong danh sách', 'warning');
-                                     return;
-                                 }
-                                 if (activeLines.some(a => (Number(a.qtyApproved || a.qtyRequested || 0)) <= 0)) {
-                                     showToast('Số lượng phải lớn hơn 0', 'warning');
-                                     return;
-                                 }
+                                 const selectedLines = approvals.filter(a => !a.isDeleted && a.selected && a.status === 'PENDING');
+                                  
+                                  if (!canEdit && selectedLines.length === 0) {
+                                      showToast('Vui lòng chọn ít nhất 1 mặt hàng để phê duyệt', 'warning');
+                                      return;
+                                  }
 
-                                 const finalLines = activeLines.map(a => ({
-                                     lineId: a.lineId,
-                                     requestLineId: a.requestLineId,
-                                     itemId: a.itemId,
-                                     qtyRequested: a.qtyRequested,
-                                     qtyApproved: a.qtyApproved,
-                                     unitPrice: a.unitPrice,
-                                     supplier: a.supplier,
-                                     location: a.location,
-                                     gender: a.gender
-                                 }));
+                                  if (canEdit && activeLines.length === 0) {
+                                      showToast('Cần ít nhất 1 mặt hàng trong danh sách', 'warning');
+                                      return;
+                                  }
+
+                                  const finalLines = (canEdit ? activeLines : selectedLines).map(a => ({
+                                      lineId: a.lineId,
+                                      requestLineId: a.requestLineId,
+                                      itemId: a.itemId,
+                                      qtyRequested: a.qtyRequested,
+                                      qtyApproved: a.qtyApproved,
+                                      unitPrice: a.unitPrice,
+                                      supplier: a.supplier,
+                                      location: a.location,
+                                      gender: a.gender
+                                  }));
 
                                  if (canEdit) {
                                      try {
