@@ -104,6 +104,17 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
     }
   };
 
+  const handleComplete = async () => {
+    if (!window.confirm('Hành động này sẽ đóng phiếu nhập kho và không đợi nhập thêm nữa. Bạn chắc chắn chứ?')) return;
+    try {
+      await api.post(`/receipts/${currentId}/complete`);
+      showToast('Đã hoàn thành phiếu nhập kho!');
+      await refreshData();
+    } catch (err: any) {
+      showToast(err.response?.data?.error || 'Lỗi hệ thống', 'error');
+    }
+  };
+
   const handleCancelReceipt = async () => {
     if (!cancelModal.reason.trim()) {
       showToast('Vui lòng nhập lý do hủy phiếu', 'warning');
@@ -123,7 +134,7 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
 
   if (loading || !data) return <div className="p-10 flex justify-center"><div className="w-8 h-8 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin"></div></div>;
 
-  const isPending = data.status === 'PENDING';
+  const isPending = data.status === 'PENDING' || data.status === 'PARTIALLY_RECEIVED';
 
   // Checking for discrepancies
   const totalOrdered = data.lines.reduce((s: number, l: any) => s + l.qtyOrdered, 0);
@@ -182,11 +193,15 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
         <div className="flex items-center gap-3">
           <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
             data.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-            data.status === 'DISCREPANCY' ? 'bg-amber-50 text-amber-600 border-amber-100' : 
+            data.status === 'PARTIALLY_RECEIVED' ? 'bg-amber-50 text-amber-600 border-amber-100' : 
+            data.status === 'DISCREPANCY' ? 'bg-rose-50 text-rose-600 border-rose-100' : 
             data.status === 'CANCELLED' ? 'bg-slate-100 text-slate-400 border-slate-200' : 
             'bg-blue-50 text-blue-600 border-blue-100'
           }`}>
-            {data.status === 'PENDING' ? 'Chờ kiểm hàng' : data.status === 'COMPLETED' ? 'Đã nhập kho' : data.status === 'CANCELLED' ? 'Đã hủy' : 'Lệch / Lỗi'}
+            {data.status === 'PENDING' ? 'Chờ kiểm hàng' : 
+             data.status === 'PARTIALLY_RECEIVED' ? 'Nhập một phần' : 
+             data.status === 'COMPLETED' ? 'Đã nhập kho' : 
+             data.status === 'CANCELLED' ? 'Đã hủy' : 'Lệch / Lỗi'}
           </span>
 
           <div className="flex items-center gap-2">
@@ -195,8 +210,13 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                 <button onClick={() => setCancelModal({ open: true, reason: '' })} className="h-9 px-4 text-[11px] font-bold text-slate-500 hover:bg-slate-50 border border-slate-200 rounded-lg transition uppercase tracking-wide">
                   Hủy phiếu
                 </button>
+                {data.status === 'PARTIALLY_RECEIVED' && (
+                  <button onClick={handleComplete} className="h-9 px-4 text-[11px] font-bold text-emerald-600 hover:bg-emerald-50 border border-emerald-200 rounded-lg transition uppercase tracking-wide">
+                    Hoàn thành phiếu
+                  </button>
+                )}
                 <button onClick={handleConfirm} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg transition uppercase tracking-wide shadow-sm">
-                  Xác nhận nhập kho
+                  {data.status === 'PARTIALLY_RECEIVED' ? 'Xác nhận nhập thêm' : 'Xác nhận nhập kho'}
                 </button>
               </>
             ) : data.status !== 'CANCELLED' && (
@@ -282,10 +302,15 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                               className="w-14 h-8 text-center bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 focus:border-blue-400 outline-none transition shadow-sm" />
                           ) : <span className="font-bold text-slate-600">{l.qtyDelivered}</span>}
                         </td>
-                        <td className="p-4 text-center">
+                         <td className="p-4 text-center">
                           {isPending ? (
-                            <input type="number" value={v.qtyAccepted} onChange={(e) => setReconcileValues(reconcileValues.map(a => a.id === l.id ? { ...a, qtyAccepted: parseInt(e.target.value) || 0 } : a))}
-                              className="w-14 h-8 text-center bg-white border border-blue-200 rounded-lg text-xs font-bold text-blue-600 focus:border-blue-500 outline-none transition shadow-sm ring-1 ring-blue-50" />
+                            <div className="flex flex-col items-center gap-1">
+                                <input type="number" value={v.qtyAccepted} onChange={(e) => setReconcileValues(reconcileValues.map(a => a.id === l.id ? { ...a, qtyAccepted: parseInt(e.target.value) || 0 } : a))}
+                                  className="w-14 h-8 text-center bg-white border border-blue-200 rounded-lg text-xs font-bold text-blue-600 focus:border-blue-500 outline-none transition shadow-sm ring-1 ring-blue-50" />
+                                {l.qtyConfirmed > 0 && (
+                                    <span className="text-[8px] font-black text-emerald-500 uppercase tracking-tighter">Đã nhập: {l.qtyConfirmed}</span>
+                                )}
+                            </div>
                           ) : <span className="font-bold text-blue-600">{l.qtyAccepted}</span>}
                         </td>
                         <td className="p-4 text-center">
