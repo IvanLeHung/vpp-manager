@@ -55,11 +55,12 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
       setData(res.data);
       if (res.data) {
         setReconcileValues(res.data.lines.map((l: any) => ({
-          id: l.id,
+          lineId: l.id,
+          itemId: l.itemId,
           qtyDelivered: l.qtyDelivered || l.qtyOrdered,
-          qtyAccepted: l.qtyAccepted || l.qtyOrdered,
-          qtyDefective: l.qtyDefective || 0,
-          note: l.note || '',
+          actualQty: 0,
+          qtyDefective: 0,
+          note: '',
           location: l.location || ''
         })));
       }
@@ -77,7 +78,15 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
 
   const handleSaveDraft = async () => {
     try {
-      await api.put(`/receipts/${currentId}/check`, { lines: reconcileValues });
+      const draftPayload = reconcileValues.map((v: any) => ({
+          id: v.lineId,
+          qtyDelivered: v.qtyDelivered,
+          qtyAccepted: (data.lines.find((l: any) => l.id === v.lineId)?.qtyConfirmed || 0) + (v.actualQty || 0),
+          qtyDefective: v.qtyDefective,
+          note: v.note,
+          location: v.location
+      }));
+      await api.put(`/receipts/${currentId}/check`, { lines: draftPayload });
       showToast('Đã lưu nháp biên bản Kiểm Hàng!');
       await refreshData();
     } catch (err: any) {
@@ -85,31 +94,23 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
     }
   };
 
-  const handleConfirm = async () => {
-    if (!window.confirm('Hành động này sẽ thực sự cộng Tồn kho. Bạn chắc chắn chứ?')) return;
+  const handleConfirm = async (mode: 'PARTIAL' | 'FULL') => {
+    const totalInput = reconcileValues.reduce((s: number, v: any) => s + (v.actualQty || 0), 0);
+    if (totalInput === 0 && mode === 'PARTIAL') {
+       showToast('Vui lòng nhập số lượng thực nhập trước khi xác nhận!', 'warning');
+       return;
+    }
+    if (!window.confirm(`Bạn đang xác nhận ${mode === 'FULL' ? 'HOÀN TẤT phiếu (những dòng chưa đủ sẽ chốt thiếu)' : 'NHẬP KHO phần đã nhận'}. Hành động này sẽ cộng Tồn kho. Bạn chắc chắn chứ?`)) return;
+    
     try {
-      // Đầu tiên lưu current changes
-      await api.put(`/receipts/${currentId}/check`, { lines: reconcileValues });
-      // Sau đó chốt nhập
-      await api.post(`/receipts/${currentId}/confirm`);
-      showToast('Hoàn thành Nhập Kho & Cộng Tồn!');
+      await api.post(`/receipts/${currentId}/confirm`, { mode, lines: reconcileValues });
+      showToast('Xác nhận Nhập Kho thành công!');
       
-      if (canGoNext) {
+      if (canGoNext && mode === 'FULL') {
         setTimeout(() => goNext(), 500);
       } else {
         await refreshData();
       }
-    } catch (err: any) {
-      showToast(err.response?.data?.error || 'Lỗi hệ thống', 'error');
-    }
-  };
-
-  const handleComplete = async () => {
-    if (!window.confirm('Hành động này sẽ đóng phiếu nhập kho và không đợi nhập thêm nữa. Bạn chắc chắn chứ?')) return;
-    try {
-      await api.post(`/receipts/${currentId}/complete`);
-      showToast('Đã hoàn thành phiếu nhập kho!');
-      await refreshData();
     } catch (err: any) {
       showToast(err.response?.data?.error || 'Lỗi hệ thống', 'error');
     }
@@ -134,28 +135,27 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
 
   if (loading || !data) return <div className="p-10 flex justify-center"><div className="w-8 h-8 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin"></div></div>;
 
-  const isPending = data.status === 'PENDING' || data.status === 'PARTIALLY_RECEIVED';
+  const isPending = data.status === 'PENDING' || data.status === 'PARTIALLY_RECEIVED' || data.status === 'DRAFT';
 
   // Checking for discrepancies
   const totalOrdered = data.lines.reduce((s: number, l: any) => s + l.qtyOrdered, 0);
-  const currentAccepted = reconcileValues.reduce((s: number, v: any) => s + (v.qtyAccepted || 0), 0);
+  const totalConfirmed = data.lines.reduce((s: number, l: any) => s + (l.qtyConfirmed || 0), 0); // Đã nhận thực tế (Cộng dồn)
+  const currentInputActual = reconcileValues.reduce((s: number, v: any) => s + (v.actualQty || 0), 0); // Vừa gõ
   const currentDefective = reconcileValues.reduce((s: number, v: any) => s + (v.qtyDefective || 0), 0);
   const currentDelivered = reconcileValues.reduce((s: number, v: any) => s + (v.qtyDelivered || 0), 0);
 
   // Breakdown stats
   const totalMissing = data.lines.reduce((sum: number, l: any) => {
-    const v = reconcileValues.find(x => x.id === l.id);
-    const diff = l.qtyOrdered - (v?.qtyDelivered || 0);
+    const diff = l.qtyOrdered - (l.qtyConfirmed || 0);
     return sum + (diff > 0 ? diff : 0);
   }, 0);
 
   const totalExtra = data.lines.reduce((sum: number, l: any) => {
-    const v = reconcileValues.find(x => x.id === l.id);
-    const diff = (v?.qtyDelivered || 0) - l.qtyOrdered;
+    const diff = (l.qtyConfirmed || 0) - l.qtyOrdered;
     return sum + (diff > 0 ? diff : 0);
   }, 0);
 
-  const hasDiscrepancy = currentAccepted < totalOrdered || currentDefective > 0 || totalExtra > 0;
+  const hasDiscrepancy = totalConfirmed < totalOrdered || currentDefective > 0 || totalExtra > 0;
 
   return (
     <div className="flex flex-col h-full bg-[#F8FAFC] relative overflow-hidden font-sans text-slate-900">
@@ -210,13 +210,11 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                 <button onClick={() => setCancelModal({ open: true, reason: '' })} className="h-9 px-4 text-[11px] font-bold text-slate-500 hover:bg-slate-50 border border-slate-200 rounded-lg transition uppercase tracking-wide">
                   Hủy phiếu
                 </button>
-                {data.status === 'PARTIALLY_RECEIVED' && (
-                  <button onClick={handleComplete} className="h-9 px-4 text-[11px] font-bold text-emerald-600 hover:bg-emerald-50 border border-emerald-200 rounded-lg transition uppercase tracking-wide">
-                    Hoàn thành phiếu
-                  </button>
-                )}
-                <button onClick={handleConfirm} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg transition uppercase tracking-wide shadow-sm">
-                  {data.status === 'PARTIALLY_RECEIVED' ? 'Xác nhận nhập thêm' : 'Xác nhận nhập kho'}
+                <button onClick={() => handleConfirm('PARTIAL')} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg transition uppercase tracking-wide shadow-sm">
+                  Xác nhận nhập phần đã nhận
+                </button>
+                <button onClick={() => handleConfirm('FULL')} className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition uppercase tracking-wide shadow-sm">
+                  Xác nhận & hoàn tất
                 </button>
               </>
             ) : data.status !== 'CANCELLED' && (
@@ -237,9 +235,9 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
           {[
             { label: 'Nhà cung cấp', value: data.supplier, icon: User, color: 'text-slate-300' },
             { label: 'Quy chiếu (PO)', value: totalOrdered, icon: Package, color: 'text-slate-300' },
-            { label: 'Đã nhập', value: `${currentAccepted} / ${totalOrdered}`, icon: CheckCircle, color: 'text-emerald-400' },
+            { label: 'Đã nhập', value: `${totalConfirmed} / ${totalOrdered}`, icon: CheckCircle, color: 'text-emerald-400' },
             { label: 'Lệch / Lỗi', value: hasDiscrepancy ? (totalMissing + totalExtra + currentDefective) : 0, icon: AlertTriangle, color: hasDiscrepancy ? 'text-amber-400' : 'text-slate-300' },
-            { label: 'Hoàn tất', value: `${totalOrdered > 0 ? Math.round((currentAccepted / totalOrdered) * 100) : 0}%`, icon: CheckCircle, color: 'text-blue-400' }
+            { label: 'Hoàn tất', value: `${totalOrdered > 0 ? Math.round((totalConfirmed / totalOrdered) * 100) : 0}%`, icon: CheckCircle, color: 'text-blue-400' }
           ].map((card, i) => (
             <div key={i} className="bg-white p-4 rounded-xl border border-slate-200 flex flex-col gap-1 shadow-sm">
               <div className="flex items-center gap-2">
@@ -283,8 +281,9 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {data.lines.map((l: any, idx: number) => {
-                    const v = reconcileValues.find(x => x.id === l.id) || {};
-                    const isDiscrepantLine = v.qtyAccepted < l.qtyOrdered || v.qtyDefective > 0;
+                    const v = reconcileValues.find(x => x.lineId === l.id) || {};
+                    const isDiscrepantLine = (l.qtyConfirmed + (v.actualQty || 0)) !== l.qtyOrdered || v.qtyDefective > 0;
+                    const diffQty = (v.actualQty || 0) - (v.qtyDelivered || 0);
                     
                     return (
                       <tr key={l.id} className={`group transition-all ${isDiscrepantLine ? 'bg-amber-50/20' : 'hover:bg-slate-50/50'}`}>
@@ -298,30 +297,35 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                         </td>
                         <td className="p-4 text-center">
                           {isPending ? (
-                            <input type="number" value={v.qtyDelivered} onChange={(e) => setReconcileValues(reconcileValues.map(a => a.id === l.id ? { ...a, qtyDelivered: parseInt(e.target.value) || 0 } : a))}
+                            <input type="number" value={v.qtyDelivered} onChange={(e) => setReconcileValues(reconcileValues.map(a => a.lineId === l.id ? { ...a, qtyDelivered: parseInt(e.target.value) || 0 } : a))}
                               className="w-14 h-8 text-center bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 focus:border-blue-400 outline-none transition shadow-sm" />
                           ) : <span className="font-bold text-slate-600">{l.qtyDelivered}</span>}
                         </td>
                          <td className="p-4 text-center">
                           {isPending ? (
                             <div className="flex flex-col items-center gap-1">
-                                <input type="number" value={v.qtyAccepted} onChange={(e) => setReconcileValues(reconcileValues.map(a => a.id === l.id ? { ...a, qtyAccepted: parseInt(e.target.value) || 0 } : a))}
+                                <input type="number" value={v.actualQty} onChange={(e) => setReconcileValues(reconcileValues.map(a => a.lineId === l.id ? { ...a, actualQty: parseInt(e.target.value) || 0 } : a))}
                                   className="w-14 h-8 text-center bg-white border border-blue-200 rounded-lg text-xs font-bold text-blue-600 focus:border-blue-500 outline-none transition shadow-sm ring-1 ring-blue-50" />
                                 {l.qtyConfirmed > 0 && (
-                                    <span className="text-[8px] font-black text-emerald-500 uppercase tracking-tighter">Đã nhập: {l.qtyConfirmed}</span>
+                                    <span className="text-[8px] font-black text-emerald-500 uppercase tracking-tighter">Đã nhập đợt trước: {l.qtyConfirmed}</span>
                                 )}
                             </div>
-                          ) : <span className="font-bold text-blue-600">{l.qtyAccepted}</span>}
+                          ) : <span className="font-bold text-blue-600">{l.qtyConfirmed}</span>}
                         </td>
                         <td className="p-4 text-center">
                           {isPending ? (
-                            <input type="number" value={v.qtyDefective} onChange={(e) => setReconcileValues(reconcileValues.map(a => a.id === l.id ? { ...a, qtyDefective: parseInt(e.target.value) || 0 } : a))}
-                              className="w-14 h-8 text-center bg-white border border-slate-200 rounded-lg text-xs font-bold text-amber-600 focus:border-amber-400 outline-none transition" />
+                             diffQty === 0 ? (
+                               <span className="text-slate-300">-</span>
+                             ) : diffQty > 0 ? (
+                               <span className="text-emerald-500 font-bold">+{diffQty}</span>
+                             ) : (
+                               <span className="text-rose-500 font-bold">{diffQty}</span>
+                             )
                           ) : <span className={`font-bold ${l.qtyDefective > 0 ? 'text-amber-600' : 'text-slate-200'}`}>{l.qtyDefective || '-'}</span>}
                         </td>
                         <td className="p-4">
                           {isPending ? (
-                            <input type="text" placeholder="..." value={v.note} onChange={(e) => setReconcileValues(reconcileValues.map(a => a.id === l.id ? { ...a, note: e.target.value } : a))}
+                            <input type="text" placeholder="..." value={v.note} onChange={(e) => setReconcileValues(reconcileValues.map(a => a.lineId === l.id ? { ...a, note: e.target.value } : a))}
                               className="w-full h-8 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 focus:bg-white focus:border-blue-400 outline-none transition" />
                           ) : (
                             <div className="flex items-center gap-2">
@@ -354,12 +358,12 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                   <span className="text-xs font-bold text-slate-600">{currentDelivered}</span>
                 </div>
                 <div className="flex flex-col items-center">
-                  <span className="text-[8px] text-blue-400 uppercase font-black tracking-tighter">Thực nhập</span>
-                  <span className="text-sm font-black text-blue-600">{currentAccepted}</span>
+                  <span className="text-[8px] text-blue-400 uppercase font-black tracking-tighter">Đã Nhập Tổng</span>
+                  <span className="text-sm font-black text-blue-600">{totalConfirmed}</span>
                 </div>
                 <div className="flex flex-col items-center">
-                  <span className="text-[8px] text-amber-400 uppercase font-black tracking-tighter">Lỗi/Bù</span>
-                  <span className="text-xs font-bold text-amber-600">{currentDefective}</span>
+                  <span className="text-[8px] text-amber-400 uppercase font-black tracking-tighter">Vừa Nhập</span>
+                  <span className="text-xs font-bold text-amber-600">{currentInputActual}</span>
                 </div>
               </div>
             </div>
