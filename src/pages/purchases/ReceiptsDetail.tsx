@@ -95,12 +95,27 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
   };
 
   const handleConfirm = async (mode: 'PARTIAL' | 'FULL') => {
+    const totalOrdered = data.lines.reduce((s: number, l: any) => s + l.qtyOrdered, 0);
+    const totalConfirmed = data.lines.reduce((s: number, l: any) => s + (l.qtyConfirmed || 0), 0);
     const totalInput = reconcileValues.reduce((s: number, v: any) => s + (v.actualQty || 0), 0);
-    if (totalInput === 0 && mode === 'PARTIAL') {
-       showToast('Vui lòng nhập số lượng thực nhập trước khi xác nhận!', 'warning');
-       return;
+    const remainingQtyAfterConfirm = totalOrdered - (totalConfirmed + totalInput);
+
+    if (mode === 'PARTIAL') {
+      if (totalInput === 0) {
+        showToast('Vui lòng nhập ít nhất một mặt hàng để xác nhận nhập phần đã nhận!', 'warning');
+        return;
+      }
+      if (!window.confirm('Bạn có chắc chắn muốn xác nhận nhập kho cho phần số lượng đã nhận này? (Phiếu vẫn tiếp tục mở để nhập tiếp)')) return;
+    } else {
+      // mode === 'FULL'
+      if (remainingQtyAfterConfirm > 0) {
+        if (!window.confirm(`Phiếu còn thiếu ${remainingQtyAfterConfirm} sản phẩm chưa nhập. Bạn có chắc chắn muốn hoàn tất và đóng phiếu không?`)) {
+          return;
+        }
+      } else {
+        if (!window.confirm('Bạn có chắc chắn muốn xác nhận nhập kho và hoàn tất phiếu nhập này?')) return;
+      }
     }
-    if (!window.confirm(`Bạn đang xác nhận ${mode === 'FULL' ? 'HOÀN TẤT phiếu (những dòng chưa đủ sẽ chốt thiếu)' : 'NHẬP KHO phần đã nhận'}. Hành động này sẽ cộng Tồn kho. Bạn chắc chắn chứ?`)) return;
     
     try {
       await api.post(`/receipts/${currentId}/confirm`, { mode, lines: reconcileValues });
@@ -135,7 +150,7 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
 
   if (loading || !data) return <div className="p-10 flex justify-center"><div className="w-8 h-8 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin"></div></div>;
 
-  const isPending = data.status === 'PENDING' || data.status === 'PARTIALLY_RECEIVED' || data.status === 'DRAFT';
+  const isPending = data.status === 'PENDING' || data.status === 'PARTIAL_RECEIVED' || data.status === 'PARTIALLY_RECEIVED' || data.status === 'DRAFT';
 
   // Checking for discrepancies
   const totalOrdered = data.lines.reduce((s: number, l: any) => s + l.qtyOrdered, 0);
@@ -155,6 +170,9 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
     return sum + (diff > 0 ? diff : 0);
   }, 0);
 
+  const remainingQty = Math.max(0, totalOrdered - totalConfirmed);
+  const totalDefective = data.lines.reduce((s: number, l: any) => s + (l.qtyDefective || 0), 0);
+  const totalDiscrepancy = totalDefective + totalExtra;
   const hasDiscrepancy = totalConfirmed < totalOrdered || currentDefective > 0 || totalExtra > 0;
 
   return (
@@ -192,15 +210,15 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
 
         <div className="flex items-center gap-3">
           <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-            data.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-            data.status === 'PARTIALLY_RECEIVED' ? 'bg-amber-50 text-amber-600 border-amber-100' : 
-            data.status === 'DISCREPANCY' ? 'bg-rose-50 text-rose-600 border-rose-100' : 
+            data.status === 'COMPLETED' || data.status === 'FULL_RECEIVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+            data.status === 'PARTIALLY_RECEIVED' || data.status === 'PARTIAL_RECEIVED' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
+            data.status === 'DISCREPANCY' || data.status === 'HAS_ERROR' ? 'bg-rose-50 text-rose-600 border-rose-100' : 
             data.status === 'CANCELLED' ? 'bg-slate-100 text-slate-400 border-slate-200' : 
-            'bg-blue-50 text-blue-600 border-blue-100'
+            'bg-amber-50 text-amber-600 border-amber-100'
           }`}>
             {data.status === 'PENDING' ? 'Chờ kiểm hàng' : 
-             data.status === 'PARTIALLY_RECEIVED' ? 'Nhập một phần' : 
-             data.status === 'COMPLETED' ? 'Đã nhập kho' : 
+             data.status === 'PARTIALLY_RECEIVED' || data.status === 'PARTIAL_RECEIVED' ? 'Nhập một phần' : 
+             data.status === 'COMPLETED' || data.status === 'FULL_RECEIVED' ? 'Đã nhập kho' : 
              data.status === 'CANCELLED' ? 'Đã hủy' : 'Lệch / Lỗi'}
           </span>
 
@@ -210,9 +228,11 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                 <button onClick={() => setCancelModal({ open: true, reason: '' })} className="h-9 px-4 text-[11px] font-bold text-slate-500 hover:bg-slate-50 border border-slate-200 rounded-lg transition uppercase tracking-wide">
                   Hủy phiếu
                 </button>
-                <button onClick={() => handleConfirm('PARTIAL')} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg transition uppercase tracking-wide shadow-sm">
-                  Xác nhận nhập phần đã nhận
-                </button>
+                {remainingQty > 0 && (
+                  <button onClick={() => handleConfirm('PARTIAL')} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg transition uppercase tracking-wide shadow-sm">
+                    Xác nhận nhập phần đã nhận
+                  </button>
+                )}
                 <button onClick={() => handleConfirm('FULL')} className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition uppercase tracking-wide shadow-sm">
                   Xác nhận & hoàn tất
                 </button>
@@ -231,12 +251,13 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
 
       <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6 custom-scrollbar print:hidden">
         {/* TOP SUMMARY CARDS */}
-        <div className="grid grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {[
-            { label: 'Nhà cung cấp', value: data.supplier, icon: User, color: 'text-slate-300' },
+            { label: 'Nhà cung cấp', value: data.supplier || 'N/A', icon: User, color: 'text-slate-300' },
             { label: 'Quy chiếu (PO)', value: totalOrdered, icon: Package, color: 'text-slate-300' },
             { label: 'Đã nhập', value: `${totalConfirmed} / ${totalOrdered}`, icon: CheckCircle, color: 'text-emerald-400' },
-            { label: 'Lệch / Lỗi', value: hasDiscrepancy ? (totalMissing + totalExtra + currentDefective) : 0, icon: AlertTriangle, color: hasDiscrepancy ? 'text-amber-400' : 'text-slate-300' },
+            { label: 'Còn lại', value: remainingQty, icon: Package, color: remainingQty > 0 ? 'text-amber-500' : 'text-slate-300' },
+            { label: 'Lệch / Lỗi', value: totalDiscrepancy, icon: AlertTriangle, color: totalDiscrepancy > 0 ? 'text-rose-400' : 'text-slate-300' },
             { label: 'Hoàn tất', value: `${totalOrdered > 0 ? Math.round((totalConfirmed / totalOrdered) * 100) : 0}%`, icon: CheckCircle, color: 'text-blue-400' }
           ].map((card, i) => (
             <div key={i} className="bg-white p-4 rounded-xl border border-slate-200 flex flex-col gap-1 shadow-sm">
@@ -273,60 +294,90 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                     <th className="p-4 w-12 text-center border-b border-slate-100">STT</th>
                     <th className="p-4 border-b border-slate-100">Hàng hoá</th>
                     <th className="p-4 text-center border-b border-slate-100">Quy Chiếu</th>
-                    <th className="p-4 text-center border-b border-slate-100">Giao Tới</th>
-                    <th className="p-4 text-center border-b border-slate-100">Thực Nhập</th>
-                    <th className="p-4 text-center border-b border-slate-100">Lỗi / Bù</th>
+                    <th className="p-4 text-center border-b border-slate-100">Đã Nhập Trước</th>
+                    <th className="p-4 text-center border-b border-slate-100">Còn Lại</th>
+                    <th className="p-4 text-center border-b border-slate-100 w-32">Thực Nhập Đợt Này</th>
+                    <th className="p-4 text-center border-b border-slate-100 w-24">Hỏng / Lỗi</th>
                     <th className="p-4 border-b border-slate-100">Ghi chú</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {data.lines.map((l: any, idx: number) => {
                     const v = reconcileValues.find(x => x.lineId === l.id) || {};
-                    const isDiscrepantLine = (l.qtyConfirmed + (v.actualQty || 0)) !== l.qtyOrdered || v.qtyDefective > 0;
-                    const diffQty = (v.actualQty || 0) - (v.qtyDelivered || 0);
+                    const remainingLineQty = Math.max(0, l.qtyOrdered - l.qtyConfirmed);
+                    const isLineCompleted = remainingLineQty <= 0;
                     
                     return (
-                      <tr key={l.id} className={`group transition-all ${isDiscrepantLine ? 'bg-amber-50/20' : 'hover:bg-slate-50/50'}`}>
+                      <tr key={l.id} className={`group transition-all ${isLineCompleted ? 'bg-slate-50/40 opacity-75' : 'hover:bg-slate-50/50'}`}>
                         <td className="p-4 text-center text-xs font-medium text-slate-300">{idx + 1}</td>
                         <td className="p-4 max-w-[250px]">
                           <p className="font-bold text-slate-700 text-xs leading-snug uppercase">{l.item.name}</p>
                           <p className="text-[9px] font-bold text-slate-400 mt-0.5 tracking-tight">{l.item.mvpp} · {l.item.unit}</p>
                         </td>
                         <td className="p-4 text-center">
-                          <span className="font-bold text-slate-400">{l.qtyOrdered}</span>
+                          <span className="font-bold text-slate-500">{l.qtyOrdered}</span>
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className="font-bold text-emerald-600">{l.qtyConfirmed}</span>
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className={`font-bold ${remainingLineQty > 0 ? 'text-amber-600' : 'text-slate-300'}`}>{remainingLineQty}</span>
                         </td>
                         <td className="p-4 text-center">
                           {isPending ? (
-                            <input type="number" value={v.qtyDelivered} onChange={(e) => setReconcileValues(reconcileValues.map(a => a.lineId === l.id ? { ...a, qtyDelivered: parseInt(e.target.value) || 0 } : a))}
-                              className="w-14 h-8 text-center bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 focus:border-blue-400 outline-none transition shadow-sm" />
-                          ) : <span className="font-bold text-slate-600">{l.qtyDelivered}</span>}
-                        </td>
-                         <td className="p-4 text-center">
-                          {isPending ? (
-                            <div className="flex flex-col items-center gap-1">
-                                <input type="number" value={v.actualQty} onChange={(e) => setReconcileValues(reconcileValues.map(a => a.lineId === l.id ? { ...a, actualQty: parseInt(e.target.value) || 0 } : a))}
-                                  className="w-14 h-8 text-center bg-white border border-blue-200 rounded-lg text-xs font-bold text-blue-600 focus:border-blue-500 outline-none transition shadow-sm ring-1 ring-blue-50" />
-                                {l.qtyConfirmed > 0 && (
-                                    <span className="text-[8px] font-black text-emerald-500 uppercase tracking-tighter">Đã nhập đợt trước: {l.qtyConfirmed}</span>
-                                )}
-                            </div>
-                          ) : <span className="font-bold text-blue-600">{l.qtyConfirmed}</span>}
+                            isLineCompleted ? (
+                              <span className="text-[10px] font-black text-emerald-500 uppercase tracking-tighter bg-emerald-50 px-2 py-1 rounded">Đủ</span>
+                            ) : (
+                              <input 
+                                type="number" 
+                                min={0} 
+                                max={remainingLineQty} 
+                                value={v.actualQty} 
+                                onChange={(e) => {
+                                  const val = Math.max(0, parseInt(e.target.value) || 0);
+                                  const finalVal = val > remainingLineQty ? remainingLineQty : val;
+                                  setReconcileValues(reconcileValues.map(a => a.lineId === l.id ? { ...a, actualQty: finalVal } : a));
+                                }}
+                                className="w-16 h-8 text-center bg-white border border-blue-200 rounded-lg text-xs font-bold text-blue-600 focus:border-blue-500 outline-none transition shadow-sm ring-1 ring-blue-50" 
+                              />
+                            )
+                          ) : (
+                            <span className="font-bold text-blue-600">{l.qtyConfirmed}</span>
+                          )}
                         </td>
                         <td className="p-4 text-center">
                           {isPending ? (
-                             diffQty === 0 ? (
-                               <span className="text-slate-300">-</span>
-                             ) : diffQty > 0 ? (
-                               <span className="text-emerald-500 font-bold">+{diffQty}</span>
-                             ) : (
-                               <span className="text-rose-500 font-bold">{diffQty}</span>
-                             )
-                          ) : <span className={`font-bold ${l.qtyDefective > 0 ? 'text-amber-600' : 'text-slate-200'}`}>{l.qtyDefective || '-'}</span>}
+                            isLineCompleted ? (
+                              <span className="text-slate-300">-</span>
+                            ) : (
+                              <input 
+                                type="number" 
+                                min={0} 
+                                value={v.qtyDefective} 
+                                onChange={(e) => {
+                                  const val = Math.max(0, parseInt(e.target.value) || 0);
+                                  setReconcileValues(reconcileValues.map(a => a.lineId === l.id ? { ...a, qtyDefective: val } : a));
+                                }}
+                                className="w-14 h-8 text-center bg-white border border-slate-200 rounded-lg text-xs font-bold text-amber-600 focus:border-amber-500 outline-none transition shadow-sm" 
+                              />
+                            )
+                          ) : (
+                            <span className={`font-bold ${l.qtyDefective > 0 ? 'text-amber-600' : 'text-slate-300'}`}>{l.qtyDefective || '-'}</span>
+                          )}
                         </td>
                         <td className="p-4">
                           {isPending ? (
-                            <input type="text" placeholder="..." value={v.note} onChange={(e) => setReconcileValues(reconcileValues.map(a => a.lineId === l.id ? { ...a, note: e.target.value } : a))}
-                              className="w-full h-8 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 focus:bg-white focus:border-blue-400 outline-none transition" />
+                            isLineCompleted ? (
+                              <span className="text-slate-300">-</span>
+                            ) : (
+                              <input 
+                                type="text" 
+                                placeholder="..." 
+                                value={v.note} 
+                                onChange={(e) => setReconcileValues(reconcileValues.map(a => a.lineId === l.id ? { ...a, note: e.target.value } : a))}
+                                className="w-full h-8 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 focus:bg-white focus:border-blue-400 outline-none transition" 
+                              />
+                            )
                           ) : (
                             <div className="flex items-center gap-2">
                               {l.note ? (
@@ -354,16 +405,16 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                   <span className="text-xs font-bold text-slate-400">{totalOrdered}</span>
                 </div>
                 <div className="flex flex-col items-center">
-                  <span className="text-[8px] text-slate-400 uppercase font-black tracking-tighter">Giao tới</span>
-                  <span className="text-xs font-bold text-slate-600">{currentDelivered}</span>
+                  <span className="text-[8px] text-emerald-400 uppercase font-black tracking-tighter">Đã Nhập Tổng</span>
+                  <span className="text-xs font-bold text-emerald-600">{totalConfirmed}</span>
                 </div>
                 <div className="flex flex-col items-center">
-                  <span className="text-[8px] text-blue-400 uppercase font-black tracking-tighter">Đã Nhập Tổng</span>
-                  <span className="text-sm font-black text-blue-600">{totalConfirmed}</span>
+                  <span className="text-[8px] text-amber-400 uppercase font-black tracking-tighter">Còn Lại</span>
+                  <span className="text-xs font-bold text-amber-600">{remainingQty}</span>
                 </div>
                 <div className="flex flex-col items-center">
-                  <span className="text-[8px] text-amber-400 uppercase font-black tracking-tighter">Vừa Nhập</span>
-                  <span className="text-xs font-bold text-amber-600">{currentInputActual}</span>
+                  <span className="text-[8px] text-blue-400 uppercase font-black tracking-tighter">Vừa Nhập</span>
+                  <span className="text-sm font-black text-blue-600">{currentInputActual}</span>
                 </div>
               </div>
             </div>

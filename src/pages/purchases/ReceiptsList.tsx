@@ -22,7 +22,15 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
     
     let matchTab = true;
     if (activeTab === 'ALL') matchTab = true;
-    else matchTab = d.status === activeTab;
+    else if (activeTab === 'PENDING') {
+      matchTab = d.status === 'PENDING' || d.status === 'PARTIAL_RECEIVED' || d.status === 'PARTIALLY_RECEIVED';
+    } else if (activeTab === 'COMPLETED') {
+      matchTab = d.status === 'COMPLETED' || d.status === 'FULL_RECEIVED';
+    } else if (activeTab === 'DISCREPANCY') {
+      matchTab = d.status === 'DISCREPANCY' || d.status === 'HAS_ERROR';
+    } else {
+      matchTab = d.status === activeTab;
+    }
 
     return matchSearch && matchTab;
   });
@@ -51,8 +59,12 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
   const getStatusBadge = (status: string) => {
       switch(status) {
           case 'PENDING': return <span className="px-2 py-1 rounded bg-amber-100 text-amber-700 font-bold text-[10px] uppercase border border-amber-200">Chờ Kiểm Hàng</span>;
-          case 'COMPLETED': return <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-700 font-bold text-[10px] uppercase border border-emerald-200">Đã Nhập Kho</span>;
-          case 'DISCREPANCY': return <span className="px-2 py-1 rounded bg-rose-100 text-rose-700 font-bold text-[10px] uppercase border border-rose-200 flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Lệch / Lỗi</span>;
+          case 'PARTIAL_RECEIVED':
+          case 'PARTIALLY_RECEIVED': return <span className="px-2 py-1 rounded bg-blue-100 text-blue-700 font-bold text-[10px] uppercase border border-blue-200">Nhập Một Phần</span>;
+          case 'COMPLETED':
+          case 'FULL_RECEIVED': return <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-700 font-bold text-[10px] uppercase border border-emerald-200">Đã Nhập Kho</span>;
+          case 'DISCREPANCY':
+          case 'HAS_ERROR': return <span className="px-2 py-1 rounded bg-rose-100 text-rose-700 font-bold text-[10px] uppercase border border-rose-200 flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Lệch / Lỗi</span>;
           case 'CANCELLED': return <span className="px-2 py-1 rounded bg-slate-100 text-slate-500 font-bold text-[10px] uppercase border border-slate-200 line-through">Đã Hủy</span>;
           default: return <span className="px-2 py-1 rounded bg-slate-100 text-slate-500 font-bold text-[10px] uppercase">{status}</span>;
       }
@@ -90,7 +102,7 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition group" onClick={()=>setActiveTab('PENDING')}>
                     <div className="flex justify-between items-start mb-4">
                         <div className="p-3 bg-amber-50 text-amber-500 rounded-xl group-hover:scale-110 transition shrink-0"><Clock className="w-6 h-6"/></div>
-                        <h3 className="text-3xl font-black text-slate-800">{data.filter(d => d.status === 'PENDING').length}</h3>
+                        <h3 className="text-3xl font-black text-slate-800">{data.filter(d => d.status === 'PENDING' || d.status === 'PARTIAL_RECEIVED' || d.status === 'PARTIALLY_RECEIVED').length}</h3>
                     </div>
                     <p className="font-bold text-slate-500 text-sm">Chờ Kiểm Hàng / Nhập</p>
                 </div>
@@ -98,7 +110,7 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition group" onClick={()=>setActiveTab('DISCREPANCY')}>
                     <div className="flex justify-between items-start mb-4">
                         <div className="p-3 bg-rose-50 text-rose-500 rounded-xl group-hover:scale-110 transition shrink-0"><AlertTriangle className="w-6 h-6"/></div>
-                        <h3 className="text-3xl font-black text-rose-600">{data.filter(d => d.status === 'DISCREPANCY').length}</h3>
+                        <h3 className="text-3xl font-black text-rose-600">{data.filter(d => d.status === 'DISCREPANCY' || d.status === 'HAS_ERROR').length}</h3>
                     </div>
                     <p className="font-bold text-slate-500 text-sm">Nhập Kho Có Lệch/Lỗi</p>
                 </div>
@@ -106,7 +118,7 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition group" onClick={()=>setActiveTab('COMPLETED')}>
                     <div className="flex justify-between items-start mb-4">
                         <div className="p-3 bg-emerald-50 text-emerald-500 rounded-xl group-hover:scale-110 transition shrink-0"><CheckCircle className="w-6 h-6"/></div>
-                        <h3 className="text-3xl font-black text-slate-800">{data.filter(d => d.status === 'COMPLETED').length}</h3>
+                        <h3 className="text-3xl font-black text-slate-800">{data.filter(d => d.status === 'COMPLETED' || d.status === 'FULL_RECEIVED').length}</h3>
                     </div>
                     <p className="font-bold text-slate-500 text-sm">Đã Nhập Kho</p>
                 </div>
