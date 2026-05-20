@@ -97,7 +97,16 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
   const handleConfirm = async (mode: 'PARTIAL' | 'FULL') => {
     const totalOrdered = data.lines.reduce((s: number, l: any) => s + l.qtyOrdered, 0);
     const totalConfirmed = data.lines.reduce((s: number, l: any) => s + (l.qtyConfirmed || 0), 0);
-    const totalInput = reconcileValues.reduce((s: number, v: any) => s + (v.actualQty || 0), 0);
+    const sanitizedLines = reconcileValues.map((v: any) => {
+      const l = data.lines.find((x: any) => x.id === v.lineId);
+      const remainingLineQty = Math.max(0, (l?.qtyOrdered || 0) - (l?.qtyConfirmed || 0));
+      if (remainingLineQty <= 0) {
+        return { ...v, actualQty: 0, qtyDefective: 0 };
+      }
+      return v;
+    });
+
+    const totalInput = sanitizedLines.reduce((s: number, v: any) => s + (v.actualQty || 0), 0);
     const remainingQtyAfterConfirm = totalOrdered - (totalConfirmed + totalInput);
 
     if (mode === 'PARTIAL') {
@@ -118,7 +127,7 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
     }
     
     try {
-      await api.post(`/receipts/${currentId}/confirm`, { mode, lines: reconcileValues });
+      await api.post(`/receipts/${currentId}/confirm`, { mode, lines: sanitizedLines });
       showToast('Xác nhận Nhập Kho thành công!');
       
       if (canGoNext && mode === 'FULL') {
@@ -228,10 +237,14 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                 <button onClick={() => setCancelModal({ open: true, reason: '' })} className="h-9 px-4 text-[11px] font-bold text-slate-500 hover:bg-slate-50 border border-slate-200 rounded-lg transition uppercase tracking-wide">
                   Hủy phiếu
                 </button>
-                {remainingQty > 0 && (
+                {remainingQty > 0 ? (
                   <button onClick={() => handleConfirm('PARTIAL')} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg transition uppercase tracking-wide shadow-sm">
                     Xác nhận nhập phần đã nhận
                   </button>
+                ) : (
+                  <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
+                    <CheckCircle className="w-3.5 h-3.5" /> Phiếu đã nhập đủ
+                  </span>
                 )}
                 <button onClick={() => handleConfirm('FULL')} className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition uppercase tracking-wide shadow-sm">
                   Xác nhận & hoàn tất
@@ -312,7 +325,12 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                         <td className="p-4 text-center text-xs font-medium text-slate-300">{idx + 1}</td>
                         <td className="p-4 max-w-[250px]">
                           <p className="font-bold text-slate-700 text-xs leading-snug uppercase">{l.item.name}</p>
-                          <p className="text-[9px] font-bold text-slate-400 mt-0.5 tracking-tight">{l.item.mvpp} · {l.item.unit}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-[9px] font-bold text-slate-400 tracking-tight">{l.item.mvpp} · {l.item.unit}</p>
+                            {isLineCompleted && (
+                              <span className="text-[8px] font-black text-emerald-600 uppercase tracking-tighter bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">Đã nhập đủ</span>
+                            )}
+                          </div>
                         </td>
                         <td className="p-4 text-center">
                           <span className="font-bold text-slate-500">{l.qtyOrdered}</span>
@@ -321,63 +339,61 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                           <span className="font-bold text-emerald-600">{l.qtyConfirmed}</span>
                         </td>
                         <td className="p-4 text-center">
-                          <span className={`font-bold ${remainingLineQty > 0 ? 'text-amber-600' : 'text-slate-300'}`}>{remainingLineQty}</span>
+                          <span className={`font-bold ${remainingLineQty > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{remainingLineQty}</span>
                         </td>
                         <td className="p-4 text-center">
                           {isPending ? (
-                            isLineCompleted ? (
-                              <span className="text-[10px] font-black text-emerald-500 uppercase tracking-tighter bg-emerald-50 px-2 py-1 rounded">Đủ</span>
-                            ) : (
-                              <input 
-                                type="number" 
-                                min={0} 
-                                max={remainingLineQty} 
-                                value={v.actualQty} 
-                                onChange={(e) => {
-                                  const val = Math.max(0, parseInt(e.target.value) || 0);
-                                  const finalVal = val > remainingLineQty ? remainingLineQty : val;
-                                  setReconcileValues(reconcileValues.map(a => a.lineId === l.id ? { ...a, actualQty: finalVal } : a));
-                                }}
-                                className="w-16 h-8 text-center bg-white border border-blue-200 rounded-lg text-xs font-bold text-blue-600 focus:border-blue-500 outline-none transition shadow-sm ring-1 ring-blue-50" 
-                              />
-                            )
+                            <input 
+                              type="number" 
+                              min={0} 
+                              max={remainingLineQty} 
+                              value={isLineCompleted ? "" : v.actualQty} 
+                              disabled={isLineCompleted}
+                              placeholder={isLineCompleted ? "Đã đủ" : "0"}
+                              tabIndex={isLineCompleted ? -1 : undefined}
+                              onChange={(e) => {
+                                const val = Math.max(0, parseInt(e.target.value) || 0);
+                                if (val > remainingLineQty) {
+                                  showToast('Số nhập đợt này không được vượt số còn lại.', 'warning');
+                                }
+                                const finalVal = val > remainingLineQty ? remainingLineQty : val;
+                                setReconcileValues(reconcileValues.map(a => a.lineId === l.id ? { ...a, actualQty: finalVal } : a));
+                              }}
+                              className="w-16 h-8 text-center bg-white disabled:bg-slate-50 border border-blue-200 disabled:border-slate-100 rounded-lg text-xs font-bold text-blue-600 disabled:text-slate-400 focus:border-blue-500 outline-none transition shadow-sm ring-1 ring-blue-50/50" 
+                            />
                           ) : (
                             <span className="font-bold text-blue-600">{l.qtyConfirmed}</span>
                           )}
                         </td>
                         <td className="p-4 text-center">
                           {isPending ? (
-                            isLineCompleted ? (
-                              <span className="text-slate-300">-</span>
-                            ) : (
-                              <input 
-                                type="number" 
-                                min={0} 
-                                value={v.qtyDefective} 
-                                onChange={(e) => {
-                                  const val = Math.max(0, parseInt(e.target.value) || 0);
-                                  setReconcileValues(reconcileValues.map(a => a.lineId === l.id ? { ...a, qtyDefective: val } : a));
-                                }}
-                                className="w-14 h-8 text-center bg-white border border-slate-200 rounded-lg text-xs font-bold text-amber-600 focus:border-amber-500 outline-none transition shadow-sm" 
-                              />
-                            )
+                            <input 
+                              type="number" 
+                              min={0} 
+                              value={isLineCompleted ? "" : v.qtyDefective} 
+                              disabled={isLineCompleted}
+                              placeholder={isLineCompleted ? "-" : "0"}
+                              tabIndex={isLineCompleted ? -1 : undefined}
+                              onChange={(e) => {
+                                const val = Math.max(0, parseInt(e.target.value) || 0);
+                                setReconcileValues(reconcileValues.map(a => a.lineId === l.id ? { ...a, qtyDefective: val } : a));
+                              }}
+                              className="w-14 h-8 text-center bg-white disabled:bg-slate-50 border border-slate-200 disabled:border-slate-100 rounded-lg text-xs font-bold text-amber-600 disabled:text-slate-400 focus:border-amber-500 outline-none transition shadow-sm" 
+                            />
                           ) : (
                             <span className={`font-bold ${l.qtyDefective > 0 ? 'text-amber-600' : 'text-slate-300'}`}>{l.qtyDefective || '-'}</span>
                           )}
                         </td>
                         <td className="p-4">
                           {isPending ? (
-                            isLineCompleted ? (
-                              <span className="text-slate-300">-</span>
-                            ) : (
-                              <input 
-                                type="text" 
-                                placeholder="..." 
-                                value={v.note} 
-                                onChange={(e) => setReconcileValues(reconcileValues.map(a => a.lineId === l.id ? { ...a, note: e.target.value } : a))}
-                                className="w-full h-8 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 focus:bg-white focus:border-blue-400 outline-none transition" 
-                              />
-                            )
+                            <input 
+                              type="text" 
+                              placeholder="..." 
+                              value={isLineCompleted ? "" : v.note} 
+                              disabled={isLineCompleted}
+                              onChange={(e) => setReconcileValues(reconcileValues.map(a => a.lineId === l.id ? { ...a, note: e.target.value } : a))}
+                              className="w-full h-8 px-3 bg-slate-50 disabled:bg-slate-100 border border-slate-200 disabled:border-slate-100 rounded-lg text-xs font-medium text-slate-600 disabled:text-slate-400 focus:bg-white focus:border-blue-400 outline-none transition" 
+                            />
                           ) : (
                             <div className="flex items-center gap-2">
                               {l.note ? (
@@ -415,6 +431,10 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                 <div className="flex flex-col items-center">
                   <span className="text-[8px] text-blue-400 uppercase font-black tracking-tighter">Vừa Nhập</span>
                   <span className="text-sm font-black text-blue-600">{currentInputActual}</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="text-[8px] text-rose-400 uppercase font-black tracking-tighter">Lỗi / Hỏng</span>
+                  <span className="text-sm font-black text-rose-600">{currentDefective}</span>
                 </div>
               </div>
             </div>
