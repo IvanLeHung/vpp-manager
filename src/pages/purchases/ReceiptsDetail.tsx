@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import api from '../../lib/api';
 import {
   ArrowLeft, CheckCircle, Package, AlertTriangle, Printer, 
-  ChevronLeft, ChevronRight, User, History, Undo, FileText
+  ChevronLeft, ChevronRight, User, History, Undo, FileText,
+  Plus, Trash2, Search
 } from 'lucide-react';
 
 const AUDIT_ACTION_MAP: Record<string, { label: string, impact: string, color: string }> = {
@@ -26,6 +27,11 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
   const [loading, setLoading] = useState(true);
   const [currentId, setCurrentId] = useState(receiptId);
   const [cancelModal, setCancelModal] = useState<{ open: boolean, reason: string }>({ open: false, reason: '' });
+  
+  // Unexpected items catalog search state
+  const [items, setItems] = useState<any[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Navigation logic
   const currentIndex = navigationIds.indexOf(currentId);
@@ -45,9 +51,17 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentIndex]);
 
-
   // Reconciliation data
   const [reconcileValues, setReconcileValues] = useState<any[]>([]);
+
+  const fetchItems = async () => {
+    try {
+      const res = await api.get('/items');
+      setItems(res.data.filter((i: any) => i.isActive));
+    } catch (err) {
+      console.error('Error fetching items:', err);
+    }
+  };
 
   const refreshData = async () => {
     try {
@@ -60,8 +74,11 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
           qtyDelivered: l.qtyDelivered || l.qtyOrdered,
           actualQty: 0,
           qtyDefective: 0,
-          note: '',
-          location: l.location || ''
+          note: l.note || '',
+          location: l.location || '',
+          discrepancyType: l.discrepancyType || '',
+          status: l.status || '',
+          isUnexpected: l.qtyOrdered === 0
         })));
       }
     } catch (err) {
@@ -72,20 +89,70 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
   };
 
   useEffect(() => {
+    fetchItems();
+  }, []);
+
+  useEffect(() => {
     refreshData();
   }, [currentId]);
 
+  const handleAddUnexpectedItem = (item: any) => {
+    if (reconcileValues.find(v => v.itemId === item.id)) {
+      showToast('Mặt hàng này đã có trong danh sách đối chiếu!', 'warning');
+      return;
+    }
+    const tempId = `temp-${Date.now()}`;
+    setReconcileValues([
+      ...reconcileValues,
+      {
+        lineId: tempId,
+        itemId: item.id,
+        qtyDelivered: 1,
+        actualQty: 1,
+        qtyDefective: 0,
+        note: 'Nhà cung cấp giao khác model',
+        location: '',
+        discrepancyType: 'Hàng ngoài PO / Sai model',
+        status: 'Chờ xử lý lệch',
+        isUnexpected: true
+      }
+    ]);
+    setShowAddModal(false);
+    setSearchTerm('');
+    showToast(`Đã thêm hàng phát sinh: ${item.name}`);
+  };
+
+  const handleApplyRemainingAll = () => {
+    if (!data) return;
+    const updated = reconcileValues.map((v: any) => {
+      const l = data.lines.find((x: any) => x.id === v.lineId);
+      if (l && l.qtyOrdered > 0) {
+        const remaining = Math.max(0, l.qtyOrdered - (l.qtyConfirmed || 0));
+        return { ...v, actualQty: remaining };
+      }
+      return v;
+    });
+    setReconcileValues(updated);
+    showToast('Đã áp dụng nhập đủ phần còn lại cho tất cả các dòng hàng!', 'success');
+  };
 
   const handleSaveDraft = async () => {
     try {
-      const draftPayload = reconcileValues.map((v: any) => ({
+      const draftPayload = reconcileValues.map((v: any) => {
+        const l = data.lines.find((x: any) => x.id === v.lineId);
+        const qtyConfirmedBefore = l ? (l.qtyConfirmed || 0) : 0;
+        return {
           id: v.lineId,
-          qtyDelivered: v.qtyDelivered,
-          qtyAccepted: (data.lines.find((l: any) => l.id === v.lineId)?.qtyConfirmed || 0) + (v.actualQty || 0),
+          itemId: v.itemId,
+          qtyDelivered: v.qtyDelivered || 0,
+          qtyAccepted: qtyConfirmedBefore + (v.actualQty || 0),
           qtyDefective: v.qtyDefective,
           note: v.note,
-          location: v.location
-      }));
+          location: v.location,
+          discrepancyType: v.discrepancyType || null,
+          status: v.status || null
+        };
+      });
       await api.put(`/receipts/${currentId}/check`, { lines: draftPayload });
       showToast('Đã lưu nháp biên bản Kiểm Hàng!');
       await refreshData();
@@ -96,12 +163,15 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
 
   const handleConfirm = async (mode: 'PARTIAL' | 'FULL') => {
     const totalOrdered = data.lines.reduce((s: number, l: any) => s + l.qtyOrdered, 0);
-    const totalConfirmed = data.lines.reduce((s: number, l: any) => s + (l.qtyConfirmed || 0), 0);
+    const totalConfirmed = data.lines.reduce((s: number, l: any) => s + (l.qtyOrdered > 0 ? (l.qtyConfirmed || 0) : 0), 0);
+    
     const sanitizedLines = reconcileValues.map((v: any) => {
       const l = data.lines.find((x: any) => x.id === v.lineId);
-      const remainingLineQty = Math.max(0, (l?.qtyOrdered || 0) - (l?.qtyConfirmed || 0));
-      if (remainingLineQty <= 0) {
-        return { ...v, actualQty: 0, qtyDefective: 0 };
+      if (l && l.qtyOrdered > 0) {
+        const remainingLineQty = Math.max(0, l.qtyOrdered - (l.qtyConfirmed || 0));
+        if (remainingLineQty <= 0) {
+          return { ...v, actualQty: 0, qtyDefective: 0 };
+        }
       }
       return v;
     });
@@ -155,26 +225,28 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
     }
   };
 
-
-
   if (loading || !data) return <div className="p-10 flex justify-center"><div className="w-8 h-8 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin"></div></div>;
 
   const isPending = data.status === 'PENDING' || data.status === 'PARTIAL_RECEIVED' || data.status === 'PARTIALLY_RECEIVED' || data.status === 'DRAFT';
 
   // Checking for discrepancies
   const totalOrdered = data.lines.reduce((s: number, l: any) => s + l.qtyOrdered, 0);
-  const totalConfirmed = data.lines.reduce((s: number, l: any) => s + (l.qtyConfirmed || 0), 0); // Đã nhận thực tế (Cộng dồn)
-  const currentInputActual = reconcileValues.reduce((s: number, v: any) => s + (v.actualQty || 0), 0); // Vừa gõ
+  const totalConfirmed = data.lines.reduce((s: number, l: any) => s + (l.qtyOrdered > 0 ? (l.qtyConfirmed || 0) : 0), 0); // Chỉ hàng chuẩn
+  const currentInputActual = reconcileValues.reduce((s: number, v: any) => s + (v.actualQty || 0), 0);
   const currentDefective = reconcileValues.reduce((s: number, v: any) => s + (v.qtyDefective || 0), 0);
   const currentDelivered = reconcileValues.reduce((s: number, v: any) => s + (v.qtyDelivered || 0), 0);
 
   // Breakdown stats
   const totalMissing = data.lines.reduce((sum: number, l: any) => {
+    if (l.qtyOrdered === 0) return sum;
     const diff = l.qtyOrdered - (l.qtyConfirmed || 0);
     return sum + (diff > 0 ? diff : 0);
   }, 0);
 
   const totalExtra = data.lines.reduce((sum: number, l: any) => {
+    if (l.qtyOrdered === 0) {
+      return sum + (l.qtyConfirmed || 0);
+    }
     const diff = (l.qtyConfirmed || 0) - l.qtyOrdered;
     return sum + (diff > 0 ? diff : 0);
   }, 0);
@@ -182,7 +254,6 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
   const remainingQty = Math.max(0, totalOrdered - totalConfirmed);
   const totalDefective = data.lines.reduce((s: number, l: any) => s + (l.qtyDefective || 0), 0);
   const totalDiscrepancy = totalDefective + totalExtra;
-  const hasDiscrepancy = totalConfirmed < totalOrdered || currentDefective > 0 || totalExtra > 0;
 
   return (
     <div className="flex flex-col h-full bg-[#F8FAFC] relative overflow-hidden font-sans text-slate-900">
@@ -236,6 +307,9 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
               <>
                 <button onClick={() => setCancelModal({ open: true, reason: '' })} className="h-9 px-4 text-[11px] font-bold text-slate-500 hover:bg-slate-50 border border-slate-200 rounded-lg transition uppercase tracking-wide">
                   Hủy phiếu
+                </button>
+                <button onClick={handleApplyRemainingAll} className="h-9 px-4 text-[11px] font-bold text-teal-600 hover:bg-teal-50 border border-teal-200 rounded-lg transition uppercase tracking-wide">
+                  Áp dụng nhập đủ
                 </button>
                 {remainingQty > 0 ? (
                   <button onClick={() => handleConfirm('PARTIAL')} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg transition uppercase tracking-wide shadow-sm">
@@ -294,9 +368,14 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                 <Package className="w-4 h-4 text-blue-500" /> Đối chiếu & nhập thực tế
               </h3>
               {isPending && (
-                <button onClick={handleSaveDraft} className="text-[10px] font-bold text-blue-600 hover:text-blue-700 transition uppercase tracking-widest">
-                  Lưu nháp đối chiếu
-                </button>
+                <div className="flex items-center gap-4">
+                  <button onClick={() => setShowAddModal(true)} className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 transition uppercase tracking-widest flex items-center gap-1">
+                    <Plus className="w-3.5 h-3.5" /> Thêm hàng phát sinh
+                  </button>
+                  <button onClick={handleSaveDraft} className="text-[10px] font-bold text-blue-600 hover:text-blue-700 transition uppercase tracking-widest">
+                    Lưu nháp đối chiếu
+                  </button>
+                </div>
               )}
             </div>
 
@@ -309,26 +388,40 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                     <th className="p-4 text-center border-b border-slate-100">Quy Chiếu</th>
                     <th className="p-4 text-center border-b border-slate-100">Đã Nhập Trước</th>
                     <th className="p-4 text-center border-b border-slate-100">Còn Lại</th>
-                    <th className="p-4 text-center border-b border-slate-100 w-32">Thực Nhập Đợt Này</th>
-                    <th className="p-4 text-center border-b border-slate-100 w-24">Hỏng / Lỗi</th>
+                    <th className="p-4 text-center border-b border-slate-100 w-24">Thực Nhập</th>
+                    <th className="p-4 text-center border-b border-slate-100 w-20">Hỏng / Lỗi</th>
+                    <th className="p-4 border-b border-slate-100 w-36">Loại lệch</th>
+                    <th className="p-4 border-b border-slate-100 w-44">Trạng thái</th>
                     <th className="p-4 border-b border-slate-100">Ghi chú</th>
+                    <th className="p-4 text-center border-b border-slate-100 w-16">Tác vụ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {data.lines.map((l: any, idx: number) => {
-                    const v = reconcileValues.find(x => x.lineId === l.id) || {};
+                  {reconcileValues.map((v: any, idx: number) => {
+                    const l = data.lines.find((x: any) => x.id === v.lineId) || {
+                      id: v.lineId,
+                      qtyOrdered: 0,
+                      qtyConfirmed: 0,
+                      qtyDefective: 0,
+                      note: '',
+                      item: items.find(i => i.id === v.itemId) || { name: 'Đang tải...', mvpp: '', unit: '' }
+                    };
                     const remainingLineQty = Math.max(0, l.qtyOrdered - l.qtyConfirmed);
-                    const isLineCompleted = remainingLineQty <= 0;
+                    const isLineCompleted = l.qtyOrdered > 0 && remainingLineQty <= 0;
+                    const isUnexpected = v.isUnexpected || l.qtyOrdered === 0;
                     
                     return (
-                      <tr key={l.id} className={`group transition-all ${isLineCompleted ? 'bg-slate-50/40 opacity-75' : 'hover:bg-slate-50/50'}`}>
+                      <tr key={v.lineId} className={`group transition-all ${isLineCompleted ? 'bg-slate-50/40 opacity-75' : 'hover:bg-slate-50/50'}`}>
                         <td className="p-4 text-center text-xs font-medium text-slate-300">{idx + 1}</td>
-                        <td className="p-4 max-w-[250px]">
+                        <td className="p-4 max-w-[220px]">
                           <p className="font-bold text-slate-700 text-xs leading-snug uppercase">{l.item.name}</p>
                           <div className="flex items-center gap-2 mt-0.5">
                             <p className="text-[9px] font-bold text-slate-400 tracking-tight">{l.item.mvpp} · {l.item.unit}</p>
                             {isLineCompleted && (
                               <span className="text-[8px] font-black text-emerald-600 uppercase tracking-tighter bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">Đã nhập đủ</span>
+                            )}
+                            {isUnexpected && (
+                              <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">Hàng phát sinh</span>
                             )}
                           </div>
                         </td>
@@ -346,18 +439,18 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                             <input 
                               type="number" 
                               min={0} 
-                              max={remainingLineQty} 
+                              max={isUnexpected ? undefined : remainingLineQty} 
                               value={isLineCompleted ? "" : v.actualQty} 
                               disabled={isLineCompleted}
                               placeholder={isLineCompleted ? "Đã đủ" : "0"}
                               tabIndex={isLineCompleted ? -1 : undefined}
                               onChange={(e) => {
                                 const val = Math.max(0, parseInt(e.target.value) || 0);
-                                if (val > remainingLineQty) {
+                                if (!isUnexpected && val > remainingLineQty) {
                                   showToast('Số nhập đợt này không được vượt số còn lại.', 'warning');
                                 }
-                                const finalVal = val > remainingLineQty ? remainingLineQty : val;
-                                setReconcileValues(reconcileValues.map(a => a.lineId === l.id ? { ...a, actualQty: finalVal } : a));
+                                const finalVal = (!isUnexpected && val > remainingLineQty) ? remainingLineQty : val;
+                                setReconcileValues(reconcileValues.map(a => a.lineId === v.lineId ? { ...a, actualQty: finalVal } : a));
                               }}
                               className="w-16 h-8 text-center bg-white disabled:bg-slate-50 border border-blue-200 disabled:border-slate-100 rounded-lg text-xs font-bold text-blue-600 disabled:text-slate-400 focus:border-blue-500 outline-none transition shadow-sm ring-1 ring-blue-50/50" 
                             />
@@ -376,7 +469,7 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                               tabIndex={isLineCompleted ? -1 : undefined}
                               onChange={(e) => {
                                 const val = Math.max(0, parseInt(e.target.value) || 0);
-                                setReconcileValues(reconcileValues.map(a => a.lineId === l.id ? { ...a, qtyDefective: val } : a));
+                                setReconcileValues(reconcileValues.map(a => a.lineId === v.lineId ? { ...a, qtyDefective: val } : a));
                               }}
                               className="w-14 h-8 text-center bg-white disabled:bg-slate-50 border border-slate-200 disabled:border-slate-100 rounded-lg text-xs font-bold text-amber-600 disabled:text-slate-400 focus:border-amber-500 outline-none transition shadow-sm" 
                             />
@@ -386,12 +479,61 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                         </td>
                         <td className="p-4">
                           {isPending ? (
+                            isUnexpected ? (
+                              <select
+                                value={v.discrepancyType || 'Hàng ngoài PO / Sai model'}
+                                onChange={(e) => setReconcileValues(reconcileValues.map(a => a.lineId === v.lineId ? { ...a, discrepancyType: e.target.value } : a))}
+                                className="w-full h-8 px-2 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:border-blue-400 outline-none transition shadow-sm"
+                              >
+                                <option value="Hàng ngoài PO / Sai model">Hàng ngoài PO / Sai model</option>
+                                <option value="Hàng ngoài PO / Khác cấu hình">Hàng ngoài PO / Khác cấu hình</option>
+                                <option value="Hàng khuyến mãi / tặng kèm">Hàng khuyến mãi / tặng kèm</option>
+                                <option value="Khác">Khác</option>
+                              </select>
+                            ) : (
+                              <span className="text-slate-400 text-xs font-medium">-</span>
+                            )
+                          ) : (
+                            <span className="text-slate-500 text-xs font-bold">{l.discrepancyType || '-'}</span>
+                          )}
+                        </td>
+                        <td className="p-4">
+                          {isPending ? (
+                            isUnexpected ? (
+                              <select
+                                value={v.status || 'Chờ xử lý lệch'}
+                                onChange={(e) => setReconcileValues(reconcileValues.map(a => a.lineId === v.lineId ? { ...a, status: e.target.value } : a))}
+                                className="w-full h-8 px-2 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:border-blue-400 outline-none transition shadow-sm"
+                              >
+                                <option value="Chờ xử lý lệch">Chờ xử lý lệch</option>
+                                <option value="Chấp nhận hàng thay thế">Chấp nhận hàng thay thế</option>
+                                <option value="Trả lại nhà cung cấp">Trả lại nhà cung cấp</option>
+                                <option value="Chờ bổ sung/chỉnh PO">Chờ bổ sung/chỉnh PO</option>
+                                <option value="Nhập tạm chờ duyệt">Nhập tạm chờ duyệt</option>
+                              </select>
+                            ) : (
+                              <span className="text-slate-400 text-xs font-medium">-</span>
+                            )
+                          ) : (
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              l.status === 'Chấp nhận hàng thay thế' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                              l.status === 'Trả lại nhà cung cấp' ? 'bg-rose-50 text-rose-600 border border-rose-100' :
+                              l.status === 'Chờ bổ sung/chỉnh PO' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                              l.status === 'Nhập tạm chờ duyệt' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
+                              l.status ? 'bg-slate-100 text-slate-600 border border-slate-200' : ''
+                            }`}>
+                              {l.status || '-'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-4">
+                          {isPending ? (
                             <input 
                               type="text" 
                               placeholder="..." 
                               value={isLineCompleted ? "" : v.note} 
                               disabled={isLineCompleted}
-                              onChange={(e) => setReconcileValues(reconcileValues.map(a => a.lineId === l.id ? { ...a, note: e.target.value } : a))}
+                              onChange={(e) => setReconcileValues(reconcileValues.map(a => a.lineId === v.lineId ? { ...a, note: e.target.value } : a))}
                               className="w-full h-8 px-3 bg-slate-50 disabled:bg-slate-100 border border-slate-200 disabled:border-slate-100 rounded-lg text-xs font-medium text-slate-600 disabled:text-slate-400 focus:bg-white focus:border-blue-400 outline-none transition" 
                             />
                           ) : (
@@ -403,6 +545,21 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                                 </>
                               ) : <span className="text-slate-200 text-xs">-</span>}
                             </div>
+                          )}
+                        </td>
+                        <td className="p-4 text-center">
+                          {isPending && isUnexpected ? (
+                            <button 
+                              onClick={() => {
+                                setReconcileValues(reconcileValues.filter(a => a.lineId !== v.lineId));
+                              }}
+                              className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 hover:text-rose-600 text-rose-400 flex items-center justify-center transition mx-auto"
+                              title="Xóa hàng phát sinh"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <span className="text-slate-300">-</span>
                           )}
                         </td>
                       </tr>
@@ -530,6 +687,75 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
         </div>
       )}
 
+      {/* ADD UNEXPECTED ITEM MODAL */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
+            <div className="p-6 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <Package className="w-5 h-5 text-emerald-600" /> Thêm hàng phát sinh / hàng ngoài PO
+              </h3>
+              <p className="text-xs text-slate-500 mt-1 font-medium leading-relaxed">
+                Chọn vật tư từ danh mục hệ thống để đưa vào biên bản đối chiếu thực tế.
+              </p>
+            </div>
+            
+            <div className="p-6 flex-1 overflow-y-auto space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input 
+                  type="text"
+                  placeholder="Gõ tên hoặc mã MVPP để tìm kiếm..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2.5 rounded-xl outline-none focus:border-blue-500 focus:bg-white transition-all font-medium text-sm text-slate-700"
+                />
+              </div>
+
+              <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto border border-slate-100 rounded-xl bg-white shadow-sm">
+                {items.filter(i => 
+                  i.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                  i.mvpp.toLowerCase().includes(searchTerm.toLowerCase())
+                ).slice(0, 10).map((item: any) => (
+                  <div 
+                    key={item.id} 
+                    onClick={() => handleAddUnexpectedItem(item)}
+                    className="p-3 hover:bg-slate-50 flex items-center justify-between cursor-pointer transition group"
+                  >
+                    <div className="flex-1 min-w-0 pr-3">
+                      <p className="font-bold text-slate-800 text-xs leading-normal uppercase">{item.name}</p>
+                      <p className="text-[9px] font-black tracking-widest text-slate-400 mt-0.5">{item.mvpp} · Đơn vị: {item.unit}</p>
+                    </div>
+                    <button className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 opacity-0 group-hover:opacity-100 transition">
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                {items.filter(i => 
+                  i.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                  i.mvpp.toLowerCase().includes(searchTerm.toLowerCase())
+                ).length === 0 && (
+                  <div className="p-8 text-center text-slate-400 text-xs font-semibold">
+                    Không tìm thấy sản phẩm nào phù hợp.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 shrink-0">
+              <button 
+                onClick={() => {
+                  setShowAddModal(false);
+                  setSearchTerm('');
+                }} 
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-600 font-bold rounded-lg transition text-xs uppercase tracking-wide"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FORMAL PRINT-ONLY SECTION (A4 Standard) */}
       <div className="hidden print:block print-container">
