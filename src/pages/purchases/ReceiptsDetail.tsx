@@ -990,7 +990,6 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
             </form>
           </div>
         </div>
-        </div>
       )}
 
       {/* ADD UNEXPECTED ITEM MODAL */}
