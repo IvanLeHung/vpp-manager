@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
 import { useAppContext } from '../../context/AppContext';
+import LinkedDocumentReferences from '../../components/LinkedDocumentReferences';
 
 const AUDIT_ACTION_MAP: Record<string, { label: string, impact: string, color: string }> = {
   'CREATE': { label: 'Khởi tạo phiếu', impact: 'Hệ thống', color: 'bg-slate-50 text-slate-400 border-slate-100' },
@@ -304,12 +305,18 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
     }
 
     // Build the lines payload
-    const linesPayload = reconcileValues.map((v: any) => ({
-      receiptLineId: v.lineId,
-      receivedThisBatch: v.actualQty || 0,
-      damagedQty: v.qtyDefective || 0,
-      note: v.note || ''
-    }));
+    const linesPayload = reconcileValues.map((v: any) => {
+      const l = data.lines.find((x: any) => x.id === v.lineId);
+      const remainingLineQty = l ? Math.max(0, l.qtyOrdered - l.qtyConfirmed - (l.replacedQtyTotal || 0)) : 0;
+      const isCompleted = l && l.qtyOrdered > 0 && remainingLineQty <= 0;
+
+      return {
+        receiptLineId: v.lineId,
+        receivedThisBatch: isCompleted ? 0 : (v.actualQty || 0),
+        damagedQty: isCompleted ? 0 : (v.qtyDefective || 0),
+        note: isCompleted ? '' : (v.note || '')
+      };
+    });
 
     try {
       const res = await api.post(`/receipts/${currentId}/close-with-shortage`, {
@@ -400,9 +407,20 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
           
           <div className="h-6 w-px bg-slate-200 mx-2"></div>
           
-          <p className="text-[11px] font-medium text-slate-400">
-            Tham chiếu PO: <span className="text-blue-600 font-bold">{data.poId || 'N/A'}</span> • Kho: {data.warehouseCode} • Nhà cung cấp: <span className="text-slate-700 font-bold">{data.supplier || 'N/A'}</span>
-          </p>
+          <LinkedDocumentReferences
+            request={
+              data.po?.lines?.find((l: any) => l.requestLine?.requestId)
+                ? {
+                    id: data.po.lines.find((l: any) => l.requestLine?.requestId).requestLine.requestId,
+                    code: data.po.lines.find((l: any) => l.requestLine?.requestId).requestLine.requestId
+                  }
+                : undefined
+            }
+            purchaseOrder={data.poId ? { id: data.poId, code: data.poId } : undefined}
+            receipt={{ id: data.id, code: data.id }}
+            warehouse={data.warehouseCode ? { id: data.warehouseCode, name: data.warehouseCode === 'MAIN' ? 'MAIN (Văn phòng phẩm)' : 'VE_SINH (Vệ sinh)' } : undefined}
+            supplier={data.supplier ? { id: data.supplier, name: data.supplier } : undefined}
+          />
         </div>
 
         <div className="flex items-center gap-3">
@@ -928,8 +946,27 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
               <h3 className="text-lg font-bold text-slate-800">
                 Xác nhận đóng phiếu khi còn thiếu hàng
               </h3>
-              <p className="text-xs text-slate-500 mt-1 font-medium leading-relaxed">
-                Phiếu còn thiếu <span className="font-bold text-rose-600">{remainingQty}</span> sản phẩm chưa nhập. Nếu xác nhận, hệ thống sẽ đóng phiếu ở trạng thái “Hoàn tất thiếu” và không cho nhập tiếp phần còn lại. Vui lòng nhập lý do.
+              <div className="mt-3 bg-slate-50 border border-slate-100 rounded-xl p-3.5 space-y-2 text-xs font-semibold text-slate-600">
+                <div className="flex justify-between">
+                  <span>Tổng quy chiếu PO:</span>
+                  <span className="font-bold text-slate-800">{totalExpected} sản phẩm</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Đã nhập đúng PO:</span>
+                  <span className="font-bold text-emerald-600">{totalReceivedOriginal} sản phẩm</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Đã nhập thay thế:</span>
+                  <span className="font-bold text-indigo-600">{totalReceivedReplacement} sản phẩm</span>
+                </div>
+                <div className="h-px bg-slate-200 my-1"></div>
+                <div className="flex justify-between text-slate-800">
+                  <span>Còn thiếu thực tế chưa nhập:</span>
+                  <span className="font-black text-rose-600 text-sm">{totalRemaining} sản phẩm</span>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-3 font-medium leading-relaxed">
+                Nếu xác nhận, hệ thống sẽ đóng phiếu ở trạng thái <span className="font-bold text-amber-700">“Hoàn tất thiếu”</span> và không cho phép nhập tiếp hay thay đổi bất kỳ thông tin nào nữa. Vui lòng nhập lý do.
               </p>
             </div>
             <form onSubmit={handleCloseWithShortageSubmit} className="p-6 space-y-4">
