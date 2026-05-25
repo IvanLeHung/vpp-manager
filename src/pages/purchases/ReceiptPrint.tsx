@@ -70,6 +70,7 @@ const ReceiptPrint: React.FC = () => {
         unit: line.item.unit,
         qtyOrdered: '-',
         qtyAccepted: line.qtyConfirmed,
+        shortageQty: 0,
         handlingType: line.status || 'Hàng phát sinh ngoài PO',
         note: line.note || '',
         isUnexpected: true
@@ -81,7 +82,9 @@ const ReceiptPrint: React.FC = () => {
 
       const isFullyReplaced = line.qtyConfirmed === 0 && replacements.length > 0;
 
-      if (line.qtyConfirmed > 0) {
+      if (line.qtyConfirmed > 0 || (line.qtyConfirmed === 0 && replacements.length === 0 && data.status !== 'COMPLETED_WITH_SHORTAGE')) {
+        // If not shortage closed, print unreceived standard lines here too (optional, but keep default behavior)
+        // If shortage closed, we print unreceived lines in the separate table below.
         printLines.push({
           id: line.id,
           itemCode: line.item.mvpp,
@@ -89,6 +92,7 @@ const ReceiptPrint: React.FC = () => {
           unit: line.item.unit,
           qtyOrdered: line.qtyOrdered,
           qtyAccepted: line.qtyConfirmed,
+          shortageQty: line.shortageQty || 0,
           handlingType: 'Đúng model',
           note: line.note || '',
           isOriginal: true
@@ -103,6 +107,7 @@ const ReceiptPrint: React.FC = () => {
           unit: rep.replacementItem.unit,
           qtyOrdered: isFullyReplaced ? line.qtyOrdered : '-',
           qtyAccepted: rep.replacementQty,
+          shortageQty: 0,
           handlingType: 'Đổi hàng / Sai model',
           note: `Thay cho: ${line.item.name}. Lý do: ${rep.reason}${rep.note ? ` (${rep.note})` : ''}`,
           isReplacement: true
@@ -128,6 +133,13 @@ const ReceiptPrint: React.FC = () => {
   };
 
   const totalActualQty = printLines.reduce((sum: number, line: any) => sum + (line.qtyAccepted || 0), 0);
+  const totalShortageQty = data.status === 'COMPLETED_WITH_SHORTAGE'
+    ? printLines.reduce((sum: number, line: any) => sum + (line.shortageQty || (line.qtyOrdered > 0 ? Math.max(0, line.qtyOrdered - line.qtyAccepted) : 0)), 0) +
+      undeliveredLines.reduce((sum: number, line: any) => {
+        const hasRep = (data.replacements || []).some((r: any) => r.originalReceiptLineId === line.id && r.status === 'ACCEPTED');
+        return sum + (hasRep ? 0 : line.qtyOrdered); // don't double count shortage of fully replaced items
+      }, 0)
+    : 0;
 
   return (
     <div className="bg-white min-h-screen text-black">
@@ -218,7 +230,7 @@ const ReceiptPrint: React.FC = () => {
         }
         .meta-label {
           font-weight: bold;
-          min-width: 130px;
+          min-width: 140px;
         }
         .meta-val {
           flex: 1;
@@ -320,9 +332,25 @@ const ReceiptPrint: React.FC = () => {
             <span className="meta-label">Kho nhận hàng:</span>
             <span className="meta-val">{data.warehouseCode || 'MAIN'}</span>
           </div>
+          <div className="meta-item">
+            <span className="meta-label">Trạng thái phiếu:</span>
+            <span className="meta-val font-bold" style={{ color: data.status === 'COMPLETED_WITH_SHORTAGE' ? '#d97706' : 'inherit' }}>
+              {data.status === 'COMPLETED' || data.status === 'FULL_RECEIVED' ? 'Hoàn tất đủ' :
+               data.status === 'COMPLETED_WITH_SHORTAGE' ? 'Hoàn tất thiếu' : 'Chờ kiểm hàng'}
+            </span>
+          </div>
+          {data.status === 'COMPLETED_WITH_SHORTAGE' && (
+            <div className="meta-item">
+              <span className="meta-label">Lý do đóng thiếu:</span>
+              <span className="meta-val font-bold text-amber-700">{data.shortageReason || 'Không rõ'}</span>
+            </div>
+          )}
           <div className="meta-item col-span-2">
             <span className="meta-label">Ghi chú phiếu:</span>
-            <span className="meta-val italic">{data.note || 'Không có ghi chú'}</span>
+            <span className="meta-val italic">
+              {data.note || 'Không có ghi chú'}
+              {data.shortageNote ? ` (Ghi chú đóng thiếu: ${data.shortageNote})` : ''}
+            </span>
           </div>
         </div>
 
@@ -335,10 +363,13 @@ const ReceiptPrint: React.FC = () => {
             <tr>
               <th style={{ width: '5%', textAlign: 'center' }}>STT</th>
               <th style={{ width: '12%', textAlign: 'center' }}>Mã VT</th>
-              <th style={{ width: '38%', textAlign: 'left' }}>Tên Văn Phòng Phẩm Thực Nhận</th>
+              <th style={{ width: data.status === 'COMPLETED_WITH_SHORTAGE' ? '28%' : '38%', textAlign: 'left' }}>Tên Văn Phòng Phẩm Thực Nhận</th>
               <th style={{ width: '8%', textAlign: 'center' }}>ĐVT</th>
               <th style={{ width: '10%', textAlign: 'center' }}>Số lượng PO</th>
               <th style={{ width: '10%', textAlign: 'center' }}>Thực nhập</th>
+              {data.status === 'COMPLETED_WITH_SHORTAGE' && (
+                <th style={{ width: '10%', textAlign: 'center', color: '#dc2626' }}>Thiếu không nhập</th>
+              )}
               <th style={{ width: '17%', textAlign: 'left' }}>Loại xử lý</th>
               <th style={{ width: '20%', textAlign: 'left' }}>Ghi chú</th>
             </tr>
@@ -359,13 +390,18 @@ const ReceiptPrint: React.FC = () => {
                 <td style={{ textAlign: 'center' }}>{l.unit}</td>
                 <td style={{ textAlign: 'center' }}>{l.qtyOrdered}</td>
                 <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{l.qtyAccepted}</td>
+                {data.status === 'COMPLETED_WITH_SHORTAGE' && (
+                  <td style={{ textAlign: 'center', color: '#dc2626', fontWeight: 'bold' }}>
+                    {l.shortageQty || (l.qtyOrdered > 0 ? Math.max(0, l.qtyOrdered - l.qtyAccepted) : 0) || '-'}
+                  </td>
+                )}
                 <td>{l.handlingType}</td>
                 <td style={{ fontSize: '10px' }}>{l.note || '-'}</td>
               </tr>
             ))}
             {printLines.length === 0 && (
               <tr>
-                <td colSpan={8} className="text-center italic" style={{ padding: '15px' }}>
+                <td colSpan={data.status === 'COMPLETED_WITH_SHORTAGE' ? 9 : 8} className="text-center italic" style={{ padding: '15px' }}>
                   Không có hàng hóa thực nhận.
                 </td>
               </tr>
@@ -373,6 +409,9 @@ const ReceiptPrint: React.FC = () => {
             <tr style={{ fontWeight: 'bold', backgroundColor: '#f9f9f9' }}>
               <td colSpan={5} style={{ textAlign: 'right', textTransform: 'uppercase' }}>TỔNG CỘNG THỰC NHẬP:</td>
               <td style={{ textAlign: 'center', fontSize: '13px' }}>{totalActualQty}</td>
+              {data.status === 'COMPLETED_WITH_SHORTAGE' && (
+                <td style={{ textAlign: 'center', fontSize: '13px', color: '#dc2626' }}>{totalShortageQty}</td>
+              )}
               <td colSpan={2}></td>
             </tr>
           </tbody>
@@ -401,7 +440,10 @@ const ReceiptPrint: React.FC = () => {
                     <td style={{ textTransform: 'uppercase' }}>{l.item.name}</td>
                     <td style={{ textAlign: 'center' }}>{l.item.unit}</td>
                     <td style={{ textAlign: 'center' }}>{l.qtyOrdered}</td>
-                    <td style={{ fontSize: '10px', fontStyle: 'italic' }}>{getUndeliveredStatus(l)}</td>
+                    <td style={{ fontSize: '10px', fontStyle: 'italic' }}>
+                      {getUndeliveredStatus(l)}
+                      {data.status === 'COMPLETED_WITH_SHORTAGE' && ` (Thiếu: ${l.qtyOrdered})`}
+                    </td>
                   </tr>
                 ))}
               </tbody>

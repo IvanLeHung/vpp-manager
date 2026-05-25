@@ -14,7 +14,8 @@ const AUDIT_ACTION_MAP: Record<string, { label: string, impact: string, color: s
   'CONFIRM': { label: 'Xác nhận nhập kho', impact: 'Cập nhật tồn', color: 'bg-emerald-50 text-emerald-500 border-emerald-100' },
   'CANCEL': { label: 'Hủy phiếu', impact: 'Không đổi tồn', color: 'bg-rose-50 text-rose-500 border-rose-100' },
   'CANCEL_AND_RESTORE': { label: 'Hủy & hoàn tồn', impact: 'Hoàn tồn', color: 'bg-rose-600 text-white border-rose-600' },
-  'ADJUST': { label: 'Điều chỉnh tồn', impact: 'Cập nhật tồn', color: 'bg-amber-50 text-amber-500 border-amber-100' }
+  'ADJUST': { label: 'Điều chỉnh tồn', impact: 'Cập nhật tồn', color: 'bg-amber-50 text-amber-500 border-amber-100' },
+  'CLOSE_WITH_SHORTAGE': { label: 'Đóng phiếu thiếu', impact: 'Cập nhật tồn', color: 'bg-amber-50 text-amber-600 border-amber-100' }
 };
 
 interface ReceiptsDetailProps {
@@ -29,10 +30,16 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
   const [loading, setLoading] = useState(true);
   const [currentId, setCurrentId] = useState(receiptId);
   const [cancelModal, setCancelModal] = useState<{ open: boolean, reason: string }>({ open: false, reason: '' });
+  const [shortageModal, setShortageModal] = useState<{ open: boolean, reason: string, note: string }>({
+    open: false,
+    reason: 'Nhà cung cấp không giao đủ',
+    note: ''
+  });
   
   const { currentUser } = useAppContext();
   const role = currentUser?.role || 'EMPLOYEE';
   const isWarehouseOrAdmin = role === 'ADMIN' || role === 'WAREHOUSE';
+  const hasCloseShortagePermission = role === 'ADMIN' || role === 'WAREHOUSE';
 
   // Unexpected items catalog search state
   const [items, setItems] = useState<any[]>([]);
@@ -289,6 +296,37 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
     win.focus();
   };
 
+  const handleCloseWithShortageSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!shortageModal.reason.trim()) {
+      showToast('Vui lòng chọn hoặc nhập lý do đóng thiếu', 'warning');
+      return;
+    }
+
+    // Build the lines payload
+    const linesPayload = reconcileValues.map((v: any) => ({
+      receiptLineId: v.lineId,
+      receivedThisBatch: v.actualQty || 0,
+      damagedQty: v.qtyDefective || 0,
+      note: v.note || ''
+    }));
+
+    try {
+      const res = await api.post(`/receipts/${currentId}/close-with-shortage`, {
+        lines: linesPayload,
+        reason: shortageModal.reason,
+        note: shortageModal.note
+      });
+      if (res.data.success) {
+        showToast('Đã đóng thiếu phiếu nhập kho thành công!', 'success');
+        setShortageModal({ open: false, reason: 'Nhà cung cấp không giao đủ', note: '' });
+        await refreshData();
+      }
+    } catch (err: any) {
+      showToast(err.response?.data?.error || 'Lỗi khi đóng thiếu phiếu', 'error');
+    }
+  };
+
   if (loading || !data) return <div className="p-10 flex justify-center"><div className="w-8 h-8 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin"></div></div>;
 
   const isPending = data.status === 'PENDING' || data.status === 'PARTIAL_RECEIVED' || data.status === 'PARTIALLY_RECEIVED' || data.status === 'DRAFT';
@@ -370,6 +408,7 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
         <div className="flex items-center gap-3">
           <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
             data.status === 'COMPLETED' || data.status === 'FULL_RECEIVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+            data.status === 'COMPLETED_WITH_SHORTAGE' ? 'bg-amber-50 text-amber-700 border-amber-200' :
             data.status === 'PARTIALLY_RECEIVED' || data.status === 'PARTIAL_RECEIVED' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
             data.status === 'DISCREPANCY' || data.status === 'HAS_ERROR' ? 'bg-rose-50 text-rose-600 border-rose-100' : 
             data.status === 'CANCELLED' ? 'bg-slate-100 text-slate-400 border-slate-200' : 
@@ -378,6 +417,7 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
             {data.status === 'PENDING' ? 'Chờ kiểm hàng' : 
              data.status === 'PARTIALLY_RECEIVED' || data.status === 'PARTIAL_RECEIVED' ? 'Nhập một phần' : 
              data.status === 'COMPLETED' || data.status === 'FULL_RECEIVED' ? 'Đã nhập kho' : 
+             data.status === 'COMPLETED_WITH_SHORTAGE' ? 'Hoàn tất thiếu' :
              data.status === 'CANCELLED' ? 'Đã hủy' : 'Lệch / Lỗi'}
           </span>
 
@@ -391,17 +431,26 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                   Áp dụng nhập đủ
                 </button>
                 {remainingQty > 0 ? (
-                  <button onClick={() => handleConfirm('PARTIAL')} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg transition uppercase tracking-wide shadow-sm">
-                    Xác nhận nhập phần đã nhận
-                  </button>
+                  <>
+                    <button onClick={() => handleConfirm('PARTIAL')} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg transition uppercase tracking-wide shadow-sm">
+                      Xác nhận nhập phần đã nhận
+                    </button>
+                    {hasCloseShortagePermission && (
+                      <button onClick={() => setShortageModal({ open: true, reason: 'Nhà cung cấp không giao đủ', note: '' })} className="h-9 px-4 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold rounded-lg transition uppercase tracking-wide shadow-sm">
+                        Xác nhận thiếu & đóng phiếu
+                      </button>
+                    )}
+                  </>
                 ) : (
-                  <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
-                    <CheckCircle className="w-3.5 h-3.5" /> Phiếu đã nhập đủ
-                  </span>
+                  <>
+                    <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
+                      <CheckCircle className="w-3.5 h-3.5" /> Phiếu đã nhập đủ
+                    </span>
+                    <button onClick={() => handleConfirm('FULL')} className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition uppercase tracking-wide shadow-sm">
+                      Xác nhận & hoàn tất
+                    </button>
+                  </>
                 )}
-                <button onClick={() => handleConfirm('FULL')} className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition uppercase tracking-wide shadow-sm">
-                  Xác nhận & hoàn tất
-                </button>
               </>
             ) : data.status !== 'CANCELLED' && (
               <button onClick={() => setCancelModal({ open: true, reason: '' })} className="h-9 px-4 text-[11px] font-bold text-slate-500 hover:bg-slate-50 border border-slate-200 rounded-lg transition flex items-center gap-2 uppercase tracking-wide">
@@ -868,6 +917,79 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* SHORTAGE CLOSE MODAL */}
+      {shortageModal.open && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-800">
+                Xác nhận đóng phiếu khi còn thiếu hàng
+              </h3>
+              <p className="text-xs text-slate-500 mt-1 font-medium leading-relaxed">
+                Phiếu còn thiếu <span className="font-bold text-rose-600">{remainingQty}</span> sản phẩm chưa nhập. Nếu xác nhận, hệ thống sẽ đóng phiếu ở trạng thái “Hoàn tất thiếu” và không cho nhập tiếp phần còn lại. Vui lòng nhập lý do.
+              </p>
+            </div>
+            <form onSubmit={handleCloseWithShortageSubmit} className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lý do đóng thiếu *</label>
+                <select
+                  value={shortageModal.reason}
+                  onChange={e => setShortageModal({ ...shortageModal, reason: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white transition-all text-slate-700"
+                  required
+                >
+                  <option value="Nhà cung cấp không giao đủ">Nhà cung cấp không giao đủ</option>
+                  <option value="Phút cuối chỉ duyệt nhập số lượng thực tế">Phút cuối chỉ duyệt nhập số lượng thực tế</option>
+                  <option value="Hủy phần còn lại không nhập nữa">Hủy phần còn lại không nhập nữa</option>
+                  <option value="Điều chỉnh theo thực tế sử dụng">Điều chỉnh theo thực tế sử dụng</option>
+                  <option value="Khác">Lý do khác...</option>
+                </select>
+              </div>
+
+              {shortageModal.reason === 'Khác' && (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nhập lý do chi tiết *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Gõ lý do khác ở đây..."
+                    onChange={e => setShortageModal({ ...shortageModal, reason: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white transition-all text-slate-700"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ghi chú bổ sung (Tùy chọn)</label>
+                <textarea
+                  placeholder="Ghi chú thêm thông tin đối soát..."
+                  value={shortageModal.note}
+                  onChange={e => setShortageModal({ ...shortageModal, note: e.target.value })}
+                  className="w-full h-20 bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white transition-all resize-none"
+                ></textarea>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button 
+                  type="button" 
+                  onClick={() => setShortageModal({ open: false, reason: 'Nhà cung cấp không giao đủ', note: '' })} 
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-lg transition text-xs uppercase tracking-wide"
+                >
+                  Hủy
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg transition text-xs uppercase tracking-wide shadow-sm shadow-amber-500/20"
+                >
+                  Xác nhận đóng thiếu
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
         </div>
       )}
 
