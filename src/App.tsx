@@ -8,6 +8,7 @@ import InventoryReport from './pages/InventoryReport';
 import Analytics from './pages/Analytics';
 import Purchases from './pages/purchases/Purchases';
 import Receipts from './pages/purchases/Receipts';
+import ReceiptPrint from './pages/purchases/ReceiptPrint';
 import GuestRequest from './pages/GuestRequest';
 import Users from './pages/Users';
 import Items from './pages/Items';
@@ -262,6 +263,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/guest-request" element={<GuestRequest />} />
+          <Route path="/receipts/:id/print" element={<ReceiptPrint />} />
           <Route element={<MainLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             {/* Về sau sẽ tạo 2 trang này */}

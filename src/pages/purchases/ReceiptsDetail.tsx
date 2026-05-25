@@ -279,19 +279,38 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
     }
   };
 
+  const handlePrintReceipt = () => {
+    const printUrl = `/receipts/${currentId}/print`;
+    const win = window.open(printUrl, '_blank');
+    if (!win) {
+      showToast('Trình duyệt đã chặn cửa sổ in. Vui lòng cho phép popup.', 'error');
+      return;
+    }
+    win.focus();
+  };
+
   if (loading || !data) return <div className="p-10 flex justify-center"><div className="w-8 h-8 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin"></div></div>;
 
   const isPending = data.status === 'PENDING' || data.status === 'PARTIAL_RECEIVED' || data.status === 'PARTIALLY_RECEIVED' || data.status === 'DRAFT';
 
   // Checking for discrepancies
-  const totalOrdered = data.lines.reduce((s: number, l: any) => s + l.qtyOrdered, 0);
-  const totalConfirmed = data.lines.reduce((s: number, l: any) => s + (l.qtyOrdered > 0 ? (l.qtyConfirmed || 0) : 0), 0); // Chỉ hàng chuẩn
+  const totalExpected = data.lines.reduce((s: number, l: any) => s + l.qtyOrdered, 0);
+  const totalReceivedOriginal = data.lines.reduce((s: number, l: any) => s + (l.qtyOrdered > 0 ? (l.qtyConfirmed || 0) : 0), 0);
+  const totalReceivedReplacement = data.replacements?.reduce((sum: number, r: any) => sum + (r.status === 'ACCEPTED' ? r.replacementQty : 0), 0) || 0;
+  const totalHandled = totalReceivedOriginal + totalReceivedReplacement;
+  const totalRemaining = Math.max(0, totalExpected - totalHandled);
+
+  // Keep compatibility variables
+  const totalOrdered = totalExpected;
+  const totalConfirmed = totalHandled;
+  const remainingQty = totalRemaining;
+
   const currentInputActual = reconcileValues.reduce((s: number, v: any) => s + (v.actualQty || 0), 0);
   const currentDefective = reconcileValues.reduce((s: number, v: any) => s + (v.qtyDefective || 0), 0);
   const currentDelivered = reconcileValues.reduce((s: number, v: any) => s + (v.qtyDelivered || 0), 0);
 
   // Replacement stats
-  const totalReplacementsAccepted = data.replacements?.reduce((sum: number, r: any) => sum + (r.status === 'ACCEPTED' ? r.replacementQty : 0), 0) || 0;
+  const totalReplacementsAccepted = totalReceivedReplacement;
   const totalReplacementsReturned = data.replacements?.reduce((sum: number, r: any) => sum + (r.status === 'RETURNED' ? r.replacementQty : 0), 0) || 0;
   const totalReplacementsPending = data.replacements?.reduce((sum: number, r: any) => sum + (['WAITING_APPROVAL', 'PENDING_PO_ADJUSTMENT'].includes(r.status) ? r.replacementQty : 0), 0) || 0;
 
@@ -310,9 +329,10 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
     return sum + (diff > 0 ? diff : 0);
   }, 0);
 
-  const remainingQty = Math.max(0, totalOrdered - totalConfirmed);
   const totalDefective = data.lines.reduce((s: number, l: any) => s + (l.qtyDefective || 0), 0);
-  const totalDiscrepancy = totalDefective + totalExtra;
+  const unexpectedReceivedTotal = data.lines.reduce((s: number, l: any) => s + (l.qtyOrdered === 0 ? l.qtyConfirmed : 0), 0);
+  const totalDiscrepancy = totalDefective + unexpectedReceivedTotal;
+  const completionRate = totalExpected > 0 ? Math.round((totalHandled / totalExpected) * 100) : 0;
 
   return (
     <div className="flex flex-col h-full bg-[#F8FAFC] relative overflow-hidden font-sans text-slate-900">
@@ -343,7 +363,7 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
           <div className="h-6 w-px bg-slate-200 mx-2"></div>
           
           <p className="text-[11px] font-medium text-slate-400">
-            Tham chiếu PO: <span className="text-blue-600 font-bold">{data.poId || 'N/A'}</span> • Kho: {data.warehouseCode}
+            Tham chiếu PO: <span className="text-blue-600 font-bold">{data.poId || 'N/A'}</span> • Kho: {data.warehouseCode} • Nhà cung cấp: <span className="text-slate-700 font-bold">{data.supplier || 'N/A'}</span>
           </p>
         </div>
 
@@ -388,7 +408,7 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                 <Undo className="w-3.5 h-3.5" /> Hủy & hoàn tồn
               </button>
             )}
-            <button onClick={() => window.print()} className="p-2 text-slate-400 hover:text-slate-600 transition">
+            <button onClick={handlePrintReceipt} className="p-2 text-slate-400 hover:text-slate-600 transition" title="In biên bản">
               <Printer className="w-5 h-5"/>
             </button>
           </div>
@@ -399,12 +419,12 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
         {/* TOP SUMMARY CARDS */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {[
-            { label: 'Nhà cung cấp', value: data.supplier || 'N/A', icon: User, color: 'text-slate-300' },
-            { label: 'Quy chiếu (PO)', value: totalOrdered, icon: Package, color: 'text-slate-300' },
-            { label: 'Đã nhập', value: `${totalConfirmed} / ${totalOrdered}`, icon: CheckCircle, color: 'text-emerald-400' },
-            { label: 'Còn lại', value: remainingQty, icon: Package, color: remainingQty > 0 ? 'text-amber-500' : 'text-slate-300' },
+            { label: 'Quy chiếu (PO)', value: totalExpected, icon: Package, color: 'text-slate-300' },
+            { label: 'Đã nhập đúng PO', value: totalReceivedOriginal, icon: CheckCircle, color: 'text-emerald-400' },
+            { label: 'Đã nhập thay thế', value: totalReceivedReplacement, icon: RefreshCw, color: 'text-indigo-400' },
+            { label: 'Còn lại', value: totalRemaining, icon: Package, color: totalRemaining > 0 ? 'text-amber-500' : 'text-slate-300' },
             { label: 'Lệch / Lỗi', value: totalDiscrepancy, icon: AlertTriangle, color: totalDiscrepancy > 0 ? 'text-rose-400' : 'text-slate-300' },
-            { label: 'Hoàn tất', value: `${totalOrdered > 0 ? Math.round((totalConfirmed / totalOrdered) * 100) : 0}%`, icon: CheckCircle, color: 'text-blue-400' }
+            { label: 'Hoàn tất', value: `${completionRate}%`, icon: CheckCircle, color: 'text-blue-400' }
           ].map((card, i) => (
             <div key={i} className="bg-white p-4 rounded-xl border border-slate-200 flex flex-col gap-1 shadow-sm">
               <div className="flex items-center gap-2">
@@ -465,7 +485,7 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                       note: '',
                       item: items.find(i => i.id === v.itemId) || { name: 'Đang tải...', mvpp: '', unit: '' }
                     };
-                    const remainingLineQty = Math.max(0, l.qtyOrdered - l.qtyConfirmed);
+                    const remainingLineQty = Math.max(0, l.qtyOrdered - l.qtyConfirmed - (l.replacedQtyTotal || 0));
                     const isLineCompleted = l.qtyOrdered > 0 && remainingLineQty <= 0;
                     const isUnexpected = v.isUnexpected || l.qtyOrdered === 0;
                     
