@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { XCircle, Printer, CheckCircle, RefreshCw, ArrowLeft, Archive, CheckSquare, Trash2, StopCircle, AlertTriangle, ShoppingCart, Minus, Plus, Check, FileSpreadsheet, ChevronLeft, ChevronRight, Shield, Search, Filter, Package, History as HistoryIcon } from 'lucide-react';
+import { XCircle, Printer, CheckCircle, RefreshCw, ArrowLeft, Archive, CheckSquare, Trash2, StopCircle, AlertTriangle, ShoppingCart, Minus, Plus, Check, FileSpreadsheet, ChevronLeft, ChevronRight, Shield, Search, Filter, Package, History as HistoryIcon, Layers, FileText, CheckCircle2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../../lib/api';
 import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
+import LinkedDocumentReferences from '../../components/LinkedDocumentReferences';
 import type { User } from '../../context/AppContext';
 import type { ViewMode } from '../Requests';
 
@@ -44,6 +45,7 @@ function sortLinesForPrinting(lines: any[]) {
 export default function RequestsDetail({ requestId, navigationIds, onNavigate, setViewMode, setActiveRequest, refreshData, showToast, currentUser }: Props) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [chainData, setChainData] = useState<any>(null);
 
   // Navigation Logic
   const currentIndex = navigationIds ? navigationIds.indexOf(requestId) : -1;
@@ -92,7 +94,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
   const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH'>('ALL');
   const [isConfirmingIssue, setIsConfirmingIssue] = useState(false);
   const [autoCreateBackorder, setAutoCreateBackorder] = useState(true);
-  const [activeTab, setActiveTab] = useState<'items' | 'deliveries' | 'history'>('items');
+  const [activeTab, setActiveTab] = useState<'items' | 'deliveries' | 'history' | 'links'>('items');
   const [batchToPrint, setBatchToPrint] = useState<any>(null);
 
 
@@ -101,6 +103,12 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       setLoading(true);
       const res = await api.get(`/requests/${requestId}`);
       setData(res.data);
+      try {
+        const chainRes = await api.get(`/procurement-chain/by-request/${requestId}`);
+        setChainData(chainRes.data);
+      } catch (e) {
+        console.error("Failed to load chain data", e);
+      }
       // Init modal states
       setApprovals(res.data.lines.map((l:any) => ({ 
         lineId: l.id, 
@@ -223,14 +231,15 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
     }
   };
 
-  const printDocument = async () => {
+  const printDocument = async (printType: 'ALL' | 'VPP' | 'VE_SINH' = 'ALL') => {
       const hasPendingReplacement = data.lines.some((l: any) => l.status === 'REPLACEMENT_PENDING_ADMIN');
       if (hasPendingReplacement) {
           showToast('Không thể in: Có vật tư đang chờ Admin duyệt thay thế.', 'warning');
           return;
       }
-      window.print();
-      try { await api.post(`/requests/${requestId}/print`, { printType: 'FOR_RECORDS' }); } catch(e) {}
+      setSelectedPrintType(printType);
+      window.open(`/requests/${requestId}/print?printType=${printType}`, '_blank');
+      try { await api.post(`/requests/${requestId}/print`, { printType }); } catch(e) {}
   };
 
   const handlePrintBatch = (batch: any) => {
@@ -385,6 +394,18 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                     {data.priority === 'Khẩn cấp' && <span className="ml-3 text-[10px] bg-rose-500 text-white px-2 py-0.5 rounded uppercase tracking-wider animate-pulse shadow-sm shadow-rose-500/50">Khẩn cấp</span>}
                   </h2>
                   <p className="text-sm font-semibold text-slate-500 mt-0.5">{data.requestType} • Lập lúc {new Date(data.createdAt).toLocaleString('vi-VN')}</p>
+                  {chainData && (
+                    <div className="mt-2">
+                      <LinkedDocumentReferences
+                        request={chainData.request ? { id: chainData.request.id, code: chainData.request.id } : undefined}
+                        purchaseOrder={chainData.purchaseOrder ? { id: chainData.purchaseOrder.id, code: chainData.purchaseOrder.id } : undefined}
+                        receipt={chainData.receipts?.length === 1 ? { id: chainData.receipts[0].id, code: chainData.receipts[0].id } : undefined}
+                        receipts={chainData.receipts?.length > 1 ? chainData.receipts.map((r: any) => ({ id: r.id, code: r.id })) : undefined}
+                        warehouse={chainData.warehouse ? { id: chainData.warehouse.id, name: chainData.warehouse.name } : undefined}
+                        supplier={chainData.supplier ? { id: chainData.supplier.id, name: chainData.supplier.name } : undefined}
+                      />
+                    </div>
+                  )}
               </div>
           </div>
           <div className="flex items-center gap-3">
@@ -431,21 +452,27 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                        <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mr-2.5 shrink-0"><CheckSquare className="w-4 h-4"/></div>
                        <div>
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Đã Duyệt</p>
-                          <h4 className="text-xl font-black text-emerald-600">{data.lines.filter((l:any) => l.status.includes('APPROVED') || l.status === 'COMPLETED' || l.status.includes('PARTIAL')).length}</h4>
+                          <h4 className="text-xl font-black text-emerald-600">
+                             {data.lines.reduce((sum: number, l: any) => sum + (l.qtyApproved ?? 0), 0)}
+                          </h4>
                        </div>
                     </div>
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 flex items-center">
                        <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center mr-2.5 shrink-0"><XCircle className="w-4 h-4"/></div>
                        <div>
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bị Từ Chối</p>
-                          <h4 className="text-xl font-black text-rose-600">{data.lines.filter((l:any) => l.status.includes('REJECTED')).length}</h4>
+                          <h4 className="text-xl font-black text-rose-600">
+                             {data.lines.reduce((sum: number, l: any) => sum + Math.max(0, l.qtyRequested - (l.qtyApproved ?? 0)), 0)}
+                          </h4>
                        </div>
                     </div>
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 flex items-center">
                        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mr-2.5 shrink-0"><Archive className="w-4 h-4"/></div>
                        <div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Đã Xuất</p>
-                          <h4 className="text-xl font-black text-blue-600">{data.lines.filter((l:any) => l.qtyDelivered > 0).length}</h4>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Đã Xuất/giao</p>
+                          <h4 className="text-xl font-black text-blue-600">
+                             {data.lines.reduce((sum: number, l: any) => sum + (l.qtyDelivered ?? 0), 0)}
+                          </h4>
                        </div>
                     </div>
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 flex flex-col justify-center">
@@ -592,7 +619,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                         {[
                             { id: 'items', label: 'Vật tư yêu cầu', icon: Archive },
                             { id: 'deliveries', label: 'Lịch sử giao hàng', icon: Package },
-                            { id: 'history', label: 'Lịch sử xử lý', icon: HistoryIcon }
+                            { id: 'history', label: 'Lịch sử xử lý', icon: HistoryIcon },
+                            { id: 'links', label: 'Liên kết chứng từ', icon: FileText }
                         ].map(tab => (
                             <button
                                 key={tab.id}
@@ -888,6 +916,76 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                             </div>
                         </div>
                     )}
+
+                    {activeTab === 'links' && (
+                        <div className="p-8">
+                            {chainData ? (
+                                <div className="space-y-6 relative before:absolute before:top-4 before:bottom-4 before:left-5 before:w-0.5 before:bg-slate-200">
+                                    {/* 1. Request */}
+                                    {chainData.request && (
+                                        <div className="flex gap-4 items-start relative pl-2">
+                                            <div className="w-10 h-10 rounded-full bg-blue-50 border-2 border-blue-200 flex items-center justify-center shrink-0 z-10">
+                                                <FileText className="w-5 h-5 text-blue-600" />
+                                            </div>
+                                            <div className="flex-1 bg-white border border-slate-200 hover:border-blue-300 p-4 rounded-2xl transition shadow-sm">
+                                                <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md">Phiếu Đề Xuất</span>
+                                                <h4 className="text-sm font-black text-slate-800 mt-1.5">{chainData.request.id}</h4>
+                                                <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500 mt-2.5">
+                                                    <p>Trạng thái: <span className="font-extrabold text-indigo-650">{chainData.request.status}</span></p>
+                                                    <p>Người tạo: <span className="font-extrabold text-slate-700">{chainData.request.requester?.fullName}</span></p>
+                                                    <p>Ngày tạo: <span className="font-bold">{new Date(chainData.request.createdAt).toLocaleDateString('vi-VN')}</span></p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* 2. PO */}
+                                    {chainData.purchaseOrder && (
+                                        <div className="flex gap-4 items-start relative pl-2">
+                                            <div className="w-10 h-10 rounded-full bg-indigo-50 border-2 border-indigo-200 flex items-center justify-center shrink-0 z-10">
+                                                <Layers className="w-5 h-5 text-indigo-600" />
+                                            </div>
+                                            <div className="flex-1 bg-white border border-slate-200 hover:border-indigo-300 p-4 rounded-2xl transition shadow-sm">
+                                                <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">Phiếu Mua Hàng / PO</span>
+                                                <h4 className="text-sm font-black text-slate-800 mt-1.5">{chainData.purchaseOrder.id}</h4>
+                                                <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500 mt-2.5">
+                                                    <p>Trạng thái: <span className="font-extrabold text-indigo-650">{chainData.purchaseOrder.status}</span></p>
+                                                    <p>Nhà cung cấp: <span className="font-extrabold text-slate-700">{chainData.purchaseOrder.supplier}</span></p>
+                                                    <p>Tổng giá trị: <span className="font-black text-emerald-600">{Number(chainData.purchaseOrder.totalAmount || 0).toLocaleString('vi-VN')} đ</span></p>
+                                                    <p>Ngày lập PO: <span className="font-bold">{new Date(chainData.purchaseOrder.createdAt).toLocaleDateString('vi-VN')}</span></p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* 3. Receipts */}
+                                    {chainData.receipts && chainData.receipts.length > 0 && (
+                                        <div className="space-y-4">
+                                            {chainData.receipts.map((rc: any) => (
+                                                <div key={rc.id} className="flex gap-4 items-start relative pl-2">
+                                                    <div className="w-10 h-10 rounded-full bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center shrink-0 z-10">
+                                                        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                                                    </div>
+                                                    <div className="flex-1 bg-white border border-slate-200 hover:border-emerald-300 p-4 rounded-2xl transition shadow-sm">
+                                                        <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">Phiếu Nhập Kho / GRN</span>
+                                                        <h4 className="text-sm font-black text-slate-800 mt-1.5">{rc.id}</h4>
+                                                        <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500 mt-2.5">
+                                                            <p>Trạng thái: <span className="font-extrabold text-indigo-650">{rc.status}</span></p>
+                                                            <p>Kho: <span className="font-extrabold text-slate-700">{rc.warehouseCode || 'MAIN'}</span></p>
+                                                            <p>Thủ kho: <span className="font-bold text-slate-700">{rc.receiver?.fullName}</span></p>
+                                                            <p>Ngày nhập: <span className="font-bold">{new Date(rc.receiveDate || rc.createdAt).toLocaleDateString('vi-VN')}</span></p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="text-center py-10 text-slate-400 font-medium">Đang tải dữ liệu liên kết...</div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -973,7 +1071,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                             return (
                               <div className="space-y-2">
                                 <button 
-                                  onClick={() => { setSelectedPrintType('VPP'); setTimeout(() => printDocument(), 100); }} 
+                                  onClick={() => printDocument('VPP')} 
                                   disabled={hasPendingReplacement}
                                   className={`w-full py-3 flex items-center justify-center rounded-xl font-black transition shadow-sm border ${hasPendingReplacement ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-white text-indigo-600 hover:bg-indigo-50 border-indigo-100 hover:border-indigo-200'}`}
                                 >
@@ -981,7 +1079,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                 </button>
                                 
                                 <button 
-                                  onClick={() => { setSelectedPrintType('VE_SINH'); setTimeout(() => printDocument(), 100); }} 
+                                  onClick={() => printDocument('VE_SINH')} 
                                   disabled={hasPendingReplacement}
                                   className={`w-full py-3 flex items-center justify-center rounded-xl font-black transition shadow-sm border ${hasPendingReplacement ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-white text-cyan-600 hover:bg-cyan-50 border-cyan-100 hover:border-cyan-200'}`}
                                 >
@@ -989,7 +1087,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                 </button>
 
                                 <button 
-                                  onClick={() => { setSelectedPrintType('ALL'); setTimeout(() => printDocument(), 100); }} 
+                                  onClick={() => printDocument('ALL')} 
                                   disabled={hasPendingReplacement}
                                   className={`w-full py-3.5 flex items-center justify-center rounded-xl font-black transition shadow-lg border ${hasPendingReplacement ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-slate-800 text-white hover:bg-slate-900 border-slate-900'}`}
                                 >

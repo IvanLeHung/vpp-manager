@@ -7,10 +7,11 @@ import {
   TrendingUp, Coins, FileText, AlertTriangle, Download, Trash2,
   ExternalLink, User as UserIcon, Building, Clock, Paperclip,
   Truck, Package, Search, Plus, RotateCcw,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Layers, CheckCircle2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import WorkflowStepper from '../../components/purchases/WorkflowStepper';
+import LinkedDocumentReferences from '../../components/LinkedDocumentReferences';
 import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
 
 interface PurchasesDetailProps {
@@ -85,6 +86,8 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
 
   // Modal States
   const [showApproveModal, setShowApproveModal] = useState(false);
+  const [chainData, setChainData] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'items' | 'reconciliation' | 'history' | 'links'>('items');
   const [approvals, setApprovals] = useState<any[]>([]);
 
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -121,6 +124,12 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
     try {
       const res = await api.get(`/purchases/${poId}`);
       setData(res.data);
+      try {
+        const chainRes = await api.get(`/procurement-chain/by-po/${poId}`);
+        setChainData(chainRes.data);
+      } catch (e) {
+        console.error("Failed to load chain data", e);
+      }
       if (res.data) {
           setApprovals(res.data.lines.map((l: any) => ({
               lineId: l.id,
@@ -173,6 +182,16 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
     } catch (err: any) {
       showToast(err.response?.data?.error || 'Thao tác thất bại', 'error');
     }
+  };
+
+  const printDocument = async (printType: 'ALL' | 'VPP' | 'VE_SINH' = 'ALL') => {
+      const hasPendingReplacement = data?.lines?.some((l: any) => l.requestLine?.status === 'REPLACEMENT_PENDING_ADMIN');
+      if (hasPendingReplacement) {
+          showToast('Không thể in: Có vật tư đang chờ Admin duyệt thay thế.', 'warning');
+          return;
+      }
+      setSelectedPrintType(printType);
+      window.open(`/purchase-orders/${poId}/print?printType=${printType}`, '_blank');
   };
 
   const handleAdminReplacementAction = async (lineId: string, action: 'APPROVE' | 'REJECT') => {
@@ -391,6 +410,18 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                         <span className="mx-1.5 text-slate-200">|</span>
                         <span className="truncate max-w-[400px]">{renderTitleWithLinks(data.title)}</span>
                       </p>
+                      {chainData && (
+                        <div className="mt-2">
+                          <LinkedDocumentReferences
+                            request={chainData.request ? { id: chainData.request.id, code: chainData.request.id } : undefined}
+                            purchaseOrder={chainData.purchaseOrder ? { id: chainData.purchaseOrder.id, code: chainData.purchaseOrder.id } : undefined}
+                            receipt={chainData.receipts?.length === 1 ? { id: chainData.receipts[0].id, code: chainData.receipts[0].id } : undefined}
+                            receipts={chainData.receipts?.length > 1 ? chainData.receipts.map((r: any) => ({ id: r.id, code: r.id })) : undefined}
+                            warehouse={chainData.warehouse ? { id: chainData.warehouse.id, name: chainData.warehouse.name } : undefined}
+                            supplier={chainData.supplier ? { id: chainData.supplier.id, name: chainData.supplier.name } : undefined}
+                          />
+                        </div>
+                      )}
                   </div>
               </div>
               <div className="flex items-center gap-2">
@@ -472,9 +503,32 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                   </div>
               </div>
 
-              {/* Box 2: Item Table */}
-              <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200 flex flex-col overflow-hidden">
-                  <div className="p-4 border-b border-slate-100 bg-white flex flex-col md:flex-row md:items-center justify-between gap-3">
+              {/* Tab Selector Header */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-1 flex items-center gap-1 mb-4 select-none">
+                  {[
+                      { id: 'items', label: 'Chi tiết dòng hàng', icon: Archive },
+                      { id: 'reconciliation', label: 'Đối chiếu dòng hàng', icon: FileText },
+                      { id: 'history', label: 'Lịch sử xử lý', icon: Clock },
+                      { id: 'links', label: 'Liên kết chứng từ', icon: ShoppingCart }
+                  ].map(tab => (
+                      <button
+                          key={tab.id}
+                          onClick={() => setActiveTab(tab.id as any)}
+                          className={`flex items-center gap-2 px-6 py-2.5 text-[11px] font-black uppercase tracking-widest transition-all rounded-xl ${
+                              activeTab === tab.id 
+                              ? 'bg-indigo-50 text-indigo-650 shadow-sm border border-indigo-100/50' 
+                              : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                          }`}
+                      >
+                          <tab.icon className="w-4 h-4" />
+                          {tab.label}
+                      </button>
+                  ))}
+              </div>
+
+              {activeTab === 'items' && (
+                  <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200 flex flex-col overflow-hidden">
+                      <div className="p-4 border-b border-slate-100 bg-white flex flex-col md:flex-row md:items-center justify-between gap-3">
                      <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-inner">
                           <Package className="w-5 h-5"/>
@@ -737,75 +791,186 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                   </div>
               </div>
 
-              {/* Tracking & Attachments */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  {/* Receipts List */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
-                      <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-50">
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center"><Package className="w-3.5 h-3.5 mr-1.5 text-indigo-500"/> Phiếu Nhập Kho (GRNs)</h3>
-                        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-lg">{data.receipts?.length || 0} Phiếu</span>
-                      </div>
-                      
-                      {data.receipts && data.receipts.length > 0 ? (
-                        <div className="space-y-2">
-                            {data.receipts.map((rc:any) => (
-                                <div key={rc.id} className="group relative flex justify-between items-center p-3 rounded-xl border border-slate-100 bg-slate-50 hover:bg-white hover:shadow-xl hover:shadow-indigo-500/5 transition-all cursor-pointer">
-                                    <div className="flex gap-3 items-center">
-                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 ${rc.status==='COMPLETED'?'bg-emerald-50 text-emerald-600':'bg-amber-50 text-amber-600'}`}>
-                                           {rc.status === 'COMPLETED' ? <CheckCircle className="w-5 h-5"/> : <Clock className="w-5 h-5"/>}
-                                        </div>
-                                        <div>
-                                            <p className="text-[13px] font-black text-slate-800 flex items-center gap-1">{rc.id} <ExternalLink className="w-2.5 h-2.5 text-slate-300"/></p>
-                                            <p className="text-[9px] font-black text-slate-400 mt-0.5 tracking-widest uppercase flex items-center gap-1"><UserIcon className="w-2.5 h-2.5"/> {rc.receiver?.fullName}</p>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className={`text-[9px] font-black uppercase tracking-widest ${rc.status==='COMPLETED'?'text-emerald-500':'text-amber-500'}`}>{rc.status}</p>
-                                        <p className="text-[9px] font-bold text-slate-400 mt-0.5">{new Date(rc.createdAt).toLocaleDateString('vi-VN')}</p>
-                                    </div>
+              {/* TAB CONTENT: Reconciliation */}
+              {activeTab === 'reconciliation' && (
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 overflow-x-auto mb-6">
+                  <div className="mb-4 flex items-center justify-between">
+                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5"><FileText className="w-4 h-4 text-indigo-500"/> Đối Chiếu Dòng Hàng Chuỗi Phiếu</h3>
+                  </div>
+                  <table className="w-full text-left whitespace-nowrap min-w-full border-collapse">
+                    <thead className="bg-slate-50 border-b border-slate-200">
+                      <tr className="text-[9px] uppercase font-black text-slate-400 tracking-wider">
+                        <th className="px-3 py-3">Hàng hóa</th>
+                        <th className="px-3 py-3 text-center">Đề xuất</th>
+                        <th className="px-3 py-3 text-center">Duyệt</th>
+                        <th className="px-3 py-3 text-center">PO</th>
+                        <th className="px-3 py-3 text-center">Nhập đúng</th>
+                        <th className="px-3 py-3 text-center">Nhập thay thế</th>
+                        <th className="px-3 py-3 text-center">Thiếu</th>
+                        <th className="px-3 py-3 text-center">Còn lại</th>
+                        <th className="px-3 py-3 text-right">Giá PO</th>
+                        <th className="px-3 py-3 text-right">Giá thực tế</th>
+                        <th className="px-3 py-3">Ghi chú</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs">
+                      {chainData?.lines?.map((line: any) => {
+                        const isReplacement = line.isReplacement;
+                        
+                        return (
+                          <tr key={line.id} className={`hover:bg-slate-50/50 ${isReplacement ? 'bg-amber-50/20' : ''}`}>
+                            <td className="px-3 py-3 font-semibold text-slate-800">
+                              {isReplacement ? (
+                                <div className="pl-4 flex items-center gap-1.5">
+                                  <span className="text-[9px] bg-amber-100 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded font-black uppercase">Hàng thay thế</span>
+                                  <span>{line.actualItemName}</span>
+                                  <span className="text-[10px] text-slate-400 font-normal">({line.actualItemCode})</span>
                                 </div>
-                            ))}
+                              ) : (
+                                <div>
+                                  <span>{line.itemName}</span>
+                                  <span className="block text-[10px] text-slate-450 font-normal">{line.itemCode}</span>
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-3 py-3 text-center font-medium text-slate-500">{isReplacement ? '-' : line.requestedQty}</td>
+                            <td className="px-3 py-3 text-center font-bold text-slate-600">{isReplacement ? '-' : line.approvedQty}</td>
+                            <td className="px-3 py-3 text-center font-bold text-indigo-650">{isReplacement ? '-' : line.orderedQty}</td>
+                            <td className="px-3 py-3 text-center font-bold text-emerald-600">{line.receivedOriginalQty || '-'}</td>
+                            <td className="px-3 py-3 text-center font-bold text-teal-650">{line.receivedReplacementQty || '-'}</td>
+                            <td className="px-3 py-3 text-center font-bold text-rose-500">{line.shortageQty || '-'}</td>
+                            <td className="px-3 py-3 text-center font-bold text-slate-600">{line.remainingQty || '-'}</td>
+                            <td className="px-3 py-3 text-right font-medium text-slate-650">
+                              {line.poUnitPrice ? `${Number(line.poUnitPrice).toLocaleString('vi-VN')} đ` : '-'}
+                            </td>
+                            <td className="px-3 py-3 text-right font-black text-emerald-600">
+                              {line.actualReceiptUnitPrice ? `${Number(line.actualReceiptUnitPrice).toLocaleString('vi-VN')} đ` : '-'}
+                            </td>
+                            <td className="px-3 py-3 text-slate-500 max-w-[200px] truncate" title={line.note}>{line.note || '-'}</td>
+                          </tr>
+                        );
+                      })}
+                      {(!chainData || chainData.lines?.length === 0) && (
+                        <tr>
+                          <td colSpan={11} className="py-10 text-center text-slate-400 italic font-medium">Chưa có dữ liệu đối chiếu chuỗi phiếu.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* TAB CONTENT: History */}
+              {activeTab === 'history' && (
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+                  <div className="mb-4">
+                     <h3 className="text-xs font-black text-slate-450 uppercase tracking-widest flex items-center gap-1.5"><Clock className="w-4 h-4 text-indigo-500"/> Lịch Sử Xử Lý (Audit Trail)</h3>
+                  </div>
+                  <div className="relative pl-6 border-l-2 border-slate-100 space-y-6">
+                    {data.auditLogs?.map((audit: any) => {
+                      const isPositive = ['APPROVE', 'ORDERED', 'CONFIRM_DELIVERY', 'RECEIVE'].includes(audit.action);
+                      const isNegative = ['REJECT', 'CANCEL'].includes(audit.action);
+                      
+                      return (
+                        <div key={audit.id} className="relative group">
+                          <div className={`absolute -left-[32px] top-1 w-4 h-4 rounded-full bg-white border-2 shadow-sm z-10 transition-all group-hover:scale-125 ${isPositive ? 'border-emerald-500' : isNegative ? 'border-rose-500' : 'border-indigo-500'}`}></div>
+                          <div className="flex justify-between items-start">
+                            <h4 className={`text-xs font-black uppercase tracking-tight ${isPositive ? 'text-emerald-600' : isNegative ? 'text-rose-600' : 'text-slate-800'}`}>
+                              {formatAuditAction(audit.action)}
+                            </h4>
+                            <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded uppercase">{new Date(audit.createdAt).toLocaleDateString('vi-VN')}</span>
+                          </div>
+                          <p className="text-[10px] font-bold text-slate-500 mt-1 flex items-center gap-1">
+                            <UserIcon className="w-3 h-3"/> {audit.user?.fullName || 'Hệ thống'} • {new Date(audit.createdAt).toLocaleTimeString('vi-VN')}
+                          </p>
+                          {audit.newValues?.reason && (
+                            <div className="mt-2 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs font-medium text-slate-700 leading-normal italic relative group-hover:bg-indigo-50/30 group-hover:border-indigo-100 transition-all max-w-2xl">
+                              "{audit.newValues.reason}"
+                            </div>
+                          )}
                         </div>
-                      ) : (
-                        <div className="py-6 flex flex-col items-center text-slate-300">
-                           <ShoppingCart className="w-8 h-8 mb-2 opacity-20"/>
-                           <p className="text-[10px] font-bold uppercase tracking-widest">Chưa có phiếu nhập</p>
+                      );
+                    })}
+                    {(!data.auditLogs || data.auditLogs.length === 0) && (
+                      <div className="text-center py-6 text-slate-400 font-medium">Chưa có lịch sử xử lý nào.</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB CONTENT: Links */}
+              {activeTab === 'links' && (
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+                  <div className="mb-4">
+                     <h3 className="text-xs font-black text-slate-455 uppercase tracking-widest flex items-center gap-1.5"><ShoppingCart className="w-4 h-4 text-indigo-500"/> Liên Kết Chứng Từ Trong Chuỗi</h3>
+                  </div>
+                  {chainData ? (
+                    <div className="space-y-6 relative before:absolute before:top-4 before:bottom-4 before:left-5 before:w-0.5 before:bg-slate-200">
+                      {/* 1. Request */}
+                      {chainData.request && (
+                        <div className="flex gap-4 items-start relative pl-2">
+                          <div className="w-10 h-10 rounded-full bg-blue-50 border-2 border-blue-200 flex items-center justify-center shrink-0 z-10">
+                            <FileText className="w-5 h-5 text-blue-600" />
+                          </div>
+                          <div className="flex-1 bg-white border border-slate-200 hover:border-blue-300 p-4 rounded-2xl transition shadow-sm">
+                            <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md">Phiếu Đề Xuất</span>
+                            <h4 className="text-sm font-black text-slate-800 mt-1.5">{chainData.request.id}</h4>
+                            <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500 mt-2.5">
+                              <p>Trạng thái: <span className="font-extrabold text-indigo-650">{chainData.request.status}</span></p>
+                              <p>Người tạo: <span className="font-extrabold text-slate-700">{chainData.request.requester?.fullName}</span></p>
+                              <p>Ngày tạo: <span className="font-bold">{new Date(chainData.request.createdAt).toLocaleDateString('vi-VN')}</span></p>
+                            </div>
+                          </div>
                         </div>
                       )}
-                  </div>
 
-                  {/* Audit Trail */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
-                        <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-50">
-                           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center"><TrendingUp className="w-3.5 h-3.5 mr-1.5 text-indigo-500"/> Lịch Sử Xử Lý (Audit Trail)</h3>
+                      {/* 2. PO */}
+                      {chainData.purchaseOrder && (
+                        <div className="flex gap-4 items-start relative pl-2">
+                          <div className="w-10 h-10 rounded-full bg-indigo-50 border-2 border-indigo-200 flex items-center justify-center shrink-0 z-10">
+                            <Layers className="w-5 h-5 text-indigo-600" />
+                          </div>
+                          <div className="flex-1 bg-white border border-slate-200 hover:border-indigo-300 p-4 rounded-2xl transition shadow-sm">
+                            <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">Phiếu Mua Hàng / PO</span>
+                            <h4 className="text-sm font-black text-slate-800 mt-1.5">{chainData.purchaseOrder.id}</h4>
+                            <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500 mt-2.5">
+                              <p>Trạng thái: <span className="font-extrabold text-indigo-655">{chainData.purchaseOrder.status}</span></p>
+                              <p>Nhà cung cấp: <span className="font-extrabold text-slate-700">{chainData.purchaseOrder.supplier}</span></p>
+                              <p>Tổng giá trị: <span className="font-black text-emerald-600">{Number(chainData.purchaseOrder.totalAmount || 0).toLocaleString('vi-VN')} đ</span></p>
+                              <p>Ngày lập PO: <span className="font-bold">{new Date(chainData.purchaseOrder.createdAt).toLocaleDateString('vi-VN')}</span></p>
+                            </div>
+                          </div>
                         </div>
-                        <div className="relative pl-5 border-l-2 border-slate-100 space-y-4">
-                            {data.auditLogs?.map((audit:any) => {
-                               const isPositive = ['APPROVE', 'ORDERED', 'CONFIRM_DELIVERY', 'RECEIVE'].includes(audit.action);
-                               const isNegative = ['REJECT', 'CANCEL'].includes(audit.action);
-                               
-                               return (
-                               <div key={audit.id} className="relative group">
-                                 <div className={`absolute -left-[27px] top-1 w-3 h-3 rounded-full bg-white border-2 shadow-sm z-10 transition-all group-hover:scale-125 ${isPositive ? 'border-emerald-500' : isNegative ? 'border-rose-500' : 'border-indigo-500'}`}></div>
-                                 <div className="flex justify-between items-start">
-                                    <h4 className={`text-[11px] font-black uppercase tracking-tight ${isPositive ? 'text-emerald-600' : isNegative ? 'text-rose-600' : 'text-slate-800'}`}>
-                                      {formatAuditAction(audit.action)}
-                                    </h4>
-                                    <span className="text-[8px] font-black text-slate-400 bg-slate-100 px-1 py-0.5 rounded uppercase">{new Date(audit.createdAt).toLocaleDateString('vi-VN')}</span>
-                                 </div>
-                                 <p className="text-[9px] font-bold text-slate-500 mt-0.5 flex items-center gap-1">
-                                    <UserIcon className="w-2.5 h-2.5"/> {audit.user?.fullName || 'Hệ thống'} • {new Date(audit.createdAt).toLocaleTimeString('vi-VN')}
-                                 </p>
-                                 {audit.newValues?.reason && (
-                                   <div className="mt-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100 text-[10px] font-medium text-slate-700 leading-normal italic relative group-hover:bg-indigo-50/30 group-hover:border-indigo-100 transition-all">
-                                      "{audit.newValues.reason}"
-                                   </div>
-                                 )}
-                               </div>
-                                   )})}
+                      )}
+
+                      {/* 3. Receipts */}
+                      {chainData.receipts && chainData.receipts.length > 0 && (
+                        <div className="space-y-4">
+                          {chainData.receipts.map((rc: any) => (
+                            <div key={rc.id} className="flex gap-4 items-start relative pl-2">
+                              <div className="w-10 h-10 rounded-full bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center shrink-0 z-10">
+                                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                              </div>
+                              <div className="flex-1 bg-white border border-slate-200 hover:border-emerald-300 p-4 rounded-2xl transition shadow-sm">
+                                <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">Phiếu Nhập Kho / GRN</span>
+                                <h4 className="text-sm font-black text-slate-800 mt-1.5">{rc.id}</h4>
+                                <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500 mt-2.5">
+                                  <p>Trạng thái: <span className="font-extrabold text-indigo-650">{rc.status}</span></p>
+                                  <p>Kho: <span className="font-extrabold text-slate-700">{rc.warehouseCode || 'MAIN'}</span></p>
+                                  <p>Thủ kho: <span className="font-bold text-slate-700">{rc.receiver?.fullName}</span></p>
+                                  <p>Ngày nhập: <span className="font-bold">{new Date(rc.receiveDate || rc.createdAt).toLocaleDateString('vi-VN')}</span></p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                  </div>
-              </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-10 text-slate-400 font-medium">Đang tải dữ liệu liên kết...</div>
+                  )}
+                </div>
+              )}
 
                {/* Attachments Section */}
                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-6">
@@ -950,7 +1115,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                             return (
                               <div className="space-y-2">
                                 <button 
-                                  onClick={() => { setSelectedPrintType('VPP'); setTimeout(() => window.print(), 100); }} 
+                                  onClick={() => printDocument('VPP')} 
                                   disabled={hasPendingReplacement}
                                   className={`w-full py-3 flex items-center justify-center rounded-xl font-black transition shadow-sm border ${hasPendingReplacement ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-white text-indigo-600 hover:bg-indigo-50 border-indigo-100 hover:border-indigo-200'}`}
                                 >
@@ -958,7 +1123,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                 </button>
                                 
                                 <button 
-                                  onClick={() => { setSelectedPrintType('VE_SINH'); setTimeout(() => window.print(), 100); }} 
+                                  onClick={() => printDocument('VE_SINH')} 
                                   disabled={hasPendingReplacement}
                                   className={`w-full py-3 flex items-center justify-center rounded-xl font-black transition shadow-sm border ${hasPendingReplacement ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-white text-cyan-600 hover:bg-cyan-50 border-cyan-100 hover:border-cyan-200'}`}
                                 >
@@ -966,7 +1131,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                 </button>
 
                                 <button 
-                                  onClick={() => { setSelectedPrintType('ALL'); setTimeout(() => window.print(), 100); }} 
+                                  onClick={() => printDocument('ALL')} 
                                   disabled={hasPendingReplacement}
                                   className={`w-full py-3.5 flex items-center justify-center rounded-xl font-black transition shadow-lg border ${hasPendingReplacement ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-slate-800 text-white hover:bg-slate-900 border-slate-900'}`}
                                 >

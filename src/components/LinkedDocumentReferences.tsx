@@ -28,6 +28,7 @@ interface LinkedDocumentReferencesProps {
   request?: DocumentInfo;
   purchaseOrder?: DocumentInfo;
   receipt?: DocumentInfo;
+  receipts?: DocumentInfo[];
   warehouse?: DocumentInfo;
   supplier?: DocumentInfo;
 }
@@ -38,6 +39,7 @@ export default function LinkedDocumentReferences({
   request,
   purchaseOrder,
   receipt,
+  receipts,
   warehouse,
   supplier
 }: LinkedDocumentReferencesProps) {
@@ -45,6 +47,7 @@ export default function LinkedDocumentReferences({
   const [detailData, setDetailData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showReceiptList, setShowReceiptList] = useState(false);
 
   useEffect(() => {
     if (!activeDoc) {
@@ -175,7 +178,15 @@ export default function LinkedDocumentReferences({
       )}
 
       {/* Receipt Badge */}
-      {receipt && receipt.id && (
+      {receipts && receipts.length > 1 ? (
+        <button
+          onClick={() => setShowReceiptList(true)}
+          className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 border border-emerald-100 rounded-lg transition duration-200 shadow-sm"
+        >
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          <span>GRN: {receipts.length} phiếu</span>
+        </button>
+      ) : (receipt && receipt.id && (
         <button
           onClick={() => setActiveDoc({ type: 'GRN', id: receipt.id })}
           className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 hover:text-emerald-700 border border-emerald-100 rounded-lg transition duration-200 shadow-sm"
@@ -183,7 +194,7 @@ export default function LinkedDocumentReferences({
           <CheckCircle2 className="w-3.5 h-3.5" />
           <span>GRN: {receipt.code || receipt.id}</span>
         </button>
-      )}
+      ))}
 
       {/* Warehouse Badge */}
       {warehouse && warehouse.id && (
@@ -520,6 +531,59 @@ export default function LinkedDocumentReferences({
               <button
                 onClick={() => setActiveDoc(null)}
                 className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl transition text-xs uppercase tracking-wide"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MULTIPLE GRNs SELECTION MODAL */}
+      {showReceiptList && receipts && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[210] flex items-center justify-center p-4 animate-in fade-in duration-200 text-slate-800 font-sans">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200 flex flex-col">
+            <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800">
+                  Danh sách Phiếu Nhập Kho (GRN)
+                </h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">Tìm thấy {receipts.length} phiếu nhập kho liên kết</p>
+              </div>
+              <button 
+                onClick={() => setShowReceiptList(false)} 
+                className="p-2 hover:bg-slate-200/60 rounded-full text-slate-400 hover:text-slate-650 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 divide-y divide-slate-100 max-h-[60vh] overflow-y-auto custom-scrollbar">
+              {receipts.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => {
+                    setActiveDoc({ type: 'GRN', id: r.id });
+                    setShowReceiptList(false);
+                  }}
+                  className="w-full text-left py-3 px-2 hover:bg-slate-50 rounded-xl transition flex justify-between items-center group"
+                >
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                    <div>
+                      <p className="text-xs font-extrabold text-slate-850 group-hover:text-indigo-650 transition">{r.code || r.id}</p>
+                      {r.name && <p className="text-[10px] text-slate-450 mt-0.5">{r.name}</p>}
+                    </div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-slate-350 opacity-0 group-hover:opacity-100 transition duration-200" />
+                </button>
+              ))}
+            </div>
+
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+              <button
+                onClick={() => setShowReceiptList(false)}
+                className="px-4 py-2 bg-slate-205 hover:bg-slate-300 text-slate-700 font-bold rounded-xl transition text-xs uppercase tracking-wide"
               >
                 Đóng
               </button>

@@ -9,6 +9,8 @@ import Analytics from './pages/Analytics';
 import Purchases from './pages/purchases/Purchases';
 import Receipts from './pages/purchases/Receipts';
 import ReceiptPrint from './pages/purchases/ReceiptPrint';
+import RequestPrint from './pages/requests/RequestPrint';
+import PurchasePrint from './pages/purchases/PurchasePrint';
 import GuestRequest from './pages/GuestRequest';
 import Users from './pages/Users';
 import Items from './pages/Items';
@@ -264,6 +266,8 @@ function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/guest-request" element={<GuestRequest />} />
           <Route path="/receipts/:id/print" element={<ReceiptPrint />} />
+          <Route path="/requests/:id/print" element={<RequestPrint />} />
+          <Route path="/purchase-orders/:id/print" element={<PurchasePrint />} />
           <Route element={<MainLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             {/* Về sau sẽ tạo 2 trang này */}

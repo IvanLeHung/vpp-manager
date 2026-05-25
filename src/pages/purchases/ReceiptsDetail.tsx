@@ -3,7 +3,7 @@ import api from '../../lib/api';
 import {
   ArrowLeft, CheckCircle, Package, AlertTriangle, Printer, 
   ChevronLeft, ChevronRight, User, History, Undo, FileText,
-  Plus, Trash2, Search, RefreshCw
+  Plus, Trash2, Search, RefreshCw, Clock, ShoppingCart, Layers, CheckCircle2
 } from 'lucide-react';
 import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
 import { useAppContext } from '../../context/AppContext';
@@ -49,6 +49,8 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
 
   // Exchange items state
   const [showReplaceModal, setShowReplaceModal] = useState(false);
+  const [chainData, setChainData] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'items' | 'reconciliation' | 'history' | 'links'>('items');
   const [replaceFormData, setReplaceFormData] = useState({
     originalReceiptLineId: '',
     replacementItemId: '',
@@ -93,6 +95,12 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
     try {
       const res = await api.get(`/receipts/${currentId}`);
       setData(res.data);
+      try {
+        const chainRes = await api.get(`/procurement-chain/by-receipt/${currentId}`);
+        setChainData(chainRes.data);
+      } catch (e) {
+        console.error("Failed to load chain data", e);
+      }
       if (res.data) {
         setReconcileValues(res.data.lines.map((l: any) => ({
           lineId: l.id,
@@ -407,20 +415,31 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
           
           <div className="h-6 w-px bg-slate-200 mx-2"></div>
           
-          <LinkedDocumentReferences
-            request={
-              data.po?.lines?.find((l: any) => l.requestLine?.requestId)
-                ? {
-                    id: data.po.lines.find((l: any) => l.requestLine?.requestId).requestLine.requestId,
-                    code: data.po.lines.find((l: any) => l.requestLine?.requestId).requestLine.requestId
-                  }
-                : undefined
-            }
-            purchaseOrder={data.poId ? { id: data.poId, code: data.poId } : undefined}
-            receipt={{ id: data.id, code: data.id }}
-            warehouse={data.warehouseCode ? { id: data.warehouseCode, name: data.warehouseCode === 'MAIN' ? 'MAIN (Văn phòng phẩm)' : 'VE_SINH (Vệ sinh)' } : undefined}
-            supplier={data.supplier ? { id: data.supplier, name: data.supplier } : undefined}
-          />
+          {chainData ? (
+            <LinkedDocumentReferences
+              request={chainData.request ? { id: chainData.request.id, code: chainData.request.id } : undefined}
+              purchaseOrder={chainData.purchaseOrder ? { id: chainData.purchaseOrder.id, code: chainData.purchaseOrder.id } : undefined}
+              receipt={chainData.receipts?.length === 1 ? { id: chainData.receipts[0].id, code: chainData.receipts[0].id } : undefined}
+              receipts={chainData.receipts?.length > 1 ? chainData.receipts.map((r: any) => ({ id: r.id, code: r.id })) : undefined}
+              warehouse={chainData.warehouse ? { id: chainData.warehouse.id, name: chainData.warehouse.name } : undefined}
+              supplier={chainData.supplier ? { id: chainData.supplier.id, name: chainData.supplier.name } : undefined}
+            />
+          ) : (
+            <LinkedDocumentReferences
+              request={
+                data.po?.lines?.find((l: any) => l.requestLine?.requestId)
+                  ? {
+                      id: data.po.lines.find((l: any) => l.requestLine?.requestId).requestLine.requestId,
+                      code: data.po.lines.find((l: any) => l.requestLine?.requestId).requestLine.requestId
+                    }
+                  : undefined
+              }
+              purchaseOrder={data.poId ? { id: data.poId, code: data.poId } : undefined}
+              receipt={{ id: data.id, code: data.id }}
+              warehouse={data.warehouseCode ? { id: data.warehouseCode, name: data.warehouseCode === 'MAIN' ? 'MAIN (Văn phòng phẩm)' : 'VE_SINH (Vệ sinh)' } : undefined}
+              supplier={data.supplier ? { id: data.supplier, name: data.supplier } : undefined}
+            />
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -505,8 +524,31 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
           ))}
         </div>
 
-        {/* MAIN SPLIT CONTENT */}
-        <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
+        {/* Tab Selector Header */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-1 flex items-center gap-1 mb-4 select-none">
+            {[
+                { id: 'items', label: 'Đối chiếu & nhập thực tế', icon: Package },
+                { id: 'reconciliation', label: 'Đối chiếu dòng hàng', icon: FileText },
+                { id: 'history', label: 'Lịch sử xử lý', icon: Clock },
+                { id: 'links', label: 'Liên kết chứng từ', icon: ShoppingCart }
+            ].map(tab => (
+                <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`flex items-center gap-2 px-6 py-2.5 text-[11px] font-black uppercase tracking-widest transition-all rounded-xl ${
+                        activeTab === tab.id 
+                        ? 'bg-indigo-50 text-indigo-650 shadow-sm border border-indigo-100/50' 
+                        : 'text-slate-400 hover:text-slate-650 hover:bg-slate-50'
+                    }`}
+                >
+                    <tab.icon className="w-4 h-4" />
+                    {tab.label}
+                </button>
+            ))}
+        </div>
+
+        {activeTab === 'items' && (
+          <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
           {/* LEFT COLUMN: TABLE (65%) */}
           <div className="flex-[3] bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden min-h-[400px]">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-20">
@@ -899,6 +941,188 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
             </div>
           </div>
         </div>
+        )}
+
+        {/* TAB CONTENT: Reconciliation */}
+        {activeTab === 'reconciliation' && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 overflow-x-auto">
+            <div className="mb-4 flex items-center justify-between">
+               <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5"><FileText className="w-4 h-4 text-indigo-500"/> Đối Chiếu Dòng Hàng Chuỗi Phiếu</h3>
+            </div>
+            <table className="w-full text-left whitespace-nowrap min-w-full border-collapse">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr className="text-[9px] uppercase font-black text-slate-400 tracking-wider">
+                  <th className="px-3 py-3">Hàng hóa</th>
+                  <th className="px-3 py-3 text-center">Đề xuất</th>
+                  <th className="px-3 py-3 text-center">Duyệt</th>
+                  <th className="px-3 py-3 text-center">PO</th>
+                  <th className="px-3 py-3 text-center">Nhập đúng</th>
+                  <th className="px-3 py-3 text-center">Nhập thay thế</th>
+                  <th className="px-3 py-3 text-center">Thiếu</th>
+                  <th className="px-3 py-3 text-center">Còn lại</th>
+                  <th className="px-3 py-3 text-right">Giá PO</th>
+                  <th className="px-3 py-3 text-right">Giá thực tế</th>
+                  <th className="px-3 py-3">Ghi chú</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs">
+                {chainData?.lines?.map((line: any) => {
+                  const isReplacement = line.isReplacement;
+                  
+                  return (
+                    <tr key={line.id} className={`hover:bg-slate-50/50 ${isReplacement ? 'bg-amber-50/20' : ''}`}>
+                      <td className="px-3 py-3 font-semibold text-slate-800">
+                        {isReplacement ? (
+                          <div className="pl-4 flex items-center gap-1.5">
+                            <span className="text-[9px] bg-amber-100 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded font-black uppercase">Hàng thay thế</span>
+                            <span>{line.actualItemName}</span>
+                            <span className="text-[10px] text-slate-400 font-normal">({line.actualItemCode})</span>
+                          </div>
+                        ) : (
+                          <div>
+                            <span>{line.itemName}</span>
+                            <span className="block text-[10px] text-slate-450 font-normal">{line.itemCode}</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-center font-medium text-slate-500">{isReplacement ? '-' : line.requestedQty}</td>
+                      <td className="px-3 py-3 text-center font-bold text-slate-600">{isReplacement ? '-' : line.approvedQty}</td>
+                      <td className="px-3 py-3 text-center font-bold text-indigo-650">{isReplacement ? '-' : line.orderedQty}</td>
+                      <td className="px-3 py-3 text-center font-bold text-emerald-600">{line.receivedOriginalQty || '-'}</td>
+                      <td className="px-3 py-3 text-center font-bold text-teal-650">{line.receivedReplacementQty || '-'}</td>
+                      <td className="px-3 py-3 text-center font-bold text-rose-500">{line.shortageQty || '-'}</td>
+                      <td className="px-3 py-3 text-center font-bold text-slate-600">{line.remainingQty || '-'}</td>
+                      <td className="px-3 py-3 text-right font-medium text-slate-655">
+                        {line.poUnitPrice ? `${Number(line.poUnitPrice).toLocaleString('vi-VN')} đ` : '-'}
+                      </td>
+                      <td className="px-3 py-3 text-right font-black text-emerald-600">
+                        {line.actualReceiptUnitPrice ? `${Number(line.actualReceiptUnitPrice).toLocaleString('vi-VN')} đ` : '-'}
+                      </td>
+                      <td className="px-3 py-3 text-slate-500 max-w-[200px] truncate" title={line.note}>{line.note || '-'}</td>
+                    </tr>
+                  );
+                })}
+                {(!chainData || chainData.lines?.length === 0) && (
+                  <tr>
+                    <td colSpan={11} className="py-10 text-center text-slate-400 italic font-medium">Chưa có dữ liệu đối chiếu chuỗi phiếu.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* TAB CONTENT: History */}
+        {activeTab === 'history' && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="mb-4">
+               <h3 className="text-xs font-black text-slate-450 uppercase tracking-widest flex items-center gap-1.5"><Clock className="w-4 h-4 text-indigo-500"/> Lịch Sử Xử Lý (Audit Trail)</h3>
+            </div>
+            <div className="relative pl-6 border-l-2 border-slate-100 space-y-6">
+              {data.auditLogs?.map((audit: any) => {
+                const mapped = AUDIT_ACTION_MAP[audit.action] || { label: audit.action, impact: 'Thay đổi', color: 'bg-slate-100 text-slate-400 border-slate-200' };
+                const isCancel = audit.action.includes('CANCEL');
+                
+                return (
+                  <div key={audit.id} className="relative group">
+                    <div className={`absolute -left-[32px] top-1 w-4 h-4 rounded-full bg-white border-2 shadow-sm z-10 transition-all group-hover:scale-125 ${isCancel ? 'border-rose-400' : 'border-indigo-500'}`}></div>
+                    <div className="flex justify-between items-start">
+                      <h4 className={`text-xs font-black uppercase tracking-tight ${isCancel ? 'text-rose-600' : 'text-slate-800'}`}>
+                        {mapped.label}
+                      </h4>
+                      <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded uppercase">{new Date(audit.createdAt).toLocaleDateString('vi-VN')}</span>
+                    </div>
+                    <p className="text-[10px] font-bold text-slate-500 mt-1 flex items-center gap-1">
+                      <User className="w-3 h-3"/> {audit.user?.fullName || 'Hệ thống'} • {new Date(audit.createdAt).toLocaleTimeString('vi-VN')}
+                    </p>
+                    {audit.newValues?.reason && (
+                      <div className="mt-2 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs font-medium text-slate-700 leading-normal italic relative group-hover:bg-indigo-50/30 group-hover:border-indigo-100 transition-all max-w-2xl">
+                        "{audit.newValues.reason}"
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {(!data.auditLogs || data.auditLogs.length === 0) && (
+                <div className="text-center py-6 text-slate-400 font-medium">Chưa có lịch sử xử lý nào.</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB CONTENT: Links */}
+        {activeTab === 'links' && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="mb-4">
+               <h3 className="text-xs font-black text-slate-455 uppercase tracking-widest flex items-center gap-1.5"><ShoppingCart className="w-4 h-4 text-indigo-500"/> Liên Kết Chứng Từ Trong Chuỗi</h3>
+            </div>
+            {chainData ? (
+              <div className="space-y-6 relative before:absolute before:top-4 before:bottom-4 before:left-5 before:w-0.5 before:bg-slate-200">
+                {/* 1. Request */}
+                {chainData.request && (
+                  <div className="flex gap-4 items-start relative pl-2">
+                    <div className="w-10 h-10 rounded-full bg-blue-50 border-2 border-blue-200 flex items-center justify-center shrink-0 z-10">
+                      <FileText className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1 bg-white border border-slate-200 hover:border-blue-300 p-4 rounded-2xl transition shadow-sm">
+                      <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md">Phiếu Đề Xuất</span>
+                      <h4 className="text-sm font-black text-slate-800 mt-1.5">{chainData.request.id}</h4>
+                      <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500 mt-2.5">
+                        <p>Trạng thái: <span className="font-extrabold text-indigo-650">{chainData.request.status}</span></p>
+                        <p>Người tạo: <span className="font-extrabold text-slate-700">{chainData.request.requester?.fullName}</span></p>
+                        <p>Ngày tạo: <span className="font-bold">{new Date(chainData.request.createdAt).toLocaleDateString('vi-VN')}</span></p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. PO */}
+                {chainData.purchaseOrder && (
+                  <div className="flex gap-4 items-start relative pl-2">
+                    <div className="w-10 h-10 rounded-full bg-indigo-50 border-2 border-indigo-200 flex items-center justify-center shrink-0 z-10">
+                      <Layers className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <div className="flex-1 bg-white border border-slate-200 hover:border-indigo-300 p-4 rounded-2xl transition shadow-sm">
+                      <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">Phiếu Mua Hàng / PO</span>
+                      <h4 className="text-sm font-black text-slate-800 mt-1.5">{chainData.purchaseOrder.id}</h4>
+                      <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500 mt-2.5">
+                        <p>Trạng thái: <span className="font-extrabold text-indigo-655">{chainData.purchaseOrder.status}</span></p>
+                        <p>Nhà cung cấp: <span className="font-extrabold text-slate-700">{chainData.purchaseOrder.supplier}</span></p>
+                        <p>Tổng giá trị: <span className="font-black text-emerald-600">{Number(chainData.purchaseOrder.totalAmount || 0).toLocaleString('vi-VN')} đ</span></p>
+                        <p>Ngày lập PO: <span className="font-bold">{new Date(chainData.purchaseOrder.createdAt).toLocaleDateString('vi-VN')}</span></p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Receipts */}
+                {chainData.receipts && chainData.receipts.length > 0 && (
+                  <div className="space-y-4">
+                    {chainData.receipts.map((rc: any) => (
+                      <div key={rc.id} className="flex gap-4 items-start relative pl-2">
+                        <div className="w-10 h-10 rounded-full bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center shrink-0 z-10">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                        </div>
+                        <div className="flex-1 bg-white border border-slate-200 hover:border-emerald-300 p-4 rounded-2xl transition shadow-sm">
+                          <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">Phiếu Nhập Kho / GRN</span>
+                          <h4 className="text-sm font-black text-slate-800 mt-1.5">{rc.id}</h4>
+                          <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500 mt-2.5">
+                            <p>Trạng thái: <span className="font-extrabold text-indigo-650">{rc.status}</span></p>
+                            <p>Kho: <span className="font-extrabold text-slate-700">{rc.warehouseCode || 'MAIN'}</span></p>
+                            <p>Thủ kho: <span className="font-bold text-slate-700">{rc.receiver?.fullName}</span></p>
+                            <p>Ngày nhập: <span className="font-bold">{new Date(rc.receiveDate || rc.createdAt).toLocaleDateString('vi-VN')}</span></p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-10 text-slate-400 font-medium">Đang tải dữ liệu liên kết...</div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* REFINED CANCEL MODAL */}
