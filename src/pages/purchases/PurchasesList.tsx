@@ -8,6 +8,7 @@ import {
 import * as XLSX from 'xlsx';
 import * as docx from 'docx';
 import { saveAs } from 'file-saver';
+import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
 
 interface PurchasesListProps {
   onCreateNew: () => void;
@@ -1390,7 +1391,19 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                           <tr key={idx} className="hover:bg-slate-50/30 transition-colors">
                             <td className="px-5 py-4 text-center text-[10px] font-black text-slate-300 italic">{idx + 1}</td>
                             <td className="px-5 py-4">
-                              <p className="font-bold text-slate-700 text-[11px] leading-snug whitespace-normal line-clamp-2">{line.item?.name || 'N/A'}</p>
+                              {line.item ? (
+                                <GoodsNameWithPreview 
+                                  itemId={line.item.id}
+                                  itemCode={line.item.mvpp}
+                                  itemName={line.item.name}
+                                  imageUrl={line.item.imageUrl}
+                                  thumbnailUrl={line.item.thumbnailUrl}
+                                  categoryName={line.item.category}
+                                  unit={line.item.unit}
+                                />
+                              ) : (
+                                <p className="font-bold text-slate-700 text-[11px] leading-snug whitespace-normal line-clamp-2">N/A</p>
+                              )}
                               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{line.item?.mvpp || '—'}</span>
                             </td>
                             <td className="px-5 py-4 text-center">

@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import type { VPPRequest, User } from '../../context/AppContext';
 import { useAppContext } from '../../context/AppContext';
 import api from '../../lib/api';
+import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
 import type { ViewMode } from '../Requests';
 
 interface Props {
@@ -778,7 +779,22 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                   {(previewReq.lines || []).map((line: any, idx: number) => (
                     <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-4 py-2.5 text-center text-xs font-bold text-slate-400">{idx+1}</td>
-                      <td className="px-4 py-2.5"><p className="font-bold text-slate-800 text-sm whitespace-normal leading-snug">{line.item?.name || 'N/A'}</p><span className="text-[9px] font-black text-slate-400 tracking-wider">{line.item?.mvpp || '—'}</span></td>
+                      <td className="px-4 py-2.5">
+                        {line.item ? (
+                          <GoodsNameWithPreview 
+                            itemId={line.item.id}
+                            itemCode={line.item.mvpp}
+                            itemName={line.item.name}
+                            imageUrl={line.item.imageUrl}
+                            thumbnailUrl={line.item.thumbnailUrl}
+                            categoryName={line.item.category}
+                            unit={line.item.unit}
+                          />
+                        ) : (
+                          <p className="font-bold text-slate-800 text-sm whitespace-normal leading-snug">N/A</p>
+                        )}
+                        <span className="text-[9px] font-black text-slate-400 tracking-wider">{line.item?.mvpp || '-'}</span>
+                      </td>
                       <td className="px-4 py-2.5 text-center"><span className="font-black text-base text-indigo-600">{line.qtyRequested}</span></td>
                       <td className="px-4 py-2.5 text-center text-xs font-bold text-slate-500">{line.item?.unit || '—'}</td>
                       <td className="px-4 py-2.5 text-right text-xs font-bold text-slate-600">{line.item?.price ? Number(line.item.price).toLocaleString('vi-VN') : '—'}</td>

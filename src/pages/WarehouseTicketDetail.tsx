@@ -6,6 +6,7 @@ import {
   ClipboardList, User, Calendar, MessageSquare, Shield, ShoppingCart
 } from 'lucide-react';
 import api from '../lib/api';
+import { GoodsNameWithPreview } from '../components/GoodsNameWithPreview';
 import { useAppContext } from '../context/AppContext';
 
 // ── Types ──
@@ -448,7 +449,21 @@ export default function WarehouseTicketDetail({ basePath = '/warehouse-tickets' 
                     <tr key={line.id} className="hover:bg-slate-50/50">
                       <td className="p-4 text-slate-400 font-bold text-sm">{i + 1}</td>
                       <td className="p-4 font-black text-indigo-600">{line.item.mvpp}</td>
-                      <td className="p-4 font-bold text-slate-800">{line.item.name}</td>
+                      <td className="p-4 font-bold text-slate-800">
+                        {line.item ? (
+                          <GoodsNameWithPreview 
+                            itemId={line.itemId}
+                            itemCode={line.item.mvpp}
+                            itemName={line.item.name}
+                            imageUrl={(line.item as any).imageUrl}
+                            thumbnailUrl={(line.item as any).thumbnailUrl}
+                            categoryName={line.item.category}
+                            unit={line.item.unit}
+                          />
+                        ) : (
+                          <span>N/A</span>
+                        )}
+                      </td>
                       <td className="p-4 text-center text-slate-500">{line.item.unit}</td>
                       <td className={`p-4 text-right font-black text-lg ${line.qty > 0 ? 'text-blue-600' : 'text-rose-600'}`}>
                         {line.qty > 0 ? `+${line.qty}` : Math.abs(line.qty)}

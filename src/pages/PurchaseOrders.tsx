@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Plus, PackagePlus, Search, Trash2, ShieldAlert, CheckCircle, Truck } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import type { PurchaseOrder, VPPItem } from '../context/AppContext';
+import { GoodsNameWithPreview } from '../components/GoodsNameWithPreview';
 
 export default function PurchaseOrders() {
     const { currentUser, items, purchaseOrders, addPurchaseOrder, importPurchaseOrder } = useAppContext();
@@ -150,7 +151,17 @@ export default function PurchaseOrders() {
                                     {targetItems.map((t, idx) => (
                                         <tr key={t.item.mvpp} className="hover:bg-slate-50">
                                             <td className="p-4 text-center text-slate-400 font-bold">{idx+1}</td>
-                                            <td className="p-4 font-bold text-slate-800">{t.item.name} <span className="text-[10px] bg-slate-100 text-slate-500 px-1 ml-2 rounded border">{t.item.mvpp}</span></td>
+                                            <td className="p-4 font-bold text-slate-800">
+                                              <GoodsNameWithPreview 
+                                                itemId={t.item.id}
+                                                itemCode={t.item.mvpp}
+                                                itemName={t.item.name}
+                                                imageUrl={t.item.imageUrl}
+                                                thumbnailUrl={t.item.thumbnailUrl}
+                                                categoryName={t.item.category}
+                                                unit={t.item.unit}
+                                              />
+                                            </td>
                                             <td className="p-4 font-bold text-slate-500 text-right">{t.item.price.toLocaleString('vi-VN')}</td>
                                             <td className="p-2 border-x border-slate-200 bg-white relative">
                                                 <input type="number" min="1" value={t.quantity} onChange={e => updateQty(t.item.mvpp, e.target.value)} className="w-full text-center py-2 bg-slate-50 border border-slate-100 outline-none rounded font-black text-lg text-indigo-700 focus:bg-white focus:ring-2 focus:ring-indigo-500" />

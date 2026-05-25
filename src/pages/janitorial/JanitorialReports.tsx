@@ -3,6 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { TrendingDown, AlertTriangle, ShieldCheck, FileText, Printer, Download, History, ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../../lib/api';
+import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
 
 export default function JanitorialReports() {
   const [metrics, setMetrics] = useState<any>({});
@@ -159,8 +160,19 @@ export default function JanitorialReports() {
                      {consumption.map((c, i) => (
                        <li key={i} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-xl border border-slate-100">
                           <div>
-                            <p className="font-bold text-slate-800">{c.item.name}</p>
-                            <p className="text-xs text-slate-500">{c.item.mvpp}</p>
+                            {c.item ? (
+                              <GoodsNameWithPreview 
+                                itemId={c.item.id}
+                                itemCode={c.item.mvpp}
+                                itemName={c.item.name}
+                                imageUrl={c.item.imageUrl}
+                                thumbnailUrl={c.item.thumbnailUrl}
+                                categoryName={c.item.category}
+                                unit={c.item.unit}
+                              />
+                            ) : (
+                              <p className="font-bold text-slate-800">N/A</p>
+                            )}
                           </div>
                           <div className="text-right">
                             <p className="font-black text-rose-600 text-lg">{c.totalQtyConsumed} <span className="text-xs font-medium text-slate-500">{c.item.unit}</span></p>
@@ -208,8 +220,19 @@ export default function JanitorialReports() {
                            )}
                         </td>
                         <td className="py-3 px-4">
-                           <p className="font-bold text-slate-800">{h.item?.name}</p>
-                           <p className="text-[10px] text-slate-400">{h.item?.mvpp}</p>
+                           {h.item ? (
+                             <GoodsNameWithPreview 
+                               itemId={h.item.id}
+                               itemCode={h.item.mvpp}
+                               itemName={h.item.name}
+                               imageUrl={h.item.imageUrl}
+                               thumbnailUrl={h.item.thumbnailUrl}
+                               categoryName={h.item.category}
+                               unit={h.item.unit}
+                             />
+                           ) : (
+                             <p className="font-bold text-slate-800">N/A</p>
+                           )}
                         </td>
                         <td className="py-3 px-4 text-right font-black text-slate-700">
                            <span className={h.movementType === 'ISSUE' ? 'text-rose-600' : 'text-emerald-600'}>{h.movementType === 'ISSUE' ? '-' : '+'}</span>{Math.abs(h.qty)} <span className="text-xs font-normal text-slate-400">{h.item?.unit}</span>

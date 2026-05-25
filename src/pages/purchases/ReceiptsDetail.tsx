@@ -5,6 +5,7 @@ import {
   ChevronLeft, ChevronRight, User, History, Undo, FileText,
   Plus, Trash2, Search
 } from 'lucide-react';
+import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
 
 const AUDIT_ACTION_MAP: Record<string, { label: string, impact: string, color: string }> = {
   'CREATE': { label: 'Khởi tạo phiếu', impact: 'Hệ thống', color: 'bg-slate-50 text-slate-400 border-slate-100' },
@@ -414,7 +415,19 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                       <tr key={v.lineId} className={`group transition-all ${isLineCompleted ? 'bg-slate-50/40 opacity-75' : 'hover:bg-slate-50/50'}`}>
                         <td className="p-4 text-center text-xs font-medium text-slate-300">{idx + 1}</td>
                         <td className="p-4 max-w-[220px]">
-                          <p className="font-bold text-slate-700 text-xs leading-snug uppercase">{l.item.name}</p>
+                          {l.item?.id ? (
+                            <GoodsNameWithPreview 
+                              itemId={l.item.id}
+                              itemCode={l.item.mvpp}
+                              itemName={l.item.name}
+                              imageUrl={l.item.imageUrl}
+                              thumbnailUrl={l.item.thumbnailUrl}
+                              categoryName={l.item.category}
+                              unit={l.item.unit}
+                            />
+                          ) : (
+                            <p className="font-bold text-slate-700 text-xs leading-snug uppercase">{l.item?.name || 'Đang tải...'}</p>
+                          )}
                           <div className="flex items-center gap-2 mt-0.5">
                             <p className="text-[9px] font-bold text-slate-400 tracking-tight">{l.item.mvpp} · {l.item.unit}</p>
                             {isLineCompleted && (

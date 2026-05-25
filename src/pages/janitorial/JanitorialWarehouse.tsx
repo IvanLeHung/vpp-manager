@@ -6,6 +6,7 @@ import WarehouseTicketModal from '../../components/warehouse/WarehouseTicketModa
 import QuickHandoverModal from '../../components/warehouse/QuickHandoverModal';
 import { StockAdjustModal } from '../../components/warehouse/StockAdjustModal';
 import * as XLSX from 'xlsx';
+import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
 
 type QuickActionModalProps = {
   isOpen: boolean;
@@ -863,7 +864,16 @@ export default function JanitorialWarehouse() {
                       <td className="px-4 py-4 font-black text-slate-600 text-xs tracking-wider">{stock.item.mvpp}</td>
                       <td className="px-4 py-4">
                         <div className="flex flex-col">
-                          <span className="font-black text-slate-800 text-sm group-hover:text-emerald-600 transition-colors">{stock.item.name}</span>
+                          <GoodsNameWithPreview 
+                            itemId={stock.item.id}
+                            itemCode={stock.item.mvpp}
+                            itemName={stock.item.name}
+                            imageUrl={stock.item.imageUrl}
+                            thumbnailUrl={stock.item.thumbnailUrl}
+                            categoryName={stock.item.category}
+                            unit={stock.item.unit}
+                            stockQty={stock.quantityOnHand}
+                          />
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{stock.item.category}</span>
                         </div>
                       </td>

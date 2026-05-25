@@ -13,6 +13,7 @@ import ImportExcelModal from './items/ImportExcelModal';
 import ItemHistoryModal from './items/ItemHistoryModal';
 import ImportHistoryModal from './items/ImportHistoryModal';
 import WarehouseTransferModal from './items/WarehouseTransferModal';
+import { GoodsNameWithPreview } from '../components/GoodsNameWithPreview';
 
 // ── Types ──
 type ItemData = {
@@ -96,7 +97,7 @@ export default function Items() {
   // Modals
   const [showItemForm, setShowItemForm] = useState(false);
   const [editingItem, setEditingItem] = useState<ItemData | null>(null);
-  const [formData, setFormData] = useState({ mvpp: '', name: '', category: '', unit: '', price: 0, quota: 100, itemType: 'VPP', isActive: true, printSortGroup: '' });
+  const [formData, setFormData] = useState({ mvpp: '', name: '', category: '', unit: '', price: 0, quota: 100, itemType: 'VPP', isActive: true, printSortGroup: '', imageUrl: '', thumbnailUrl: '' });
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [statusModal, setStatusModal] = useState<{ isOpen: boolean; item: ItemData | null; reason: string; targetStatus: boolean }>({ isOpen: false, item: null, reason: '', targetStatus: false });
   const [showImportModal, setShowImportModal] = useState(false);
@@ -231,7 +232,7 @@ export default function Items() {
 
   const openAdd = () => {
     setEditingItem(null);
-    setFormData({ mvpp: '', name: '', category: '', unit: '', price: 0, quota: 100, itemType: 'VPP', isActive: true, printSortGroup: '' });
+    setFormData({ mvpp: '', name: '', category: '', unit: '', price: 0, quota: 100, itemType: 'VPP', isActive: true, printSortGroup: '', imageUrl: '', thumbnailUrl: '' });
     setShowItemForm(true);
   };
 
@@ -483,7 +484,16 @@ export default function Items() {
                         <td className="p-4 font-black tracking-wide text-slate-600">{item.mvpp}</td>
                         <td className="p-4 font-bold text-slate-800">
                           <span className={`w-2 h-2 rounded-full inline-block mr-2 ${item.itemType === 'VPP' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
-                          {item.name}
+                          <GoodsNameWithPreview 
+                            itemId={item.id}
+                            itemCode={item.mvpp}
+                            itemName={item.name}
+                            imageUrl={item.imageUrl}
+                            thumbnailUrl={item.thumbnailUrl}
+                            categoryName={item.category}
+                            unit={item.unit}
+                            stockQty={item.stock}
+                          />
                         </td>
                         <td className="p-4 text-slate-600 font-medium">{item.category}</td>
                         <td className="p-4 text-center text-slate-500 font-medium">{item.unit}</td>
@@ -624,6 +634,84 @@ export default function Items() {
                 <input value={formData.printSortGroup || ''} onChange={e => setFormData({ ...formData, printSortGroup: e.target.value })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none bg-white shadow-sm" placeholder="Ví dụ: Giấy in, Bút bi..." />
                 <p className="text-[10px] text-slate-400 mt-1 italic">Để trống nếu muốn dùng tên hàng hóa để sắp xếp tự động.</p>
               </div>
+              {editingItem && (
+                <div className="mb-6">
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Ảnh sản phẩm</label>
+                  <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <div className="w-20 h-20 rounded-lg bg-slate-50 border overflow-hidden flex items-center justify-center shrink-0">
+                      {formData.imageUrl ? (
+                        <img 
+                          src={formData.imageUrl.startsWith('http') ? formData.imageUrl : `${api.defaults.baseURL?.replace(/\/api$/, '')}${formData.imageUrl}`} 
+                          alt="Product" 
+                          className="w-full h-full object-contain" 
+                        />
+                      ) : (
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider text-center px-1">Chưa có ảnh</span>
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-1.5">
+                      <div className="flex gap-2">
+                        <label className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-[10px] cursor-pointer transition flex items-center gap-1 border border-indigo-100 uppercase tracking-wider">
+                          <span>{formData.imageUrl ? 'Thay ảnh' : 'Tải ảnh lên'}</span>
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (file.size > 5 * 1024 * 1024) {
+                                addToast('Kích thước ảnh vượt quá 5MB!', 'error');
+                                return;
+                              }
+                              const form = new FormData();
+                              form.append('file', file);
+                              try {
+                                const res = await api.post(`/items/${editingItem.id}/image`, form, {
+                                  headers: { 'Content-Type': 'multipart/form-data' }
+                                });
+                                setFormData(prev => ({
+                                  ...prev,
+                                  imageUrl: res.data.imageUrl,
+                                  thumbnailUrl: res.data.thumbnailUrl
+                                }));
+                                addToast('Tải ảnh sản phẩm lên thành công!');
+                                fetchItems();
+                              } catch (err: any) {
+                                addToast(err.response?.data?.error || 'Lỗi tải ảnh lên', 'error');
+                              }
+                            }}
+                          />
+                        </label>
+                        {formData.imageUrl && (
+                          <button 
+                            type="button" 
+                            onClick={async () => {
+                              if (!window.confirm('Xác nhận xóa ảnh sản phẩm này?')) return;
+                              try {
+                                await api.delete(`/items/${editingItem.id}/image`);
+                                setFormData(prev => ({
+                                  ...prev,
+                                  imageUrl: '',
+                                  thumbnailUrl: ''
+                                }));
+                                addToast('Đã xóa ảnh sản phẩm!');
+                                fetchItems();
+                              } catch (err: any) {
+                                addToast(err.response?.data?.error || 'Lỗi khi xóa ảnh', 'error');
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold rounded-xl text-[10px] transition border border-rose-100 uppercase tracking-wider"
+                          >
+                            Xóa ảnh
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[9px] text-slate-400 font-medium">Chấp nhận JPG, PNG, WEBP. Tối đa 5MB.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="mb-6">
                 <label className="flex items-center cursor-pointer select-none">
                   <div className="relative">

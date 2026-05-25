@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import WorkflowStepper from '../../components/purchases/WorkflowStepper';
+import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
 
 interface PurchasesDetailProps {
   poId: string;
@@ -546,7 +547,15 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                       <td className="p-2.5">
                                           <div className="flex flex-col">
                                             <div className="flex items-center gap-2">
-                                              <p className="font-black text-slate-800 text-[13px] whitespace-normal leading-tight max-w-sm group-hover:text-indigo-900 transition-colors line-clamp-2">{effectiveItem?.name || l.item.name}</p>
+                                              <GoodsNameWithPreview 
+                                                itemId={effectiveItem?.id || l.item.id}
+                                                itemCode={effectiveItem?.mvpp || l.item.mvpp}
+                                                itemName={effectiveItem?.name || l.item.name}
+                                                imageUrl={effectiveItem?.imageUrl || l.item.imageUrl}
+                                                thumbnailUrl={effectiveItem?.thumbnailUrl || l.item.thumbnailUrl}
+                                                categoryName={effectiveItem?.category || l.item.category}
+                                                unit={effectiveItem?.unit || l.item.unit}
+                                              />
                                               {isReplaced && (
                                                  <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter ${isPending ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}`}>
                                                     {isPending ? 'Đang chờ duyệt' : 'Đã thay thế'}
@@ -642,7 +651,19 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                               <div>
                                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Thay thế cho vật tư gốc</p>
                                                 <div className="flex items-center gap-2">
-                                                  <span className="text-[13px] font-bold text-slate-600">{origItem?.name}</span>
+                                                  {origItem ? (
+                                                    <GoodsNameWithPreview 
+                                                      itemId={origItem.id}
+                                                      itemCode={origItem.mvpp}
+                                                      itemName={origItem.name}
+                                                      imageUrl={origItem.imageUrl}
+                                                      thumbnailUrl={origItem.thumbnailUrl}
+                                                      categoryName={origItem.category}
+                                                      unit={origItem.unit}
+                                                    />
+                                                  ) : (
+                                                    <span className="text-[13px] font-bold text-slate-600">N/A</span>
+                                                  )}
                                                   <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-black">{origItem?.mvpp}</span>
                                                 </div>
                                               </div>
@@ -1141,7 +1162,19 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                               )}
                                               <td className="p-5 text-center font-bold text-slate-400 text-xs">{idx + 1}</td>
                                               <td className="p-5">
-                                                  <p className="font-bold text-slate-800 text-sm whitespace-normal leading-tight">{a.item?.name}</p>
+                                                   {a.item ? (
+                                                     <GoodsNameWithPreview 
+                                                       itemId={a.item.id}
+                                                       itemCode={a.item.mvpp}
+                                                       itemName={a.item.name}
+                                                       imageUrl={a.item.imageUrl}
+                                                       thumbnailUrl={a.item.thumbnailUrl}
+                                                       categoryName={a.item.category}
+                                                       unit={a.item.unit}
+                                                     />
+                                                   ) : (
+                                                     <p className="font-bold text-slate-800 text-sm whitespace-normal leading-tight">N/A</p>
+                                                   )}
                                                   <div className="flex items-center gap-2 mt-1">
                                                       <span className="text-[9px] font-black bg-slate-100 px-1 py-0.5 rounded text-slate-500">{a.item?.mvpp}</span>
                                                       <span className={`text-[9px] font-black px-1 py-0.5 rounded ${a.item?.stock > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>Tồn: {a.item?.stock || 0}</span>

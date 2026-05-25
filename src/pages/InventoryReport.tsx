@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Download, Calendar, Search, History, ArrowDownToLine, ArrowUpFromLine, Settings2 } from 'lucide-react';
 import api from '../lib/api';
 import * as XLSX from 'xlsx';
+import { GoodsNameWithPreview } from '../components/GoodsNameWithPreview';
 
 import { useAppContext } from '../context/AppContext';
 
@@ -188,12 +189,17 @@ export default function InventoryReport({ warehouseCode = 'MAIN' }: { warehouseC
                                  {getTypeLabel(m.movementType)}
                               </td>
                               <td className="p-4 font-bold text-slate-800">
-                                 {m.item ? (
-                                    <>
-                                       <span className="text-blue-600 mr-2">{m.item.mvpp}</span>
-                                       {m.item.name}
-                                    </>
-                                 ) : (
+                                  {m.item ? (
+                                     <GoodsNameWithPreview 
+                                       itemId={m.item.id}
+                                       itemCode={m.item.mvpp}
+                                       itemName={m.item.name}
+                                       imageUrl={m.item.imageUrl}
+                                       thumbnailUrl={m.item.thumbnailUrl}
+                                       categoryName={m.item.category}
+                                       unit={m.item.unit}
+                                     />
+                                  ) : (
                                     <span className="text-slate-400 italic">Sản phẩm đã bị xóa hoặc không còn tồn tại</span>
                                  )}
                               </td>

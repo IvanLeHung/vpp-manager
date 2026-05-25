@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { XCircle, Printer, CheckCircle, RefreshCw, ArrowLeft, Archive, CheckSquare, Trash2, StopCircle, AlertTriangle, ShoppingCart, Minus, Plus, Check, FileSpreadsheet, ChevronLeft, ChevronRight, Shield, Search, Filter, Package, History as HistoryIcon } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../../lib/api';
+import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
 import type { User } from '../../context/AppContext';
 import type { ViewMode } from '../Requests';
 
@@ -662,7 +663,19 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                            <tr key={l.id} className={`hover:bg-slate-50 transition border-l-4 ${outOfStock && data.status.startsWith('PENDING') ? 'border-l-rose-500 bg-rose-50/30' : 'border-l-transparent'}`}>
                                                <td className="px-2 py-2 text-center font-bold text-slate-400 border-r border-slate-100">{idx+1}</td>
                                                <td className="px-2 py-2 min-w-[150px]">
-                                                    <p className="font-bold text-slate-800 text-sm whitespace-normal">{l.replacementItem?.name || l.item.name}</p>
+                                                    {l.replacementItem || l.item ? (
+                                                      <GoodsNameWithPreview 
+                                                        itemId={l.replacementItem?.id || l.item.id}
+                                                        itemCode={l.replacementItem?.mvpp || l.item.mvpp}
+                                                        itemName={l.replacementItem?.name || l.item.name}
+                                                        imageUrl={l.replacementItem?.imageUrl || l.item.imageUrl}
+                                                        thumbnailUrl={l.replacementItem?.thumbnailUrl || l.item.thumbnailUrl}
+                                                        categoryName={l.replacementItem?.category || l.item.category}
+                                                        unit={l.replacementItem?.unit || l.item.unit}
+                                                      />
+                                                    ) : (
+                                                      <p className="font-bold text-slate-800 text-sm whitespace-normal">N/A</p>
+                                                    )}
                                                     <div className="flex items-center gap-2 mt-1">
                                                        <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-black tracking-widest">{l.replacementItem?.mvpp || l.item.mvpp}</span>
                                                        {l.replacementItemId && <span className="text-[9px] font-black bg-indigo-100 text-indigo-600 px-1 py-0.5 rounded uppercase">Đã thay thế</span>}
@@ -789,7 +802,21 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                                             const line = data.lines.find((l: any) => l.id === bi.requestLineId);
                                                             return (
                                                                 <tr key={bi.id} className="text-xs">
-                                                                    <td className="px-4 py-2 font-bold text-slate-700">{line?.issue_item?.name || 'Vật tư đã xóa'}</td>
+                                                                    <td className="px-4 py-2 font-bold text-slate-700">
+                                                                       {line?.issue_item ? (
+                                                                         <GoodsNameWithPreview 
+                                                                           itemId={line.issue_item.id}
+                                                                           itemCode={line.issue_item.mvpp}
+                                                                           itemName={line.issue_item.name}
+                                                                           imageUrl={line.issue_item.imageUrl}
+                                                                           thumbnailUrl={line.issue_item.thumbnailUrl}
+                                                                           categoryName={line.issue_item.category}
+                                                                           unit={line.issue_item.unit}
+                                                                         />
+                                                                       ) : (
+                                                                         <span>{line?.issue_item?.name || 'Vật tư đã xóa'}</span>
+                                                                       )}
+                                                                    </td>
                                                                     <td className="px-4 py-2 text-center font-bold">{bi.approvedQty}</td>
                                                                     <td className="px-4 py-2 text-center text-slate-400">{bi.deliveredBeforeQty}</td>
                                                                     <td className="px-4 py-2 text-center font-black text-indigo-600 bg-indigo-50/10">{bi.issueQty}</td>
@@ -1124,7 +1151,19 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                         </td>
                                         <td className="p-4 align-top">
                                             <div className="flex flex-col">
-                                              <span className="font-bold text-slate-700 text-sm whitespace-normal max-w-[300px]">{l.item.name}</span>
+                                              {l.item ? (
+                                                <GoodsNameWithPreview 
+                                                  itemId={l.item.id}
+                                                  itemCode={l.item.mvpp}
+                                                  itemName={l.item.name}
+                                                  imageUrl={l.item.imageUrl}
+                                                  thumbnailUrl={l.item.thumbnailUrl}
+                                                  categoryName={l.item.category}
+                                                  unit={l.item.unit}
+                                                />
+                                              ) : (
+                                                <span className="font-bold text-slate-700 text-sm whitespace-normal max-w-[300px]">{l.item?.name || 'N/A'}</span>
+                                              )}
                                               <span className="text-[10px] font-black text-slate-400 uppercase mt-0.5">{l.item.mvpp}</span>
                                               
                                               {approval.selected && (isChanged || currentStock === 0) && (

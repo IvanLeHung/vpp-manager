@@ -8,6 +8,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import api from '../lib/api';
+import { GoodsNameWithPreview } from '../components/GoodsNameWithPreview';
 
 export default function AllocationHistory() {
   const [loading, setLoading] = useState(true);
@@ -109,7 +110,19 @@ export default function AllocationHistory() {
                     <td className="px-10 py-6">
                        <div className="flex flex-col">
                           <span className="text-sm font-black text-slate-800 uppercase tracking-tighter">
-                            {req.items?.[0]?.item?.name || 'Vật tư tổng hợp'}
+                            {req.items?.[0]?.item ? (
+                              <GoodsNameWithPreview 
+                                itemId={req.items[0].item.id}
+                                itemCode={req.items[0].item.mvpp}
+                                itemName={req.items[0].item.name}
+                                imageUrl={req.items[0].item.imageUrl}
+                                thumbnailUrl={req.items[0].item.thumbnailUrl}
+                                categoryName={req.items[0].item.category}
+                                unit={req.items[0].item.unit}
+                              />
+                            ) : (
+                              'Vật tư tổng hợp'
+                            )}
                             {req.items?.length > 1 && <span className="text-indigo-600 ml-1">+{req.items.length - 1}</span>}
                           </span>
                           <span className="text-[10px] font-bold text-slate-400 italic uppercase">
