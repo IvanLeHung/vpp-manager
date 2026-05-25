@@ -790,6 +790,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                       </table>
                   </div>
               </div>
+              )}
 
               {/* TAB CONTENT: Reconciliation */}
               {activeTab === 'reconciliation' && (
