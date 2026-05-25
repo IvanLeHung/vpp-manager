@@ -3,7 +3,7 @@ import api from '../../lib/api';
 import {
   ArrowLeft, CheckCircle, Package, AlertTriangle, Printer, 
   ChevronLeft, ChevronRight, User, History, Undo, FileText,
-  Plus, Trash2, Search
+  Plus, Trash2, Search, RefreshCw
 } from 'lucide-react';
 import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
 import { useAppContext } from '../../context/AppContext';
@@ -367,24 +367,6 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                 <button onClick={() => setCancelModal({ open: true, reason: '' })} className="h-9 px-4 text-[11px] font-bold text-slate-500 hover:bg-slate-50 border border-slate-200 rounded-lg transition uppercase tracking-wide">
                   Hủy phiếu
                 </button>
-                {isWarehouseOrAdmin && (
-                  <button onClick={() => {
-                    const firstUnsatisfied = data.lines.find((line: any) => line.qtyOrdered > 0 && (line.qtyOrdered - line.qtyConfirmed - (line.replacedQtyTotal || 0)) > 0);
-                    const initialQty = firstUnsatisfied ? Math.max(0, firstUnsatisfied.qtyOrdered - firstUnsatisfied.qtyConfirmed - (firstUnsatisfied.replacedQtyTotal || 0)) : 1;
-                    setReplaceFormData({
-                      originalReceiptLineId: firstUnsatisfied?.id || '',
-                      replacementItemId: '',
-                      replacementQty: initialQty,
-                      handlingMode: 'ACCEPT_REPLACEMENT',
-                      reason: 'NCC giao model thay thế',
-                      note: ''
-                    });
-                    setReplaceSearchTerm('');
-                    setShowReplaceModal(true);
-                  }} className="h-9 px-4 text-[11px] font-bold text-amber-600 hover:bg-amber-50 border border-amber-200 rounded-lg transition uppercase tracking-wide">
-                    Đổi hàng
-                  </button>
-                )}
                 <button onClick={handleApplyRemainingAll} className="h-9 px-4 text-[11px] font-bold text-teal-600 hover:bg-teal-50 border border-teal-200 rounded-lg transition uppercase tracking-wide">
                   Áp dụng nhập đủ
                 </button>
@@ -651,6 +633,7 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                           <td className="p-4 text-center">
                             {isPending && isUnexpected ? (
                               <button 
+                                type="button"
                                 onClick={() => {
                                   setReconcileValues(reconcileValues.filter(a => a.lineId !== v.lineId));
                                 }}
@@ -658,6 +641,26 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                                 title="Xóa hàng phát sinh"
                               >
                                 <Trash2 className="w-4 h-4" />
+                              </button>
+                            ) : isPending && !isUnexpected && remainingLineQty > 0 && isWarehouseOrAdmin ? (
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  setReplaceFormData({
+                                    originalReceiptLineId: l.id,
+                                    replacementItemId: '',
+                                    replacementQty: remainingLineQty,
+                                    handlingMode: 'ACCEPT_REPLACEMENT',
+                                    reason: 'NCC giao model thay thế',
+                                    note: ''
+                                  });
+                                  setReplaceSearchTerm('');
+                                  setShowReplaceModal(true);
+                                }}
+                                className="w-8 h-8 rounded-full bg-amber-50 hover:bg-amber-100 hover:text-amber-600 text-amber-500 flex items-center justify-center transition mx-auto border border-amber-100/50"
+                                title="Đổi hàng thay thế"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5" />
                               </button>
                             ) : (
                               <span className="text-slate-300">-</span>
