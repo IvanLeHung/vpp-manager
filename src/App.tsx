@@ -276,7 +276,9 @@ function App() {
             <Route path="/inventory-report" element={<InventoryReport />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/purchase-orders" element={<Purchases />} />
+            <Route path="/purchase-orders/:id" element={<Purchases />} />
             <Route path="/receipts" element={<Receipts />} />
+            <Route path="/receipts/:id" element={<Receipts />} />
             <Route path="/users" element={<Users />} /> 
             <Route path="/items" element={<Items />} />
             <Route path="/warehouse-tickets" element={<WarehouseTickets />} />

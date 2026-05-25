@@ -4,6 +4,8 @@ import * as XLSX from 'xlsx';
 import api from '../../lib/api';
 import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
 import LinkedDocumentReferences from '../../components/LinkedDocumentReferences';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import DocumentChainMap from '../../components/DocumentChainMap';
 import type { User } from '../../context/AppContext';
 import type { ViewMode } from '../Requests';
 
@@ -43,6 +45,11 @@ function sortLinesForPrinting(lines: any[]) {
 }
 
 export default function RequestsDetail({ requestId, navigationIds, onNavigate, setViewMode, setActiveRequest, refreshData, showToast, currentUser }: Props) {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const from = searchParams.get('from');
+  const ref = searchParams.get('ref');
+
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [chainData, setChainData] = useState<any>(null);
@@ -354,6 +361,20 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
   const isHandover = (currentUid === data.requesterId || currentUser.role === 'ADMIN') && data.status === 'WAITING_HANDOVER';
   const isFutureApprover = currentUser.role === 'MANAGER' && data.approvalSteps?.some((s: any) => s.approverId === currentUid) && data.status === 'PENDING_MANAGER' && data.currentApproverId !== currentUid;
 
+  const handleBack = () => {
+    if (from && ref) {
+      if (from === 'request') {
+        navigate(`/requests/${ref}`);
+      } else if (from === 'po') {
+        navigate(`/purchase-orders/${ref}`);
+      } else if (from === 'receipt') {
+        navigate(`/receipts/${ref}`);
+      }
+    } else {
+      setViewMode('LIST');
+    }
+  };
+
   const hasRemaining = data?.lines?.some((l: any) => (l.qtyApproved ?? l.qtyRequested) > (l.qtyDelivered || 0));
   const canUrge = (['PARTIALLY_ISSUED', 'APPROVED', 'READY_TO_ISSUE', 'BACKORDER'].includes(data.status)) && currentUid === data.requesterId && hasRemaining;
 
@@ -362,7 +383,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       {/* HEADER BAR */}
       <div className="no-print h-20 bg-white border-b border-slate-200 flex justify-between items-center px-6 md:px-10 shrink-0 z-20 shadow-sm">
           <div className="flex items-center gap-6">
-              <button onClick={() => setViewMode('LIST')} className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition shadow-inner">
+              <button onClick={handleBack} className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition shadow-inner">
                   <ArrowLeft className="w-5 h-5"/>
               </button>
               <div>
@@ -920,67 +941,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                     {activeTab === 'links' && (
                         <div className="p-8">
                             {chainData ? (
-                                <div className="space-y-6 relative before:absolute before:top-4 before:bottom-4 before:left-5 before:w-0.5 before:bg-slate-200">
-                                    {/* 1. Request */}
-                                    {chainData.request && (
-                                        <div className="flex gap-4 items-start relative pl-2">
-                                            <div className="w-10 h-10 rounded-full bg-blue-50 border-2 border-blue-200 flex items-center justify-center shrink-0 z-10">
-                                                <FileText className="w-5 h-5 text-blue-600" />
-                                            </div>
-                                            <div className="flex-1 bg-white border border-slate-200 hover:border-blue-300 p-4 rounded-2xl transition shadow-sm">
-                                                <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md">Phiếu Đề Xuất</span>
-                                                <h4 className="text-sm font-black text-slate-800 mt-1.5">{chainData.request.id}</h4>
-                                                <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500 mt-2.5">
-                                                    <p>Trạng thái: <span className="font-extrabold text-indigo-650">{chainData.request.status}</span></p>
-                                                    <p>Người tạo: <span className="font-extrabold text-slate-700">{chainData.request.requester?.fullName}</span></p>
-                                                    <p>Ngày tạo: <span className="font-bold">{new Date(chainData.request.createdAt).toLocaleDateString('vi-VN')}</span></p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* 2. PO */}
-                                    {chainData.purchaseOrder && (
-                                        <div className="flex gap-4 items-start relative pl-2">
-                                            <div className="w-10 h-10 rounded-full bg-indigo-50 border-2 border-indigo-200 flex items-center justify-center shrink-0 z-10">
-                                                <Layers className="w-5 h-5 text-indigo-600" />
-                                            </div>
-                                            <div className="flex-1 bg-white border border-slate-200 hover:border-indigo-300 p-4 rounded-2xl transition shadow-sm">
-                                                <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">Phiếu Mua Hàng / PO</span>
-                                                <h4 className="text-sm font-black text-slate-800 mt-1.5">{chainData.purchaseOrder.id}</h4>
-                                                <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500 mt-2.5">
-                                                    <p>Trạng thái: <span className="font-extrabold text-indigo-650">{chainData.purchaseOrder.status}</span></p>
-                                                    <p>Nhà cung cấp: <span className="font-extrabold text-slate-700">{chainData.purchaseOrder.supplier}</span></p>
-                                                    <p>Tổng giá trị: <span className="font-black text-emerald-600">{Number(chainData.purchaseOrder.totalAmount || 0).toLocaleString('vi-VN')} đ</span></p>
-                                                    <p>Ngày lập PO: <span className="font-bold">{new Date(chainData.purchaseOrder.createdAt).toLocaleDateString('vi-VN')}</span></p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* 3. Receipts */}
-                                    {chainData.receipts && chainData.receipts.length > 0 && (
-                                        <div className="space-y-4">
-                                            {chainData.receipts.map((rc: any) => (
-                                                <div key={rc.id} className="flex gap-4 items-start relative pl-2">
-                                                    <div className="w-10 h-10 rounded-full bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center shrink-0 z-10">
-                                                        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                                                    </div>
-                                                    <div className="flex-1 bg-white border border-slate-200 hover:border-emerald-300 p-4 rounded-2xl transition shadow-sm">
-                                                        <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">Phiếu Nhập Kho / GRN</span>
-                                                        <h4 className="text-sm font-black text-slate-800 mt-1.5">{rc.id}</h4>
-                                                        <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500 mt-2.5">
-                                                            <p>Trạng thái: <span className="font-extrabold text-indigo-650">{rc.status}</span></p>
-                                                            <p>Kho: <span className="font-extrabold text-slate-700">{rc.warehouseCode || 'MAIN'}</span></p>
-                                                            <p>Thủ kho: <span className="font-bold text-slate-700">{rc.receiver?.fullName}</span></p>
-                                                            <p>Ngày nhập: <span className="font-bold">{new Date(rc.receiveDate || rc.createdAt).toLocaleDateString('vi-VN')}</span></p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
+                                <DocumentChainMap chainData={chainData} currentDocType="request" currentDocId={requestId} />
                             ) : (
                                 <div className="text-center py-10 text-slate-400 font-medium">Đang tải dữ liệu liên kết...</div>
                             )}

@@ -1,14 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import ReceiptsList from './ReceiptsList';
 import ReceiptsDetail from './ReceiptsDetail';
 
 export type ViewMode = 'LIST' | 'DETAIL';
 
 const Receipts: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
   const [viewMode, setViewMode] = useState<ViewMode>('LIST');
   const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
   const [navigationIds, setNavigationIds] = useState<string[]>([]);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'warning'} | null>(null);
+
+  useEffect(() => {
+    if (id) {
+      setSelectedReceiptId(id);
+      setViewMode('DETAIL');
+    }
+  }, [id]);
 
   const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     setToast({ message, type });

@@ -8,6 +8,8 @@ import {
 import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
 import { useAppContext } from '../../context/AppContext';
 import LinkedDocumentReferences from '../../components/LinkedDocumentReferences';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import DocumentChainMap from '../../components/DocumentChainMap';
 
 const AUDIT_ACTION_MAP: Record<string, { label: string, impact: string, color: string }> = {
   'CREATE': { label: 'Khởi tạo phiếu', impact: 'Hệ thống', color: 'bg-slate-50 text-slate-400 border-slate-100' },
@@ -27,6 +29,11 @@ interface ReceiptsDetailProps {
 }
 
 const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationIds = [], onBack, showToast }) => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const from = searchParams.get('from');
+  const ref = searchParams.get('ref');
+
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [currentId, setCurrentId] = useState(receiptId);
@@ -36,6 +43,20 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
     reason: 'Nhà cung cấp không giao đủ',
     note: ''
   });
+
+  const handleBack = () => {
+    if (from && ref) {
+      if (from === 'request') {
+        navigate(`/requests/${ref}`);
+      } else if (from === 'po') {
+        navigate(`/purchase-orders/${ref}`);
+      } else if (from === 'receipt') {
+        navigate(`/receipts/${ref}`);
+      }
+    } else {
+      onBack();
+    }
+  };
   
   const { currentUser } = useAppContext();
   const role = currentUser?.role || 'EMPLOYEE';
@@ -392,7 +413,7 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
       {/* HEADER SECTION */}
       <div className="h-16 bg-white border-b border-slate-200 flex justify-between items-center px-6 shrink-0 z-20 print:hidden">
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-2 hover:bg-slate-50 text-slate-400 hover:text-slate-600 rounded-lg transition" title="Quay lại">
+          <button onClick={handleBack} className="p-2 hover:bg-slate-50 text-slate-400 hover:text-slate-600 rounded-lg transition" title="Quay lại">
             <ArrowLeft className="w-5 h-5" />
           </button>
           
@@ -1057,67 +1078,7 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                <h3 className="text-xs font-black text-slate-455 uppercase tracking-widest flex items-center gap-1.5"><ShoppingCart className="w-4 h-4 text-indigo-500"/> Liên Kết Chứng Từ Trong Chuỗi</h3>
             </div>
             {chainData ? (
-              <div className="space-y-6 relative before:absolute before:top-4 before:bottom-4 before:left-5 before:w-0.5 before:bg-slate-200">
-                {/* 1. Request */}
-                {chainData.request && (
-                  <div className="flex gap-4 items-start relative pl-2">
-                    <div className="w-10 h-10 rounded-full bg-blue-50 border-2 border-blue-200 flex items-center justify-center shrink-0 z-10">
-                      <FileText className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div className="flex-1 bg-white border border-slate-200 hover:border-blue-300 p-4 rounded-2xl transition shadow-sm">
-                      <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md">Phiếu Đề Xuất</span>
-                      <h4 className="text-sm font-black text-slate-800 mt-1.5">{chainData.request.id}</h4>
-                      <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500 mt-2.5">
-                        <p>Trạng thái: <span className="font-extrabold text-indigo-650">{chainData.request.status}</span></p>
-                        <p>Người tạo: <span className="font-extrabold text-slate-700">{chainData.request.requester?.fullName}</span></p>
-                        <p>Ngày tạo: <span className="font-bold">{new Date(chainData.request.createdAt).toLocaleDateString('vi-VN')}</span></p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 2. PO */}
-                {chainData.purchaseOrder && (
-                  <div className="flex gap-4 items-start relative pl-2">
-                    <div className="w-10 h-10 rounded-full bg-indigo-50 border-2 border-indigo-200 flex items-center justify-center shrink-0 z-10">
-                      <Layers className="w-5 h-5 text-indigo-600" />
-                    </div>
-                    <div className="flex-1 bg-white border border-slate-200 hover:border-indigo-300 p-4 rounded-2xl transition shadow-sm">
-                      <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">Phiếu Mua Hàng / PO</span>
-                      <h4 className="text-sm font-black text-slate-800 mt-1.5">{chainData.purchaseOrder.id}</h4>
-                      <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500 mt-2.5">
-                        <p>Trạng thái: <span className="font-extrabold text-indigo-655">{chainData.purchaseOrder.status}</span></p>
-                        <p>Nhà cung cấp: <span className="font-extrabold text-slate-700">{chainData.purchaseOrder.supplier}</span></p>
-                        <p>Tổng giá trị: <span className="font-black text-emerald-600">{Number(chainData.purchaseOrder.totalAmount || 0).toLocaleString('vi-VN')} đ</span></p>
-                        <p>Ngày lập PO: <span className="font-bold">{new Date(chainData.purchaseOrder.createdAt).toLocaleDateString('vi-VN')}</span></p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. Receipts */}
-                {chainData.receipts && chainData.receipts.length > 0 && (
-                  <div className="space-y-4">
-                    {chainData.receipts.map((rc: any) => (
-                      <div key={rc.id} className="flex gap-4 items-start relative pl-2">
-                        <div className="w-10 h-10 rounded-full bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center shrink-0 z-10">
-                          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                        </div>
-                        <div className="flex-1 bg-white border border-slate-200 hover:border-emerald-300 p-4 rounded-2xl transition shadow-sm">
-                          <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">Phiếu Nhập Kho / GRN</span>
-                          <h4 className="text-sm font-black text-slate-800 mt-1.5">{rc.id}</h4>
-                          <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500 mt-2.5">
-                            <p>Trạng thái: <span className="font-extrabold text-indigo-650">{rc.status}</span></p>
-                            <p>Kho: <span className="font-extrabold text-slate-700">{rc.warehouseCode || 'MAIN'}</span></p>
-                            <p>Thủ kho: <span className="font-bold text-slate-700">{rc.receiver?.fullName}</span></p>
-                            <p>Ngày nhập: <span className="font-bold">{new Date(rc.receiveDate || rc.createdAt).toLocaleDateString('vi-VN')}</span></p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <DocumentChainMap chainData={chainData} currentDocType="receipt" currentDocId={receiptId} />
             ) : (
               <div className="text-center py-10 text-slate-400 font-medium">Đang tải dữ liệu liên kết...</div>
             )}

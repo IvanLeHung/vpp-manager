@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import PurchasesList from './PurchasesList';
 import PurchasesCreate from './PurchasesCreate';
 import PurchasesDetail from './PurchasesDetail';
@@ -6,10 +7,18 @@ import PurchasesDetail from './PurchasesDetail';
 export type ViewMode = 'LIST' | 'CREATE' | 'DETAIL';
 
 const Purchases: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
   const [viewMode, setViewMode] = useState<ViewMode>('LIST');
   const [selectedPoId, setSelectedPoId] = useState<string | null>(null);
   const [navigationIds, setNavigationIds] = useState<string[]>([]);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'warning'} | null>(null);
+
+  useEffect(() => {
+    if (id) {
+      setSelectedPoId(id);
+      setViewMode('DETAIL');
+    }
+  }, [id]);
 
   const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     setToast({ message, type });
