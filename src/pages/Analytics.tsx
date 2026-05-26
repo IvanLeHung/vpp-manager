@@ -4,6 +4,7 @@ import {
   PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { useAppContext } from '../context/AppContext';
+import api from '../lib/api';
 import { 
   TrendingUp, Download, Clock, CheckCircle, RefreshCw, 
   FileText, Printer, ArrowUpRight, ArrowDownRight, Package, 
@@ -125,6 +126,11 @@ const INITIAL_TICKETS: DeliveryTicket[] = [
 export default function Analytics() {
   const { currentUser } = useAppContext();
   const [tickets, setTickets] = useState<DeliveryTicket[]>([]);
+  
+  const departmentsList = useMemo(() => {
+    const depts = new Set(tickets.map(t => t.department).filter(Boolean));
+    return Array.from(depts).sort();
+  }, [tickets]);
   const [loading, setLoading] = useState(true);
   const [activeView, setActiveView] = useState<'report' | 'tickets'>('report');
   
@@ -194,16 +200,40 @@ export default function Analytics() {
     note: ''
   });
 
-  // Load and save localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('vpp_delivery_tickets');
-    if (saved) {
-      setTickets(JSON.parse(saved));
-    } else {
-      localStorage.setItem('vpp_delivery_tickets', JSON.stringify(INITIAL_TICKETS));
-      setTickets(INITIAL_TICKETS);
+  // Fetch tickets from real-time backend API
+  const fetchTickets = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get('/reports/vpp-giao-nhan');
+      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setTickets(res.data);
+        localStorage.setItem('vpp_delivery_tickets', JSON.stringify(res.data));
+      } else {
+        // Fallback to local storage or initial templates if empty
+        const saved = localStorage.getItem('vpp_delivery_tickets');
+        if (saved) {
+          setTickets(JSON.parse(saved));
+        } else {
+          localStorage.setItem('vpp_delivery_tickets', JSON.stringify(INITIAL_TICKETS));
+          setTickets(INITIAL_TICKETS);
+        }
+      }
+    } catch (err: any) {
+      console.error('Lỗi tải báo cáo VPP:', err);
+      // Fallback
+      const saved = localStorage.getItem('vpp_delivery_tickets');
+      if (saved) {
+        setTickets(JSON.parse(saved));
+      } else {
+        setTickets(INITIAL_TICKETS);
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchTickets();
   }, []);
 
   const saveTickets = (updated: DeliveryTicket[]) => {
@@ -570,7 +600,7 @@ export default function Analytics() {
   };
 
   // SAVE NEW TICKET
-  const handleSaveNewTicket = (e: React.FormEvent) => {
+  const handleSaveNewTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validate
@@ -579,61 +609,35 @@ export default function Analytics() {
       return;
     }
 
-    const nextId = `PDX-VPP-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(tickets.length + 1).padStart(3, '0')}`;
-    
-    // Map items to VppItem format
-    const formattedItems: VppItem[] = newTicketForm.items.map(i => {
-      const unit = TEMPLATE_ITEMS.find(t => t.name === i.name)?.unit || 'Cái';
-      const remaining = Math.max(0, i.qtyApproved - i.qtyReceived);
-      
-      let status: VppItem['status'] = 'Đã nhận đủ';
-      if (i.isWrong) status = 'Nhận sai hàng';
-      else if (i.qtyReceived === 0) status = 'Chưa nhận';
-      else if (remaining > 0) status = 'Nhận thiếu';
-
-      return {
-        name: i.name,
-        unit,
-        qtyRequested: Number(i.qtyRequested),
-        qtyApproved: Number(i.qtyApproved),
-        qtyReceived: Number(i.qtyReceived),
-        status,
-        note: i.note
+    try {
+      setLoading(true);
+      const payload = {
+        department: newTicketForm.department,
+        requester: newTicketForm.requester,
+        approver: newTicketForm.approver,
+        deliverer: newTicketForm.deliverer,
+        receiver: newTicketForm.receiver,
+        generalNote: newTicketForm.generalNote,
+        items: newTicketForm.items.map(i => ({
+          name: i.name,
+          qtyRequested: Number(i.qtyRequested),
+          qtyApproved: Number(i.qtyApproved),
+          qtyReceived: Number(i.qtyReceived),
+          note: i.note,
+          isWrong: i.isWrong
+        }))
       };
-    });
 
-    // Overall status
-    const hasWrong = formattedItems.some(i => i.status === 'Nhận sai hàng');
-    const totalApp = formattedItems.reduce((s, i) => s + i.qtyApproved, 0);
-    const totalRec = formattedItems.reduce((s, i) => s + i.qtyReceived, 0);
-    let deliveryStatus: DeliveryTicket['deliveryStatus'] = 'RECEIVED_FULL';
-    
-    if (hasWrong) deliveryStatus = 'WRONG_ITEMS';
-    else if (totalRec === 0) deliveryStatus = 'PENDING';
-    else if (totalRec < totalApp) deliveryStatus = 'RECEIVED_SHORT';
-
-    const newTicket: DeliveryTicket = {
-      id: nextId,
-      date: new Date().toISOString().split('T')[0],
-      department: newTicketForm.department,
-      requester: newTicketForm.requester,
-      approver: newTicketForm.approver,
-      approvalDate: new Date().toISOString().split('T')[0],
-      approvalStatus: 'APPROVED',
-      deliveryStatus,
-      deliveryDate: new Date().toISOString().split('T')[0],
-      deliverer: newTicketForm.deliverer,
-      receiver: newTicketForm.receiver,
-      delivererSignature: newTicketForm.delivererSignature || newTicketForm.deliverer,
-      receiverSignature: newTicketForm.receiverSignature || newTicketForm.receiver,
-      generalNote: newTicketForm.generalNote,
-      items: formattedItems
-    };
-
-    const updated = [newTicket, ...tickets];
-    saveTickets(updated);
-    setIsCreateModalOpen(false);
-    toast.success(`Đã tạo và lưu thành công phiếu giao nhận ${nextId}`);
+      const res = await api.post('/reports/vpp-create-ticket', payload);
+      toast.success(`Đã tạo và lưu thành công phiếu giao nhận ${res.data.id || res.data.id}`);
+      setIsCreateModalOpen(false);
+      fetchTickets();
+    } catch (err: any) {
+      console.error('Lỗi tạo phiếu:', err);
+      toast.error('Không thể lưu phiếu giao nhận lên hệ thống: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setLoading(false);
+    }
   };
 
   // OPEN CONFIRM TICKET MODAL
@@ -678,50 +682,33 @@ export default function Analytics() {
   };
 
   // SUBMIT TICKET CONFIRMATION
-  const handleSubmitConfirmation = (e: React.FormEvent) => {
+  const handleSubmitConfirmation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTicket) return;
 
-    const updatedTickets = tickets.map(t => {
-      if (t.id === selectedTicket.id) {
-        const updatedItems = t.items.map((item, idx) => {
-          const formItem = confirmForm.items[idx];
-          return {
-            ...item,
-            qtyReceived: Number(formItem.qtyReceived),
-            status: formItem.status,
-            note: formItem.note,
-            confirmedBy: confirmForm.confirmedBy,
-            confirmedAt: confirmForm.confirmedAt
-          };
-        });
+    try {
+      setLoading(true);
+      await api.post('/reports/vpp-confirm', {
+        requestId: selectedTicket.id,
+        confirmedBy: confirmForm.confirmedBy,
+        note: confirmForm.generalNote,
+        items: confirmForm.items.map(i => ({
+          name: i.name,
+          qtyReceived: Number(i.qtyReceived),
+          status: i.status,
+          note: i.note
+        }))
+      });
 
-        // Recalculate ticket delivery status
-        const hasWrong = updatedItems.some(i => i.status === 'Nhận sai hàng');
-        const totalApp = updatedItems.reduce((s, i) => s + i.qtyApproved, 0);
-        const totalRec = updatedItems.reduce((s, i) => s + i.qtyReceived, 0);
-        let deliveryStatus: DeliveryTicket['deliveryStatus'] = 'RECEIVED_FULL';
-        
-        if (hasWrong) deliveryStatus = 'WRONG_ITEMS';
-        else if (totalRec === 0) deliveryStatus = 'PENDING';
-        else if (totalRec < totalApp) deliveryStatus = 'RECEIVED_SHORT';
-
-        return {
-          ...t,
-          deliveryStatus,
-          receiver: confirmForm.confirmedBy,
-          deliveryDate: confirmForm.confirmedAt,
-          receiverSignature: confirmForm.confirmedBy,
-          generalNote: confirmForm.generalNote,
-          items: updatedItems
-        };
-      }
-      return t;
-    });
-
-    saveTickets(updatedTickets);
-    setIsConfirmModalOpen(false);
-    toast.success(`Đã xác nhận giao nhận cho phiếu ${selectedTicket.id}`);
+      toast.success(`Đã xác nhận giao nhận cho phiếu ${selectedTicket.id}`);
+      setIsConfirmModalOpen(false);
+      fetchTickets();
+    } catch (err: any) {
+      console.error('Lỗi xác nhận phiếu:', err);
+      toast.error('Không thể xác nhận giao nhận phiếu: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setLoading(false);
+    }
   };
 
   // OPEN CONFIRM SINGLE ITEM MODAL
@@ -741,49 +728,33 @@ export default function Analytics() {
   };
 
   // SUBMIT SINGLE ITEM CONFIRMATION
-  const handleSubmitSingleItemConfirmation = (e: React.FormEvent) => {
+  const handleSubmitSingleItemConfirmation = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Update this item in all filtered tickets
-    const targetIds = new Set(filteredTickets.map(t => t.id));
-    const updatedTickets = tickets.map(t => {
-      if (targetIds.has(t.id)) {
-        const updatedItems = t.items.map(item => {
-          if (item.name === selectedItemName) {
-            return {
-              ...item,
-              qtyReceived: Number(confirmSingleForm.qtyReceived),
-              status: confirmSingleForm.status,
-              note: confirmSingleForm.note,
-              confirmedBy: confirmSingleForm.confirmedBy,
-              confirmedAt: confirmSingleForm.confirmedAt
-            };
-          }
-          return item;
+    try {
+      setLoading(true);
+      const targetIds = filteredTickets.map(t => t.id);
+      
+      for (const rId of targetIds) {
+        await api.post('/reports/vpp-confirm', {
+          requestId: rId,
+          itemName: selectedItemName,
+          qtyReceived: Number(confirmSingleForm.qtyReceived),
+          status: confirmSingleForm.status,
+          note: confirmSingleForm.note,
+          confirmedBy: confirmSingleForm.confirmedBy
         });
-
-        // Recalculate ticket delivery status
-        const hasWrong = updatedItems.some(i => i.status === 'Nhận sai hàng');
-        const totalApp = updatedItems.reduce((s, i) => s + i.qtyApproved, 0);
-        const totalRec = updatedItems.reduce((s, i) => s + i.qtyReceived, 0);
-        let deliveryStatus: DeliveryTicket['deliveryStatus'] = 'RECEIVED_FULL';
-        
-        if (hasWrong) deliveryStatus = 'WRONG_ITEMS';
-        else if (totalRec === 0) deliveryStatus = 'PENDING';
-        else if (totalRec < totalApp) deliveryStatus = 'RECEIVED_SHORT';
-
-        return {
-          ...t,
-          deliveryStatus,
-          items: updatedItems
-        };
       }
-      return t;
-    });
 
-    saveTickets(updatedTickets);
-    setIsConfirmSingleItemModalOpen(false);
-    toast.success(`Đã cập nhật tình trạng giao nhận cho mặt hàng "${selectedItemName}"`);
+      toast.success(`Đã cập nhật tình trạng giao nhận cho mặt hàng "${selectedItemName}"`);
+      setIsConfirmSingleItemModalOpen(false);
+      fetchTickets();
+    } catch (err: any) {
+      console.error('Lỗi cập nhật mặt hàng:', err);
+      toast.error('Không thể xác nhận giao nhận mặt hàng: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setLoading(false);
+    }
   };
 
   // CHECK ALL OVERALL STATUS CONDITIONS
@@ -966,9 +937,9 @@ export default function Analytics() {
               className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="ALL">Tất cả phòng ban</option>
-              <option value="Phòng Hành chính">Phòng Hành chính</option>
-              <option value="Phòng Kế toán">Phòng Kế toán</option>
-              <option value="Phòng Kinh doanh">Phòng Kinh doanh</option>
+              {departmentsList.map((dept, idx) => (
+                <option key={idx} value={dept}>{dept}</option>
+              ))}
             </select>
           </div>
 
@@ -1438,9 +1409,17 @@ export default function Analytics() {
                     onChange={e => setNewTicketForm({ ...newTicketForm, department: e.target.value })}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
                   >
-                    <option value="Phòng Hành chính">Phòng Hành chính</option>
-                    <option value="Phòng Kế toán">Phòng Kế toán</option>
-                    <option value="Phòng Kinh doanh">Phòng Kinh doanh</option>
+                    {departmentsList.length > 0 ? (
+                      departmentsList.map((dept, index) => (
+                        <option key={index} value={dept}>{dept}</option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="Phòng Hành chính">Phòng Hành chính</option>
+                        <option value="Phòng Kế toán">Phòng Kế toán</option>
+                        <option value="Phòng Kinh doanh">Phòng Kinh doanh</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
