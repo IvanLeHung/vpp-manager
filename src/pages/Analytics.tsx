@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Fragment } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -139,6 +139,7 @@ export default function Analytics() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [approvalStatusFilter, setApprovalStatusFilter] = useState('ALL');
   const [reporter, setReporter] = useState(currentUser?.fullName || 'Bộ phận Hành chính');
   const [searchText, setSearchText] = useState('');
   
@@ -247,6 +248,7 @@ export default function Analytics() {
     setStartDate('');
     setEndDate('');
     setStatusFilter('ALL');
+    setApprovalStatusFilter('ALL');
     setReporter(currentUser?.fullName || 'Bộ phận Hành chính');
     setSearchText('');
     toast.info("Đã làm mới bộ lọc");
@@ -261,6 +263,9 @@ export default function Analytics() {
       // Date filter
       if (startDate && t.date < startDate) return false;
       if (endDate && t.date > endDate) return false;
+      
+      // Approval Status filter
+      if (approvalStatusFilter !== 'ALL' && t.approvalStatus !== approvalStatusFilter) return false;
       
       // Status filter
       if (statusFilter !== 'ALL') {
@@ -377,6 +382,16 @@ export default function Analytics() {
     });
   }, [filteredTickets]);
 
+  // Expanded Departments state for sub-table view
+  const [expandedDepts, setExpandedDepts] = useState<Record<string, boolean>>({});
+
+  const toggleDeptExpand = (dept: string) => {
+    setExpandedDepts(prev => ({
+      ...prev,
+      [dept]: !prev[dept]
+    }));
+  };
+
   // Aggregated Department Report Table
   const departmentalSummary = useMemo(() => {
     const map = new Map<string, {
@@ -386,6 +401,15 @@ export default function Analytics() {
       qtyApproved: number;
       qtyReceived: number;
       hasWrong: boolean;
+      itemsMap: Map<string, {
+        name: string;
+        unit: string;
+        qtyRequested: number;
+        qtyApproved: number;
+        qtyReceived: number;
+        status: VppItem['status'];
+        note: string;
+      }>;
     }>();
 
     filteredTickets.forEach(t => {
@@ -395,7 +419,8 @@ export default function Analytics() {
         qtyRequested: 0,
         qtyApproved: 0,
         qtyReceived: 0,
-        hasWrong: false
+        hasWrong: false,
+        itemsMap: new Map()
       };
 
       t.items.forEach(i => {
@@ -404,6 +429,39 @@ export default function Analytics() {
         exist.qtyApproved += i.qtyApproved;
         exist.qtyReceived += i.qtyReceived;
         if (i.status === 'Nhận sai hàng') exist.hasWrong = true;
+
+        const itemExist = exist.itemsMap.get(i.name) || {
+          name: i.name,
+          unit: i.unit,
+          qtyRequested: 0,
+          qtyApproved: 0,
+          qtyReceived: 0,
+          status: 'Chưa nhận' as VppItem['status'],
+          note: ''
+        };
+
+        itemExist.qtyRequested += i.qtyRequested;
+        itemExist.qtyApproved += i.qtyApproved;
+        itemExist.qtyReceived += i.qtyReceived;
+
+        // Resolve status for item in dept
+        if (i.status === 'Nhận sai hàng' || itemExist.status === 'Nhận sai hàng') {
+          itemExist.status = 'Nhận sai hàng';
+        } else if (i.status === 'Chờ bổ sung' || itemExist.status === 'Chờ bổ sung') {
+          itemExist.status = 'Chờ bổ sung';
+        } else if (itemExist.qtyReceived >= itemExist.qtyApproved && itemExist.qtyApproved > 0) {
+          itemExist.status = 'Đã nhận đủ';
+        } else if (itemExist.qtyReceived > 0) {
+          itemExist.status = 'Nhận thiếu';
+        } else {
+          itemExist.status = 'Chưa nhận';
+        }
+
+        if (i.note) {
+          itemExist.note = itemExist.note ? `${itemExist.note}; ${i.note}` : i.note;
+        }
+
+        exist.itemsMap.set(i.name, itemExist);
       });
 
       map.set(t.department, exist);
@@ -428,7 +486,8 @@ export default function Analytics() {
         qtyReceived: val.qtyReceived,
         remaining,
         receiveRate: val.qtyApproved > 0 ? Math.round((val.qtyReceived / val.qtyApproved) * 100) : 0,
-        overallStatus
+        overallStatus,
+        items: Array.from(val.itemsMap.values())
       };
     });
   }, [filteredTickets]);
@@ -767,7 +826,7 @@ export default function Analytics() {
   };
 
   return (
-    <div className="flex flex-col min-h-full p-4 md:p-10 bg-slate-50 relative overflow-y-auto custom-scrollbar">
+    <div className="w-full max-w-full min-w-0 overflow-x-hidden p-4 lg:p-6 bg-slate-50 relative flex flex-col gap-6 box-border">
       
       {/* ── STYLE BLOCK FOR PRINTING ── */}
       <style dangerouslySetInnerHTML={{__html: `
@@ -874,13 +933,12 @@ export default function Analytics() {
         }
       `}} />
 
-      {/* ── TOP HEADER ── */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 shrink-0 gap-6 no-print">
+      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-10 no-print w-full min-w-0">
         <div className="animate-in fade-in slide-in-from-left-4 duration-700">
           <div className="flex items-center gap-3 mb-1">
             <div className="w-2 h-8 bg-indigo-600 rounded-full"></div>
             <h2 className="text-3xl font-black text-slate-800 tracking-tighter uppercase italic">
-              Báo Cáo Đề Xuất & Giao Nhận VPP
+              Báo cáo đề xuất & giao nhận VPP
             </h2>
           </div>
           <p className="text-slate-400 font-bold text-sm ml-5 uppercase tracking-widest">
@@ -888,7 +946,7 @@ export default function Analytics() {
           </p>
         </div>
         
-        <div className="flex flex-wrap gap-3 animate-in fade-in slide-in-from-right-4 duration-700">
+        <div className="flex flex-wrap gap-3 justify-start xl:justify-end animate-in fade-in slide-in-from-right-4 duration-700 max-w-full">
           <button 
             onClick={() => setIsCreateModalOpen(true)}
             className="px-5 py-3.5 bg-indigo-650 hover:bg-indigo-700 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-100 transition-all flex items-center gap-2 transform active:scale-95 cursor-pointer"
@@ -922,19 +980,19 @@ export default function Analytics() {
       </div>
 
       {/* ── FILTERS AREA ── */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden mb-8 no-print p-6 md:p-8 animate-in fade-in slide-in-from-top-2 duration-300">
-        <div className="flex items-center gap-2 mb-6 border-b border-slate-100 pb-3">
-          <Activity className="w-4 h-4 text-indigo-600" />
-          <span className="text-xs font-black text-slate-650 tracking-widest uppercase italic">Bộ lọc dữ liệu giao nhận</span>
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm mb-5 no-print p-4 md:p-5 animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className="flex items-center gap-2 mb-3">
+          <Activity className="w-3.5 h-3.5 text-indigo-600" />
+          <span className="text-[10px] font-black text-slate-500 tracking-widest uppercase italic">Bộ lọc dữ liệu</span>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Phòng ban</label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          <div className="space-y-1">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">Phòng ban</label>
             <select 
               value={deptFilter} 
               onChange={e => setDeptFilter(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full h-[34px] px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="ALL">Tất cả phòng ban</option>
               {departmentsList.map((dept, idx) => (
@@ -943,32 +1001,46 @@ export default function Analytics() {
             </select>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Từ ngày</label>
+          <div className="space-y-1">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">Từ ngày</label>
             <input 
               type="date" 
               value={startDate} 
               onChange={e => setStartDate(e.target.value)}
-              className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 h-[38px]"
+              className="w-full h-[34px] px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Đến ngày</label>
+          <div className="space-y-1">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">Đến ngày</label>
             <input 
               type="date" 
               value={endDate} 
               onChange={e => setEndDate(e.target.value)}
-              className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 h-[38px]"
+              className="w-full h-[34px] px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Trạng thái nhận hàng</label>
+          <div className="space-y-1">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">Trạng thái phiếu</label>
+            <select 
+              value={approvalStatusFilter} 
+              onChange={e => setApprovalStatusFilter(e.target.value)}
+              className="w-full h-[34px] px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="ALL">Tất cả trạng thái phiếu</option>
+              <option value="APPROVED">Đã duyệt</option>
+              <option value="PENDING">Chờ duyệt</option>
+              <option value="REJECTED">Đã từ chối</option>
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">Trạng thái nhận hàng</label>
             <select 
               value={statusFilter} 
               onChange={e => setStatusFilter(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full h-[34px] px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="ALL">Tất cả trạng thái</option>
               <option value="RECEIVED_FULL">Đã nhận đủ</option>
@@ -978,43 +1050,43 @@ export default function Analytics() {
             </select>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Người lập biểu</label>
+          <div className="space-y-1">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">Người lập biểu</label>
             <input 
               type="text" 
               value={reporter} 
               onChange={e => setReporter(e.target.value)}
               placeholder="Họ tên người lập..."
-              className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 h-[38px]"
+              className="w-full h-[34px] px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 pt-4 border-t border-slate-100">
-          <div className="relative w-full sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-4 pt-3 border-t border-slate-100">
+          <div className="relative w-full sm:max-w-[240px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <input 
               type="text"
               placeholder="Tìm theo số phiếu, tên món hàng..."
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 h-[36px]"
+              className="w-full h-[32px] pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
           <div className="flex gap-2 w-full sm:w-auto">
             <button 
               onClick={handleResetFilters}
-              className="flex-1 sm:flex-initial px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              className="flex-1 sm:flex-initial px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-[11px] rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1"
             >
-              <RefreshCcw className="w-3.5 h-3.5" /> Làm mới bộ lọc
+              <RefreshCcw className="w-3 h-3" /> Làm mới bộ lọc
             </button>
           </div>
         </div>
       </div>
 
       {/* ── STRATEGIC KPIS ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-8 no-print">
+      <div className="stats-grid mb-8 no-print">
         <StatCard label="Phòng đề xuất" value={stats.departmentsCount} color="indigo" />
         <StatCard label="Tổng mặt hàng" value={stats.itemsCount} color="blue" />
         <StatCard label="Tổng đề xuất" value={stats.totalRequested} color="indigo" />
@@ -1032,9 +1104,9 @@ export default function Analytics() {
           <p className="text-slate-400 font-bold text-sm uppercase tracking-wider">Chưa có dữ liệu báo cáo trong kỳ đã chọn</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 no-print">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8 no-print w-full">
           {/* Compare Chart */}
-          <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+          <div className="xl:col-span-2 bg-white rounded-3xl p-6 border border-slate-200 shadow-sm min-w-0">
             <h4 className="text-xs font-black text-slate-700 uppercase tracking-widest mb-4 flex items-center gap-2">
               <Activity className="w-4 h-4 text-indigo-500" /> Biến động Giao nhận theo phòng ban
             </h4>
@@ -1055,7 +1127,7 @@ export default function Analytics() {
           </div>
 
           {/* Status Pie Chart */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col">
+          <div className="xl:col-span-1 bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col min-w-0">
             <h4 className="text-xs font-black text-slate-700 uppercase tracking-widest mb-4 text-center">
               Tỷ lệ trạng thái phiếu
             </h4>
@@ -1099,8 +1171,8 @@ export default function Analytics() {
             <div className="p-6 border-b border-slate-100 bg-slate-50/50">
               <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest italic">1. Bảng tổng hợp số lượng theo phòng ban</h4>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
+            <div className="table-wrapper">
+              <table className="min-w-[900px] w-full text-left">
                 <thead>
                   <tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
                     <th className="p-4">Phòng ban</th>
@@ -1111,27 +1183,97 @@ export default function Analytics() {
                     <th className="p-4 text-right">Tổng còn thiếu</th>
                     <th className="p-4 text-center">Tỷ lệ thực nhận</th>
                     <th className="p-4 text-center">Trạng thái tổng thể</th>
+                    <th className="p-4 text-center w-36">Chi tiết</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs font-bold text-slate-700">
                   {departmentalSummary.length === 0 && (
-                    <tr><td colSpan={8} className="p-10 text-center text-slate-400 italic">Không có dữ liệu</td></tr>
+                    <tr><td colSpan={9} className="p-10 text-center text-slate-400 italic">Không có dữ liệu</td></tr>
                   )}
                   {departmentalSummary.map(d => (
-                    <tr key={d.department} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="p-4 text-slate-900">{d.department}</td>
-                      <td className="p-4 text-center tabular-nums">{d.itemsCount} món</td>
-                      <td className="p-4 text-right tabular-nums">{d.qtyRequested}</td>
-                      <td className="p-4 text-right tabular-nums">{d.qtyApproved}</td>
-                      <td className="p-4 text-right tabular-nums text-emerald-600">{d.qtyReceived}</td>
-                      <td className="p-4 text-right tabular-nums text-amber-600">{d.remaining}</td>
-                      <td className="p-4 text-center tabular-nums text-indigo-600">{d.receiveRate}%</td>
-                      <td className="p-4 text-center">
-                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border ${getStatusBadgeClass(d.overallStatus)}`}>
-                          {d.overallStatus}
-                        </span>
-                      </td>
-                    </tr>
+                    <Fragment key={d.department}>
+                      <tr className="hover:bg-slate-50/50 transition-colors border-b border-slate-100">
+                        <td className="p-4 text-slate-900">{d.department}</td>
+                        <td className="p-4 text-center tabular-nums">{d.itemsCount} món</td>
+                        <td className="p-4 text-right tabular-nums">{d.qtyRequested}</td>
+                        <td className="p-4 text-right tabular-nums">{d.qtyApproved}</td>
+                        <td className="p-4 text-right tabular-nums text-emerald-600">{d.qtyReceived}</td>
+                        <td className="p-4 text-right tabular-nums text-amber-600">{d.remaining}</td>
+                        <td className="p-4 text-center tabular-nums text-indigo-600">{d.receiveRate}%</td>
+                        <td className="p-4 text-center">
+                          <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border ${getStatusBadgeClass(d.overallStatus)}`}>
+                            {d.overallStatus}
+                          </span>
+                        </td>
+                        <td className="p-4 text-center">
+                          <button
+                            onClick={() => toggleDeptExpand(d.department)}
+                            className="px-3 py-1 bg-slate-100 border border-slate-200 text-slate-700 hover:bg-indigo-55 hover:border-indigo-200 hover:text-indigo-650 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 mx-auto"
+                          >
+                            {expandedDepts[d.department] ? (
+                              <>▲ Ẩn hàng hóa</>
+                            ) : (
+                              <>▼ Xem hàng hóa</>
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                      {expandedDepts[d.department] && (
+                        <tr className="bg-slate-50/70">
+                          <td colSpan={9} className="p-6">
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 overflow-hidden animate-in slide-in-from-top-1 duration-200">
+                              <h5 className="text-xs font-black text-indigo-700 uppercase tracking-widest mb-3 italic">
+                                Danh mục hàng hóa của {d.department}
+                              </h5>
+                              
+                              {d.items.length === 0 ? (
+                                <p className="text-xs font-bold text-slate-400 italic">Chưa có danh mục hàng hóa cho phòng ban này</p>
+                              ) : (
+                                <div className="table-wrapper">
+                                  <table className="min-w-[900px] w-full text-left text-xs border-collapse">
+                                    <thead>
+                                      <tr className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
+                                        <th className="p-3 text-center w-12">STT</th>
+                                        <th className="p-3">Tên hàng hóa / Tên VPP</th>
+                                        <th className="p-3 text-center">Đơn vị tính</th>
+                                        <th className="p-3 text-right">Số lượng đề xuất ban đầu</th>
+                                        <th className="p-3 text-right">Số lượng được duyệt</th>
+                                        <th className="p-3 text-right">Số lượng thực nhận</th>
+                                        <th className="p-3 text-right">Số lượng còn thiếu</th>
+                                        <th className="p-3 text-center">Trạng thái nhận hàng</th>
+                                        <th className="p-3">Ghi chú</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 text-slate-700 font-bold">
+                                      {d.items.map((item: any, idx: number) => {
+                                        const missingQty = Math.max(0, item.qtyApproved - item.qtyReceived);
+                                        return (
+                                          <tr key={idx} className="hover:bg-slate-50/50">
+                                            <td className="p-3 text-center text-slate-400">{idx + 1}</td>
+                                            <td className="p-3 text-slate-900">{item.name}</td>
+                                            <td className="p-3 text-center text-slate-500 uppercase">{item.unit}</td>
+                                            <td className="p-3 text-right tabular-nums">{item.qtyRequested}</td>
+                                            <td className="p-3 text-right tabular-nums">{item.qtyApproved}</td>
+                                            <td className="p-3 text-right text-emerald-600 tabular-nums">{item.qtyReceived}</td>
+                                            <td className="p-3 text-right text-amber-600 tabular-nums">{missingQty}</td>
+                                            <td className="p-3 text-center">
+                                              <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${getStatusBadgeClass(item.status)}`}>
+                                                {item.status}
+                                              </span>
+                                            </td>
+                                            <td className="p-3 text-slate-400 italic text-[11px] truncate max-w-xs">{item.note || '-'}</td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
@@ -1143,8 +1285,8 @@ export default function Analytics() {
             <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
               <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest italic">2. Chi tiết tổng hợp theo từng món hàng</h4>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
+            <div className="table-wrapper">
+              <table className="min-w-[900px] w-full text-left">
                 <thead>
                   <tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
                     <th className="p-4 text-center w-12">STT</th>
@@ -1213,8 +1355,8 @@ export default function Analytics() {
           <div className="p-6 border-b border-slate-100 bg-slate-50/50">
             <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest italic">Danh sách toàn bộ phiếu đề xuất & giao nhận VPP</h4>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
+          <div className="table-wrapper">
+            <table className="min-w-[900px] w-full text-left">
               <thead>
                 <tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
                   <th className="p-4">Số phiếu đề xuất</th>
@@ -1461,8 +1603,8 @@ export default function Analytics() {
                   </button>
                 </div>
 
-                <div className="border border-slate-200 rounded-2xl overflow-hidden">
-                  <table className="w-full text-left">
+                <div className="border border-slate-200 rounded-2xl overflow-x-auto">
+                  <table className="min-w-[800px] w-full text-left">
                     <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
                       <tr>
                         <th className="p-3 w-10 text-center">STT</th>
@@ -1632,8 +1774,8 @@ export default function Analytics() {
 
               <div className="space-y-3">
                 <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Danh sách món hàng</h5>
-                <div className="border border-slate-200 rounded-xl overflow-hidden">
-                  <table className="w-full text-left text-xs">
+                <div className="border border-slate-200 rounded-xl overflow-x-auto">
+                  <table className="min-w-[800px] w-full text-left text-xs">
                     <thead className="bg-slate-50 font-bold text-slate-450 border-b border-slate-100">
                       <tr>
                         <th className="p-3 text-center w-12">STT</th>
@@ -1727,8 +1869,8 @@ export default function Analytics() {
               {/* Items List to Verify */}
               <div className="space-y-3">
                 <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kiểm chứng số lượng thực nhận của từng dòng</h5>
-                <div className="border border-slate-200 rounded-2xl overflow-hidden">
-                  <table className="w-full text-left text-xs">
+                <div className="border border-slate-200 rounded-2xl overflow-x-auto">
+                  <table className="min-w-[800px] w-full text-left text-xs">
                     <thead className="bg-slate-50 font-bold text-slate-450 border-b border-slate-100">
                       <tr>
                         <th className="p-3 text-center w-12">STT</th>

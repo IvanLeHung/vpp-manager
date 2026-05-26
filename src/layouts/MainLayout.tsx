@@ -188,7 +188,7 @@ export default function MainLayout() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden relative print:h-auto print:overflow-visible">
+      <main className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden relative print:h-auto print:overflow-visible">
         {/* Universal Top Header */}
         <header className="no-print print:hidden bg-white/90 backdrop-blur-md border-b border-slate-200 z-[100] shrink-0 sticky top-0">
           <div className="h-16 flex items-center justify-between px-6 md:px-8">
@@ -264,7 +264,7 @@ export default function MainLayout() {
         />
 
         {/* Dynamic Page Component Outlet */}
-        <div className="flex-1 overflow-y-auto bg-slate-50 flex flex-col print:h-auto print:overflow-visible print:bg-white">
+        <div className="flex-1 overflow-y-auto bg-slate-50 flex flex-col print:h-auto print:overflow-visible print:bg-white min-w-0">
            <Outlet />
         </div>
       </main>
