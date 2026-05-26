@@ -136,8 +136,109 @@ export default function Analytics() {
   
   // Filter States
   const [deptFilter, setDeptFilter] = useState('ALL');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const today = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  const [isMultiSelect, setIsMultiSelect] = useState(false);
+
+  const years = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const list = [];
+    for (let y = currentYear - 3; y <= currentYear + 2; y++) {
+      list.push(y);
+    }
+    return list;
+  }, []);
+
+  useEffect(() => {
+    setSelectedDays([]);
+  }, [selectedMonth, selectedYear]);
+
+  const getDaysInMonth = (month: number, year: number) => {
+    return new Date(year, month, 0).getDate();
+  };
+
+  const getFirstDayOfWeek = (month: number, year: number) => {
+    const day = new Date(year, month - 1, 1).getDay();
+    return day === 0 ? 6 : day - 1; // convert Sunday=0 to index 6, Monday=1 to index 0
+  };
+
+  const renderCalendarDays = useMemo(() => {
+    const daysInMonth = getDaysInMonth(selectedMonth, selectedYear);
+    const firstDayIndex = getFirstDayOfWeek(selectedMonth, selectedYear);
+    
+    const days: { dateStr: string; dayNum: number; isCurrentMonth: boolean }[] = [];
+    
+    // Previous month days
+    const prevMonth = selectedMonth === 1 ? 12 : selectedMonth - 1;
+    const prevYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
+    const daysInPrevMonth = getDaysInMonth(prevMonth, prevYear);
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      const d = daysInPrevMonth - i;
+      const mStr = String(prevMonth).padStart(2, '0');
+      const dStr = String(d).padStart(2, '0');
+      days.push({
+        dateStr: `${prevYear}-${mStr}-${dStr}`,
+        dayNum: d,
+        isCurrentMonth: false
+      });
+    }
+    
+    // Current month days
+    const mStr = String(selectedMonth).padStart(2, '0');
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dStr = String(d).padStart(2, '0');
+      days.push({
+        dateStr: `${selectedYear}-${mStr}-${dStr}`,
+        dayNum: d,
+        isCurrentMonth: true
+      });
+    }
+    
+    // Next month days to fill the grid (42 cells)
+    const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1;
+    const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
+    const remainingCells = 42 - days.length;
+    const nextMStr = String(nextMonth).padStart(2, '0');
+    for (let d = 1; d <= remainingCells; d++) {
+      const dStr = String(d).padStart(2, '0');
+      days.push({
+        dateStr: `${nextYear}-${nextMStr}-${dStr}`,
+        dayNum: d,
+        isCurrentMonth: false
+      });
+    }
+    
+    return days;
+  }, [selectedMonth, selectedYear]);
+
+  const handleDayClick = (dateStr: string) => {
+    if (isMultiSelect) {
+      if (selectedDays.includes(dateStr)) {
+        setSelectedDays(selectedDays.filter(d => d !== dateStr));
+      } else {
+        setSelectedDays([...selectedDays, dateStr]);
+      }
+    } else {
+      if (selectedDays.includes(dateStr)) {
+        setSelectedDays([]);
+      } else {
+        setSelectedDays([dateStr]);
+      }
+    }
+  };
+
+  const handleCurrentMonth = () => {
+    const t = new Date();
+    setSelectedMonth(t.getMonth() + 1);
+    setSelectedYear(t.getFullYear());
+    setSelectedDays([]);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedDays([]);
+  };
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [approvalStatusFilter, setApprovalStatusFilter] = useState('ALL');
   const [reporter, setReporter] = useState(currentUser?.fullName || 'Bộ phận Hành chính');
@@ -245,8 +346,11 @@ export default function Analytics() {
   // Reset Filters
   const handleResetFilters = () => {
     setDeptFilter('ALL');
-    setStartDate('');
-    setEndDate('');
+    const t = new Date();
+    setSelectedMonth(t.getMonth() + 1);
+    setSelectedYear(t.getFullYear());
+    setSelectedDays([]);
+    setIsMultiSelect(false);
     setStatusFilter('ALL');
     setApprovalStatusFilter('ALL');
     setReporter(currentUser?.fullName || 'Bộ phận Hành chính');
@@ -254,15 +358,11 @@ export default function Analytics() {
     toast.info("Đã làm mới bộ lọc");
   };
 
-  // Filtered Tickets
-  const filteredTickets = useMemo(() => {
+  // 1. Filter tickets by everything EXCEPT calendar date selections (used for calendar marks/counts)
+  const ticketsFilteredExceptDate = useMemo(() => {
     return tickets.filter(t => {
       // Dept filter
       if (deptFilter !== 'ALL' && t.department !== deptFilter) return false;
-      
-      // Date filter
-      if (startDate && t.date < startDate) return false;
-      if (endDate && t.date > endDate) return false;
       
       // Approval Status filter
       if (approvalStatusFilter !== 'ALL' && t.approvalStatus !== approvalStatusFilter) return false;
@@ -286,7 +386,66 @@ export default function Analytics() {
       
       return true;
     });
-  }, [tickets, deptFilter, startDate, endDate, statusFilter, searchText]);
+  }, [tickets, deptFilter, statusFilter, approvalStatusFilter, searchText]);
+
+  // 2. Filtered Tickets (the final list)
+  const filteredTickets = useMemo(() => {
+    return ticketsFilteredExceptDate.filter(t => {
+      const [y, m] = t.date.split('-').map(Number);
+      if (selectedDays.length > 0) {
+        return selectedDays.includes(t.date);
+      } else {
+        return y === selectedYear && m === selectedMonth;
+      }
+    });
+  }, [ticketsFilteredExceptDate, selectedDays, selectedMonth, selectedYear]);
+
+  // Tickets grouped by date for the calendar dots and tooltips
+  const ticketsByDate = useMemo(() => {
+    const groups: Record<string, DeliveryTicket[]> = {};
+    ticketsFilteredExceptDate.forEach(t => {
+      if (!groups[t.date]) {
+        groups[t.date] = [];
+      }
+      groups[t.date].push(t);
+    });
+    return groups;
+  }, [ticketsFilteredExceptDate]);
+
+  const getTooltipContent = (dateStr: string) => {
+    const list = ticketsByDate[dateStr] || [];
+    if (list.length === 0) return null;
+    const [y, m, d] = dateStr.split('-');
+    return {
+      date: `${d}/${m}/${y}`,
+      count: list.length,
+      tickets: list.slice(0, 5).map(t => t.id),
+      totalCount: list.length
+    };
+  };
+
+  const getPrintedDateRangeLabel = () => {
+    if (selectedTicket) return 'Theo phiếu giao nhận';
+    if (selectedDays.length > 0) {
+      return `Các ngày: ${selectedDays.map(d => {
+        const [yy, mm, dd] = d.split('-');
+        return `${dd}/${mm}/${yy}`;
+      }).join(', ')}`;
+    }
+    return `Tháng ${selectedMonth}/${selectedYear}`;
+  };
+
+  const handleSelectAllDaysWithTickets = () => {
+    const daysWithTickets = ticketsFilteredExceptDate
+      .filter(t => {
+        const [y, m] = t.date.split('-').map(Number);
+        return y === selectedYear && m === selectedMonth;
+      })
+      .map(t => t.date);
+    const uniqueDays = Array.from(new Set(daysWithTickets));
+    setSelectedDays(uniqueDays);
+    toast.success(`Đã chọn tất cả các ngày có phiếu trong Tháng ${selectedMonth}/${selectedYear}`);
+  };
 
   // Strategic KPI Calculations
   const stats = useMemo(() => {
@@ -564,8 +723,7 @@ export default function Analytics() {
     // Metadata / Cover Info
     const coverData = [
       { A: 'BÁO CÁO ĐỀ XUẤT VÀ GIAO NHẬN VĂN PHÒNG PHẨM', B: '' },
-      { A: 'Thời gian từ ngày:', B: startDate || 'Tất cả' },
-      { A: 'Thời gian đến ngày:', B: endDate || 'Tất cả' },
+      { A: 'Thời gian báo cáo:', B: getPrintedDateRangeLabel() },
       { A: 'Phòng ban:', B: deptFilter === 'ALL' ? 'Tất cả phòng ban' : deptFilter },
       { A: 'Ngày lập biểu:', B: new Date().toLocaleDateString('vi-VN') },
       { A: 'Người lập biểu:', B: reporter },
@@ -986,7 +1144,7 @@ export default function Analytics() {
           <span className="text-[10px] font-black text-slate-500 tracking-widest uppercase italic">Bộ lọc dữ liệu</span>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-4">
           <div className="space-y-1">
             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">Phòng ban</label>
             <select 
@@ -1002,23 +1160,29 @@ export default function Analytics() {
           </div>
 
           <div className="space-y-1">
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">Từ ngày</label>
-            <input 
-              type="date" 
-              value={startDate} 
-              onChange={e => setStartDate(e.target.value)}
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">Tháng</label>
+            <select 
+              value={selectedMonth} 
+              onChange={e => setSelectedMonth(Number(e.target.value))}
               className="w-full h-[34px] px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+            >
+              {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                <option key={m} value={m}>Tháng {m}</option>
+              ))}
+            </select>
           </div>
 
           <div className="space-y-1">
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">Đến ngày</label>
-            <input 
-              type="date" 
-              value={endDate} 
-              onChange={e => setEndDate(e.target.value)}
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">Năm</label>
+            <select 
+              value={selectedYear} 
+              onChange={e => setSelectedYear(Number(e.target.value))}
               className="w-full h-[34px] px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+            >
+              {years.map(y => (
+                <option key={y} value={y}>Năm {y}</option>
+              ))}
+            </select>
           </div>
 
           <div className="space-y-1">
@@ -1062,25 +1226,185 @@ export default function Analytics() {
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-4 pt-3 border-t border-slate-100">
-          <div className="relative w-full sm:max-w-[240px]">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-            <input 
-              type="text"
-              placeholder="Tìm theo số phiếu, tên món hàng..."
-              value={searchText}
-              onChange={e => setSearchText(e.target.value)}
-              className="w-full h-[32px] pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4 border-t border-slate-100">
+          {/* Cột 1 & 2: Lịch tháng & Chế độ chọn */}
+          <div className="lg:col-span-2 flex flex-col md:flex-row gap-6 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+            {/* Lưới lịch */}
+            <div className="flex flex-col items-center shrink-0">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 align-self-start pl-1">
+                Lịch tạo phiếu Tháng {selectedMonth}/{selectedYear}
+              </span>
+              
+              <div className="grid grid-cols-7 gap-1 text-center mb-1 w-full max-w-[280px]">
+                {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((wd, idx) => (
+                  <span key={wd} className={`text-[9px] font-black uppercase ${idx === 6 ? 'text-rose-500' : idx === 5 ? 'text-blue-500' : 'text-slate-400'}`}>
+                    {wd}
+                  </span>
+                ))}
+              </div>
+              
+              <div className="grid grid-cols-7 gap-1.5 w-full max-w-[280px]">
+                {renderCalendarDays.map(day => {
+                  const isSelected = selectedDays.includes(day.dateStr);
+                  const dayTickets = ticketsByDate[day.dateStr] || [];
+                  const hasTickets = dayTickets.length > 0;
+                  const ticketCount = dayTickets.length;
+                  const tooltip = getTooltipContent(day.dateStr);
+                  
+                  return (
+                    <div 
+                      key={day.dateStr}
+                      onClick={() => day.isCurrentMonth && handleDayClick(day.dateStr)}
+                      className={`h-8 w-8 rounded-lg border relative flex flex-col items-center justify-center text-[11px] font-bold transition-all duration-150 group cursor-pointer ${
+                        !day.isCurrentMonth 
+                          ? 'border-transparent text-slate-300 opacity-20 pointer-events-none' 
+                          : isSelected
+                            ? 'bg-indigo-600 border-indigo-600 text-white font-black shadow-md shadow-indigo-100'
+                            : 'bg-white hover:bg-indigo-50 hover:text-indigo-600 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <span>{day.dayNum}</span>
+                      
+                      {day.isCurrentMonth && hasTickets && (
+                        <>
+                          <span className={`w-1 h-1 rounded-full mt-0.5 ${isSelected ? 'bg-white' : 'bg-emerald-500'}`}></span>
+                          {ticketCount > 1 && (
+                            <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-rose-500 text-white text-[8px] font-black rounded-full flex items-center justify-center shadow-sm">
+                              {ticketCount}
+                            </span>
+                          )}
+                        </>
+                      )}
+
+                      {/* Tooltip */}
+                      {day.isCurrentMonth && tooltip && (
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 bg-slate-950/95 backdrop-blur-sm text-white text-[10px] p-2.5 rounded-xl shadow-xl w-48 text-left pointer-events-none transition-all duration-200">
+                          <div className="font-black border-b border-slate-800 pb-1 mb-1 text-slate-300">
+                            {tooltip.date}
+                          </div>
+                          <div className="font-bold mb-1 text-[10px]">Có {tooltip.count} phiếu được tạo:</div>
+                          <ul className="space-y-0.5 max-h-24 overflow-y-auto font-mono text-[9px] text-slate-400 list-disc pl-3.5">
+                            {tooltip.tickets.map(id => (
+                              <li key={id}>{id}</li>
+                            ))}
+                            {tooltip.totalCount > 5 && (
+                              <li className="list-none text-slate-500 italic mt-0.5">...và {tooltip.totalCount - 5} phiếu khác</li>
+                            )}
+                          </ul>
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-950"></div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            
+            {/* Chế độ chọn và danh sách ngày đã chọn */}
+            <div className="flex-1 flex flex-col justify-between py-2">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Chế độ chọn:</span>
+                  <div className="inline-flex rounded-lg p-0.5 bg-slate-100 border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => { setIsMultiSelect(false); setSelectedDays([]); }}
+                      className={`px-3 py-1 text-[9px] font-black uppercase rounded-md transition-all cursor-pointer ${!isMultiSelect ? 'bg-white text-indigo-650 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                    >
+                      Chọn 1 ngày
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setIsMultiSelect(true); }}
+                      className={`px-3 py-1 text-[9px] font-black uppercase rounded-md transition-all cursor-pointer ${isMultiSelect ? 'bg-white text-indigo-650 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                    >
+                      Chọn nhiều
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Trạng thái lọc thời gian:</span>
+                  {selectedDays.length === 0 ? (
+                    <p className="text-[11px] font-bold text-slate-500 italic">
+                      Đang hiển thị tất cả phiếu trong tháng {selectedMonth}/{selectedYear}
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto custom-scrollbar pr-1">
+                      {selectedDays.map(d => {
+                        const [yy, mm, dd] = d.split('-');
+                        return (
+                          <span 
+                            key={d} 
+                            onClick={() => handleDayClick(d)}
+                            className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-indigo-50 border border-indigo-150 text-indigo-700 text-[10px] font-bold rounded-lg cursor-pointer hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 transition-colors"
+                            title="Click để xóa ngày này"
+                          >
+                            {dd}/{mm}
+                            <span className="text-[8px] font-black">✕</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {selectedDays.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearSelection}
+                  className="text-[10px] font-black text-rose-500 hover:text-rose-700 uppercase tracking-wider text-left transition-colors cursor-pointer w-fit mt-2"
+                >
+                  ✕ Xóa tất cả ngày đã chọn
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="flex gap-2 w-full sm:w-auto">
-            <button 
-              onClick={handleResetFilters}
-              className="flex-1 sm:flex-initial px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-[11px] rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1"
-            >
-              <RefreshCcw className="w-3 h-3" /> Làm mới bộ lọc
-            </button>
+          {/* Cột 3: Tìm kiếm, Reset filters, các nút hành động */}
+          <div className="flex flex-col justify-between space-y-4">
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">Tìm kiếm phiếu</label>
+                <div className="relative w-full">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <input 
+                    type="text"
+                    placeholder="Tìm số phiếu, tên món hàng..."
+                    value={searchText}
+                    onChange={e => setSearchText(e.target.value)}
+                    className="w-full h-[34px] pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button 
+                type="button"
+                onClick={handleCurrentMonth}
+                className="w-full px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-750 font-bold text-[11px] rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Clock className="w-3.5 h-3.5 text-slate-500" /> Về tháng hiện tại
+              </button>
+
+              <button 
+                type="button"
+                onClick={handleSelectAllDaysWithTickets}
+                className="w-full px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-150 font-bold text-[11px] rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" /> Chọn tất cả ngày có phiếu
+              </button>
+
+              <button 
+                type="button"
+                onClick={handleResetFilters}
+                className="w-full px-3.5 py-2 bg-slate-900 hover:bg-slate-850 text-white font-black uppercase tracking-wider text-[10px] rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <RefreshCcw className="w-3.5 h-3.5 text-white" /> Làm mới toàn bộ bộ lọc
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1439,7 +1763,7 @@ export default function Analytics() {
         {/* Report Meta Info */}
         <div className="print-meta">
           <div><strong>Phòng ban:</strong> {selectedTicket ? selectedTicket.department : (deptFilter === 'ALL' ? 'Tất cả phòng ban đề xuất' : deptFilter)}</div>
-          <div><strong>Thời gian báo cáo:</strong> {selectedTicket ? 'Theo phiếu giao nhận' : `Từ ngày ${startDate || 'kỳ đầu'} đến ngày ${endDate || new Date().toLocaleDateString('vi-VN')}`}</div>
+          <div><strong>Thời gian báo cáo:</strong> {getPrintedDateRangeLabel()}</div>
           <div><strong>Ngày lập biểu:</strong> {selectedTicket ? selectedTicket.date : new Date().toLocaleDateString('vi-VN')}</div>
           <div><strong>Người lập biểu:</strong> {selectedTicket ? selectedTicket.creator || reporter : reporter}</div>
           {selectedTicket ? (
