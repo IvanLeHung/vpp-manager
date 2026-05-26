@@ -134,13 +134,33 @@ export default function Analytics() {
   const [loading, setLoading] = useState(true);
   const [activeView, setActiveView] = useState<'report' | 'tickets'>('report');
   
-  // Filter States
+  // ── FILTER STATES ──
   const [deptFilter, setDeptFilter] = useState('ALL');
   const today = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+
+  // Calendar tab: "day" | "month"
+  const [calendarTab, setCalendarTab] = useState<'day' | 'month'>('day');
+
+  // Day-tab: month/year currently displayed in calendar
+  const [calViewMonth, setCalViewMonth] = useState(today.getMonth() + 1);
+  const [calViewYear, setCalViewYear] = useState(today.getFullYear());
+
+  // Day-tab selection mode
+  type DayMode = 'single' | 'multi' | 'range';
+  const [dayMode, setDayMode] = useState<DayMode>('single');
+
+  // For single / multi mode
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
-  const [isMultiSelect, setIsMultiSelect] = useState(false);
+
+  // For range mode
+  const [rangeStart, setRangeStart] = useState<string | null>(null);
+  const [rangeEnd, setRangeEnd] = useState<string | null>(null);
+  const [hoverDay, setHoverDay] = useState<string | null>(null);
+
+  // Month-tab
+  const [monthRangeStart, setMonthRangeStart] = useState<{ month: number; year: number } | null>(null);
+  const [monthRangeEnd, setMonthRangeEnd] = useState<{ month: number; year: number } | null>(null);
+  const [appliedMonthRange, setAppliedMonthRange] = useState<{ start: { month: number; year: number }; end: { month: number; year: number } } | null>(null);
 
   const years = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -151,9 +171,16 @@ export default function Analytics() {
     return list;
   }, []);
 
-  useEffect(() => {
-    setSelectedDays([]);
-  }, [selectedMonth, selectedYear]);
+  // Helper: compare two date strings YYYY-MM-DD
+  const dateCompare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
+
+  // Helper: is a day within range (handles swapped start/end)
+  const isDayInRange = (dateStr: string, start: string | null, end: string | null) => {
+    if (!start || !end) return false;
+    const lo = dateCompare(start, end) <= 0 ? start : end;
+    const hi = dateCompare(start, end) <= 0 ? end : start;
+    return dateStr >= lo && dateStr <= hi;
+  };
 
   const getDaysInMonth = (month: number, year: number) => {
     return new Date(year, month, 0).getDate();
@@ -165,14 +192,14 @@ export default function Analytics() {
   };
 
   const renderCalendarDays = useMemo(() => {
-    const daysInMonth = getDaysInMonth(selectedMonth, selectedYear);
-    const firstDayIndex = getFirstDayOfWeek(selectedMonth, selectedYear);
+    const daysInMonth = getDaysInMonth(calViewMonth, calViewYear);
+    const firstDayIndex = getFirstDayOfWeek(calViewMonth, calViewYear);
     
     const days: { dateStr: string; dayNum: number; isCurrentMonth: boolean }[] = [];
     
     // Previous month days
-    const prevMonth = selectedMonth === 1 ? 12 : selectedMonth - 1;
-    const prevYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
+    const prevMonth = calViewMonth === 1 ? 12 : calViewMonth - 1;
+    const prevYear = calViewMonth === 1 ? calViewYear - 1 : calViewYear;
     const daysInPrevMonth = getDaysInMonth(prevMonth, prevYear);
     for (let i = firstDayIndex - 1; i >= 0; i--) {
       const d = daysInPrevMonth - i;
@@ -186,19 +213,19 @@ export default function Analytics() {
     }
     
     // Current month days
-    const mStr = String(selectedMonth).padStart(2, '0');
+    const mStr = String(calViewMonth).padStart(2, '0');
     for (let d = 1; d <= daysInMonth; d++) {
       const dStr = String(d).padStart(2, '0');
       days.push({
-        dateStr: `${selectedYear}-${mStr}-${dStr}`,
+        dateStr: `${calViewYear}-${mStr}-${dStr}`,
         dayNum: d,
         isCurrentMonth: true
       });
     }
     
     // Next month days to fill the grid (42 cells)
-    const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1;
-    const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
+    const nextMonth = calViewMonth === 12 ? 1 : calViewMonth + 1;
+    const nextYear = calViewMonth === 12 ? calViewYear + 1 : calViewYear;
     const remainingCells = 42 - days.length;
     const nextMStr = String(nextMonth).padStart(2, '0');
     for (let d = 1; d <= remainingCells; d++) {
@@ -211,33 +238,47 @@ export default function Analytics() {
     }
     
     return days;
-  }, [selectedMonth, selectedYear]);
+  }, [calViewMonth, calViewYear]);
 
   const handleDayClick = (dateStr: string) => {
-    if (isMultiSelect) {
+    if (dayMode === 'single') {
+      setSelectedDays(selectedDays[0] === dateStr ? [] : [dateStr]);
+    } else if (dayMode === 'multi') {
       if (selectedDays.includes(dateStr)) {
         setSelectedDays(selectedDays.filter(d => d !== dateStr));
       } else {
         setSelectedDays([...selectedDays, dateStr]);
       }
-    } else {
-      if (selectedDays.includes(dateStr)) {
-        setSelectedDays([]);
+    } else if (dayMode === 'range') {
+      if (!rangeStart || (rangeStart && rangeEnd)) {
+        // Start new range
+        setRangeStart(dateStr);
+        setRangeEnd(null);
       } else {
-        setSelectedDays([dateStr]);
+        // Complete range - auto swap if needed
+        if (dateCompare(dateStr, rangeStart) >= 0) {
+          setRangeEnd(dateStr);
+        } else {
+          setRangeEnd(rangeStart);
+          setRangeStart(dateStr);
+        }
       }
     }
   };
 
   const handleCurrentMonth = () => {
     const t = new Date();
-    setSelectedMonth(t.getMonth() + 1);
-    setSelectedYear(t.getFullYear());
-    setSelectedDays([]);
+    setCalViewMonth(t.getMonth() + 1);
+    setCalViewYear(t.getFullYear());
   };
 
   const handleClearSelection = () => {
     setSelectedDays([]);
+    setRangeStart(null);
+    setRangeEnd(null);
+    setAppliedMonthRange(null);
+    setMonthRangeStart(null);
+    setMonthRangeEnd(null);
   };
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [approvalStatusFilter, setApprovalStatusFilter] = useState('ALL');
@@ -347,10 +388,16 @@ export default function Analytics() {
   const handleResetFilters = () => {
     setDeptFilter('ALL');
     const t = new Date();
-    setSelectedMonth(t.getMonth() + 1);
-    setSelectedYear(t.getFullYear());
+    setCalViewMonth(t.getMonth() + 1);
+    setCalViewYear(t.getFullYear());
     setSelectedDays([]);
-    setIsMultiSelect(false);
+    setDayMode('single');
+    setRangeStart(null);
+    setRangeEnd(null);
+    setCalendarTab('day');
+    setAppliedMonthRange(null);
+    setMonthRangeStart(null);
+    setMonthRangeEnd(null);
     setStatusFilter('ALL');
     setApprovalStatusFilter('ALL');
     setReporter(currentUser?.fullName || 'Bộ phận Hành chính');
@@ -388,17 +435,50 @@ export default function Analytics() {
     });
   }, [tickets, deptFilter, statusFilter, approvalStatusFilter, searchText]);
 
-  // 2. Filtered Tickets (the final list)
+  // 2. Filtered Tickets (the final list) - multi-mode date filter
   const filteredTickets = useMemo(() => {
     return ticketsFilteredExceptDate.filter(t => {
-      const [y, m] = t.date.split('-').map(Number);
-      if (selectedDays.length > 0) {
-        return selectedDays.includes(t.date);
-      } else {
-        return y === selectedYear && m === selectedMonth;
+      const dateStr = t.date; // YYYY-MM-DD
+      const [y, m] = dateStr.split('-').map(Number);
+
+      if (calendarTab === 'month') {
+        // Month-range filter
+        if (appliedMonthRange) {
+          const { start, end } = appliedMonthRange;
+          const startDate = `${start.year}-${String(start.month).padStart(2, '0')}-01`;
+          const endYear = end.year;
+          const endMonth = end.month;
+          const lastDay = new Date(endYear, endMonth, 0).getDate();
+          const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+          return dateStr >= startDate && dateStr <= endDate;
+        }
+        // No month range applied yet — show nothing or current month
+        return y === calViewYear && m === calViewMonth;
       }
+
+      // Day-tab filters
+      if (dayMode === 'single' || dayMode === 'multi') {
+        if (selectedDays.length > 0) {
+          return selectedDays.includes(dateStr);
+        }
+        // Default: show current calendar month
+        return y === calViewYear && m === calViewMonth;
+      }
+
+      if (dayMode === 'range') {
+        if (rangeStart && rangeEnd) {
+          return dateStr >= rangeStart && dateStr <= rangeEnd;
+        }
+        if (rangeStart && !rangeEnd) {
+          // Only start selected: show that single day
+          return dateStr === rangeStart;
+        }
+        return y === calViewYear && m === calViewMonth;
+      }
+
+      return y === calViewYear && m === calViewMonth;
     });
-  }, [ticketsFilteredExceptDate, selectedDays, selectedMonth, selectedYear]);
+  }, [ticketsFilteredExceptDate, calendarTab, appliedMonthRange, calViewMonth, calViewYear, dayMode, selectedDays, rangeStart, rangeEnd]);
 
   // Tickets grouped by date for the calendar dots and tooltips
   const ticketsByDate = useMemo(() => {
@@ -426,25 +506,35 @@ export default function Analytics() {
 
   const getPrintedDateRangeLabel = () => {
     if (selectedTicket) return 'Theo phiếu giao nhận';
+    if (calendarTab === 'month' && appliedMonthRange) {
+      const { start, end } = appliedMonthRange;
+      return `Tháng ${start.month}/${start.year} đến Tháng ${end.month}/${end.year}`;
+    }
+    if (dayMode === 'range' && rangeStart && rangeEnd) {
+      const [sy, sm, sd] = rangeStart.split('-');
+      const [ey, em, ed] = rangeEnd.split('-');
+      return `Từ ${sd}/${sm}/${sy} đến ${ed}/${em}/${ey}`;
+    }
     if (selectedDays.length > 0) {
       return `Các ngày: ${selectedDays.map(d => {
         const [yy, mm, dd] = d.split('-');
         return `${dd}/${mm}/${yy}`;
       }).join(', ')}`;
     }
-    return `Tháng ${selectedMonth}/${selectedYear}`;
+    return `Tháng ${calViewMonth}/${calViewYear}`;
   };
 
   const handleSelectAllDaysWithTickets = () => {
     const daysWithTickets = ticketsFilteredExceptDate
       .filter(t => {
         const [y, m] = t.date.split('-').map(Number);
-        return y === selectedYear && m === selectedMonth;
+        return y === calViewYear && m === calViewMonth;
       })
       .map(t => t.date);
     const uniqueDays = Array.from(new Set(daysWithTickets));
     setSelectedDays(uniqueDays);
-    toast.success(`Đã chọn tất cả các ngày có phiếu trong Tháng ${selectedMonth}/${selectedYear}`);
+    setDayMode('multi');
+    toast.success(`Đã chọn tất cả các ngày có phiếu trong Tháng ${calViewMonth}/${calViewYear}`);
   };
 
   // Strategic KPI Calculations
@@ -1141,10 +1231,11 @@ export default function Analytics() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm mb-5 no-print p-4 md:p-5 animate-in fade-in slide-in-from-top-2 duration-300">
         <div className="flex items-center gap-2 mb-3">
           <Activity className="w-3.5 h-3.5 text-indigo-600" />
-          <span className="text-[10px] font-black text-slate-500 tracking-widest uppercase italic">Bộ lọc dữ liệu</span>
+          <span className="text-[10px] font-black text-slate-500 tracking-widest uppercase italic">Bộ lọc dữ liệu giao nhận</span>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-4">
+        {/* Row 1: Basic filters */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
           <div className="space-y-1">
             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">Phòng ban</label>
             <select 
@@ -1155,32 +1246,6 @@ export default function Analytics() {
               <option value="ALL">Tất cả phòng ban</option>
               {departmentsList.map((dept, idx) => (
                 <option key={idx} value={dept}>{dept}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">Tháng</label>
-            <select 
-              value={selectedMonth} 
-              onChange={e => setSelectedMonth(Number(e.target.value))}
-              className="w-full h-[34px] px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                <option key={m} value={m}>Tháng {m}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">Năm</label>
-            <select 
-              value={selectedYear} 
-              onChange={e => setSelectedYear(Number(e.target.value))}
-              className="w-full h-[34px] px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              {years.map(y => (
-                <option key={y} value={y}>Năm {y}</option>
               ))}
             </select>
           </div>
@@ -1224,190 +1289,415 @@ export default function Analytics() {
               className="w-full h-[34px] px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
+
+          <div className="space-y-1">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">Tìm kiếm phiếu</label>
+            <div className="relative w-full">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <input 
+                type="text"
+                placeholder="Số phiếu, tên món hàng..."
+                value={searchText}
+                onChange={e => setSearchText(e.target.value)}
+                className="w-full h-[34px] pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4 border-t border-slate-100">
-          {/* Cột 1 & 2: Lịch tháng & Chế độ chọn */}
-          <div className="lg:col-span-2 flex flex-col md:flex-row gap-6 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
-            {/* Lưới lịch */}
-            <div className="flex flex-col items-center shrink-0">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 align-self-start pl-1">
-                Lịch tạo phiếu Tháng {selectedMonth}/{selectedYear}
-              </span>
-              
-              <div className="grid grid-cols-7 gap-1 text-center mb-1 w-full max-w-[280px]">
-                {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((wd, idx) => (
-                  <span key={wd} className={`text-[9px] font-black uppercase ${idx === 6 ? 'text-rose-500' : idx === 5 ? 'text-blue-500' : 'text-slate-400'}`}>
-                    {wd}
-                  </span>
-                ))}
-              </div>
-              
-              <div className="grid grid-cols-7 gap-1.5 w-full max-w-[280px]">
-                {renderCalendarDays.map(day => {
-                  const isSelected = selectedDays.includes(day.dateStr);
-                  const dayTickets = ticketsByDate[day.dateStr] || [];
-                  const hasTickets = dayTickets.length > 0;
-                  const ticketCount = dayTickets.length;
-                  const tooltip = getTooltipContent(day.dateStr);
-                  
-                  return (
-                    <div 
-                      key={day.dateStr}
-                      onClick={() => day.isCurrentMonth && handleDayClick(day.dateStr)}
-                      className={`h-8 w-8 rounded-lg border relative flex flex-col items-center justify-center text-[11px] font-bold transition-all duration-150 group cursor-pointer ${
-                        !day.isCurrentMonth 
-                          ? 'border-transparent text-slate-300 opacity-20 pointer-events-none' 
-                          : isSelected
-                            ? 'bg-indigo-600 border-indigo-600 text-white font-black shadow-md shadow-indigo-100'
-                            : 'bg-white hover:bg-indigo-50 hover:text-indigo-600 border-slate-200 text-slate-700'
-                      }`}
-                    >
-                      <span>{day.dayNum}</span>
-                      
-                      {day.isCurrentMonth && hasTickets && (
-                        <>
-                          <span className={`w-1 h-1 rounded-full mt-0.5 ${isSelected ? 'bg-white' : 'bg-emerald-500'}`}></span>
-                          {ticketCount > 1 && (
-                            <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-rose-500 text-white text-[8px] font-black rounded-full flex items-center justify-center shadow-sm">
-                              {ticketCount}
-                            </span>
-                          )}
-                        </>
-                      )}
-
-                      {/* Tooltip */}
-                      {day.isCurrentMonth && tooltip && (
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 bg-slate-950/95 backdrop-blur-sm text-white text-[10px] p-2.5 rounded-xl shadow-xl w-48 text-left pointer-events-none transition-all duration-200">
-                          <div className="font-black border-b border-slate-800 pb-1 mb-1 text-slate-300">
-                            {tooltip.date}
-                          </div>
-                          <div className="font-bold mb-1 text-[10px]">Có {tooltip.count} phiếu được tạo:</div>
-                          <ul className="space-y-0.5 max-h-24 overflow-y-auto font-mono text-[9px] text-slate-400 list-disc pl-3.5">
-                            {tooltip.tickets.map(id => (
-                              <li key={id}>{id}</li>
-                            ))}
-                            {tooltip.totalCount > 5 && (
-                              <li className="list-none text-slate-500 italic mt-0.5">...và {tooltip.totalCount - 5} phiếu khác</li>
-                            )}
-                          </ul>
-                          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-950"></div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            
-            {/* Chế độ chọn và danh sách ngày đã chọn */}
-            <div className="flex-1 flex flex-col justify-between py-2">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Chế độ chọn:</span>
-                  <div className="inline-flex rounded-lg p-0.5 bg-slate-100 border border-slate-200">
-                    <button
-                      type="button"
-                      onClick={() => { setIsMultiSelect(false); setSelectedDays([]); }}
-                      className={`px-3 py-1 text-[9px] font-black uppercase rounded-md transition-all cursor-pointer ${!isMultiSelect ? 'bg-white text-indigo-650 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-                    >
-                      Chọn 1 ngày
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setIsMultiSelect(true); }}
-                      className={`px-3 py-1 text-[9px] font-black uppercase rounded-md transition-all cursor-pointer ${isMultiSelect ? 'bg-white text-indigo-650 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-                    >
-                      Chọn nhiều
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Trạng thái lọc thời gian:</span>
-                  {selectedDays.length === 0 ? (
-                    <p className="text-[11px] font-bold text-slate-500 italic">
-                      Đang hiển thị tất cả phiếu trong tháng {selectedMonth}/{selectedYear}
-                    </p>
-                  ) : (
-                    <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto custom-scrollbar pr-1">
-                      {selectedDays.map(d => {
-                        const [yy, mm, dd] = d.split('-');
-                        return (
-                          <span 
-                            key={d} 
-                            onClick={() => handleDayClick(d)}
-                            className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-indigo-50 border border-indigo-150 text-indigo-700 text-[10px] font-bold rounded-lg cursor-pointer hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 transition-colors"
-                            title="Click để xóa ngày này"
-                          >
-                            {dd}/{mm}
-                            <span className="text-[8px] font-black">✕</span>
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {selectedDays.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleClearSelection}
-                  className="text-[10px] font-black text-rose-500 hover:text-rose-700 uppercase tracking-wider text-left transition-colors cursor-pointer w-fit mt-2"
-                >
-                  ✕ Xóa tất cả ngày đã chọn
-                </button>
-              )}
+        {/* Row 2: Calendar filter section */}
+        <div className="pt-4 border-t border-slate-100">
+          {/* Tab Switcher */}
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Lọc theo ngày tạo phiếu:</span>
+            <div className="inline-flex rounded-xl p-0.5 bg-slate-100 border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setCalendarTab('day')}
+                className={`px-3 py-1.5 text-[9px] font-black uppercase rounded-lg transition-all cursor-pointer ${calendarTab === 'day' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                📅 Theo Ngày
+              </button>
+              <button
+                type="button"
+                onClick={() => setCalendarTab('month')}
+                className={`px-3 py-1.5 text-[9px] font-black uppercase rounded-lg transition-all cursor-pointer ${calendarTab === 'month' ? 'bg-violet-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                📆 Theo Tháng
+              </button>
             </div>
           </div>
 
-          {/* Cột 3: Tìm kiếm, Reset filters, các nút hành động */}
-          <div className="flex flex-col justify-between space-y-4">
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">Tìm kiếm phiếu</label>
-                <div className="relative w-full">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                  <input 
-                    type="text"
-                    placeholder="Tìm số phiếu, tên món hàng..."
-                    value={searchText}
-                    onChange={e => setSearchText(e.target.value)}
-                    className="w-full h-[34px] pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+            {calendarTab === 'day' ? (
+              <>
+                {/* DAY TAB: Calendar + mode selector */}
+                <div className="lg:col-span-2 flex flex-col sm:flex-row gap-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                  {/* Calendar Grid */}
+                  <div className="flex flex-col items-center shrink-0">
+                    {/* Month navigation */}
+                    <div className="flex items-center justify-between w-full max-w-[280px] mb-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (calViewMonth === 1) { setCalViewMonth(12); setCalViewYear(y => y - 1); }
+                          else setCalViewMonth(m => m - 1);
+                        }}
+                        className="p-1 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer text-sm font-black"
+                      >
+                        ‹
+                      </button>
+                      <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">
+                        Tháng {calViewMonth}/{calViewYear}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (calViewMonth === 12) { setCalViewMonth(1); setCalViewYear(y => y + 1); }
+                          else setCalViewMonth(m => m + 1);
+                        }}
+                        className="p-1 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer text-sm font-black"
+                      >
+                        ›
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-1 text-center mb-1 w-full max-w-[280px]">
+                      {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((wd, idx) => (
+                        <span key={wd} className={`text-[9px] font-black uppercase ${idx === 6 ? 'text-rose-500' : idx === 5 ? 'text-blue-500' : 'text-slate-400'}`}>
+                          {wd}
+                        </span>
+                      ))}
+                    </div>
+                    
+                    <div className="grid grid-cols-7 gap-1 w-full max-w-[280px]">
+                      {renderCalendarDays.map(day => {
+                        const dayTickets = ticketsByDate[day.dateStr] || [];
+                        const hasTickets = dayTickets.length > 0;
+                        const ticketCount = dayTickets.length;
+                        const tooltip = getTooltipContent(day.dateStr);
+
+                        // Compute visual state
+                        let isSelected = false;
+                        let isInRange = false;
+                        let isRangeStart = false;
+                        let isRangeEnd = false;
+                        let isHoverRange = false;
+
+                        if (dayMode === 'single' || dayMode === 'multi') {
+                          isSelected = selectedDays.includes(day.dateStr);
+                        } else if (dayMode === 'range') {
+                          isRangeStart = day.dateStr === rangeStart;
+                          isRangeEnd = day.dateStr === rangeEnd;
+                          if (rangeStart && rangeEnd) {
+                            isInRange = isDayInRange(day.dateStr, rangeStart, rangeEnd);
+                          } else if (rangeStart && hoverDay && !rangeEnd) {
+                            isHoverRange = isDayInRange(day.dateStr, rangeStart, hoverDay);
+                            isRangeStart = day.dateStr === rangeStart;
+                          }
+                          isSelected = isRangeStart || isRangeEnd;
+                        }
+                        
+                        return (
+                          <div 
+                            key={day.dateStr}
+                            onClick={() => day.isCurrentMonth && handleDayClick(day.dateStr)}
+                            onMouseEnter={() => dayMode === 'range' && day.isCurrentMonth && setHoverDay(day.dateStr)}
+                            onMouseLeave={() => dayMode === 'range' && setHoverDay(null)}
+                            className={`h-8 w-8 rounded-lg border relative flex flex-col items-center justify-center text-[11px] font-bold transition-all duration-100 group cursor-pointer ${
+                              !day.isCurrentMonth 
+                                ? 'border-transparent text-slate-300 opacity-20 pointer-events-none' 
+                                : isSelected
+                                  ? 'bg-indigo-600 border-indigo-600 text-white font-black shadow-md shadow-indigo-100'
+                                  : (isInRange || isHoverRange)
+                                    ? 'bg-indigo-100 border-indigo-200 text-indigo-700'
+                                    : 'bg-white hover:bg-indigo-50 hover:text-indigo-600 border-slate-200 text-slate-700'
+                            }`}
+                          >
+                            <span>{day.dayNum}</span>
+                            
+                            {day.isCurrentMonth && hasTickets && (
+                              <>
+                                <span className={`w-1 h-1 rounded-full mt-0.5 ${isSelected ? 'bg-white' : 'bg-emerald-500'}`}></span>
+                                {ticketCount > 1 && (
+                                  <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-rose-500 text-white text-[8px] font-black rounded-full flex items-center justify-center shadow-sm">
+                                    {ticketCount}
+                                  </span>
+                                )}
+                              </>
+                            )}
+
+                            {/* Tooltip */}
+                            {day.isCurrentMonth && tooltip && (
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 bg-slate-950/95 backdrop-blur-sm text-white text-[10px] p-2.5 rounded-xl shadow-xl w-48 text-left pointer-events-none">
+                                <div className="font-black border-b border-slate-800 pb-1 mb-1 text-slate-300">
+                                  {tooltip.date}
+                                </div>
+                                <div className="font-bold mb-1 text-[10px]">Có {tooltip.count} phiếu được tạo:</div>
+                                <ul className="space-y-0.5 max-h-24 overflow-y-auto font-mono text-[9px] text-slate-400 list-disc pl-3.5">
+                                  {tooltip.tickets.map(id => (
+                                    <li key={id}>{id}</li>
+                                  ))}
+                                  {tooltip.totalCount > 5 && (
+                                    <li className="list-none text-slate-500 italic mt-0.5">...và {tooltip.totalCount - 5} phiếu khác</li>
+                                  )}
+                                </ul>
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-950"></div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  
+                  {/* Mode selector + selected status */}
+                  <div className="flex-1 flex flex-col gap-3 py-1 min-w-0">
+                    {/* Mode selector */}
+                    <div>
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Chế độ chọn ngày:</span>
+                      <div className="flex flex-col gap-1">
+                        {([
+                          { key: 'single', label: '1 Ngày', desc: 'Chọn một ngày duy nhất' },
+                          { key: 'multi', label: 'Nhiều ngày', desc: 'Chọn nhiều ngày rời rạc' },
+                          { key: 'range', label: 'Khoảng ngày', desc: 'Chọn ngày bắt đầu → kết thúc' },
+                        ] as { key: DayMode; label: string; desc: string }[]).map(opt => (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            onClick={() => {
+                              setDayMode(opt.key);
+                              setSelectedDays([]);
+                              setRangeStart(null);
+                              setRangeEnd(null);
+                            }}
+                            className={`px-3 py-1.5 text-left rounded-lg border transition-all cursor-pointer flex items-center gap-2 ${dayMode === opt.key ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600'}`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dayMode === opt.key ? 'bg-white' : 'bg-slate-300'}`}></span>
+                            <span className="text-[10px] font-black uppercase">{opt.label}</span>
+                            <span className={`text-[9px] font-medium ${dayMode === opt.key ? 'text-indigo-200' : 'text-slate-400'}`}>{opt.desc}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Current filter status */}
+                    <div className="bg-white border border-slate-200 rounded-xl p-3 min-h-[60px]">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Đang lọc theo:</span>
+                      {dayMode === 'range' && rangeStart && !rangeEnd ? (
+                        <p className="text-[11px] font-bold text-amber-600">
+                          Chọn ngày kết thúc… (bắt đầu từ {rangeStart.split('-').reverse().join('/')})
+                        </p>
+                      ) : dayMode === 'range' && rangeStart && rangeEnd ? (
+                        <p className="text-[11px] font-bold text-indigo-600">
+                          📅 Từ {rangeStart.split('-').reverse().join('/')} → {rangeEnd.split('-').reverse().join('/')}
+                        </p>
+                      ) : selectedDays.length > 0 ? (
+                        <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto custom-scrollbar">
+                          {selectedDays.map(d => {
+                            const [yy, mm, dd] = d.split('-');
+                            return (
+                              <span 
+                                key={d} 
+                                onClick={() => handleDayClick(d)}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-bold rounded-lg cursor-pointer hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 transition-colors"
+                                title="Click để xóa"
+                              >
+                                {dd}/{mm}
+                                <span className="text-[8px] font-black">✕</span>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] font-bold text-slate-400 italic">
+                          Tất cả phiếu trong tháng {calViewMonth}/{calViewYear}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
+              </>
+            ) : (
+              <>
+                {/* MONTH TAB: Month range picker */}
+                <div className="lg:col-span-2 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                  <div className="mb-3">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Chọn khoảng tháng liên thông</span>
+                  </div>
+
+                  {/* Year navigator + month grid */}
+                  {(() => {
+                    const [gridYear, setGridYear] = [calViewYear, setCalViewYear];
+                    const monthNames = ['Th.1','Th.2','Th.3','Th.4','Th.5','Th.6','Th.7','Th.8','Th.9','Th.10','Th.11','Th.12'];
+                    
+                    const isMonthInRange = (m: number, y: number) => {
+                      if (!monthRangeStart || !monthRangeEnd) return false;
+                      const val = y * 100 + m;
+                      const startVal = monthRangeStart.year * 100 + monthRangeStart.month;
+                      const endVal = monthRangeEnd.year * 100 + monthRangeEnd.month;
+                      const lo = Math.min(startVal, endVal);
+                      const hi = Math.max(startVal, endVal);
+                      return val >= lo && val <= hi;
+                    };
+                    const isMonthSelected = (m: number, y: number) => {
+                      const val = y * 100 + m;
+                      const sv = monthRangeStart ? monthRangeStart.year * 100 + monthRangeStart.month : null;
+                      const ev = monthRangeEnd ? monthRangeEnd.year * 100 + monthRangeEnd.month : null;
+                      return val === sv || val === ev;
+                    };
+
+                    return (
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <button type="button" onClick={() => setCalViewYear((y: number) => y - 1)} className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 font-black text-sm cursor-pointer">‹</button>
+                          <span className="text-[11px] font-black text-slate-700 uppercase tracking-widest">Năm {gridYear}</span>
+                          <button type="button" onClick={() => setCalViewYear((y: number) => y + 1)} className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 font-black text-sm cursor-pointer">›</button>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2">
+                          {monthNames.map((name, idx) => {
+                            const m = idx + 1;
+                            const y = gridYear;
+                            const inRange = isMonthInRange(m, y);
+                            const selected = isMonthSelected(m, y);
+                            const ticketsInMonth = ticketsFilteredExceptDate.filter(t => {
+                              const [ty, tm] = t.date.split('-').map(Number);
+                              return ty === y && tm === m;
+                            }).length;
+                            
+                            return (
+                              <button
+                                key={m}
+                                type="button"
+                                onClick={() => {
+                                  if (!monthRangeStart || (monthRangeStart && monthRangeEnd)) {
+                                    setMonthRangeStart({ month: m, year: y });
+                                    setMonthRangeEnd(null);
+                                  } else {
+                                    const sv = monthRangeStart.year * 100 + monthRangeStart.month;
+                                    const ev = y * 100 + m;
+                                    if (ev >= sv) {
+                                      setMonthRangeEnd({ month: m, year: y });
+                                    } else {
+                                      setMonthRangeEnd(monthRangeStart);
+                                      setMonthRangeStart({ month: m, year: y });
+                                    }
+                                  }
+                                }}
+                                className={`relative py-2.5 px-2 rounded-xl text-[10px] font-black transition-all cursor-pointer border ${
+                                  selected
+                                    ? 'bg-violet-600 border-violet-600 text-white shadow-md'
+                                    : inRange
+                                      ? 'bg-violet-100 border-violet-200 text-violet-700'
+                                      : 'bg-white border-slate-200 text-slate-600 hover:border-violet-300 hover:text-violet-600'
+                                }`}
+                              >
+                                {name}
+                                {ticketsInMonth > 0 && (
+                                  <span className={`absolute -top-1 -right-1 w-4 h-4 rounded-full text-[8px] font-black flex items-center justify-center ${selected ? 'bg-white text-violet-600' : 'bg-violet-500 text-white'}`}>
+                                    {ticketsInMonth > 9 ? '9+' : ticketsInMonth}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Apply button */}
+                        {monthRangeStart && (
+                          <div className="mt-3 flex items-center gap-2">
+                            <div className="flex-1 text-[10px] text-violet-700 font-bold bg-violet-50 border border-violet-200 rounded-lg px-3 py-2">
+                              {monthRangeStart && !monthRangeEnd ? (
+                                <>Từ <strong>Tháng {monthRangeStart.month}/{monthRangeStart.year}</strong> → Chọn tháng kết thúc...</>
+                              ) : (
+                                <>Từ <strong>Tháng {monthRangeStart.month}/{monthRangeStart.year}</strong> đến <strong>Tháng {monthRangeEnd!.month}/{monthRangeEnd!.year}</strong></>
+                              )}
+                            </div>
+                            {monthRangeStart && monthRangeEnd && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAppliedMonthRange({ start: monthRangeStart!, end: monthRangeEnd! });
+                                  toast.success(`Đã lọc từ Tháng ${monthRangeStart!.month}/${monthRangeStart!.year} đến Tháng ${monthRangeEnd!.month}/${monthRangeEnd!.year}`);
+                                }}
+                                className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-black rounded-lg transition-all cursor-pointer uppercase tracking-widest whitespace-nowrap"
+                              >
+                                Áp dụng
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {appliedMonthRange && (
+                          <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                            <span className="text-[10px] font-bold text-emerald-700 flex-1">
+                              ✓ Đang lọc: Tháng {appliedMonthRange.start.month}/{appliedMonthRange.start.year} → Tháng {appliedMonthRange.end.month}/{appliedMonthRange.end.year}
+                            </span>
+                            <button type="button" onClick={() => { setAppliedMonthRange(null); setMonthRangeStart(null); setMonthRangeEnd(null); }} className="text-[9px] text-rose-500 hover:text-rose-700 font-black cursor-pointer">✕ Xóa</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </>
+            )}
+
+            {/* Column 3: Action buttons */}
+            <div className="flex flex-col justify-between gap-2">
+              <div className="space-y-2">
+                <button 
+                  type="button"
+                  onClick={handleCurrentMonth}
+                  className="w-full px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Clock className="w-3.5 h-3.5 text-slate-500" /> Về tháng hiện tại
+                </button>
+
+                {calendarTab === 'day' && (
+                  <button 
+                    type="button"
+                    onClick={handleSelectAllDaysWithTickets}
+                    className="w-full px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-[11px] rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" /> Chọn tất cả ngày có phiếu
+                  </button>
+                )}
+
+                {(selectedDays.length > 0 || rangeStart || appliedMonthRange) && (
+                  <button
+                    type="button"
+                    onClick={handleClearSelection}
+                    className="w-full px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold text-[11px] rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <X className="w-3.5 h-3.5" /> Xóa lọc thời gian
+                  </button>
+                )}
               </div>
-            </div>
 
-            <div className="flex flex-col gap-2">
-              <button 
-                type="button"
-                onClick={handleCurrentMonth}
-                className="w-full px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-750 font-bold text-[11px] rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <Clock className="w-3.5 h-3.5 text-slate-500" /> Về tháng hiện tại
-              </button>
-
-              <button 
-                type="button"
-                onClick={handleSelectAllDaysWithTickets}
-                className="w-full px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-150 font-bold text-[11px] rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" /> Chọn tất cả ngày có phiếu
-              </button>
-
-              <button 
-                type="button"
-                onClick={handleResetFilters}
-                className="w-full px-3.5 py-2 bg-slate-900 hover:bg-slate-850 text-white font-black uppercase tracking-wider text-[10px] rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <RefreshCcw className="w-3.5 h-3.5 text-white" /> Làm mới toàn bộ bộ lọc
-              </button>
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                {/* Filter summary */}
+                <div className="bg-slate-50 rounded-xl border border-slate-200 p-2.5 text-[10px]">
+                  <div className="font-black text-slate-400 uppercase tracking-widest mb-1">Kết quả lọc</div>
+                  <div className="font-bold text-indigo-700 text-sm">{filteredTickets.length} <span className="text-slate-500 text-[10px] font-bold">phiếu</span></div>
+                  <div className="text-slate-500 text-[9px] mt-0.5 truncate">{getPrintedDateRangeLabel()}</div>
+                </div>
+                <button 
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="w-full px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-black uppercase tracking-wider text-[10px] rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <RefreshCcw className="w-3.5 h-3.5 text-white" /> Làm mới bộ lọc
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+
+
 
       {/* ── STRATEGIC KPIS ── */}
       <div className="stats-grid mb-8 no-print">
