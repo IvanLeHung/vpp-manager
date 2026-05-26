@@ -553,8 +553,11 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                         { val: 'PENDING_ADMIN', lab: '⏳ Chờ Hành chính', color: 'amber' },
                         { val: 'APPROVED', lab: '✅ Đã duyệt', color: 'emerald' },
                         { val: 'READY_TO_ISSUE', lab: '🚚 Sẵn sàng xuất', color: 'emerald' },
+                        { val: 'WAITING_HANDOVER', lab: '🤝 Chờ bàn giao', color: 'blue' },
+                        { val: 'PARTIALLY_DELIVERED', lab: '🚚 Đang giao dở', color: 'teal' },
                         { val: 'COMPLETED', lab: '🏁 Hoàn thành', color: 'emerald' },
                         { val: 'REJECTED', lab: '❌ Từ chối', color: 'rose' },
+                        { val: 'CANCELLED', lab: '🚫 Đã hủy', color: 'rose' },
                         { val: 'RETURNED', lab: '↩️ Trả lại', color: 'orange' },
                         { val: 'DRAFT', lab: '📝 Bản nháp', color: 'slate' }
                       ].map(st => (
