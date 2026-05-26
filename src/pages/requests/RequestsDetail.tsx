@@ -95,7 +95,23 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
   // Custom approvals
   const [approvals, setApprovals] = useState<{lineId: string, qtyApproved: number, selected: boolean, note: string}[]>([]);
   // Custom issues
-  const [issues, setIssues] = useState<{lineId: string, qtyDelivered: number, warehouseCode?: string, selected?: boolean}[]>([]);
+  const [issues, setIssues] = useState<{
+    lineId: string;
+    qtyDelivered: number;
+    warehouseCode?: string;
+    selected?: boolean;
+    issueItemId?: string;
+    issueItemData?: any;
+    replacementSource?: string;
+  }[]>([]);
+  
+  // Swap Item modal states
+  const [swapModalLineId, setSwapModalLineId] = useState<string | null>(null);
+  const [swapSearch, setSwapSearch] = useState<string>('');
+  const [swapSearchResults, setSwapSearchResults] = useState<any[]>([]);
+  const [swapSelectedItem, setSwapSelectedItem] = useState<any | null>(null);
+  const [loadingSwapSearch, setLoadingSwapSearch] = useState<boolean>(false);
+
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
   const [selectedWarehouse, setSelectedWarehouse] = useState('MAIN');
   const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH'>('ALL');
@@ -164,6 +180,53 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
   useEffect(() => {
     fetchDetail();
   }, [requestId]);
+
+  const openIssueModal = async () => {
+    try {
+      setLoading(true);
+      const previewRes = await api.get(`/requests/${requestId}/delivery-preview`);
+      const preview = previewRes.data;
+      
+      setIssues(preview.lines.map((l: any) => {
+        return {
+          lineId: l.lineId,
+          qtyDelivered: l.issueQty,
+          warehouseCode: l.issueItem?.warehouse || 'MAIN',
+          selected: l.remainingQty > 0 && (l.issueItem?.availableQty || 0) > 0,
+          issueItemId: l.issueItem?.id,
+          issueItemData: {
+            id: l.issueItem?.id,
+            name: l.issueItem?.name,
+            mvpp: l.issueItem?.code,
+            unit: l.issueItem?.unit,
+            stocks: l.issueItem?.stocks || []
+          },
+          replacementSource: l.replacementSource
+        };
+      }));
+      setShowIssueModal(true);
+    } catch (err: any) {
+      showToast(err.response?.data?.error || 'Lỗi tải dữ liệu xuất kho', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const searchSwapItems = async (query: string) => {
+    if (!query.trim()) {
+      setSwapSearchResults([]);
+      return;
+    }
+    try {
+      setLoadingSwapSearch(true);
+      const res = await api.get('/items', { params: { q: query } });
+      setSwapSearchResults(res.data || []);
+    } catch (err: any) {
+      showToast('Lỗi tìm kiếm vật tư thay thế', 'error');
+    } finally {
+      setLoadingSwapSearch(false);
+    }
+  };
 
   const autoSelectWarehouses = () => {
     const updatedIssues = issues.map(issue => {
@@ -988,7 +1051,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
                       {/* --- THAO TÁC CỦA KHO --- */}
                       {(isWarehouse || currentUser.role === 'ADMIN' || currentUser.role === 'WAREHOUSE') && ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED', 'PARTIAL_ADMIN_APPROVED', 'BACKORDER', 'PARTIALLY_DELIVERED', 'PENDING_REMAINING_DELIVERY'].includes(data.status) && (
-                           <button onClick={() => setShowIssueModal(true)} className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/40 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-emerald-500"><Archive className="w-6 h-6 mr-2"/> CẤP PHÁT CHO NHÂN SỰ</button>
+                           <button onClick={() => openIssueModal()} className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/40 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-emerald-500"><Archive className="w-6 h-6 mr-2"/> CẤP PHÁT CHO NHÂN SỰ</button>
                       )}
 
                       {/* --- TẠO MUA SẮM (AUTO PO) --- */}
@@ -1467,21 +1530,23 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                </button>
                                <button 
                                  onClick={() => {
-                                   const newIssues = data.lines.map((l: any) => {
-                                     const issue = issues.find((a: any) => a.lineId === l.id);
-                                     const wh = issue?.warehouseCode || selectedWarehouse;
-                                     const stock = l.issue_item?.stocks?.find((s: any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
-                                     const remaining = (l.qtyApproved ?? l.qtyRequested) - (l.qtyDelivered || 0);
-                                     return {
-                                       ...issue,
-                                       lineId: l.id,
-                                       qtyDelivered: Math.min(remaining, stock),
-                                       selected: remaining > 0 && stock > 0,
-                                       warehouseCode: wh
-                                     };
-                                   });
-                                   setIssues(newIssues);
-                                   showToast('Đã tự động điền số lượng theo tồn thực tế', 'success');
+                                    const newIssues = data.lines.map((l: any) => {
+                                      const issue = issues.find((a: any) => a.lineId === l.id);
+                                      const wh = issue?.warehouseCode || selectedWarehouse;
+                                      const issueItem = issue?.issueItemData || l.issue_item || l.item;
+                                      const stock = issueItem?.stocks?.find((s: any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
+                                      const targetQty = l.final_approved_qty ?? l.qtyApproved ?? l.qtyRequested;
+                                      const remaining = targetQty - (l.qtyDelivered || 0);
+                                      return {
+                                        ...issue,
+                                        lineId: l.id,
+                                        qtyDelivered: Math.min(remaining, stock),
+                                        selected: remaining > 0 && stock > 0,
+                                        warehouseCode: wh
+                                      };
+                                    });
+                                    setIssues(newIssues);
+                                    showToast('Đã tự động điền số lượng theo tồn thực tế', 'success');
                                  }}
                                  className="w-full py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-600 rounded-xl font-bold text-xs hover:bg-emerald-100 transition flex items-center justify-center gap-2"
                                >
@@ -1493,8 +1558,10 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                     onClick={() => {
                                       const newIssues = issues.map(i => {
                                         const line = data.lines.find((l: any) => l.id === i.lineId);
-                                        const stock = line?.issue_item?.stocks?.find((s: any) => s.warehouseCode === i.warehouseCode)?.quantityOnHand ?? 0;
-                                        const remaining = (line?.qtyApproved ?? line?.qtyRequested) - (line?.qtyDelivered || 0);
+                                        const issueItem = i.issueItemData || line?.issue_item || line?.item;
+                                        const stock = issueItem?.stocks?.find((s: any) => s.warehouseCode === i.warehouseCode)?.quantityOnHand ?? 0;
+                                        const targetQty = line?.final_approved_qty ?? line?.qtyApproved ?? line?.qtyRequested;
+                                        const remaining = targetQty - (line?.qtyDelivered || 0);
                                         return { ...i, selected: remaining > 0 && stock >= remaining };
                                       });
                                       setIssues(newIssues);
@@ -1505,7 +1572,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                     onClick={() => {
                                       const newIssues = issues.map(i => {
                                         const line = data.lines.find((l: any) => l.id === i.lineId);
-                                        const stock = line?.issue_item?.stocks?.find((s: any) => s.warehouseCode === i.warehouseCode)?.quantityOnHand ?? 0;
+                                        const issueItem = i.issueItemData || line?.issue_item || line?.item;
+                                        const stock = issueItem?.stocks?.find((s: any) => s.warehouseCode === i.warehouseCode)?.quantityOnHand ?? 0;
                                         return { ...i, selected: stock > 0 };
                                       });
                                       setIssues(newIssues);
@@ -1563,8 +1631,10 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                   const fixedIssues = issues.map(i => {
                                     if (!i.selected) return {...i, qtyDelivered: 0};
                                     const line = data.lines.find((l: any) => l.id === i.lineId);
-                                    const stock = line?.issue_item?.stocks?.find((s: any) => s.warehouseCode === i.warehouseCode)?.quantityOnHand ?? 0;
-                                    const remaining = (line?.qtyApproved ?? line?.qtyRequested) - (line?.qtyDelivered || 0);
+                                    const issueItem = i.issueItemData || line?.issue_item || line?.item;
+                                    const stock = issueItem?.stocks?.find((s: any) => s.warehouseCode === i.warehouseCode)?.quantityOnHand ?? 0;
+                                    const targetQty = line?.final_approved_qty ?? line?.qtyApproved ?? line?.qtyRequested;
+                                    const remaining = targetQty - (line?.qtyDelivered || 0);
                                     return {
                                       ...i,
                                       qtyDelivered: Math.min(i.qtyDelivered, stock, remaining)
@@ -1580,7 +1650,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
                              
                               {data.lines.some((l: any) => {
-                                 const target = l.qtyApproved ?? l.qtyRequested;
+                                 const target = l.final_approved_qty ?? l.qtyApproved ?? l.qtyRequested;
                                  const delivered = l.qtyDelivered || 0;
                                  return target > delivered;
                               }) && (
@@ -1625,62 +1695,95 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                             <tbody className="divide-y divide-slate-100">
                                 {data.lines
                                   .filter((l: any) => {
-                                    if (!showOnlyErrors) return true;
                                     const issue = issues.find((a: any) => a.lineId === l.id);
-                                    const qtyIssue = issue?.qtyDelivered ?? (l.qtyApproved ?? l.qtyRequested);
+                                    const targetQty = l.final_approved_qty ?? l.qtyApproved ?? l.qtyRequested;
+                                    const qtyIssue = issue?.qtyDelivered ?? targetQty;
+                                    if (!showOnlyErrors) return true;
                                     const wh = issue?.warehouseCode || selectedWarehouse;
-                                    const stock = l.issue_item.stocks?.find((s: any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
+                                    const issueItem = issue?.issueItemData || l.issue_item || l.item;
+                                    const stock = issueItem?.stocks?.find((s: any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
                                     return qtyIssue > stock;
                                   })
                                   .map((l:any) => {
-                                    const issue = issues.find((a:any)=>a.lineId===l.id);
-                                    const qtyIssue = issue?.qtyDelivered ?? (l.qtyApproved ?? l.qtyRequested);
-                                    const wh = issue?.warehouseCode || selectedWarehouse;
-                                    const stock = l.issue_item.stocks?.find((s: any) => s.warehouseCode === wh) || { quantityOnHand: 0 };
-
-
-                                    const isReplaced = l.is_replaced;
-                                    const overStock = qtyIssue > (stock?.quantityOnHand ?? 0);
-                                    const targetQty = l.qtyApproved ?? l.qtyRequested;
-                                    const deliveredBefore = l.qtyDelivered || 0;
-                                    const remaining = targetQty - deliveredBefore;
-                                    const shortAfter = remaining - qtyIssue;
-                                    
-                                    const isDone = deliveredBefore >= targetQty;
-
-                                    return (
-                                    <tr key={l.id} className={`${isDone ? 'opacity-40 bg-slate-50' : ''} ${overStock ? 'bg-rose-50/30' : ''}`}>
-                                        <td className="p-4">
-                                          <input 
-                                            type="checkbox"
-                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                            checked={issue?.selected || false}
-                                            onChange={(e) => setIssues(issues.map(a => a.lineId === l.id ? {...a, selected: e.target.checked} : a))}
-                                          />
-                                        </td>
-                                        <td className="p-4">
-                                            <div className="flex flex-col">
-                                              <p className="font-bold text-slate-800 text-sm whitespace-normal max-w-[250px]">{l.issue_item.name}</p>
-                                              <div className="flex items-center gap-4 mt-2">
-                                                <select 
-                                                  value={wh}
-                                                  onChange={(e) => setIssues(issues.map(a => a.lineId === l.id ? {...a, warehouseCode: e.target.value} : a))}
-                                                  className={`text-[10px] font-black p-1 rounded border ${overStock ? 'border-rose-300 bg-rose-50 text-rose-600' : 'border-slate-200 bg-white text-slate-500'}`}
-                                                >
-                                                  <option value="MAIN">MAIN</option>
-                                                  <option value="SUPPLY">SUPPLY</option>
-                                                  <option value="SCRAP">SCRAP</option>
-                                                  <option value="VE_SINH">VE_SINH</option>
-                                                </select>
-                                                <span className={`font-black text-[10px] uppercase ${stock.quantityOnHand === 0 ? 'text-rose-500' : 'text-slate-400'}`}>Tồn: {stock.quantityOnHand} {l.issue_item.unit}</span>
-                                              </div>
-                                              {isReplaced && (
-                                                <p className="text-[9px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full w-fit mt-2">
-                                                  Thay cho: {l.original_item.name}
-                                                </p>
-                                              )}
-                                            </div>
-                                        </td>
+                                     const issue = issues.find((a:any)=>a.lineId===l.id);
+                                     const targetQty = l.final_approved_qty ?? l.qtyApproved ?? l.qtyRequested;
+                                     const qtyIssue = issue?.qtyDelivered ?? targetQty;
+                                     const wh = issue?.warehouseCode || selectedWarehouse;
+                                     
+                                     const issueItem = issue?.issueItemData || l.issue_item || l.item;
+                                     const stock = issueItem?.stocks?.find((s: any) => s.warehouseCode === wh) || { quantityOnHand: 0 };
+                                     const source = issue?.replacementSource || l.replacement_source || 'original';
+ 
+                                     const isReplaced = source !== 'original' || l.is_replaced;
+                                     const overStock = qtyIssue > (stock?.quantityOnHand ?? 0);
+                                     const deliveredBefore = l.qtyDelivered || 0;
+                                     const remaining = targetQty - deliveredBefore;
+                                     const shortAfter = remaining - qtyIssue;
+                                     
+                                     const isDone = deliveredBefore >= targetQty;
+ 
+                                     const getSourceBadge = (src: string) => {
+                                       switch(src) {
+                                         case 'request':
+                                           return <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-650 text-[9px] font-black uppercase border border-indigo-150">Thủ công</span>;
+                                         case 'receipt':
+                                           return <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-650 text-[9px] font-black uppercase border border-emerald-150">Nhập kho</span>;
+                                         case 'purchase':
+                                           return <span className="px-2 py-0.5 rounded bg-sky-50 text-sky-600 text-[9px] font-black uppercase border border-sky-150">Mua hàng</span>;
+                                         default:
+                                           return <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-500 text-[9px] font-black uppercase border border-slate-200">Gốc</span>;
+                                       }
+                                     };
+ 
+                                     return (
+                                     <tr key={l.id} className={`${isDone ? 'opacity-40 bg-slate-50' : ''} ${overStock ? 'bg-rose-50/30' : ''}`}>
+                                         <td className="p-4">
+                                           <input 
+                                             type="checkbox"
+                                             className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                             checked={issue?.selected || false}
+                                             onChange={(e) => setIssues(issues.map(a => a.lineId === l.id ? {...a, selected: e.target.checked} : a))}
+                                           />
+                                         </td>
+                                         <td className="p-4">
+                                             <div className="flex flex-col">
+                                               <p className="font-bold text-slate-800 text-sm whitespace-normal max-w-[250px]">{issueItem?.name || l.item?.name}</p>
+                                               <div className="flex items-center gap-4 mt-2">
+                                                 <select 
+                                                   value={wh}
+                                                   onChange={(e) => setIssues(issues.map(a => a.lineId === l.id ? {...a, warehouseCode: e.target.value} : a))}
+                                                   className={`text-[10px] font-black p-1 rounded border ${overStock ? 'border-rose-300 bg-rose-50 text-rose-600' : 'border-slate-200 bg-white text-slate-500'}`}
+                                                 >
+                                                   <option value="MAIN">MAIN</option>
+                                                   <option value="SUPPLY">SUPPLY</option>
+                                                   <option value="SCRAP">SCRAP</option>
+                                                   <option value="VE_SINH">VE_SINH</option>
+                                                 </select>
+                                                 <span className={`font-black text-[10px] uppercase ${stock.quantityOnHand === 0 ? 'text-rose-500' : 'text-slate-400'}`}>Tồn: {stock.quantityOnHand} {issueItem?.unit || l.item?.unit}</span>
+                                                 
+                                                 <button 
+                                                   type="button"
+                                                   onClick={() => {
+                                                     setSwapModalLineId(l.id);
+                                                     setSwapSearch('');
+                                                     setSwapSearchResults([]);
+                                                     setSwapSelectedItem(null);
+                                                   }}
+                                                   className="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-600 rounded text-[9px] font-black transition"
+                                                 >
+                                                   ĐỔI ITEM
+                                                 </button>
+                                               </div>
+                                               <div className="flex items-center gap-2 mt-2">
+                                                 {getSourceBadge(source)}
+                                                 {isReplaced && (
+                                                   <p className="text-[9px] font-bold text-slate-400">
+                                                     Thay cho: {l.original_item?.name || l.item?.name}
+                                                   </p>
+                                                 )}
+                                               </div>
+                                             </div>
+                                         </td>
                                         <td className="p-4 text-center font-bold text-slate-600">{targetQty}</td>
                                         <td className="p-4 text-center font-bold text-slate-400">{deliveredBefore}</td>
                                         <td className="p-4 text-center bg-indigo-50/20 font-black text-indigo-600">{remaining}</td>
@@ -1724,6 +1827,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                       <p className="text-sm text-slate-500 mb-8 font-medium">Bạn đang thực hiện cấp phát hàng từ kho <b>{selectedWarehouse}</b>. Hành động này không thể hoàn tác.</p>
                       <div className="flex flex-col gap-3">
                          <button 
+                            type="button"
                             onClick={() => {
                                const selectedIssues = issues.filter(i => i.selected);
                                const hasErr = data.lines.some((l:any) => {
@@ -1731,7 +1835,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                   if (!issue?.selected) return false;
                                   const qtyIssue = issue?.qtyDelivered ?? 0;
                                   const wh = issue?.warehouseCode || selectedWarehouse;
-                                  const stock = l.issue_item?.stocks?.find((s:any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
+                                  const issueItem = issue?.issueItemData || l.issue_item || l.item;
+                                  const stock = issueItem?.stocks?.find((s:any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
                                   return qtyIssue > stock;
                                });
                                if (hasErr) {
@@ -1739,7 +1844,15 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                   setIsConfirmingIssue(false);
                                   return;
                                }
-                               handleAction('/issue', { warehouseCode: selectedWarehouse, lineIssues: selectedIssues }, 'CẤP PHÁT VẬT TƯ THÀNH CÔNG! ĐANG CHỜ NHÂN SỰ XÁC NHẬN.');
+                               handleAction('/issue', { 
+                                  warehouseCode: selectedWarehouse, 
+                                  lineIssues: selectedIssues.map((i: any) => ({
+                                     lineId: i.lineId,
+                                     qtyDelivered: i.qtyDelivered,
+                                     warehouseCode: i.warehouseCode,
+                                     issueItemId: i.issueItemId
+                                  })) 
+                               }, 'CẤP PHÁT VẬT TƯ THÀNH CÔNG! ĐANG CHỜ NHÂN SỰ XÁC NHẬN.');
                                setIsConfirmingIssue(false);
                                setShowIssueModal(false);
                             }}
@@ -1749,6 +1862,165 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                          <button onClick={()=>setIsConfirmingIssue(false)} className="w-full py-3 text-slate-400 font-bold hover:text-slate-600">Quay lại chỉnh sửa</button>
                       </div>
                    </div>
+                </div>
+              )}
+
+              {/* SWAP ITEM MODAL */}
+              {swapModalLineId && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+                  <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-in">
+                    {/* Header */}
+                    <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-700 text-white">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-indigo-600 rounded-lg"><Layers className="w-5 h-5"/></div>
+                        <div>
+                          <h3 className="text-lg font-black uppercase tracking-tight text-white">Thay đổi vật tư thực xuất</h3>
+                          <p className="text-[10px] text-indigo-100 font-bold uppercase tracking-widest">Chọn vật tư thay thế cho dòng hiện tại</p>
+                        </div>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={() => setSwapModalLineId(null)} 
+                        className="text-indigo-200 hover:text-white transition"
+                      >
+                        <XCircle className="w-6 h-6"/>
+                      </button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-6 flex-1 overflow-y-auto space-y-4">
+                      {/* Target line info */}
+                      {(() => {
+                        const line = data.lines.find((l: any) => l.id === swapModalLineId);
+                        if (!line) return null;
+                        return (
+                          <div className="p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl flex justify-between items-center">
+                            <div>
+                              <p className="text-[10px] font-black text-indigo-500 uppercase">Vật tư gốc yêu cầu</p>
+                              <p className="text-sm font-bold text-slate-800 mt-1">{line.item?.name}</p>
+                              <p className="text-[10px] text-slate-400 font-medium mt-0.5">Mã: {line.item?.mvpp} | ĐVT: {line.item?.unit}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[10px] font-black text-indigo-500 uppercase">SL Duyệt thực tế</p>
+                              <p className="text-lg font-black text-indigo-700 mt-0.5">{line.final_approved_qty ?? line.qtyApproved ?? line.qtyRequested}</p>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Search input */}
+                      <div className="relative">
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
+                        <input
+                          type="text"
+                          value={swapSearch}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSwapSearch(val);
+                            searchSwapItems(val);
+                          }}
+                          placeholder="Nhập tên hoặc mã vật tư cần tìm..."
+                          className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 font-bold text-sm outline-none transition-all placeholder:text-slate-400"
+                        />
+                      </div>
+
+                      {/* Search results */}
+                      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                        {loadingSwapSearch ? (
+                          <div className="text-center py-8 text-slate-400 font-bold text-sm flex items-center justify-center gap-2">
+                            <RefreshCw className="w-5 h-5 animate-spin text-indigo-600"/> Đang tra cứu danh mục...
+                          </div>
+                        ) : swapSearchResults.length === 0 ? (
+                          <div className="text-center py-8 text-slate-400 font-bold text-xs italic">
+                            {swapSearch.trim() ? 'Không tìm thấy vật tư phù hợp.' : 'Nhập từ khóa để bắt đầu tìm kiếm.'}
+                          </div>
+                        ) : (
+                          swapSearchResults.map((item) => {
+                            const isSelected = swapSelectedItem?.id === item.id;
+                            return (
+                              <div
+                                key={item.id}
+                                onClick={() => setSwapSelectedItem(item)}
+                                className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-3 ${isSelected ? 'border-indigo-600 bg-indigo-50/30 ring-1 ring-indigo-500' : 'border-slate-100 bg-slate-50 hover:bg-slate-100 hover:border-slate-200'}`}
+                              >
+                                <div>
+                                  <p className="font-bold text-slate-800 text-sm">{item.name}</p>
+                                  <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase">Mã: {item.mvpp} | ĐVT: {item.unit}</p>
+                                </div>
+                                {/* Stocks per warehouse */}
+                                <div className="flex flex-wrap gap-1.5 md:justify-end">
+                                  {item.stocks?.map((st: any) => (
+                                    <span 
+                                      key={st.warehouseCode}
+                                      className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase ${st.quantityOnHand > 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' : 'bg-slate-100 text-slate-400'}`}
+                                    >
+                                      {st.warehouseCode}: {st.quantityOnHand}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="p-6 border-t border-slate-100 flex gap-3 bg-slate-50">
+                      <button
+                        type="button"
+                        onClick={() => setSwapModalLineId(null)}
+                        className="flex-1 py-3 bg-white border border-slate-200 text-slate-500 font-bold rounded-2xl text-sm hover:bg-slate-100 hover:text-slate-700 transition"
+                      >
+                        HỦY BỎ
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!swapSelectedItem}
+                        onClick={() => {
+                          if (!swapSelectedItem || !swapModalLineId) return;
+                          
+                          // Update issues state
+                          const line = data.lines.find((l: any) => l.id === swapModalLineId);
+                          const firstWhWithStock = swapSelectedItem.stocks?.find((s: any) => s.quantityOnHand > 0)?.warehouseCode || 'MAIN';
+                          const primaryWh = data.warehouseCode || 'MAIN';
+                          const hasStockPrimary = swapSelectedItem.stocks?.find((s: any) => s.warehouseCode === primaryWh)?.quantityOnHand > 0;
+                          const wh = hasStockPrimary ? primaryWh : firstWhWithStock;
+                          
+                          const stock = swapSelectedItem.stocks?.find((s: any) => s.warehouseCode === wh)?.quantityOnHand ?? 0;
+                          const remaining = (line?.final_approved_qty ?? line?.qtyApproved ?? line?.qtyRequested) - (line?.qtyDelivered || 0);
+
+                          const updatedIssues = issues.map((i) => {
+                            if (i.lineId === swapModalLineId) {
+                              return {
+                                ...i,
+                                issueItemId: swapSelectedItem.id,
+                                issueItemData: {
+                                  id: swapSelectedItem.id,
+                                  name: swapSelectedItem.name,
+                                  mvpp: swapSelectedItem.mvpp,
+                                  unit: swapSelectedItem.unit,
+                                  stocks: swapSelectedItem.stocks || []
+                                },
+                                qtyDelivered: Math.min(remaining, stock),
+                                warehouseCode: wh,
+                                selected: remaining > 0 && stock > 0,
+                                replacementSource: 'request'
+                              };
+                            }
+                            return i;
+                          });
+
+                          setIssues(updatedIssues);
+                          setSwapModalLineId(null);
+                          showToast('Đã đổi sang vật tư thay thế thành công!', 'success');
+                        }}
+                        className={`flex-1 py-3 font-black rounded-2xl text-sm transition flex items-center justify-center gap-2 ${swapSelectedItem ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                      >
+                        <Check className="w-4 h-4"/> XÁC NHẬN ĐỔI
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
           </div>
