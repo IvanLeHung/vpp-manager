@@ -775,24 +775,33 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                            <tr key={l.id} className={`hover:bg-slate-50 transition border-l-4 ${outOfStock && data.status.startsWith('PENDING') ? 'border-l-rose-500 bg-rose-50/30' : 'border-l-transparent'}`}>
                                                <td className="px-2 py-2 text-center font-bold text-slate-400 border-r border-slate-100">{idx+1}</td>
                                                <td className="px-2 py-2 min-w-[150px]">
-                                                    {l.replacementItem || l.item ? (
+                                                    {l.issue_item || l.item ? (
                                                       <GoodsNameWithPreview 
-                                                        itemId={l.replacementItem?.id || l.item.id}
-                                                        itemCode={l.replacementItem?.mvpp || l.item.mvpp}
-                                                        itemName={l.replacementItem?.name || l.item.name}
-                                                        imageUrl={l.replacementItem?.imageUrl || l.item.imageUrl}
-                                                        thumbnailUrl={l.replacementItem?.thumbnailUrl || l.item.thumbnailUrl}
-                                                        categoryName={l.replacementItem?.category || l.item.category}
-                                                        unit={l.replacementItem?.unit || l.item.unit}
+                                                        itemId={l.issue_item?.id || l.item.id}
+                                                        itemCode={l.issue_item?.mvpp || l.item.mvpp}
+                                                        itemName={l.issue_item?.name || l.item.name}
+                                                        imageUrl={l.issue_item?.imageUrl || l.item.imageUrl}
+                                                        thumbnailUrl={l.issue_item?.thumbnailUrl || l.item.thumbnailUrl}
+                                                        categoryName={l.issue_item?.category || l.item.category}
+                                                        unit={l.issue_item?.unit || l.item.unit}
                                                       />
                                                     ) : (
                                                       <p className="font-bold text-slate-800 text-sm whitespace-normal">N/A</p>
                                                     )}
                                                     <div className="flex items-center gap-2 mt-1">
-                                                       <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-black tracking-widest">{l.replacementItem?.mvpp || l.item.mvpp}</span>
-                                                       {l.replacementItemId && <span className="text-[9px] font-black bg-indigo-100 text-indigo-600 px-1 py-0.5 rounded uppercase">Đã thay thế</span>}
+                                                       <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-black tracking-widest">{l.issue_item?.mvpp || l.item.mvpp}</span>
+                                                       {l.issue_item?.id !== l.item.id && (
+                                                           <span className="text-[9px] font-black bg-indigo-100 text-indigo-600 px-1 py-0.5 rounded uppercase">
+                                                               {l.replacement_source === 'receipt_replacement' || l.replacement_source === 'receipt' ? 'Đã đổi ở kho' : 'Đã thay thế'}
+                                                           </span>
+                                                       )}
                                                        <span className="text-[10px] font-bold text-indigo-500 flex items-center gap-1"><Archive className="w-3 h-3"/> Kho: {data.warehouseCode}</span>
                                                     </div>
+                                                    {l.issue_item?.id !== l.item.id && (
+                                                         <div className="text-[10px] text-slate-400 italic mt-0.5">
+                                                             Thay thế cho: {l.item.name} ({l.item.mvpp})
+                                                         </div>
+                                                     )}
                                                 </td>
                                                <td className="px-2 py-2">
                                                    <div className="flex flex-col items-center gap-1">
@@ -844,11 +853,11 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                                </td>
 
                                                <td className="px-2 py-2 text-right">
-                                                   <span className="text-xs font-bold text-slate-500">{(l.item.price || 0).toLocaleString('vi-VN')}</span>
+                                                   <span className="text-xs font-bold text-slate-500">{((l.issue_item || l.item).price || 0).toLocaleString('vi-VN')}</span>
                                                </td>
 
                                                <td className="px-2 py-2 text-right">
-                                                   <span className="text-xs font-black text-slate-800">{((l.item.price || 0) * (l.qtyApproved ?? l.qtyRequested)).toLocaleString('vi-VN')}</span>
+                                                   <span className="text-xs font-black text-slate-800">{(((l.issue_item || l.item).price || 0) * (l.qtyApproved ?? l.qtyRequested)).toLocaleString('vi-VN')}</span>
                                                </td>
                                                <td className="px-2 py-2 text-center">
                                                    <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest border ${getLineStatusColor(l.status)}`}>
@@ -2105,10 +2114,10 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                     return (
                       <>
                         {filteredLines.map((l: any, idx: number) => {
-                          const displayItem = l.replacementItem || l.item;
-                           const isReplaced = !!l.replacementItemId;
-                           const displayQtyRequested = l.qtyRequested;
-                           const displayQtyApproved = l.replacementQty ?? l.qtyApproved;
+                           const displayItem = l.issue_item || l.item;
+                            const isReplaced = l.issue_item?.id !== l.item.id;
+                            const displayQtyRequested = l.qtyRequested;
+                            const displayQtyApproved = l.replacementQty ?? l.qtyApproved;
 
                            return (
                            <tr key={l.id} className="h-10">
@@ -2156,7 +2165,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                             </td>
                             <td className="border border-black p-2 text-right" colSpan={2}>
                                 {filteredLines.reduce((sum: number, line: any) => {
-                                  const item = line.replacementItem || line.item;
+                                  const item = line.issue_item || line.item;
                                   const qty = line.replacementQty ?? line.qtyApproved ?? line.qtyRequested;
                                   return sum + ((item.price || 0) * qty);
                                 }, 0).toLocaleString('vi-VN')} VNĐ

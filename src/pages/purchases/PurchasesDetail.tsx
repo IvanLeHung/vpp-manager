@@ -314,9 +314,9 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
   // Financial Stats
   const totalAmount = data.lines?.reduce((sum: number, l: any) => {
       const qtyReq = l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested;
-      const isReplaced = !!l.requestLine?.replacementItemId;
-      const effectivePrice = isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0);
-      const effectiveQty = isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyReq;
+      const isReplaced = !!l.requestLine?.replacementItemId || !!l.receiptReplacementItem;
+      const effectivePrice = l.receiptReplacementItem ? Number(l.receiptReplacementPrice || 0) : (isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0));
+      const effectiveQty = l.receiptReplacementItem ? Number(l.receiptReplacementQty || 0) : (isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyReq);
       return sum + (effectivePrice * effectiveQty);
   }, 0) || Number(data.totalAmount || 0);
   const vatAmount = totalAmount * (Number(data.vat || 0) / 100);
@@ -594,17 +594,18 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                   .map((l:any, idx:number) => {
                                     const qtyReq = l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested;
                                     
-                                    // Replacement Info from RequestLine
-                                    const isReplaced = !!l.requestLine?.replacementItemId;
-                                    const origItem = l.requestLine?.item;
-                                    const origPrice = Number(l.requestLine?.unitPrice || origItem?.price || 0);
-                                    const origQty = Number(l.requestLine?.qtyApproved || l.requestLine?.qtyRequested || 0);
+                                    // Replacement Info from RequestLine/ReceiptLine
+                                    const isReplaced = !!l.requestLine?.replacementItemId || !!l.receiptReplacementItem;
+                                    const origItem = l.receiptReplacementItem ? (l.requestLine?.replacementItemId ? l.requestLine?.replacementItem : l.item) : l.requestLine?.item;
+                                    const origPrice = l.receiptReplacementItem ? (l.requestLine?.replacementItemId ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0)) : Number(l.requestLine?.unitPrice || origItem?.price || 0);
+                                    const origQty = l.receiptReplacementItem ? (l.requestLine?.replacementItemId ? Number(l.requestLine?.replacementQty || 0) : qtyReq) : Number(l.requestLine?.qtyApproved || l.requestLine?.qtyRequested || 0);
                                     const origTotal = origPrice * origQty;
                                     
                                     const isPending = l.requestLine?.status === 'REPLACEMENT_PENDING_ADMIN';
-                                    const effectiveItem = isReplaced ? l.requestLine?.replacementItem : l.item;
-                                    const effectivePrice = isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0);
-                                    const effectiveQty = isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyReq;
+                                    const effectiveItem = l.receiptReplacementItem || (isReplaced ? l.requestLine?.replacementItem : l.item);
+                                    const effectivePrice = l.receiptReplacementItem ? Number(l.receiptReplacementPrice || 0) : (isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0));
+                                    const effectiveQty = l.receiptReplacementItem ? Number(l.receiptReplacementQty || 0) : (isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyReq);
+                                    const replacementReason = l.receiptReplacementItem ? l.receiptReplacementReason : l.requestLine?.replacementReason;
                                     const progress = effectiveQty > 0 ? Math.min(100, Math.round((l.qtyReceived / effectiveQty) * 100)) : 0;
                                     const effectiveAmount = effectivePrice * effectiveQty;
                                     
@@ -769,7 +770,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                             </div>
                                             <div className="col-span-2">
                                               <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Lý do thay thế</p>
-                                              <p className="text-[11px] font-medium text-slate-600 italic">"{l.requestLine?.replacementReason || 'Không có lý do'}"</p>
+                                              <p className="text-[11px] font-medium text-slate-600 italic">"{replacementReason || 'Không có lý do'}"</p>
                                                {isAdmin && isPending && (
                                                  <div className="mt-3 flex gap-2 justify-end border-t border-slate-100 pt-3">
                                                     <button 
@@ -1719,11 +1720,12 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                     return (
                       <>
                         {filteredLines.map((l: any, idx: number) => {
-                            const isReplaced = !!l.requestLine?.replacementItemId;
-                            const effectiveItem = isReplaced ? l.requestLine.replacementItem : l.item;
                             const qtyActual = l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested;
-                            const effectiveQty = isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyActual;
-                            const effectivePrice = isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0);
+                            const isReplaced = !!l.requestLine?.replacementItemId || !!l.receiptReplacementItem;
+                            const origItem = l.receiptReplacementItem ? (l.requestLine?.replacementItemId ? l.requestLine?.replacementItem : l.item) : l.requestLine?.item;
+                            const effectiveItem = l.receiptReplacementItem || (isReplaced ? l.requestLine.replacementItem : l.item);
+                            const effectiveQty = l.receiptReplacementItem ? Number(l.receiptReplacementQty || 0) : (isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyActual);
+                            const effectivePrice = l.receiptReplacementItem ? Number(l.receiptReplacementPrice || 0) : (isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0));
                             const effectiveAmount = effectivePrice * effectiveQty;
 
                             return (
@@ -1733,9 +1735,9 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                                 <td className="p-2 border-r border-slate-400">
                                     <div className="flex flex-col">
                                         <span className="font-bold text-[11px] uppercase">{effectiveItem?.name || l.item.name}</span>
-                                        {isReplaced && (
+                                        {isReplaced && origItem && (
                                             <span className="text-[8px] text-slate-500 italic mt-0.5">
-                                                (Thay cho: {l.item.name})
+                                                (Thay cho: {origItem.name})
                                             </span>
                                         )}
                                     </div>
@@ -1751,15 +1753,17 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                             <td colSpan={4} className="p-3 text-right">Tổng cộng (Đã bao gồm VAT {data.vat}%):</td>
                             <td className="text-center p-3 border-x border-slate-900">{filteredLines.reduce((sum: number, l: any) => {
                                 const qtyActual = l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested;
-                                return sum + (!!l.requestLine?.replacementItemId ? Number(l.requestLine?.replacementQty || 0) : qtyActual);
+                                const isReplaced = !!l.requestLine?.replacementItemId || !!l.receiptReplacementItem;
+                                const effectiveQty = l.receiptReplacementItem ? Number(l.receiptReplacementQty || 0) : (isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyActual);
+                                return sum + effectiveQty;
                             }, 0)}</td>
                             <td className="p-3 text-right" colSpan={2}>
                                 {(() => {
                                     const subTotal = filteredLines.reduce((sum: number, l: any) => {
-                                        const isReplaced = !!l.requestLine?.replacementItemId;
-                                        const effectivePrice = isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0);
+                                        const isReplaced = !!l.requestLine?.replacementItemId || !!l.receiptReplacementItem;
+                                        const effectivePrice = l.receiptReplacementItem ? Number(l.receiptReplacementPrice || 0) : (isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0));
                                         const qtyActual = l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested;
-                                        const effectiveQty = isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyActual;
+                                        const effectiveQty = l.receiptReplacementItem ? Number(l.receiptReplacementQty || 0) : (isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyActual);
                                         return sum + (effectivePrice * effectiveQty);
                                     }, 0);
                                     const vatAmount = subTotal * (data.vat / 100);
@@ -1782,7 +1786,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                   return type === selectedPrintType;
               });
 
-              if (!filteredLines.some((l: any) => !!l.requestLine?.replacementItemId)) return null;
+              if (!filteredLines.some((l: any) => !!l.requestLine?.replacementItemId || !!l.receiptReplacementItem)) return null;
 
               const approvedTotal = filteredLines.reduce((sum: number, l: any) => {
                   const origPrice = Number(l.requestLine?.unitPrice || l.requestLine?.item?.price || 0);
@@ -1791,10 +1795,10 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
               }, 0);
 
               const actualTotal = filteredLines.reduce((sum: number, l: any) => {
-                  const isReplaced = !!l.requestLine?.replacementItemId;
-                  const effectivePrice = isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0);
+                  const isReplaced = !!l.requestLine?.replacementItemId || !!l.receiptReplacementItem;
+                  const effectivePrice = l.receiptReplacementItem ? Number(l.receiptReplacementPrice || 0) : (isReplaced ? Number(l.requestLine?.replacementPrice || 0) : Number(l.unitPrice || 0));
                   const qtyActual = l.qtyOrdered ?? l.qtyApproved ?? l.qtyRequested;
-                  const effectiveQty = isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyActual;
+                  const effectiveQty = l.receiptReplacementItem ? Number(l.receiptReplacementQty || 0) : (isReplaced ? Number(l.requestLine?.replacementQty || 0) : qtyActual);
                   return sum + (effectivePrice * effectiveQty);
               }, 0);
 
