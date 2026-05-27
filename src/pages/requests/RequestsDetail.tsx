@@ -1051,10 +1051,24 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
                       {/* --- THAO TÁC CỦA KHO --- */}
                       {(isWarehouse || currentUser.role === 'ADMIN' || currentUser.role === 'WAREHOUSE') && ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED', 'PARTIAL_ADMIN_APPROVED', 'BACKORDER', 'PARTIALLY_DELIVERED', 'PENDING_REMAINING_DELIVERY'].includes(data.status) && (
-                           <button onClick={() => openIssueModal()} className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/40 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-emerald-500"><Archive className="w-6 h-6 mr-2"/> CẤP PHÁT CHO NHÂN SỰ</button>
+                           <>
+                             <button onClick={() => openIssueModal()} className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/40 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-emerald-500"><Archive className="w-6 h-6 mr-2"/> CẤP PHÁT CHO NHÂN SỰ</button>
+                             
+                             {(currentUser.role === 'ADMIN' || currentUser.role === 'WAREHOUSE') && ['PARTIALLY_ISSUED', 'PARTIALLY_DELIVERED', 'WAITING_HANDOVER', 'READY_TO_ISSUE', 'APPROVED', 'BACKORDER'].includes(data.status) && (
+                               <button 
+                                 onClick={() => {
+                                   const reason = prompt('Nhập lý do không giao nữa / đóng phiếu:');
+                                   if (reason !== null) {
+                                     handleAction('/close-remaining', { reason }, 'Đóng phiếu thành công (không giao nữa)!');
+                                   }
+                                 }} 
+                                 className="w-full py-3.5 bg-rose-600 text-white rounded-xl font-black hover:bg-rose-700 transition shadow-lg shadow-rose-500/40 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-rose-500"
+                               >
+                                 <StopCircle className="w-5 h-5 mr-2"/> KHÔNG GIAO NỮA (ĐÓNG PHIẾU)
+                               </button>
+                             )}
+                           </>
                       )}
-
-                      {/* --- TẠO MUA SẮM (AUTO PO) --- */}
                       {currentUser.role === 'ADMIN' && 
                        ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED'].includes(data.status) &&
                        data.lines.some((l:any) => l.qtyRequested > (l.qtyApproved ?? 0)) &&
