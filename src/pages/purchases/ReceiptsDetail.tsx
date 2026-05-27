@@ -365,8 +365,6 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
 
   if (loading || !data) return <div className="p-10 flex justify-center"><div className="w-8 h-8 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin"></div></div>;
 
-  const isPending = data.status === 'PENDING' || data.status === 'PARTIAL_RECEIVED' || data.status === 'PARTIALLY_RECEIVED' || data.status === 'DRAFT';
-
   // Checking for discrepancies
   const totalExpected = data.lines.reduce((s: number, l: any) => s + l.qtyOrdered, 0);
   const totalReceivedOriginal = data.lines.reduce((s: number, l: any) => s + (l.qtyOrdered > 0 ? (l.qtyConfirmed || 0) : 0), 0);
@@ -378,6 +376,9 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
   const totalOrdered = totalExpected;
   const totalConfirmed = totalHandled;
   const remainingQty = totalRemaining;
+
+  const isPending = data.status === 'PENDING' || data.status === 'PARTIAL_RECEIVED' || data.status === 'PARTIALLY_RECEIVED' || data.status === 'DRAFT' || (data.status === 'COMPLETED' && totalRemaining > 0);
+  const displayStatus = (data.status === 'COMPLETED' && totalRemaining > 0) ? 'PARTIAL_RECEIVED' : data.status;
 
   const currentInputActual = reconcileValues.reduce((s: number, v: any) => s + (v.actualQty || 0), 0);
   const currentDefective = reconcileValues.reduce((s: number, v: any) => s + (v.qtyDefective || 0), 0);
@@ -465,18 +466,18 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
 
         <div className="flex items-center gap-3">
           <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-            data.status === 'COMPLETED' || data.status === 'FULL_RECEIVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-            data.status === 'COMPLETED_WITH_SHORTAGE' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-            data.status === 'PARTIALLY_RECEIVED' || data.status === 'PARTIAL_RECEIVED' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
-            data.status === 'DISCREPANCY' || data.status === 'HAS_ERROR' ? 'bg-rose-50 text-rose-600 border-rose-100' : 
-            data.status === 'CANCELLED' ? 'bg-slate-100 text-slate-400 border-slate-200' : 
+            displayStatus === 'COMPLETED' || displayStatus === 'FULL_RECEIVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+            displayStatus === 'COMPLETED_WITH_SHORTAGE' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+            displayStatus === 'PARTIALLY_RECEIVED' || displayStatus === 'PARTIAL_RECEIVED' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
+            displayStatus === 'DISCREPANCY' || displayStatus === 'HAS_ERROR' ? 'bg-rose-50 text-rose-600 border-rose-100' : 
+            displayStatus === 'CANCELLED' ? 'bg-slate-100 text-slate-400 border-slate-200' : 
             'bg-amber-50 text-amber-600 border-amber-100'
           }`}>
-            {data.status === 'PENDING' ? 'Chờ kiểm hàng' : 
-             data.status === 'PARTIALLY_RECEIVED' || data.status === 'PARTIAL_RECEIVED' ? 'Nhập một phần' : 
-             data.status === 'COMPLETED' || data.status === 'FULL_RECEIVED' ? 'Đã nhập kho' : 
-             data.status === 'COMPLETED_WITH_SHORTAGE' ? 'Hoàn tất thiếu' :
-             data.status === 'CANCELLED' ? 'Đã hủy' : 'Lệch / Lỗi'}
+            {displayStatus === 'PENDING' ? 'Chờ kiểm hàng' : 
+             displayStatus === 'PARTIALLY_RECEIVED' || displayStatus === 'PARTIAL_RECEIVED' ? 'Nhập một phần' : 
+             displayStatus === 'COMPLETED' || displayStatus === 'FULL_RECEIVED' ? 'Đã nhập kho' : 
+             displayStatus === 'COMPLETED_WITH_SHORTAGE' ? 'Hoàn tất thiếu' :
+             displayStatus === 'CANCELLED' ? 'Đã hủy' : 'Lệch / Lỗi'}
           </span>
 
           <div className="flex items-center gap-2">
@@ -491,7 +492,7 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                 {remainingQty > 0 ? (
                   <>
                     <button onClick={() => handleConfirm('PARTIAL')} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg transition uppercase tracking-wide shadow-sm">
-                      Xác nhận nhập phần đã nhận
+                      {data.status === 'COMPLETED' ? 'Nhập kho phần còn lại' : 'Xác nhận nhập phần đã nhận'}
                     </button>
                     {hasCloseShortagePermission && (
                       <button onClick={() => setShortageModal({ open: true, reason: 'Nhà cung cấp không giao đủ', note: '' })} className="h-9 px-4 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold rounded-lg transition uppercase tracking-wide shadow-sm">

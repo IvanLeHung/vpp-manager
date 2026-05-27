@@ -20,16 +20,18 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
                         (d.poId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                         (d.supplier || '').toLowerCase().includes(searchTerm.toLowerCase());
     
+    const displayStatus = (d.status === 'COMPLETED' && (d.totalRemaining || 0) > 0) ? 'PARTIAL_RECEIVED' : d.status;
+    
     let matchTab = true;
     if (activeTab === 'ALL') matchTab = true;
     else if (activeTab === 'PENDING') {
-      matchTab = d.status === 'PENDING' || d.status === 'PARTIAL_RECEIVED' || d.status === 'PARTIALLY_RECEIVED';
+      matchTab = displayStatus === 'PENDING' || displayStatus === 'PARTIAL_RECEIVED' || displayStatus === 'PARTIALLY_RECEIVED';
     } else if (activeTab === 'COMPLETED') {
-      matchTab = d.status === 'COMPLETED' || d.status === 'FULL_RECEIVED';
+      matchTab = displayStatus === 'COMPLETED' || displayStatus === 'FULL_RECEIVED';
     } else if (activeTab === 'DISCREPANCY') {
-      matchTab = d.status === 'DISCREPANCY' || d.status === 'HAS_ERROR';
+      matchTab = displayStatus === 'DISCREPANCY' || displayStatus === 'HAS_ERROR';
     } else {
-      matchTab = d.status === activeTab;
+      matchTab = displayStatus === activeTab;
     }
 
     return matchSearch && matchTab;
@@ -102,7 +104,10 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition group" onClick={()=>setActiveTab('PENDING')}>
                     <div className="flex justify-between items-start mb-4">
                         <div className="p-3 bg-amber-50 text-amber-500 rounded-xl group-hover:scale-110 transition shrink-0"><Clock className="w-6 h-6"/></div>
-                        <h3 className="text-3xl font-black text-slate-800">{data.filter(d => d.status === 'PENDING' || d.status === 'PARTIAL_RECEIVED' || d.status === 'PARTIALLY_RECEIVED').length}</h3>
+                        <h3 className="text-3xl font-black text-slate-800">{data.filter(d => {
+                            const ds = (d.status === 'COMPLETED' && (d.totalRemaining || 0) > 0) ? 'PARTIAL_RECEIVED' : d.status;
+                            return ds === 'PENDING' || ds === 'PARTIAL_RECEIVED' || ds === 'PARTIALLY_RECEIVED';
+                        }).length}</h3>
                     </div>
                     <p className="font-bold text-slate-500 text-sm">Chờ Kiểm Hàng / Nhập</p>
                 </div>
@@ -110,7 +115,10 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition group" onClick={()=>setActiveTab('DISCREPANCY')}>
                     <div className="flex justify-between items-start mb-4">
                         <div className="p-3 bg-rose-50 text-rose-500 rounded-xl group-hover:scale-110 transition shrink-0"><AlertTriangle className="w-6 h-6"/></div>
-                        <h3 className="text-3xl font-black text-rose-600">{data.filter(d => d.status === 'DISCREPANCY' || d.status === 'HAS_ERROR').length}</h3>
+                        <h3 className="text-3xl font-black text-rose-600">{data.filter(d => {
+                            const ds = (d.status === 'COMPLETED' && (d.totalRemaining || 0) > 0) ? 'PARTIAL_RECEIVED' : d.status;
+                            return ds === 'DISCREPANCY' || ds === 'HAS_ERROR';
+                        }).length}</h3>
                     </div>
                     <p className="font-bold text-slate-500 text-sm">Nhập Kho Có Lệch/Lỗi</p>
                 </div>
@@ -118,7 +126,10 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition group" onClick={()=>setActiveTab('COMPLETED')}>
                     <div className="flex justify-between items-start mb-4">
                         <div className="p-3 bg-emerald-50 text-emerald-500 rounded-xl group-hover:scale-110 transition shrink-0"><CheckCircle className="w-6 h-6"/></div>
-                        <h3 className="text-3xl font-black text-slate-800">{data.filter(d => d.status === 'COMPLETED' || d.status === 'FULL_RECEIVED').length}</h3>
+                        <h3 className="text-3xl font-black text-slate-800">{data.filter(d => {
+                            const ds = (d.status === 'COMPLETED' && (d.totalRemaining || 0) > 0) ? 'PARTIAL_RECEIVED' : d.status;
+                            return ds === 'COMPLETED' || ds === 'FULL_RECEIVED';
+                        }).length}</h3>
                     </div>
                     <p className="font-bold text-slate-500 text-sm">Đã Nhập Kho</p>
                 </div>
@@ -203,7 +214,7 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
                                         <p className="font-bold text-slate-700 text-sm max-w-[200px] truncate">{d.supplier || <span className="text-slate-400 italic">No supplier info</span>}</p>
                                     </td>
                                     <td className="p-4 text-center">
-                                        {getStatusBadge(d.status)}
+                                        {getStatusBadge((d.status === 'COMPLETED' && (d.totalRemaining || 0) > 0) ? 'PARTIAL_RECEIVED' : d.status)}
                                     </td>
                                     <td className="p-4">
                                         <p className="text-xs font-bold text-slate-600 flex items-center"><Calendar className="w-3.5 h-3.5 mr-1.5 text-slate-400"/> {new Date(d.createdAt).toLocaleDateString('vi-VN')}</p>
