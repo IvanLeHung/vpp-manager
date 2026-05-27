@@ -3,7 +3,8 @@ import api from '../../lib/api';
 import { 
   Search, Plus, DollarSign,
   ShoppingCart, Package, Clock, ChevronRight, Truck, User as UserIcon,
-  Printer, CheckSquare, ChevronDown, FileText, AlertTriangle, X, CheckCircle, Download, Eye
+  Printer, CheckSquare, ChevronDown, FileText, AlertTriangle, X, CheckCircle, Download, Eye,
+  Archive
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import * as docx from 'docx';

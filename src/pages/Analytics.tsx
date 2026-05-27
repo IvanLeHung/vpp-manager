@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, Fragment } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -9,7 +10,8 @@ import {
   TrendingUp, Download, Clock, CheckCircle, RefreshCw, 
   FileText, Printer, ArrowUpRight, ArrowDownRight, Package, 
   Activity, AlertTriangle, PlusCircle, Search, RefreshCcw, 
-  X, CheckCircle2, User, ChevronDown, Landmark, Building2, HelpCircle
+  X, CheckCircle2, User, ChevronDown, Landmark, Building2, HelpCircle,
+  ExternalLink, AlertCircle
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toast } from 'react-toastify';
@@ -125,6 +127,7 @@ const INITIAL_TICKETS: DeliveryTicket[] = [
 
 export default function Analytics() {
   const { currentUser } = useAppContext();
+  const navigate = useNavigate();
   const [tickets, setTickets] = useState<DeliveryTicket[]>([]);
   
   const departmentsList = useMemo(() => {
@@ -1073,6 +1076,55 @@ export default function Analytics() {
     return 'Chưa nhận';
   };
 
+  // ── DISCREPANCY ANALYSIS: dòng hàng có chênh lệch trong các phiếu đang lọc ──
+  const discrepancyRows = useMemo(() => {
+    const rows: {
+      ticketId: string;
+      ticketDate: string;
+      department: string;
+      itemName: string;
+      unit: string;
+      qtyRequested: number;
+      qtyApproved: number;
+      qtyReceived: number;
+      diffReqApproved: number;  // đề xuất - được duyệt
+      diffApprovedReceived: number; // được duyệt - thực nhận
+      status: VppItem['status'];
+      note: string;
+    }[] = [];
+
+    filteredTickets.forEach(t => {
+      t.items.forEach(item => {
+        const diffReqApproved = item.qtyRequested - item.qtyApproved;
+        const diffApprovedReceived = item.qtyApproved - item.qtyReceived;
+        // Chỉ đưa vào nếu có chênh lệch ở bất kỳ bước nào
+        if (diffReqApproved !== 0 || diffApprovedReceived !== 0) {
+          rows.push({
+            ticketId: t.id,
+            ticketDate: t.date,
+            department: t.department,
+            itemName: item.name,
+            unit: item.unit,
+            qtyRequested: item.qtyRequested,
+            qtyApproved: item.qtyApproved,
+            qtyReceived: item.qtyReceived,
+            diffReqApproved,
+            diffApprovedReceived,
+            status: item.status,
+            note: item.note
+          });
+        }
+      });
+    });
+
+    return rows;
+  }, [filteredTickets]);
+
+  // Helper: navigate directly to the Request detail page
+  const navigateToPDX = (ticketId: string) => {
+    navigate(`/requests/${ticketId}`);
+  };
+
   return (
     <div className="w-full max-w-full min-w-0 overflow-x-hidden p-4 lg:p-6 bg-slate-50 relative flex flex-col gap-6 box-border">
       
@@ -1929,17 +1981,10 @@ export default function Analytics() {
                       <td className="p-4 text-right font-bold text-emerald-600 tabular-nums">{item.qtyReceived}</td>
                       <td className="p-4 text-right font-bold text-amber-600 tabular-nums">{item.remaining}</td>
                       <td className="p-4 text-center">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${getStatusBadgeClass(item.status)}`}>
-                          {item.status}
-                        </span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${getStatusBadgeClass(item.status)}`}>{item.status}</span>
                       </td>
                       <td className="p-4 text-center">
-                        <button 
-                          onClick={() => openConfirmSingleItemModal(item.name)}
-                          className="px-3 py-1 bg-indigo-50 border border-indigo-200 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all cursor-pointer"
-                        >
-                          Xác nhận
-                        </button>
+                        <button onClick={() => openConfirmSingleItemModal(item.name)} className="px-3 py-1 bg-indigo-50 border border-indigo-200 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all cursor-pointer">Xác nhận</button>
                       </td>
                       <td className="p-4 text-slate-400 italic text-[11px] max-w-xs truncate" title={item.note}>{item.note || '-'}</td>
                     </tr>
@@ -1949,12 +1994,12 @@ export default function Analytics() {
                   <tfoot className="bg-slate-900 text-white font-black text-xs uppercase tracking-wider italic">
                     <tr>
                       <td className="p-4 text-center"></td>
-                      <td className="p-4" colSpan={2}>TỔNG CỘNG</td>
+                      <td className="p-4" colSpan={2}>T\u1ed4NG C\u1ed8NG</td>
                       <td className="p-4 text-right tabular-nums">{stats.totalRequested}</td>
                       <td className="p-4 text-right tabular-nums">{stats.totalApproved}</td>
                       <td className="p-4 text-right text-emerald-400 tabular-nums">{stats.totalReceived}</td>
                       <td className="p-4 text-right text-amber-400 tabular-nums">{stats.totalMissing}</td>
-                      <td className="p-4 text-center text-indigo-300" colSpan={2}>{stats.receiveRate}% thực nhận</td>
+                      <td className="p-4 text-center text-indigo-300" colSpan={2}>{stats.receiveRate}% th\u1ef1c nh\u1eadn</td>
                       <td className="p-4"></td>
                     </tr>
                   </tfoot>
@@ -1962,9 +2007,143 @@ export default function Analytics() {
               </table>
             </div>
           </div>
+
+          {/* TAB 3: BẢNG RÀ SOÁT CHÊNH LỆCH SỐ LIỆU */}
+          <div className="bg-white rounded-3xl border border-amber-200 shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-amber-100 bg-amber-50/60 flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-500" />
+                <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest italic">3. Rà soát chênh lệch số liệu</h4>
+                <span className="text-[9px] font-bold text-slate-400 italic">(Đề xuất / Được duyệt / Thực nhận)</span>
+              </div>
+              <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border ${discrepancyRows.length > 0 ? 'bg-amber-100 border-amber-200 text-amber-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
+                {discrepancyRows.length > 0 ? `${discrepancyRows.length} dòng có chênh lệch` : 'Không có chênh lệch'}
+              </span>
+            </div>
+            {discrepancyRows.length === 0 ? (
+              <div className="p-12 text-center">
+                <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
+                <p className="text-sm font-bold text-emerald-600 uppercase tracking-wider">Không có chênh lệch số liệu</p>
+                <p className="text-xs font-medium text-slate-400 mt-1 italic">Tất cả các món hàng đều có số liệu khớp nhau</p>
+              </div>
+            ) : (
+              <div className="table-wrapper">
+                <table className="min-w-[1100px] w-full text-left">
+                  <thead>
+                    <tr className="bg-amber-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-amber-100">
+                      <th className="p-3 text-center w-8">STT</th>
+                      <th className="p-3">Số phiếu (PDX)</th>
+                      <th className="p-3">Ngày tạo</th>
+                      <th className="p-3">Phòng ban</th>
+                      <th className="p-3">Món hàng</th>
+                      <th className="p-3 text-center">ĐVT</th>
+                      <th className="p-3 text-right">Đề xuất</th>
+                      <th className="p-3 text-right">Được duyệt (Admin)</th>
+                      <th className="p-3 text-right">Thực nhận</th>
+                      <th className="p-3 text-right">CL ĐX⇒Duyệt</th>
+                      <th className="p-3 text-right">CL Duyệt⇒Nhận</th>
+                      <th className="p-3 text-center">Trạng thái</th>
+                      <th className="p-3 text-center">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-amber-50/50 text-xs font-semibold text-slate-700">
+                    {discrepancyRows.map((row, idx) => {
+                      const isReducedByApproval = row.diffReqApproved > 0;
+                      const isNotFullyReceived = row.diffApprovedReceived > 0;
+                      return (
+                        <tr key={idx} className={`hover:bg-amber-50/40 transition-colors ${(isReducedByApproval || isNotFullyReceived) ? '' : 'opacity-70'}`}>
+                          <td className="p-3 text-center text-slate-400 font-bold">{idx + 1}</td>
+                          <td className="p-3">
+                            <span className="font-mono font-black text-[10px] text-indigo-700 uppercase">{row.ticketId}</span>
+                          </td>
+                          <td className="p-3 font-mono text-slate-500">{row.ticketDate}</td>
+                          <td className="p-3 text-slate-700">{row.department}</td>
+                          <td className="p-3 font-bold text-slate-900">{row.itemName}</td>
+                          <td className="p-3 text-center uppercase text-slate-500 text-[10px]">{row.unit}</td>
+                          <td className="p-3 text-right tabular-nums font-bold text-slate-700">{row.qtyRequested}</td>
+                          <td className="p-3 text-right tabular-nums font-bold text-blue-600">{row.qtyApproved}</td>
+                          <td className="p-3 text-right tabular-nums font-bold text-emerald-600">{row.qtyReceived}</td>
+                          {/* Chênh lệch đề xuất → duyệt */}
+                          <td className="p-3 text-right">
+                            {row.diffReqApproved === 0 ? (
+                              <span className="text-emerald-500 text-[10px] font-black">✓ 0</span>
+                            ) : (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-black tabular-nums border ${
+                                isReducedByApproval
+                                  ? 'bg-orange-50 border-orange-200 text-orange-600'
+                                  : 'bg-blue-50 border-blue-200 text-blue-600'
+                              }`}>
+                                {row.diffReqApproved > 0 ? '-' : '+'}{Math.abs(row.diffReqApproved)}
+                              </span>
+                            )}
+                          </td>
+                          {/* Chênh lệch duyệt → nhận */}
+                          <td className="p-3 text-right">
+                            {row.diffApprovedReceived === 0 ? (
+                              <span className="text-emerald-500 text-[10px] font-black">✓ 0</span>
+                            ) : (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-black tabular-nums border ${
+                                isNotFullyReceived
+                                  ? 'bg-rose-50 border-rose-200 text-rose-600'
+                                  : 'bg-blue-50 border-blue-200 text-blue-600'
+                              }`}>
+                                {row.diffApprovedReceived > 0 ? '-' : '+'}{Math.abs(row.diffApprovedReceived)}
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${getStatusBadgeClass(row.status)}`}>
+                              {row.status}
+                            </span>
+                          </td>
+                          <td className="p-3 text-center">
+                            <button
+                              onClick={() => navigateToPDX(row.ticketId)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-lg transition-all cursor-pointer text-[10px] font-black uppercase tracking-wider"
+                              title="Đi đến Phiếu Đề Xuất tương ứng"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              Đến PĐX
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="bg-amber-50 border-t border-amber-100">
+                    <tr>
+                      <td colSpan={6} className="p-3 text-[10px] font-black text-amber-700 uppercase tracking-wider">
+                        TỔNG CỘNG
+                      </td>
+                      <td className="p-3 text-right font-black text-slate-700 tabular-nums">
+                        {discrepancyRows.reduce((s, r) => s + r.qtyRequested, 0)}
+                      </td>
+                      <td className="p-3 text-right font-black text-blue-600 tabular-nums">
+                        {discrepancyRows.reduce((s, r) => s + r.qtyApproved, 0)}
+                      </td>
+                      <td className="p-3 text-right font-black text-emerald-600 tabular-nums">
+                        {discrepancyRows.reduce((s, r) => s + r.qtyReceived, 0)}
+                      </td>
+                      <td className="p-3 text-right">
+                        <span className="font-black text-orange-600 tabular-nums">
+                          -{discrepancyRows.filter(r => r.diffReqApproved > 0).reduce((s, r) => s + r.diffReqApproved, 0)}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right">
+                        <span className="font-black text-rose-600 tabular-nums">
+                          -{discrepancyRows.filter(r => r.diffApprovedReceived > 0).reduce((s, r) => s + r.diffApprovedReceived, 0)}
+                        </span>
+                      </td>
+                      <td colSpan={2} className="p-3"></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       ) : (
-        /* TAB 3: DANH SÁCH PHIẾU GIAO NHẬN VPP */
+
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden no-print animate-in fade-in duration-300">
           <div className="p-6 border-b border-slate-100 bg-slate-50/50">
             <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest italic">Danh sách toàn bộ phiếu đề xuất & giao nhận VPP</h4>
@@ -1974,13 +2153,14 @@ export default function Analytics() {
               <thead>
                 <tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
                   <th className="p-4">Số phiếu đề xuất</th>
-                  <th className="p-4">Ngày đề xuất</th>
+                  <th className="p-4">Ngày tạo</th>
                   <th className="p-4">Phòng ban</th>
                   <th className="p-4">Người đề xuất</th>
-                  <th className="p-4">Người duyệt</th>
-                  <th className="p-4">Ngày duyệt</th>
-                  <th className="p-4 text-center">Trạng thái duyệt</th>
-                  <th className="p-4 text-center">Trạng thái giao nhận</th>
+                  <th className="p-4 text-right">Đề xuất</th>
+                  <th className="p-4 text-right">Được duyệt</th>
+                  <th className="p-4 text-right">Thực nhận</th>
+                  <th className="p-4 text-right">Chênh lệch</th>
+                  <th className="p-4 text-center">Trạng thái</th>
                   <th className="p-4 text-right">Thao tác</th>
                 </tr>
               </thead>
@@ -1988,18 +2168,34 @@ export default function Analytics() {
                 {filteredTickets.length === 0 && (
                   <tr><td colSpan={9} className="p-10 text-center text-slate-400 italic">Không tìm thấy phiếu nào phù hợp bộ lọc</td></tr>
                 )}
-                {filteredTickets.map(t => (
-                  <tr key={t.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="p-4 font-bold text-slate-900 font-mono uppercase">{t.id}</td>
-                    <td className="p-4 font-mono">{t.date}</td>
-                    <td className="p-4 text-slate-900">{t.department}</td>
-                    <td className="p-4">{t.requester}</td>
-                    <td className="p-4">{t.approver}</td>
-                    <td className="p-4 font-mono">{t.approvalDate}</td>
-                    <td className="p-4 text-center">
-                      <span className="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 font-black border border-emerald-100 uppercase text-[9px] tracking-wider">
-                        {t.approvalStatus}
-                      </span>
+                {filteredTickets.map(t => {
+                  const sumRequested = t.items.reduce((s, i) => s + i.qtyRequested, 0);
+                  const sumApproved = t.items.reduce((s, i) => s + i.qtyApproved, 0);
+                  const sumReceived = t.items.reduce((s, i) => s + i.qtyReceived, 0);
+                  const gap = sumApproved - sumReceived;
+                  const hasDiscrepancy = t.items.some(i => i.qtyRequested !== i.qtyApproved || i.qtyApproved !== i.qtyReceived);
+                  return (
+                  <tr key={t.id} className={`hover:bg-slate-50/50 transition-colors ${hasDiscrepancy ? 'bg-amber-50/30' : ''}`}>
+                    <td className="p-4">
+                      <div className="flex items-center gap-2">
+                        {hasDiscrepancy && <AlertCircle className="w-3 h-3 text-amber-500 flex-shrink-0" title="Có chênh lệch số liệu" />}
+                        <span className="font-bold text-slate-900 font-mono uppercase text-[10px]">{t.id}</span>
+                      </div>
+                    </td>
+                    <td className="p-4 font-mono text-xs">{t.date}</td>
+                    <td className="p-4 text-slate-900 text-xs">{t.department}</td>
+                    <td className="p-4 text-xs">{t.requester}</td>
+                    <td className="p-4 text-right tabular-nums font-bold text-slate-700">{sumRequested}</td>
+                    <td className="p-4 text-right tabular-nums font-bold text-blue-600">{sumApproved}</td>
+                    <td className="p-4 text-right tabular-nums font-bold text-emerald-600">{sumReceived}</td>
+                    <td className="p-4 text-right">
+                      {gap === 0 ? (
+                        <span className="text-[10px] font-black text-emerald-600">0</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-[10px] font-black tabular-nums">
+                          -{gap}
+                        </span>
+                      )}
                     </td>
                     <td className="p-4 text-center">
                       <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${getStatusBadgeClass(t.deliveryStatus)}`}>
@@ -2007,12 +2203,20 @@ export default function Analytics() {
                       </span>
                     </td>
                     <td className="p-4 text-right">
-                      <div className="flex justify-end gap-1.5">
+                      <div className="flex justify-end gap-1.5 flex-wrap">
                         <button 
                           onClick={() => { setSelectedTicket(t); setIsDetailModalOpen(true); }}
                           className="px-2.5 py-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors font-bold text-[10px] uppercase tracking-wider cursor-pointer"
                         >
                           Chi tiết
+                        </button>
+                        <button 
+                          onClick={() => navigateToPDX(t.id)}
+                          className="px-2.5 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors font-bold text-[10px] uppercase tracking-wider cursor-pointer flex items-center gap-1"
+                          title="Đi đến Phiếu Đề Xuất"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          PĐX
                         </button>
                         <button 
                           onClick={() => { setSelectedTicket(t); setTimeout(() => window.print(), 100); }}
@@ -2030,7 +2234,8 @@ export default function Analytics() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
