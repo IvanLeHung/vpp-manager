@@ -553,10 +553,10 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                         </div>
                         <div>
                            <h3 className="text-base font-black text-slate-800 tracking-tight">Danh Mục Văn Phòng Phẩm</h3>
-                           <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 flex items-center gap-1.5">
+                           <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 flex items-center gap-1.5">
                              <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></div>
                              Tổng cộng {data.lines.length} mặt hàng
-                           </p>
+                           </div>
                         </div>
                      </div>
                      <div className="flex items-center gap-2">
