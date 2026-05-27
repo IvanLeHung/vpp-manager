@@ -7,7 +7,7 @@ import {
   TrendingUp, Coins, FileText, AlertTriangle, Download, Trash2,
   ExternalLink, User as UserIcon, Building, Clock, Paperclip,
   Truck, Package, Search, Plus, RotateCcw,
-  ChevronLeft, ChevronRight, Layers, CheckCircle2
+  ChevronLeft, ChevronRight, Layers, CheckCircle2, Archive
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import DocumentChainMap from '../../components/DocumentChainMap';
