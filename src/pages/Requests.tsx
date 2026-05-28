@@ -70,7 +70,7 @@ export default function Requests() {
   }
 
   return (
-    <div className="h-full bg-slate-50 overflow-hidden relative">
+    <div className="flex-1 min-h-0 bg-slate-50 overflow-hidden relative flex flex-col">
       {toast && (
         <div className={`fixed top-4 right-4 z-[100] px-6 py-3 rounded-xl shadow-2xl border flex items-center animate-slide-in font-bold ${
           toast.type === 'success' ? 'bg-emerald-500 text-white border-emerald-400' : 

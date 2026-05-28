@@ -683,10 +683,10 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
   return (
     <>
-      <Layout className="h-full overflow-hidden bg-slate-100 RequestsDetail print:bg-white print:overflow-visible print:h-auto flex flex-row">
+      <Layout className="flex-1 min-h-0 overflow-hidden bg-slate-100 RequestsDetail print:bg-white print:overflow-visible print:h-auto flex flex-row">
         
         {/* LEFT COLUMN: Main Info & Lines */}
-        <Layout.Content className="no-print flex-1 min-h-0 overflow-y-auto p-6 flex flex-col gap-6" style={{ height: '100%' }}>
+        <Layout.Content className="no-print flex-1 min-h-0 overflow-y-auto p-6 flex flex-col gap-6">
           
           {/* TITLE BLOCK CARD */}
           <Card size="small" bodyStyle={{ padding: '16px 24px' }} className="shadow-sm border-slate-200">
