@@ -979,7 +979,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                     columns={columns}
                                     rowKey="id"
                                     pagination={false}
-                                    scroll={{ y: 'calc(100vh - 450px)' }}
+                                    sticky={true}
                                     rowClassName={(record: any) => {
                                         const stocks = record.item.stocks || [];
                                         const reqStock = stocks.find((s: any) => s.warehouseCode === data.warehouseCode) || { quantityOnHand: 0, quantityReserved: 0 };
