@@ -993,7 +993,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                     rowKey="id"
                                     pagination={false}
                                     sticky={true}
-                                    scroll={{ y: 'calc(100vh - 410px)' }}
+                                    scroll={{ x: 'max-content' }}
                                     rowClassName={(record: any) => {
                                         const stocks = record.item.stocks || [];
                                         const reqStock = stocks.find((s: any) => s.warehouseCode === data.warehouseCode) || { quantityOnHand: 0, quantityReserved: 0 };
@@ -1008,7 +1008,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                     )}
 
                     {activeTab === 'deliveries' && (
-                        <div className="p-6 max-h-[calc(100vh-380px)] overflow-y-auto">
+                        <div className="p-6">
                             {(!data.deliveryBatches || data.deliveryBatches.length === 0) ? (
                                 <div className="text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
                                     <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
@@ -1085,7 +1085,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                     )}
 
                     {activeTab === 'history' && (
-                        <div className="p-8 max-h-[calc(100vh-380px)] overflow-y-auto">
+                        <div className="p-8">
                             <div className="relative pl-8 border-l-2 border-slate-100 space-y-8">
                                 <div className="relative">
                                     <div className="absolute -left-[41px] top-1 w-5 h-5 rounded-full bg-slate-300 ring-4 ring-white shadow-sm flex items-center justify-center">
@@ -1139,7 +1139,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                     )}
 
                     {activeTab === 'links' && (
-                        <div className="p-8 max-h-[calc(100vh-380px)] overflow-y-auto">
+                        <div className="p-8">
                             {chainData ? (
                                 <DocumentChainMap chainData={chainData} currentDocType="request" currentDocId={requestId} />
                             ) : (
