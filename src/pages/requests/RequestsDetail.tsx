@@ -8,6 +8,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import DocumentChainMap from '../../components/DocumentChainMap';
 import type { User } from '../../context/AppContext';
 import type { ViewMode } from '../Requests';
+import { Layout, Card, Table, Dropdown, Button } from 'antd';
+import { PrinterOutlined, DownOutlined, ShieldOutlined } from '@ant-design/icons';
+import React from 'react';
 
 interface Props {
   requestId: string;
@@ -441,134 +444,375 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
   const hasRemaining = data?.lines?.some((l: any) => (l.qtyApproved ?? l.qtyRequested) > (l.qtyDelivered || 0));
   const canUrge = (['PARTIALLY_ISSUED', 'APPROVED', 'READY_TO_ISSUE', 'BACKORDER'].includes(data.status)) && currentUid === data.requesterId && hasRemaining;
 
-  return (
-    <div className="flex flex-col h-full bg-slate-100 overflow-hidden relative print:bg-white print:overflow-visible print:h-auto RequestsDetail">
-      {/* HEADER BAR */}
-      <div className="no-print h-20 bg-white border-b border-slate-200 flex justify-between items-center px-6 md:px-10 shrink-0 z-20 shadow-sm">
-          <div className="flex items-center gap-6">
-              <button onClick={handleBack} className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition shadow-inner">
-                  <ArrowLeft className="w-5 h-5"/>
-              </button>
-              <div>
-                  <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center">
-                    {data.id} 
-                    {navigationIds && navigationIds.length > 0 && (
-                      <div className="flex items-center bg-slate-100 rounded-xl p-1 ml-4 border border-slate-200">
-                        <button 
-                          onClick={goPrev}
-                          disabled={!canGoPrev}
-                          className={`p-1.5 rounded-lg transition-all ${canGoPrev ? 'hover:bg-white text-indigo-600 shadow-sm' : 'text-slate-300 cursor-not-allowed'}`}
-                          title="Phiếu trước (Arrow Left)"
-                        >
-                          <ChevronLeft className="w-5 h-5" />
-                        </button>
-                        <span className="px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest min-w-[70px] text-center border-x border-slate-200">
-                          {currentIndex + 1} / {total}
-                        </span>
-                        <button 
-                          onClick={goNext}
-                          disabled={!canGoNext}
-                          className={`p-1.5 rounded-lg transition-all ${canGoNext ? 'hover:bg-white text-indigo-600 shadow-sm' : 'text-slate-300 cursor-not-allowed'}`}
-                          title="Phiếu sau (Arrow Right)"
-                        >
-                          <ChevronRight className="w-5 h-5" />
-                        </button>
-                      </div>
-                    )}
-                    {data.priority === 'Khẩn cấp' && <span className="ml-3 text-[10px] bg-rose-500 text-white px-2 py-0.5 rounded uppercase tracking-wider animate-pulse shadow-sm shadow-rose-500/50">Khẩn cấp</span>}
-                  </h2>
-                  <p className="text-sm font-semibold text-slate-500 mt-0.5">{data.requestType} • Lập lúc {new Date(data.createdAt).toLocaleString('vi-VN')}</p>
-                  {chainData && (
-                    <div className="mt-2">
-                      <LinkedDocumentReferences
-                        request={chainData.request ? { id: chainData.request.id, code: chainData.request.id } : undefined}
-                        purchaseOrder={chainData.purchaseOrder ? { id: chainData.purchaseOrder.id, code: chainData.purchaseOrder.id } : undefined}
-                        receipt={chainData.receipts?.length === 1 ? { id: chainData.receipts[0].id, code: chainData.receipts[0].id } : undefined}
-                        receipts={chainData.receipts?.length > 1 ? chainData.receipts.map((r: any) => ({ id: r.id, code: r.id })) : undefined}
-                        warehouse={chainData.warehouse ? { id: chainData.warehouse.id, name: chainData.warehouse.name } : undefined}
-                        supplier={chainData.supplier ? { id: chainData.supplier.id, name: chainData.supplier.name } : undefined}
-                      />
-                    </div>
-                  )}
-              </div>
+  const columns = [
+    {
+      title: 'STT',
+      key: 'index',
+      width: 50,
+      align: 'center' as const,
+      className: 'border-r border-slate-100 font-bold text-slate-400',
+      render: (_: any, __: any, index: number) => index + 1,
+    },
+    {
+      title: 'Vật tư / Hàng hóa',
+      key: 'item',
+      render: (l: any) => {
+        return (
+          <div className="min-w-[150px]">
+            {l.issue_item || l.item ? (
+              <GoodsNameWithPreview 
+                itemId={l.issue_item?.id || l.item.id}
+                itemCode={l.issue_item?.mvpp || l.item.mvpp}
+                itemName={l.issue_item?.name || l.item.name}
+                imageUrl={l.issue_item?.imageUrl || l.item.imageUrl}
+                thumbnailUrl={l.issue_item?.thumbnailUrl || l.item.thumbnailUrl}
+                categoryName={l.issue_item?.category || l.item.category}
+                unit={l.issue_item?.unit || l.item.unit}
+              />
+            ) : (
+              <p className="font-bold text-slate-800 text-sm whitespace-normal">N/A</p>
+            )}
+            <div className="flex items-center gap-2 mt-1">
+               <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-black tracking-widest">{l.issue_item?.mvpp || l.item.mvpp}</span>
+               {l.issue_item?.id !== l.item.id && (
+                   <span className="text-[9px] font-black bg-indigo-100 text-indigo-600 px-1 py-0.5 rounded uppercase">
+                       {l.replacement_source === 'receipt_replacement' || l.replacement_source === 'receipt' ? 'Đã đổi ở kho' : 'Đã thay thế'}
+                   </span>
+               )}
+               <span className="text-[10px] font-bold text-indigo-500 flex items-center gap-1"><Archive className="w-3 h-3"/> Kho: {data.warehouseCode}</span>
+            </div>
+            {l.issue_item?.id !== l.item.id && (
+                 <div className="text-[10px] text-slate-400 italic mt-0.5">
+                     Thay thế cho: {l.item.name} ({l.item.mvpp})
+                 </div>
+             )}
           </div>
-          <div className="flex items-center gap-3">
-              <span className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg ${getStatusColor(data.status)}`}>{data.status.replace(/_/g, ' ')}</span>
-          </div>
-      </div>
-
-      <div key={requestId} className="no-print flex-1 overflow-y-auto p-4 md:p-8 flex flex-col xl:flex-row gap-6 w-full max-w-[1400px] mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
-          
-          {/* LEFT COLUMN: Main Info & Lines */}
-          <div className="flex-1 flex flex-col gap-6 min-w-0">
-              {/* Box 1: Info */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-2 h-full bg-indigo-500"></div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pl-4">
-                      <div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Người Đề Xuất</p>
-                          <p className="text-lg font-bold text-slate-800">{data.requester?.fullName}</p>
-                          <p className="text-sm font-semibold text-indigo-600 mt-1">{data.department}</p>
-                      </div>
-                      <div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Lý do & Mục đích</p>
-                          <p className="text-sm font-medium text-slate-700 bg-slate-50 p-4 rounded-xl border border-slate-100 italic">"{data.purpose || 'Không có ghi chú'}"</p>
-                      </div>
-                      {['REJECTED', 'RETURNED', 'CANCELLED', 'NEED_REVISION'].includes(data.status) && (
-                          <div className="md:col-span-2 bg-rose-50 border border-rose-200 rounded-xl p-4 mt-2">
-                              <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-1">Lý do {data.status}</p>
-                              <p className="font-bold text-rose-700">{data.rejectReason || data.returnReason || data.cancelReason || data.revisionReason}</p>
-                          </div>
-                      )}
-                  </div>
-              </div>
-
-              {/* Box 1.5: Summary Statistics */}
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 flex items-center">
-                       <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mr-2.5 shrink-0"><RefreshCw className="w-4 h-4"/></div>
-                       <div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hạng mục</p>
-                          <h4 className="text-xl font-black text-slate-800">{data.lines.length}</h4>
-                       </div>
-                    </div>
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 flex items-center">
-                       <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mr-2.5 shrink-0"><CheckSquare className="w-4 h-4"/></div>
-                       <div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Đã Duyệt</p>
-                          <h4 className="text-xl font-black text-emerald-600">
-                             {data.lines.reduce((sum: number, l: any) => sum + (l.qtyApproved ?? 0), 0)}
-                          </h4>
-                       </div>
-                    </div>
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 flex items-center">
-                       <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center mr-2.5 shrink-0"><XCircle className="w-4 h-4"/></div>
-                       <div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bị Từ Chối</p>
-                          <h4 className="text-xl font-black text-rose-600">
-                             {data.lines.reduce((sum: number, l: any) => sum + Math.max(0, l.qtyRequested - (l.qtyApproved ?? 0)), 0)}
-                          </h4>
-                       </div>
-                    </div>
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 flex items-center">
-                       <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mr-2.5 shrink-0"><Archive className="w-4 h-4"/></div>
-                       <div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Đã Xuất/giao</p>
-                          <h4 className="text-xl font-black text-blue-600">
-                             {data.lines.reduce((sum: number, l: any) => sum + (l.qtyDelivered ?? 0), 0)}
-                          </h4>
-                       </div>
-                    </div>
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 flex flex-col justify-center">
-                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex justify-between">Tiến độ <span>{getWorkflowProgress()}%</span></p>
-                       <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-indigo-500 transition-all duration-500" 
-                            style={{width: `${getWorkflowProgress()}%`}}
-                          ></div>
-                       </div>
-                    </div>
+        );
+      }
+    },
+    {
+      title: 'Tồn / Khả dụng',
+      key: 'stocks',
+      align: 'center' as const,
+      render: (l: any) => {
+        const stocks = l.item.stocks || [];
+        const reqStock = stocks.find((s:any) => s.warehouseCode === data.warehouseCode) || { quantityOnHand: 0, quantityReserved: 0 };
+        const totalOnHand = stocks.reduce((sum:number, s:any) => sum + s.quantityOnHand, 0);
+        const available = reqStock.quantityOnHand - reqStock.quantityReserved;
+        return (
+          <div className="flex flex-col items-center gap-1">
+             <div className="flex gap-1">
+                <div className="text-center px-1 py-0.5 bg-slate-50 border border-slate-200 rounded">
+                   <p className="text-[7px] font-black text-slate-400 uppercase">Tồn</p>
+                   <p className="text-[10px] font-black text-slate-700">{reqStock.quantityOnHand}</p>
                 </div>
+                <div className="text-center px-1 py-0.5 bg-emerald-50 border border-emerald-100 rounded">
+                   <p className="text-[7px] font-black text-emerald-400 uppercase">Khả dụng</p>
+                   <p className="text-[10px] font-black text-emerald-700">{available}</p>
+                </div>
+                <div className="text-center px-1 py-0.5 bg-amber-50 border border-amber-100 rounded">
+                   <p className="text-[7px] font-black text-amber-400 uppercase">Đã giữ</p>
+                   <p className="text-[10px] font-black text-amber-700">{reqStock.quantityReserved}</p>
+                </div>
+             </div>
+             {totalOnHand > reqStock.quantityOnHand && (
+                <p className="text-[9px] font-bold text-slate-400 italic">Tổng tồn: {totalOnHand}</p>
+             )}
+          </div>
+        );
+      }
+    },
+    {
+      title: 'SL Xin',
+      key: 'qtyRequested',
+      align: 'center' as const,
+      className: 'border-x border-slate-100',
+      render: (l: any) => (
+        <div>
+          <span className="font-black text-base text-slate-700">{l.qtyRequested}</span>{' '}
+          <span className="text-[9px] font-bold text-slate-400 uppercase">{l.item.unit}</span>
+        </div>
+      )
+    },
+    {
+      title: 'TBP Duyệt',
+      key: 'qtyManagerApproved',
+      align: 'center' as const,
+      className: 'text-amber-600 bg-amber-50/30 border-r border-slate-100',
+      render: (l: any) => {
+        return l.qtyManagerApproved !== null ? (
+            <div className="flex flex-col items-center">
+                <span className="font-black text-base text-amber-600">{l.qtyManagerApproved}</span>
+            </div>
+        ) : (
+            <span className="text-[9px] font-bold text-slate-400 uppercase">Chờ TBP</span>
+        );
+      }
+    },
+    {
+      title: 'Admin Duyệt',
+      key: 'qtyAdminApproved',
+      align: 'center' as const,
+      className: 'text-emerald-600 bg-emerald-50/30 border-r border-slate-100',
+      render: (l: any) => {
+        return l.qtyAdminApproved !== null || l.qtyApproved !== null || l.replacementQty !== null ? (
+            <div className="flex flex-col items-center">
+                <span className="font-black text-base text-emerald-600">{l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved}</span>
+            </div>
+        ) : (
+            <span className="text-[9px] font-bold text-slate-400 uppercase">Chờ Admin</span>
+        );
+      }
+    },
+    {
+      title: 'Lấy thực',
+      key: 'qtyDelivered',
+      align: 'center' as const,
+      className: 'text-blue-600 bg-blue-50/30',
+      render: (l: any) => {
+        return (
+          <div>
+            <span className="font-black text-base text-blue-600">{l.qtyDelivered ?? 0}</span>
+            {l.qtyDelivered > 0 && l.qtyDelivered < (l.qtyApproved ?? l.qtyRequested) && (
+                <p className="text-[9px] font-bold text-rose-500 bg-rose-50 rounded px-1 mt-1">Còn nợ: {(l.qtyApproved ?? l.qtyRequested) - l.qtyDelivered}</p>
+            )}
+          </div>
+        );
+      }
+    },
+    {
+      title: 'Đơn giá',
+      key: 'price',
+      align: 'right' as const,
+      render: (l: any) => (
+        <span className="text-xs font-bold text-slate-500">{((l.issue_item || l.item).price || 0).toLocaleString('vi-VN')}</span>
+      )
+    },
+    {
+      title: 'Thành tiền',
+      key: 'totalPrice',
+      align: 'right' as const,
+      render: (l: any) => (
+        <span className="text-xs font-black text-slate-800">{(((l.issue_item || l.item).price || 0) * (l.qtyApproved ?? l.qtyRequested)).toLocaleString('vi-VN')}</span>
+      )
+    },
+    {
+      title: 'Trạng thái',
+      key: 'status',
+      align: 'center' as const,
+      render: (l: any) => {
+        const getLineStatusColor = (status: string) => {
+             switch(status) {
+                 case 'COMPLETED': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+                 case 'PARTIALLY_ISSUED': return 'bg-blue-100 text-blue-700 border-blue-200';
+                 case 'READY_TO_ISSUE': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
+                 case 'TBP_APPROVED': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+                 case 'TBP_PARTIAL': return 'bg-amber-50 text-amber-600 border-amber-100';
+                 case 'TBP_REJECTED': return 'bg-rose-50 text-rose-600 border-rose-100';
+                 case 'ADMIN_APPROVED': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                 case 'ADMIN_PARTIAL': return 'bg-teal-50 text-teal-700 border-teal-100';
+                 case 'ADMIN_REJECTED': return 'bg-rose-100 text-rose-700 border-rose-200';
+                 case 'NEED_REVISION': return 'bg-orange-100 text-orange-700 border-orange-200';
+                 default: return 'bg-slate-100 text-slate-500 border-slate-200';
+             }
+        };
+        return (
+          <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest border ${getLineStatusColor(l.status)}`}>
+              {l.status.replace(/_/g, ' ')}
+          </span>
+        );
+      }
+    },
+    {
+      title: 'Ghi chú',
+      key: 'note',
+      render: (l: any) => (
+        <div className="max-w-[180px] whitespace-normal">
+           <p className="text-[11px] font-medium text-slate-600 italic leading-tight">
+              {l.note || '—'}
+           </p>
+        </div>
+      )
+    }
+  ];
+
+  return (
+    <>
+      <Layout className="h-screen overflow-hidden bg-slate-100 RequestsDetail print:bg-white print:overflow-visible print:h-auto flex flex-row">
+        
+        {/* LEFT COLUMN: Main Info & Lines */}
+        <Layout.Content className="no-print flex-1 overflow-y-auto p-6 flex flex-col gap-6" style={{ height: '100%' }}>
+          
+          {/* TITLE BLOCK CARD */}
+          <Card size="small" bodyStyle={{ padding: '16px 24px' }} className="shadow-sm border-slate-200">
+            <div className="flex flex-col gap-3">
+              {/* System title row */}
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <span className="text-lg font-black text-slate-800">Hệ thống Quản trị VPP nội bộ</span>
+                  {currentUser.role === 'ADMIN' && (
+                    <span className="text-[10px] bg-rose-50 text-rose-600 border border-rose-200 px-2 py-0.5 rounded font-black">Quyền Admin</span>
+                  )}
+                </div>
+              </div>
+              
+              {/* Ticket row */}
+              <div className="flex justify-between items-center border-t border-slate-100 pt-3">
+                <div className="flex items-center gap-4">
+                  <button onClick={handleBack} className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition shadow-inner">
+                    <ArrowLeft className="w-4 h-4"/>
+                  </button>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-xl font-black text-slate-800 tracking-tight flex items-center">
+                      {data.id}
+                      {navigationIds && navigationIds.length > 0 && (
+                        <div className="flex items-center bg-slate-100 rounded-lg p-1 ml-4 border border-slate-200">
+                          <button 
+                            onClick={goPrev} 
+                            disabled={!canGoPrev} 
+                            className={`p-1 rounded transition-all ${canGoPrev ? 'hover:bg-white text-indigo-600 shadow-sm' : 'text-slate-300 cursor-not-allowed'}`}
+                            title="Phiếu trước (Arrow Left)"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <span className="px-2.5 text-[10px] font-black text-slate-500 min-w-[50px] text-center">
+                            {currentIndex + 1} / {total}
+                          </span>
+                          <button 
+                            onClick={goNext} 
+                            disabled={!canGoNext} 
+                            className={`p-1 rounded transition-all ${canGoNext ? 'hover:bg-white text-indigo-600 shadow-sm' : 'text-slate-300 cursor-not-allowed'}`}
+                            title="Phiếu sau (Arrow Right)"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                      {data.priority === 'Khẩn cấp' && <span className="ml-3 text-[9px] bg-rose-500 text-white px-2 py-0.5 rounded uppercase tracking-wider animate-pulse font-bold">Khẩn cấp</span>}
+                    </h2>
+                    <span className="text-xs font-semibold text-slate-400">({data.requestType} • Lập lúc {new Date(data.createdAt).toLocaleString('vi-VN')})</span>
+                  </div>
+                </div>
+                <div>
+                  <span className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest shadow-md ${getStatusColor(data.status)}`}>
+                    {data.status.replace(/_/g, ' ')}
+                  </span>
+                </div>
+              </div>
+
+              {/* References Row */}
+              {chainData && (
+                <div className="border-t border-slate-100 pt-3">
+                  <LinkedDocumentReferences
+                    request={chainData.request ? { id: chainData.request.id, code: chainData.request.id } : undefined}
+                    purchaseOrder={chainData.purchaseOrder ? { id: chainData.purchaseOrder.id, code: chainData.purchaseOrder.id } : undefined}
+                    receipt={chainData.receipts?.length === 1 ? { id: chainData.receipts[0].id, code: chainData.receipts[0].id } : undefined}
+                    receipts={chainData.receipts?.length > 1 ? chainData.receipts.map((r: any) => ({ id: r.id, code: r.id })) : undefined}
+                    warehouse={chainData.warehouse ? { id: chainData.warehouse.id, name: chainData.warehouse.name } : undefined}
+                    supplier={chainData.supplier ? { id: chainData.supplier.id, name: chainData.supplier.name } : undefined}
+                  />
+                </div>
+              )}
+            </div>
+          </Card>          {/* OVERVIEW ROW CARD */}
+          <Card size="small" className="shadow-sm border-slate-200" bodyStyle={{ padding: '16px' }}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4 items-center">
+              {/* Requester */}
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">Người Đề Xuất</p>
+                <p className="text-sm font-bold text-slate-800 truncate">{data.requester?.fullName}</p>
+                <p className="text-[11px] font-semibold text-indigo-600 mt-0.5 truncate">{data.department}</p>
+              </div>
+
+              {/* Purpose */}
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">Lý do & Mục đích</p>
+                <Tooltip title={data.purpose || 'Không có ghi chú'}>
+                  <p className="text-xs font-medium text-slate-700 bg-slate-50 p-2 rounded-lg border border-slate-100 italic truncate max-w-full">
+                    "{data.purpose || 'Không có ghi chú'}"
+                  </p>
+                </Tooltip>
+              </div>
+
+              {/* Items */}
+              <div className="flex items-center gap-2 lg:border-l border-slate-150 lg:pl-3">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                  <RefreshCw className="w-4 h-4"/>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Hạng mục</p>
+                  <h4 className="text-lg font-black text-slate-800 leading-none">{data.lines.length}</h4>
+                </div>
+              </div>
+
+              {/* Approved */}
+              <div className="flex items-center gap-2 lg:border-l border-slate-150 lg:pl-3">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                  <CheckSquare className="w-4 h-4"/>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Đã Duyệt</p>
+                  <h4 className="text-lg font-black text-emerald-600 leading-none">
+                    {data.lines.reduce((sum: number, l: any) => sum + (l.qtyApproved ?? 0), 0)}
+                  </h4>
+                </div>
+              </div>
+
+              {/* Rejected */}
+              <div className="flex items-center gap-2 lg:border-l border-slate-150 lg:pl-3">
+                <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                  <XCircle className="w-4 h-4"/>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Bị Từ Chối</p>
+                  <h4 className="text-lg font-black text-rose-600 leading-none">
+                    {data.lines.reduce((sum: number, l: any) => sum + Math.max(0, l.qtyRequested - (l.qtyApproved ?? 0)), 0)}
+                  </h4>
+                </div>
+              </div>
+
+              {/* Handed Over */}
+              <div className="flex items-center gap-2 lg:border-l border-slate-150 lg:pl-3">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <Archive className="w-4 h-4"/>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Đã Xuất/giao</p>
+                  <h4 className="text-lg font-black text-blue-600 leading-none">
+                    {data.lines.reduce((sum: number, l: any) => sum + (l.qtyDelivered ?? 0), 0)}
+                  </h4>
+                </div>
+              </div>
+
+              {/* Progress */}
+              <div className="flex flex-col justify-center lg:border-l border-slate-150 lg:pl-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5 flex justify-between">
+                  Tiến độ <span>{getWorkflowProgress()}%</span>
+                </p>
+                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-indigo-500 transition-all duration-500" 
+                    style={{width: `${getWorkflowProgress()}%`}}
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* REJECTION / RETURN BANNER CARD */}
+          {['REJECTED', 'RETURNED', 'CANCELLED', 'NEED_REVISION'].includes(data.status) && (
+            <Card size="small" className="bg-rose-50/50 border-rose-200">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-rose-500 mt-0.5 shrink-0" />
+                <div>
+                  <h4 className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Lý do {data.status.replace(/_/g, ' ')}</h4>
+                  <p className="text-sm font-bold text-rose-700 leading-tight">
+                    {data.rejectReason || data.returnReason || data.cancelReason || data.revisionReason || 'Không rõ lý do'}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
 
                {/* Decision Support Panel for Admin */}
                {currentUser.role === 'ADMIN' && data.status === 'PENDING_ADMIN' && (
@@ -730,152 +974,23 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Chi tiết Vật tư Xin Cấp</h3>
                                 {data.lines.some((l:any) => (l.qtyApproved ?? l.qtyRequested) > (l.item.stocks?.find((s:any)=>s.warehouseCode===data.warehouseCode)?.quantityOnHand||0)) && <span className="text-[10px] font-bold text-rose-600 bg-rose-100 px-3 py-1 rounded border border-rose-200 flex items-center print:hidden"><AlertTriangle className="w-3.5 h-3.5 mr-1"/> Cảnh báo thiếu Tồn Kho (Kho yêu cầu)</span>}
                             </div>
-                           <div className="overflow-x-auto">
-                               <table className="w-full text-left whitespace-nowrap min-w-full">
-                                   <thead className="bg-white border-b border-slate-200">
-                                       <tr className="text-[9px] uppercase font-black text-slate-400 tracking-wider bg-slate-50/50">
-                                           <th className="px-2 py-3 text-center w-10 border-r border-slate-100">STT</th>
-                                           <th className="px-2 py-3">Vật tư / Hàng hóa</th>
-                                           <th className="px-2 py-3 text-center">Tồn / Khả dụng</th>
-                                           <th className="px-2 py-3 text-center border-x border-slate-100">SL Xin</th>
-                                           <th className="px-2 py-3 text-center text-amber-600 bg-amber-50/30 border-r border-slate-100">TBP Duyệt</th>
-                                           <th className="px-2 py-3 text-center text-emerald-600 bg-emerald-50/30 border-r border-slate-100">Admin Duyệt</th>
-                                           <th className="px-2 py-3 text-center text-blue-600 bg-blue-50/30">Lấy thực</th>
-                                            <th className="px-2 py-3 text-right">Đơn giá</th>
-                                            <th className="px-2 py-3 text-right">Thành tiền</th>
-                                           <th className="px-2 py-3 text-center">Trạng thái</th>
-                                           <th className="px-2 py-3 text-center">Ghi chú</th>
-                                       </tr>
-                                   </thead>
-                                   <tbody className="divide-y divide-slate-100">
-                                       {data.lines.map((l:any, idx:number) => {
-                                           const stocks = l.item.stocks || [];
-                                           const reqStock = stocks.find((s:any) => s.warehouseCode === data.warehouseCode) || { quantityOnHand: 0, quantityReserved: 0 };
-                                           const totalOnHand = stocks.reduce((sum:number, s:any) => sum + s.quantityOnHand, 0);
-                                           const available = reqStock.quantityOnHand - reqStock.quantityReserved;
-                                           const outOfStock = (l.qtyApproved ?? l.qtyRequested) > available;
-                                           
-                                           const getLineStatusColor = (status: string) => {
-                                                switch(status) {
-                                                    case 'COMPLETED': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-                                                    case 'PARTIALLY_ISSUED': return 'bg-blue-100 text-blue-700 border-blue-200';
-                                                    case 'READY_TO_ISSUE': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
-                                                    case 'TBP_APPROVED': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
-                                                    case 'TBP_PARTIAL': return 'bg-amber-50 text-amber-600 border-amber-100';
-                                                    case 'TBP_REJECTED': return 'bg-rose-50 text-rose-600 border-rose-100';
-                                                    case 'ADMIN_APPROVED': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-                                                    case 'ADMIN_PARTIAL': return 'bg-teal-50 text-teal-700 border-teal-100';
-                                                    case 'ADMIN_REJECTED': return 'bg-rose-100 text-rose-700 border-rose-200';
-                                                    case 'NEED_REVISION': return 'bg-orange-100 text-orange-700 border-orange-200';
-                                                    default: return 'bg-slate-100 text-slate-500 border-slate-200';
-                                                }
-                                           };
-
-                                           return (
-                                           <tr key={l.id} className={`hover:bg-slate-50 transition border-l-4 ${outOfStock && data.status.startsWith('PENDING') ? 'border-l-rose-500 bg-rose-50/30' : 'border-l-transparent'}`}>
-                                               <td className="px-2 py-2 text-center font-bold text-slate-400 border-r border-slate-100">{idx+1}</td>
-                                               <td className="px-2 py-2 min-w-[150px]">
-                                                    {l.issue_item || l.item ? (
-                                                      <GoodsNameWithPreview 
-                                                        itemId={l.issue_item?.id || l.item.id}
-                                                        itemCode={l.issue_item?.mvpp || l.item.mvpp}
-                                                        itemName={l.issue_item?.name || l.item.name}
-                                                        imageUrl={l.issue_item?.imageUrl || l.item.imageUrl}
-                                                        thumbnailUrl={l.issue_item?.thumbnailUrl || l.item.thumbnailUrl}
-                                                        categoryName={l.issue_item?.category || l.item.category}
-                                                        unit={l.issue_item?.unit || l.item.unit}
-                                                      />
-                                                    ) : (
-                                                      <p className="font-bold text-slate-800 text-sm whitespace-normal">N/A</p>
-                                                    )}
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                       <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-black tracking-widest">{l.issue_item?.mvpp || l.item.mvpp}</span>
-                                                       {l.issue_item?.id !== l.item.id && (
-                                                           <span className="text-[9px] font-black bg-indigo-100 text-indigo-600 px-1 py-0.5 rounded uppercase">
-                                                               {l.replacement_source === 'receipt_replacement' || l.replacement_source === 'receipt' ? 'Đã đổi ở kho' : 'Đã thay thế'}
-                                                           </span>
-                                                       )}
-                                                       <span className="text-[10px] font-bold text-indigo-500 flex items-center gap-1"><Archive className="w-3 h-3"/> Kho: {data.warehouseCode}</span>
-                                                    </div>
-                                                    {l.issue_item?.id !== l.item.id && (
-                                                         <div className="text-[10px] text-slate-400 italic mt-0.5">
-                                                             Thay thế cho: {l.item.name} ({l.item.mvpp})
-                                                         </div>
-                                                     )}
-                                                </td>
-                                               <td className="px-2 py-2">
-                                                   <div className="flex flex-col items-center gap-1">
-                                                      <div className="flex gap-1">
-                                                         <div className="text-center px-1 py-0.5 bg-slate-50 border border-slate-200 rounded">
-                                                            <p className="text-[7px] font-black text-slate-400 uppercase">Tồn</p>
-                                                            <p className="text-[10px] font-black text-slate-700">{reqStock.quantityOnHand}</p>
-                                                         </div>
-                                                         <div className="text-center px-1 py-0.5 bg-emerald-50 border border-emerald-100 rounded">
-                                                            <p className="text-[7px] font-black text-emerald-400 uppercase">Khả dụng</p>
-                                                            <p className="text-[10px] font-black text-emerald-700">{available}</p>
-                                                         </div>
-                                                         <div className="text-center px-1 py-0.5 bg-amber-50 border border-amber-100 rounded">
-                                                            <p className="text-[7px] font-black text-amber-400 uppercase">Đã giữ</p>
-                                                            <p className="text-[10px] font-black text-amber-700">{reqStock.quantityReserved}</p>
-                                                         </div>
-                                                      </div>
-                                                      {totalOnHand > reqStock.quantityOnHand && (
-                                                         <p className="text-[9px] font-bold text-slate-400 italic">Tổng tồn: {totalOnHand}</p>
-                                                      )}
-                                                   </div>
-                                               </td>
-                                               <td className="px-2 py-2 text-center border-x border-slate-100">
-                                                   <span className="font-black text-base text-slate-700">{l.qtyRequested}</span> <span className="text-[9px] font-bold text-slate-400 uppercase">{l.item.unit}</span>
-                                               </td>
-                                                <td className="px-2 py-2 text-center bg-amber-50/30 border-r border-slate-100">
-                                                    {l.qtyManagerApproved !== null ? (
-                                                        <div className="flex flex-col items-center">
-                                                            <span className="font-black text-base text-amber-600">{l.qtyManagerApproved}</span>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-[9px] font-bold text-slate-400 uppercase">Chờ TBP</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-2 py-2 text-center bg-emerald-50/30 border-r border-slate-100">
-                                                    {l.qtyAdminApproved !== null || l.qtyApproved !== null || l.replacementQty !== null ? (
-                                                        <div className="flex flex-col items-center">
-                                                            <span className="font-black text-base text-emerald-600">{l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved}</span>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-[9px] font-bold text-slate-400 uppercase">Chờ Admin</span>
-                                                    )}
-                                                </td>
-                                               <td className="px-2 py-2 text-center bg-blue-50/30">
-                                                   <span className="font-black text-base text-blue-600">{l.qtyDelivered ?? 0}</span>
-                                                   {l.qtyDelivered > 0 && l.qtyDelivered < (l.qtyApproved ?? l.qtyRequested) && (
-                                                       <p className="text-[9px] font-bold text-rose-500 bg-rose-50 rounded px-1 mt-1">Còn nợ: {(l.qtyApproved ?? l.qtyRequested) - l.qtyDelivered}</p>
-                                                   )}
-                                               </td>
-
-                                               <td className="px-2 py-2 text-right">
-                                                   <span className="text-xs font-bold text-slate-500">{((l.issue_item || l.item).price || 0).toLocaleString('vi-VN')}</span>
-                                               </td>
-
-                                               <td className="px-2 py-2 text-right">
-                                                   <span className="text-xs font-black text-slate-800">{(((l.issue_item || l.item).price || 0) * (l.qtyApproved ?? l.qtyRequested)).toLocaleString('vi-VN')}</span>
-                                               </td>
-                                               <td className="px-2 py-2 text-center">
-                                                   <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest border ${getLineStatusColor(l.status)}`}>
-                                                       {l.status.replace(/_/g, ' ')}
-                                                   </span>
-                                               </td>
-                                               <td className="px-2 py-2">
-                                                   <div className="max-w-[180px] whitespace-normal">
-                                                      <p className="text-[11px] font-medium text-slate-600 italic leading-tight">
-                                                         {l.note || '—'}
-                                                      </p>
-                                                   </div>
-                                                </td>
-                                           </tr>
-                                       )})}
-                                   </tbody>
-                               </table>
-                           </div>
+                            <div className="p-4">
+                                <Table
+                                    dataSource={data.lines}
+                                    columns={columns}
+                                    rowKey="id"
+                                    pagination={false}
+                                    scroll={{ y: 'calc(100vh - 450px)' }}
+                                    rowClassName={(record: any) => {
+                                        const stocks = record.item.stocks || [];
+                                        const reqStock = stocks.find((s: any) => s.warehouseCode === data.warehouseCode) || { quantityOnHand: 0, quantityReserved: 0 };
+                                        const available = reqStock.quantityOnHand - reqStock.quantityReserved;
+                                        const outOfStock = (record.qtyApproved ?? record.qtyRequested) > available;
+                                        return `hover:bg-slate-50 transition border-l-4 ${outOfStock && data.status.startsWith('PENDING') ? 'border-l-rose-500 bg-rose-50/30' : 'border-l-transparent'}`;
+                                    }}
+                                    className="RequestsDetailTable"
+                                />
+                            </div>
                         </>
                     )}
 
@@ -1020,19 +1135,18 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                         </div>
                     )}
                 </div>
-            </div>
+            </Layout.Content>
 
           {/* RIGHT COLUMN: Actions & History */}
-          <div className="no-print w-full xl:w-96 flex flex-col gap-6 shrink-0">
-              
-              {/* Box 3: Action Toolbar (Role-based) */}
-              <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl shadow-2xl p-6 border border-slate-700 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500 rounded-full blur-[80px] opacity-20 transform translate-x-1/2 -translate-y-1/2"></div>
+          <Layout.Sider width={320} theme="light" className="no-print border-l border-slate-200" style={{ height: '100%', overflowY: 'auto' }}>
+              <div className="p-6 flex flex-col gap-6">
+                  <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 relative overflow-hidden text-slate-800">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500 rounded-full blur-[80px] opacity-10 transform translate-x-1/2 -translate-y-1/2"></div>
                   <div className="flex items-center justify-between mb-6 relative z-10">
-                      <h3 className="text-sm font-black text-white uppercase tracking-tight flex items-center gap-2">
-                          <Shield className="w-5 h-5 text-indigo-400"/> TRUNG TÂM LỆNH
+                      <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+                          <Shield className="w-5 h-5 text-indigo-500"/> TRUNG TÂM LỆNH
                       </h3>
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] bg-white/5 px-2 py-1 rounded border border-white/10">ROLE: {currentUser.role}</span>
+                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] bg-slate-50 px-2 py-1 rounded border border-slate-200">ROLE: {currentUser.role}</span>
                   </div>
                   <div className="flex flex-col gap-3 relative z-10">
                       
@@ -1041,19 +1155,19 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                           <button onClick={() => {
                             if (setActiveRequest) setActiveRequest(data);
                             setViewMode('CREATE');
-                          }} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-500/30">Tiếp Tục Chỉnh Sửa</button>
+                          }} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-500/20">Tiếp Tục Chỉnh Sửa</button>
                       )}
                       {isOwnerPending && (
-                           <button onClick={() => handleAction('/withdraw', {reason:'Xin rút lại để sửa'}, 'Đã rút phiếu thành công')} className="w-full py-3 bg-slate-700 text-white rounded-xl font-bold hover:bg-slate-600 transition border border-slate-600">Thu hồi sửa đổi</button>
+                           <button onClick={() => handleAction('/withdraw', {reason:'Xin rút lại để sửa'}, 'Đã rút phiếu thành công')} className="w-full py-3 bg-slate-100 text-slate-700 hover:bg-slate-200 transition border border-slate-200 rounded-xl font-bold">Thu hồi sửa đổi</button>
                       )}
 
                       {/* --- THAO TÁC CỦA QUẢN LÝ --- */}
                       {isApprover && (
                           <>
-                             <button onClick={() => setShowApproveModal(true)} className="w-full py-3.5 bg-emerald-500 text-white rounded-xl font-black hover:bg-emerald-600 transition shadow-lg shadow-emerald-500/30 flex items-center justify-center transform hover:scale-[1.02]"><CheckSquare className="w-5 h-5 mr-2"/> {(currentUser.role === 'MANAGER' && data.status === 'PENDING_MANAGER') ? 'DUYỆT CẤP 1 (TRƯỞNG BP)' : 'PHÊ DUYỆT CẤP 2 (Admin)' }</button>
+                             <button onClick={() => setShowApproveModal(true)} className="w-full py-3.5 bg-emerald-500 text-white rounded-xl font-black hover:bg-emerald-600 transition shadow-lg shadow-emerald-500/20 flex items-center justify-center transform hover:scale-[1.02]"><CheckSquare className="w-5 h-5 mr-2"/> {(currentUser.role === 'MANAGER' && data.status === 'PENDING_MANAGER') ? 'DUYỆT CẤP 1 (TRƯỞNG BP)' : 'PHÊ DUYỆT CẤP 2 (Admin)' }</button>
                              <div className="flex gap-3">
-                                <button onClick={() => setShowRejectModal(true)} className="flex-1 py-2.5 bg-slate-800 text-rose-400 hover:bg-rose-500 hover:text-white border border-rose-500/50 rounded-xl font-bold transition">Từ Chối</button>
-                                <button onClick={() => handleAction('/return', {reason: prompt('Lý do yêu cầu làm lại?')}, 'Đã trả lại')} className="flex-1 py-2.5 bg-slate-800 text-amber-500 hover:bg-amber-500 hover:text-white border border-amber-500/50 rounded-xl font-bold transition">Trả Lại Sửa</button>
+                                <button onClick={() => setShowRejectModal(true)} className="flex-1 py-2.5 bg-white text-rose-600 hover:bg-rose-50 border border-rose-200 hover:border-rose-300 rounded-xl font-bold transition">Từ Chối</button>
+                                <button onClick={() => handleAction('/return', {reason: prompt('Lý do yêu cầu làm lại?')}, 'Đã trả lại')} className="flex-1 py-2.5 bg-white text-amber-600 hover:bg-amber-50 border border-amber-200 hover:border-amber-300 rounded-xl font-bold transition">Trả Lại Sửa</button>
                              </div>
                           </>
                       )}
@@ -1061,7 +1175,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                       {/* --- THAO TÁC CỦA KHO --- */}
                       {(isWarehouse || currentUser.role === 'ADMIN' || currentUser.role === 'WAREHOUSE') && ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED', 'PARTIAL_ADMIN_APPROVED', 'BACKORDER', 'PARTIALLY_DELIVERED', 'PENDING_REMAINING_DELIVERY'].includes(data.status) && (
                            <>
-                             <button onClick={() => openIssueModal()} className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/40 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-emerald-500"><Archive className="w-6 h-6 mr-2"/> CẤP PHÁT CHO NHÂN SỰ</button>
+                             <button onClick={() => openIssueModal()} className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/20 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-emerald-500"><Archive className="w-6 h-6 mr-2"/> CẤP PHÁT CHO NHÂN SỰ</button>
                              
                              {(currentUser.role === 'ADMIN' || currentUser.role === 'WAREHOUSE') && ['PARTIALLY_ISSUED', 'PARTIALLY_DELIVERED', 'WAITING_HANDOVER', 'READY_TO_ISSUE', 'APPROVED', 'BACKORDER'].includes(data.status) && (
                                <button 
@@ -1071,7 +1185,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                      handleAction('/close-remaining', { reason }, 'Đóng phiếu thành công (không giao nữa)!');
                                    }
                                  }} 
-                                 className="w-full py-3.5 bg-rose-600 text-white rounded-xl font-black hover:bg-rose-700 transition shadow-lg shadow-rose-500/40 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-rose-500"
+                                 className="w-full py-3.5 bg-rose-500 text-white rounded-xl font-black hover:bg-rose-600 transition shadow-lg shadow-rose-500/20 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-rose-500"
                                >
                                  <StopCircle className="w-5 h-5 mr-2"/> KHÔNG GIAO NỮA (ĐÓNG PHIẾU)
                                </button>
@@ -1086,7 +1200,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                if(window.confirm('Tạo tự động Đơn mua sắm (PO) cho các mặt hàng báo thiếu?')) {
                                    handleAction('/create_po', {}, 'Đã tạo Đơn đặt hàng (PO) thành công!');
                                }
-                           }} className="w-full py-3.5 bg-amber-500 text-white rounded-xl font-black hover:bg-amber-600 transition shadow-lg shadow-amber-500/40 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-amber-500"><ShoppingCart className="w-5 h-5 mr-2"/> TẠO ĐƠN MUA SẮM (BACKORDER)</button>
+                           }} className="w-full py-3.5 bg-amber-500 text-white rounded-xl font-black hover:bg-amber-600 transition shadow-lg shadow-amber-500/20 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-amber-500"><ShoppingCart className="w-5 h-5 mr-2"/> TẠO ĐƠN MUA SẮM (BACKORDER)</button>
                       )}
 
                       {/* --- XÁC NHẬN BÀN GIAO --- */}
@@ -1095,51 +1209,57 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                               if(window.confirm('Xác nhận bạn đã nhận đủ vật tư từ kho theo đúng số lượng thực giao?')) {
                                   handleAction('/confirm_receipt', {}, 'Bàn giao thành công. Phiếu đã được đóng!');
                               }
-                          }} className="w-full py-4 bg-indigo-500 text-white rounded-xl font-black hover:bg-indigo-600 transition shadow-lg shadow-indigo-500/40 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-indigo-500"><CheckCircle className="w-6 h-6 mr-2"/> XÁC NHẬN ĐÃ NHẬN HÀNG</button>
+                          }} className="w-full py-4 bg-indigo-500 text-white rounded-xl font-black hover:bg-indigo-600 transition shadow-lg shadow-indigo-500/20 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-indigo-500"><CheckCircle className="w-6 h-6 mr-2"/> XÁC NHẬN ĐÃ NHẬN HÀNG</button>
                       )}
 
                       {/* --- HỐI THÚC GIAO HÀNG --- */}
                       {canUrge && (
-                          <button onClick={() => handleAction('/urge_delivery', {}, 'Đã gửi yêu cầu hối thúc giao hàng')} className="w-full py-4 bg-amber-500 text-white rounded-xl font-black hover:bg-amber-600 transition shadow-lg shadow-amber-500/40 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-amber-400">
+                          <button onClick={() => handleAction('/urge_delivery', {}, 'Đã gửi yêu cầu hối thúc giao hàng')} className="w-full py-4 bg-amber-500 text-white rounded-xl font-black hover:bg-amber-600 transition shadow-lg shadow-amber-500/20 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-amber-400">
                              <RefreshCw className="w-6 h-6 mr-2 animate-spin-slow"/> HỐI THÚC GIAO HÀNG
                           </button>
                       )}
 
-                      <hr className="border-slate-700 my-2" />
+                      <hr className="border-slate-100 my-2" />
                       
-                      {canCancel && <button onClick={() => handleAction('/cancel', {reason: prompt('Nhập lý do hủy phiếu:')}, 'Đã Hủy phiếu')} className="w-full py-2.5 bg-transparent text-slate-400 hover:text-rose-500 flex items-center justify-center rounded-xl font-bold transition"><Trash2 className="w-4 h-4 mr-2"/> Hủy Bỏ Phiếu Này</button>}
+                      {canCancel && <button onClick={() => handleAction('/cancel', {reason: prompt('Nhập lý do hủy phiếu:')}, 'Đã Hủy phiếu')} className="w-full py-2.5 bg-transparent text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center rounded-xl font-bold transition"><Trash2 className="w-4 h-4 mr-2"/> Hủy Bỏ Phiếu Này</button>}
                       
                       {/* PRINT OPTIONS GROUP */}
-                      <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-slate-700">
-                          <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1 text-center">Tùy chọn in đề xuất</p>
+                      <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-slate-100">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1 text-center">Tùy chọn in đề xuất</p>
                           
                           {(() => {
                             const hasPendingReplacement = data.lines.some((l: any) => l.status === 'REPLACEMENT_PENDING_ADMIN');
+                            const printMenu = {
+                              items: [
+                                {
+                                  key: 'VPP',
+                                  label: 'In Đề Xuất Văn Phòng Phẩm',
+                                  icon: <PrinterOutlined />,
+                                },
+                                {
+                                  key: 'VE_SINH',
+                                  label: 'In Đề Xuất Vệ Sinh',
+                                  icon: <PrinterOutlined />,
+                                },
+                              ],
+                              onClick: (info: any) => {
+                                printDocument(info.key as 'VPP' | 'VE_SINH');
+                              }
+                            };
                             return (
-                              <div className="space-y-2">
-                                <button 
-                                  onClick={() => printDocument('VPP')} 
+                              <div className="w-full flex justify-center [&>div]:w-full">
+                                <Dropdown.Button
+                                  menu={printMenu}
+                                  onClick={() => printDocument('ALL')}
+                                  icon={<DownOutlined />}
+                                  type="primary"
                                   disabled={hasPendingReplacement}
-                                  className={`w-full py-3 flex items-center justify-center rounded-xl font-black transition shadow-sm border ${hasPendingReplacement ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-white text-indigo-600 hover:bg-indigo-50 border-indigo-100 hover:border-indigo-200'}`}
+                                  className="w-full font-bold h-11 flex items-center [&>button:first-child]:flex-1"
                                 >
-                                  <Printer className="w-4 h-4 mr-2"/> In Đề Xuất Văn Phòng Phẩm
-                                </button>
-                                
-                                <button 
-                                  onClick={() => printDocument('VE_SINH')} 
-                                  disabled={hasPendingReplacement}
-                                  className={`w-full py-3 flex items-center justify-center rounded-xl font-black transition shadow-sm border ${hasPendingReplacement ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-white text-cyan-600 hover:bg-cyan-50 border-cyan-100 hover:border-cyan-200'}`}
-                                >
-                                  <Printer className="w-4 h-4 mr-2"/> In Đề Xuất Vệ Sinh
-                                </button>
-
-                                <button 
-                                  onClick={() => printDocument('ALL')} 
-                                  disabled={hasPendingReplacement}
-                                  className={`w-full py-3.5 flex items-center justify-center rounded-xl font-black transition shadow-lg border ${hasPendingReplacement ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' : 'bg-slate-800 text-white hover:bg-slate-900 border-slate-900'}`}
-                                >
-                                  <Printer className="w-5 h-5 mr-2 text-indigo-400"/> IN CẢ PHIẾU (A4 FULL)
-                                </button>
+                                  <span className="flex items-center gap-2">
+                                    <PrinterOutlined /> IN CẢ PHIẾU (A4 FULL)
+                                  </span>
+                                </Dropdown.Button>
                               </div>
                             );
                           })()}
@@ -1147,19 +1267,19 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
                       <button 
                         onClick={handleExportExcel}
-                        className="w-full py-2.5 bg-white text-slate-800 hover:bg-slate-100 flex items-center justify-center rounded-xl font-bold transition shadow-sm mt-4"
+                        className="w-full py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center justify-center rounded-xl font-bold transition shadow-sm mt-4"
                       >
                         <FileSpreadsheet className="w-4 h-4 mr-2 text-emerald-500"/> Xuất File Excel
                       </button>
 
-                      <div className="mt-4 pt-4 border-t border-white/10">
+                      <div className="mt-4 pt-4 border-t border-slate-100">
                           <div className="flex justify-between items-center mb-2">
                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tiến độ xử lý</p>
                              <span className="text-xs font-black text-emerald-400">{getWorkflowProgress()}%</span>
                           </div>
-                          <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                          <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-100">
                              <div 
-                               className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-1000 shadow-[0_0_10px_rgba(99,102,241,0.5)]" 
+                               className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-1000" 
                                style={{width: `${getWorkflowProgress()}%`}}
                              ></div>
                           </div>
@@ -1214,8 +1334,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                   </div>
                 </div>
               )}
-                  </div>
               </div>
+          </Layout.Sider>
 
       {/* MODAL PHÊ DUYỆT (Manager) */}
       {showApproveModal && (
@@ -2508,6 +2628,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
            </div>
          </div>
        )}
-     </div>
+      </Layout>
+    </>
    );
  }
