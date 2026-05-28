@@ -683,10 +683,10 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
   return (
     <>
-      <Layout className="flex-1 min-h-0 overflow-hidden bg-slate-100 RequestsDetail print:bg-white print:overflow-visible print:h-auto flex flex-row">
+      <Layout className="flex-1 min-h-0 overflow-visible bg-slate-100 RequestsDetail print:bg-white print:overflow-visible print:h-auto flex flex-row">
         
         {/* LEFT COLUMN: Main Info & Lines */}
-        <Layout.Content className="no-print flex-1 min-h-0 overflow-y-auto p-6 flex flex-col gap-6">
+        <Layout.Content className="no-print flex-1 min-h-0 overflow-visible p-6 flex flex-col gap-6">
           
           {/* TITLE BLOCK CARD */}
           <Card size="small" bodyStyle={{ padding: '16px 24px' }} className="shadow-sm border-slate-200">
@@ -1151,7 +1151,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
             </Layout.Content>
 
           {/* RIGHT COLUMN: Actions & History */}
-          <Layout.Sider width={260} theme="light" className="no-print border-l border-slate-200" style={{ height: '100%', overflowY: 'auto' }}>
+          <Layout.Sider width={260} theme="light" className="no-print border-l border-slate-200 sticky top-0 h-screen overflow-y-auto">
               <div className="p-6 flex flex-col gap-6">
                   <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 relative overflow-hidden text-slate-800">
                       <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500 rounded-full blur-[80px] opacity-10 transform translate-x-1/2 -translate-y-1/2"></div>

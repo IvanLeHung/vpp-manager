@@ -264,14 +264,9 @@ export default function MainLayout() {
         />
 
         {/* Dynamic Page Component Outlet */}
-        {(() => {
-          const isScrollLockedPage = !['/help', '/contact'].includes(location.pathname);
-          return (
-            <div className={`flex-1 ${isScrollLockedPage ? 'overflow-hidden min-h-0' : 'overflow-y-auto'} bg-slate-50 flex flex-col print:h-auto print:overflow-visible print:bg-white min-w-0`}>
-               <Outlet />
-            </div>
-          );
-        })()}
+        <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50 flex flex-col print:h-auto print:overflow-visible print:bg-white min-w-0">
+          <Outlet />
+        </div>
       </main>
     </div>
   );
