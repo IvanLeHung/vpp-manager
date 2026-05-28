@@ -637,7 +637,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
   return (
     <>
-      <Layout className="h-screen overflow-hidden bg-slate-100 RequestsDetail print:bg-white print:overflow-visible print:h-auto flex flex-row">
+      <Layout className="h-full overflow-hidden bg-slate-100 RequestsDetail print:bg-white print:overflow-visible print:h-auto flex flex-row">
         
         {/* LEFT COLUMN: Main Info & Lines */}
         <Layout.Content className="no-print flex-1 overflow-y-auto p-6 flex flex-col gap-6" style={{ height: '100%' }}>
