@@ -33,7 +33,7 @@ export default function MainLayout() {
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-900 print:h-auto print:bg-white print:block app-container">
       {/* Sidebar */}
-      <aside className="no-print print:hidden w-72 bg-white border-r border-slate-200 flex flex-col shadow-sm hidden md:flex shrink-0 z-20">
+      <aside className="no-print print:hidden w-60 bg-white border-r border-slate-200 flex flex-col shadow-sm hidden md:flex shrink-0 z-20">
         <div className="h-16 flex items-center px-6 border-b border-slate-100 mt-2">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl mr-3 shadow-md">D</div>
           <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-700">Văn phòng phẩm Danko Group</span>
@@ -264,9 +264,14 @@ export default function MainLayout() {
         />
 
         {/* Dynamic Page Component Outlet */}
-        <div className="flex-1 overflow-y-auto bg-slate-50 flex flex-col print:h-auto print:overflow-visible print:bg-white min-w-0">
-           <Outlet />
-        </div>
+        {(() => {
+          const isScrollLockedPage = !['/help', '/contact'].includes(location.pathname);
+          return (
+            <div className={`flex-1 ${isScrollLockedPage ? 'overflow-hidden min-h-0' : 'overflow-y-auto'} bg-slate-50 flex flex-col print:h-auto print:overflow-visible print:bg-white min-w-0`}>
+               <Outlet />
+            </div>
+          );
+        })()}
       </main>
     </div>
   );

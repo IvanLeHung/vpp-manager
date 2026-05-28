@@ -46,6 +46,52 @@ function sortLinesForPrinting(lines: any[]) {
   });
 }
 
+interface InfoCardProps {
+  label: string;
+  value: React.ReactNode;
+  subValue?: string;
+  tone?: 'green' | 'blue' | 'rose' | 'violet' | 'slate';
+  isTooltip?: boolean;
+  tooltipText?: string;
+}
+
+function InfoCard({ label, value, subValue, tone, isTooltip, tooltipText }: InfoCardProps) {
+  const getToneClasses = () => {
+    switch (tone) {
+      case 'green':
+        return 'bg-emerald-50 text-emerald-700 border-emerald-100 ring-1 ring-emerald-100';
+      case 'blue':
+        return 'bg-blue-50 text-blue-700 border-blue-100 ring-1 ring-blue-100';
+      case 'rose':
+        return 'bg-rose-50 text-rose-700 border-rose-100 ring-1 ring-rose-100';
+      case 'violet':
+        return 'bg-indigo-50 text-indigo-700 border-indigo-100 ring-1 ring-indigo-100';
+      default:
+        return 'bg-slate-50 text-slate-700 border-slate-200 ring-1 ring-slate-100';
+    }
+  };
+
+  const cardContent = (
+    <div className={`p-3 rounded-xl border ${getToneClasses()} flex flex-col justify-between h-full min-w-0 shadow-sm hover:shadow-md transition-all`}>
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">{label}</p>
+      <div className="min-w-0">
+        <div className="text-xs font-black truncate leading-tight text-slate-800">{value}</div>
+        {subValue && <div className="text-[10px] font-bold text-slate-500 mt-0.5 truncate leading-none">{subValue}</div>}
+      </div>
+    </div>
+  );
+
+  if (isTooltip && tooltipText) {
+    return (
+      <Tooltip title={tooltipText} overlayClassName="max-w-xs">
+        <div className="cursor-help h-full">{cardContent}</div>
+      </Tooltip>
+    );
+  }
+
+  return cardContent;
+}
+
 export default function RequestsDetail({ requestId, navigationIds, onNavigate, setViewMode, setActiveRequest, refreshData, showToast, currentUser }: Props) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -602,21 +648,21 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       render: (l: any) => {
         const getLineStatusColor = (status: string) => {
              switch(status) {
-                 case 'COMPLETED': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-                 case 'PARTIALLY_ISSUED': return 'bg-blue-100 text-blue-700 border-blue-200';
-                 case 'READY_TO_ISSUE': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
-                 case 'TBP_APPROVED': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
-                 case 'TBP_PARTIAL': return 'bg-amber-50 text-amber-600 border-amber-100';
-                 case 'TBP_REJECTED': return 'bg-rose-50 text-rose-600 border-rose-100';
-                 case 'ADMIN_APPROVED': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-                 case 'ADMIN_PARTIAL': return 'bg-teal-50 text-teal-700 border-teal-100';
-                 case 'ADMIN_REJECTED': return 'bg-rose-100 text-rose-700 border-rose-200';
-                 case 'NEED_REVISION': return 'bg-orange-100 text-orange-700 border-orange-200';
-                 default: return 'bg-slate-100 text-slate-500 border-slate-200';
+                 case 'COMPLETED': return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
+                 case 'PARTIALLY_ISSUED': return 'bg-blue-50 text-blue-700 ring-blue-200';
+                 case 'READY_TO_ISSUE': return 'bg-indigo-50 text-indigo-700 ring-indigo-200';
+                 case 'TBP_APPROVED': return 'bg-emerald-50 text-emerald-600 ring-emerald-100';
+                 case 'TBP_PARTIAL': return 'bg-amber-50 text-amber-600 ring-amber-100';
+                 case 'TBP_REJECTED': return 'bg-rose-50 text-rose-600 ring-rose-100';
+                 case 'ADMIN_APPROVED': return 'bg-emerald-50 text-emerald-800 ring-emerald-200';
+                 case 'ADMIN_PARTIAL': return 'bg-teal-50 text-teal-700 ring-teal-100';
+                 case 'ADMIN_REJECTED': return 'bg-rose-50 text-rose-700 ring-rose-200';
+                 case 'NEED_REVISION': return 'bg-orange-50 text-orange-700 ring-orange-200';
+                 default: return 'bg-slate-50 text-slate-600 ring-slate-200';
              }
         };
         return (
-          <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest border ${getLineStatusColor(l.status)}`}>
+          <span className={`rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-widest ring-1 ${getLineStatusColor(l.status)}`}>
               {l.status.replace(/_/g, ' ')}
           </span>
         );
@@ -640,7 +686,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       <Layout className="h-full overflow-hidden bg-slate-100 RequestsDetail print:bg-white print:overflow-visible print:h-auto flex flex-row">
         
         {/* LEFT COLUMN: Main Info & Lines */}
-        <Layout.Content className="no-print flex-1 overflow-y-auto p-6 flex flex-col gap-6" style={{ height: '100%' }}>
+        <Layout.Content className="no-print flex-1 min-h-0 overflow-y-auto p-6 flex flex-col gap-6" style={{ height: '100%' }}>
           
           {/* TITLE BLOCK CARD */}
           <Card size="small" bodyStyle={{ padding: '16px 24px' }} className="shadow-sm border-slate-200">
@@ -714,89 +760,56 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
               )}
             </div>
           </Card>          {/* OVERVIEW ROW CARD */}
-          <Card size="small" className="shadow-sm border-slate-200" bodyStyle={{ padding: '16px' }}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4 items-center">
-              {/* Requester */}
-              <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">Người Đề Xuất</p>
-                <p className="text-sm font-bold text-slate-800 truncate">{data.requester?.fullName}</p>
-                <p className="text-[11px] font-semibold text-indigo-600 mt-0.5 truncate">{data.department}</p>
-              </div>
-
-              {/* Purpose */}
-              <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">Lý do & Mục đích</p>
-                <Tooltip title={data.purpose || 'Không có ghi chú'}>
-                  <p className="text-xs font-medium text-slate-700 bg-slate-50 p-2 rounded-lg border border-slate-100 italic truncate max-w-full">
-                    "{data.purpose || 'Không có ghi chú'}"
-                  </p>
-                </Tooltip>
-              </div>
-
-              {/* Items */}
-              <div className="flex items-center gap-2 lg:border-l border-slate-150 lg:pl-3">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                  <RefreshCw className="w-4 h-4"/>
+          {/* OVERVIEW GRID */}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+            <InfoCard 
+              label="Người Đề Xuất" 
+              value={data.requester?.fullName} 
+              subValue={data.department}
+            />
+            <InfoCard 
+              label="Lý do & Mục đích" 
+              value={data.purpose || 'Không có ghi chú'} 
+              isTooltip 
+              tooltipText={data.purpose || 'Không có ghi chú'}
+            />
+            <InfoCard 
+              label="Hạng mục" 
+              value={`${data.lines.length} mặt hàng`}
+            />
+            <InfoCard 
+              label="Đã Duyệt" 
+              value={`${data.lines.reduce((sum: number, l: any) => sum + (l.qtyApproved ?? 0), 0)} chiếc`}
+              tone="green"
+            />
+            <InfoCard 
+              label="Bị Từ Chối" 
+              value={`${data.lines.reduce((sum: number, l: any) => sum + Math.max(0, l.qtyRequested - (l.qtyApproved ?? 0)), 0)} chiếc`}
+              tone="rose"
+            />
+            <InfoCard 
+              label="Đã Xuất/giao" 
+              value={`${data.lines.reduce((sum: number, l: any) => sum + (l.qtyDelivered ?? 0), 0)} chiếc`}
+              tone="blue"
+            />
+            <InfoCard 
+              label="Tiến độ" 
+              value={
+                <div className="flex flex-col gap-1 w-full mt-0.5">
+                  <div className="flex justify-between items-center text-[10px] font-black text-indigo-700 leading-none">
+                    <span>{getWorkflowProgress()}%</span>
+                  </div>
+                  <div className="w-full h-1 bg-slate-200/50 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-indigo-600 transition-all duration-500 rounded-full" 
+                      style={{ width: `${getWorkflowProgress()}%` }}
+                    ></div>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Hạng mục</p>
-                  <h4 className="text-lg font-black text-slate-800 leading-none">{data.lines.length}</h4>
-                </div>
-              </div>
-
-              {/* Approved */}
-              <div className="flex items-center gap-2 lg:border-l border-slate-150 lg:pl-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <CheckSquare className="w-4 h-4"/>
-                </div>
-                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Đã Duyệt</p>
-                  <h4 className="text-lg font-black text-emerald-600 leading-none">
-                    {data.lines.reduce((sum: number, l: any) => sum + (l.qtyApproved ?? 0), 0)}
-                  </h4>
-                </div>
-              </div>
-
-              {/* Rejected */}
-              <div className="flex items-center gap-2 lg:border-l border-slate-150 lg:pl-3">
-                <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-                  <XCircle className="w-4 h-4"/>
-                </div>
-                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Bị Từ Chối</p>
-                  <h4 className="text-lg font-black text-rose-600 leading-none">
-                    {data.lines.reduce((sum: number, l: any) => sum + Math.max(0, l.qtyRequested - (l.qtyApproved ?? 0)), 0)}
-                  </h4>
-                </div>
-              </div>
-
-              {/* Handed Over */}
-              <div className="flex items-center gap-2 lg:border-l border-slate-150 lg:pl-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                  <Archive className="w-4 h-4"/>
-                </div>
-                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Đã Xuất/giao</p>
-                  <h4 className="text-lg font-black text-blue-600 leading-none">
-                    {data.lines.reduce((sum: number, l: any) => sum + (l.qtyDelivered ?? 0), 0)}
-                  </h4>
-                </div>
-              </div>
-
-              {/* Progress */}
-              <div className="flex flex-col justify-center lg:border-l border-slate-150 lg:pl-3">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5 flex justify-between">
-                  Tiến độ <span>{getWorkflowProgress()}%</span>
-                </p>
-                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-indigo-500 transition-all duration-500" 
-                    style={{width: `${getWorkflowProgress()}%`}}
-                  ></div>
-                </div>
-              </div>
-            </div>
-          </Card>
+              }
+              tone="violet"
+            />
+          </div>
 
           {/* REJECTION / RETURN BANNER CARD */}
           {['REJECTED', 'RETURNED', 'CANCELLED', 'NEED_REVISION'].includes(data.status) && (
@@ -980,6 +993,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                     rowKey="id"
                                     pagination={false}
                                     sticky={true}
+                                    scroll={{ y: 'calc(100vh - 410px)' }}
                                     rowClassName={(record: any) => {
                                         const stocks = record.item.stocks || [];
                                         const reqStock = stocks.find((s: any) => s.warehouseCode === data.warehouseCode) || { quantityOnHand: 0, quantityReserved: 0 };
@@ -994,7 +1008,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                     )}
 
                     {activeTab === 'deliveries' && (
-                        <div className="p-6">
+                        <div className="p-6 max-h-[calc(100vh-380px)] overflow-y-auto">
                             {(!data.deliveryBatches || data.deliveryBatches.length === 0) ? (
                                 <div className="text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
                                     <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
@@ -1071,7 +1085,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                     )}
 
                     {activeTab === 'history' && (
-                        <div className="p-8">
+                        <div className="p-8 max-h-[calc(100vh-380px)] overflow-y-auto">
                             <div className="relative pl-8 border-l-2 border-slate-100 space-y-8">
                                 <div className="relative">
                                     <div className="absolute -left-[41px] top-1 w-5 h-5 rounded-full bg-slate-300 ring-4 ring-white shadow-sm flex items-center justify-center">
@@ -1125,7 +1139,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                     )}
 
                     {activeTab === 'links' && (
-                        <div className="p-8">
+                        <div className="p-8 max-h-[calc(100vh-380px)] overflow-y-auto">
                             {chainData ? (
                                 <DocumentChainMap chainData={chainData} currentDocType="request" currentDocId={requestId} />
                             ) : (
@@ -1137,7 +1151,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
             </Layout.Content>
 
           {/* RIGHT COLUMN: Actions & History */}
-          <Layout.Sider width={320} theme="light" className="no-print border-l border-slate-200" style={{ height: '100%', overflowY: 'auto' }}>
+          <Layout.Sider width={260} theme="light" className="no-print border-l border-slate-200" style={{ height: '100%', overflowY: 'auto' }}>
               <div className="p-6 flex flex-col gap-6">
                   <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 relative overflow-hidden text-slate-800">
                       <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500 rounded-full blur-[80px] opacity-10 transform translate-x-1/2 -translate-y-1/2"></div>
