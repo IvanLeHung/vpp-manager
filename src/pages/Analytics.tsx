@@ -655,6 +655,7 @@ export default function Analytics() {
       qtyApproved: number;
       qtyReceived: number;
       hasWrong: boolean;
+      generalNotes: string[];
       itemsMap: Map<string, {
         name: string;
         unit: string;
@@ -674,8 +675,16 @@ export default function Analytics() {
         qtyApproved: 0,
         qtyReceived: 0,
         hasWrong: false,
+        generalNotes: [] as string[],
         itemsMap: new Map()
       };
+
+      if (t.generalNote && t.generalNote.trim()) {
+        const cleanNote = t.generalNote.trim();
+        if (!exist.generalNotes.includes(cleanNote)) {
+          exist.generalNotes.push(cleanNote);
+        }
+      }
 
       t.items.forEach(i => {
         exist.itemsCount.add(i.name);
@@ -683,6 +692,13 @@ export default function Analytics() {
         exist.qtyApproved += i.qtyApproved;
         exist.qtyReceived += i.qtyReceived;
         if (i.status === 'Nhận sai hàng') exist.hasWrong = true;
+
+        if (i.note && i.note.trim()) {
+          const cleanItemNote = `${i.name}: ${i.note.trim()}`;
+          if (!exist.generalNotes.includes(cleanItemNote)) {
+            exist.generalNotes.push(cleanItemNote);
+          }
+        }
 
         const itemExist = exist.itemsMap.get(i.name) || {
           name: i.name,
@@ -741,7 +757,8 @@ export default function Analytics() {
         remaining,
         receiveRate: val.qtyApproved > 0 ? Math.round((val.qtyReceived / val.qtyApproved) * 100) : 0,
         overallStatus,
-        items: Array.from(val.itemsMap.values())
+        items: Array.from(val.itemsMap.values()),
+        generalNotes: val.generalNotes.join('; ')
       };
     });
   }, [filteredTickets]);
@@ -883,6 +900,312 @@ export default function Analytics() {
     setTimeout(() => {
       window.print();
     }, 100);
+  };
+
+  // EXPORT WORD
+  const handleExportWord = () => {
+    if (aggregatedItems.length === 0 && !selectedTicket) {
+      toast.warning("Chưa có dữ liệu báo cáo để xuất!");
+      return;
+    }
+
+    const titleText = selectedTicket 
+      ? "Báo cáo đề xuất & giao nhận VPP" 
+      : "Báo cáo tổng hợp văn phòng phẩm";
+    const qrData = selectedTicket 
+      ? selectedTicket.id 
+      : `BC-VPP-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}`;
+    const reportTitle = selectedTicket 
+      ? "BÁO CÁO ĐỀ XUẤT VÀ GIAO NHẬN VĂN PHÒNG PHẨM" 
+      : (printType === 'department' 
+          ? "BÁO CÁO TỔNG HỢP SỐ LƯỢNG THEO PHÒNG BAN" 
+          : "BÁO CÁO ĐỀ XUẤT VÀ GIAO NHẬN VĂN PHÒNG PHẨM"
+        );
+    
+    const deptFilterLabel = selectedTicket 
+      ? selectedTicket.department 
+      : (deptFilter === 'ALL' ? 'Tất cả phòng ban đề xuất' : deptFilter);
+    const dateRangeLabel = getPrintedDateRangeLabel();
+    const createdDateLabel = selectedTicket ? selectedTicket.date : new Date().toLocaleDateString('vi-VN');
+    const reporterName = selectedTicket ? selectedTicket.creator || reporter : reporter;
+    const reportCode = selectedTicket ? selectedTicket.id : qrData;
+    const isDeptReport = !selectedTicket && printType === 'department';
+
+    // Build data rows
+    let tableHtml = "";
+    if (isDeptReport) {
+      tableHtml = `
+        <table style="width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px;">
+          <thead>
+            <tr>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 50px;">STT</th>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2;">Phòng ban</th>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 100px;">Số loại VPP</th>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 110px;">Tổng SL đề xuất</th>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 110px;">Tổng SL được duyệt</th>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 110px;">Tổng SL thực nhận</th>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 110px;">Tổng còn thiếu</th>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 110px;">Tỷ lệ thực nhận</th>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 120px;">Trạng thái tổng thể</th>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2;">Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${departmentalSummary.map((d, idx) => `
+              <tr>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${idx + 1}</td>
+                <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">${d.department}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${d.itemsCount}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${d.qtyRequested}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${d.qtyApproved}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: right; font-weight: bold;">${d.qtyReceived}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${d.remaining}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${d.receiveRate}%</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${d.overallStatus}</td>
+                <td style="border: 1px solid #000; padding: 6px; font-style: italic;">${d.generalNotes || '-'}</td>
+              </tr>
+            `).join('')}
+            <tr style="font-weight: bold; font-style: italic; background-color: #fafafa;">
+              <td style="border: 1px solid #000; padding: 6px; text-align: center;"></td>
+              <td style="border: 1px solid #000; padding: 6px;" colspan="2">CỘNG TỔNG</td>
+              <td style="border: 1px solid #000; padding: 6px; text-align: right;">${stats.totalRequested}</td>
+              <td style="border: 1px solid #000; padding: 6px; text-align: right;">${stats.totalApproved}</td>
+              <td style="border: 1px solid #000; padding: 6px; text-align: right;">${stats.totalReceived}</td>
+              <td style="border: 1px solid #000; padding: 6px; text-align: right;">${stats.totalMissing}</td>
+              <td style="border: 1px solid #000; padding: 6px; text-align: center;">${stats.receiveRate}%</td>
+              <td style="border: 1px solid #000; padding: 6px; text-align: center;">${getOverallStatusLabel()}</td>
+              <td style="border: 1px solid #000; padding: 6px;"></td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+    } else {
+      const itemsList = selectedTicket ? selectedTicket.items : aggregatedItems;
+      tableHtml = `
+        <table style="width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px;">
+          <thead>
+            <tr>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 50px;">STT</th>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2;">Tên món hàng</th>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 80px;">ĐVT</th>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 100px;">SL đề xuất ban đầu</th>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 100px;">SL được duyệt</th>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 100px;">SL thực nhận</th>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 100px;">SL còn thiếu</th>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 120px;">Xác nhận nhận hàng</th>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2;">Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsList.map((item, idx) => `
+              <tr>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${idx + 1}</td>
+                <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">${item.name}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${item.unit}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${item.qtyRequested}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${item.qtyApproved}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: right; font-weight: bold;">${item.qtyReceived}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${Math.max(0, item.qtyApproved - item.qtyReceived)}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${getStatusLabel(item.status)}</td>
+                <td style="border: 1px solid #000; padding: 6px; font-style: italic;">${item.note || '-'}</td>
+              </tr>
+            `).join('')}
+            <tr style="font-weight: bold; font-style: italic; background-color: #fafafa;">
+              <td style="border: 1px solid #000; padding: 6px; text-align: center;"></td>
+              <td style="border: 1px solid #000; padding: 6px;" colspan="2">CỘNG TỔNG</td>
+              <td style="border: 1px solid #000; padding: 6px; text-align: right;">
+                ${selectedTicket ? selectedTicket.items.reduce((s, i) => s + i.qtyRequested, 0) : stats.totalRequested}
+              </td>
+              <td style="border: 1px solid #000; padding: 6px; text-align: right;">
+                ${selectedTicket ? selectedTicket.items.reduce((s, i) => s + i.qtyApproved, 0) : stats.totalApproved}
+              </td>
+              <td style="border: 1px solid #000; padding: 6px; text-align: right;">
+                ${selectedTicket ? selectedTicket.items.reduce((s, i) => s + i.qtyReceived, 0) : stats.totalReceived}
+              </td>
+              <td style="border: 1px solid #000; padding: 6px; text-align: right;">
+                ${selectedTicket ? selectedTicket.items.reduce((s, i) => s + Math.max(0, i.qtyApproved - i.qtyReceived), 0) : stats.totalMissing}
+              </td>
+              <td style="border: 1px solid #000; padding: 6px; text-align: center;">
+                ${selectedTicket ? getStatusLabel(selectedTicket.deliveryStatus) : getOverallStatusLabel()}
+              </td>
+              <td style="border: 1px solid #000; padding: 6px;">
+                Tỷ lệ thực nhận: ${selectedTicket ? Math.round((selectedTicket.items.reduce((s, i) => s + i.qtyReceived, 0) / (selectedTicket.items.reduce((s, i) => s + i.qtyApproved, 0) || 1)) * 100) : stats.receiveRate}%
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+    }
+
+    // Build signature section
+    let signatureHtml = "";
+    if (selectedTicket) {
+      signatureHtml = `
+        <table class="layout-grid" style="width: 100%; margin-top: 40px; text-align: center; border: none;">
+          <tr>
+            <td style="width: 25%; border: none; text-align: center;">
+              <strong style="font-size: 11pt;">Người lập biểu</strong><br/>
+              <span style="font-size: 9pt; font-style: italic;">(Ký & ghi rõ họ tên)</span>
+              <br/><br/><br/><br/>
+              <strong style="font-size: 11pt;">${reporterName}</strong>
+            </td>
+            <td style="width: 25%; border: none; text-align: center;">
+              <strong style="font-size: 11pt;">Người giao hàng</strong><br/>
+              <span style="font-size: 9pt; font-style: italic;">(Ký & ghi rõ họ tên)</span>
+              <br/><br/><br/><br/>
+              <strong style="font-size: 11pt;">${selectedTicket.deliverer || 'Lê Văn Giao'}</strong>
+            </td>
+            <td style="width: 25%; border: none; text-align: center;">
+              <strong style="font-size: 11pt;">Người nhận hàng</strong><br/>
+              <span style="font-size: 9pt; font-style: italic;">(Ký & ghi rõ họ tên)</span>
+              <br/><br/><br/><br/>
+              <strong style="font-size: 11pt;">${selectedTicket.receiver || '---'}</strong>
+            </td>
+            <td style="width: 25%; border: none; text-align: center;">
+              <strong style="font-size: 11pt;">Trưởng bộ phận</strong><br/>
+              <span style="font-size: 9pt; font-style: italic;">(Ký & đóng dấu)</span>
+              <br/><br/><br/><br/>
+              <strong style="font-size: 11pt;">${selectedTicket.approver || 'Trần Thị B'}</strong>
+            </td>
+          </tr>
+        </table>
+      `;
+    } else {
+      signatureHtml = `
+        <table class="layout-grid" style="width: 100%; margin-top: 40px; border: none;">
+          <tr>
+            <td style="width: 60%; border: none;"></td>
+            <td style="width: 40%; text-align: center; border: none;">
+              <strong style="font-size: 11pt;">Người lập biểu</strong><br/>
+              <span style="font-size: 9pt; font-style: italic;">(Ký & ghi rõ họ tên)</span>
+              <br/><br/><br/><br/>
+              <strong style="font-size: 11pt;">${reporterName}</strong>
+            </td>
+          </tr>
+        </table>
+      `;
+    }
+
+    const htmlContent = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8">
+        <title>${titleText}</title>
+        <style>
+          @page Section1 {
+            size: ${printOrientation === 'landscape' ? '29.7cm 21.0cm' : '21.0cm 29.7cm'};
+            margin: 1.5cm 1.5cm 1.5cm 1.5cm;
+            mso-page-orientation: ${printOrientation};
+            mso-header-margin: 36.0pt;
+            mso-footer-margin: 36.0pt;
+            mso-paper-source: 0;
+          }
+          div.Section1 {
+            page: Section1;
+          }
+          body {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 12pt;
+            line-height: 1.3;
+            color: #000;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            margin-bottom: 15px;
+          }
+          th, td {
+            border: 1px solid #000;
+            padding: 6px;
+            font-size: 10pt;
+            vertical-align: middle;
+          }
+          th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+            text-align: center;
+          }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+          .font-bold { font-weight: bold; }
+          .italic { font-style: italic; }
+          
+          table.layout-grid {
+            border: none !important;
+            margin: 0;
+            width: 100%;
+          }
+          table.layout-grid td {
+            border: none !important;
+            padding: 4px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="Section1">
+          <!-- Header block -->
+          <table class="layout-grid">
+            <tr>
+              <td style="width: 40%; text-align: left; vertical-align: top;">
+                <strong style="font-size: 11pt;">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</strong><br/>
+                <em style="font-size: 10pt;">${titleText}</em><br/>
+                <span style="font-size: 10pt;">Ban Hành chính Nhân sự</span>
+              </td>
+              <td style="width: 20%; text-align: center; vertical-align: middle;">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(qrData)}" width="80" height="80" alt="QR" />
+              </td>
+              <td style="width: 40%; text-align: center; vertical-align: top;">
+                <strong style="font-size: 11pt;">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</strong><br/>
+                <strong style="text-decoration: underline; font-size: 10pt;">Độc lập - Tự do - Hạnh phúc</strong><br/>
+                <em style="font-size: 10pt; color: #555;">Hà Nội, ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}</em>
+              </td>
+            </tr>
+          </table>
+          
+          <hr style="border: 1px solid #000; margin-top: 10px; margin-bottom: 20px;" />
+          
+          <!-- Report Title -->
+          <div style="text-align: center; font-weight: bold; font-size: 14pt; margin-bottom: 20px; text-transform: uppercase;">
+            ${reportTitle}
+          </div>
+          
+          <!-- Meta Info -->
+          <table class="layout-grid" style="margin-bottom: 15px; font-size: 11pt;">
+            <tr>
+              <td style="width: 50%;"><strong>Phòng ban:</strong> ${deptFilterLabel}</td>
+              <td style="width: 50%;"><strong>Thời gian báo cáo:</strong> ${dateRangeLabel}</td>
+            </tr>
+            <tr>
+              <td style="width: 50%;"><strong>Ngày lập biểu:</strong> ${createdDateLabel}</td>
+              <td style="width: 50%;"><strong>Người lập biểu:</strong> ${reporterName}</td>
+            </tr>
+            <tr>
+              <td colspan="2"><strong>${selectedTicket ? 'Số phiếu giao nhận' : 'Mã báo cáo'}:</strong> ${reportCode}</td>
+            </tr>
+          </table>
+          
+          <!-- Report Data Table -->
+          ${tableHtml}
+          
+          <!-- Signatures Section -->
+          ${signatureHtml}
+        </div>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob(['\ufeff' + htmlContent], { type: 'application/msword;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const fileSuffix = selectedTicket ? selectedTicket.id : `${printType}_${new Date().toISOString().slice(0, 10)}`;
+    a.download = `Bao_Cao_VPP_${fileSuffix}.doc`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Xuất báo cáo Word thành công!");
   };
 
   // ADD TICKET FORM ROW ACTIONS
@@ -1135,7 +1458,7 @@ export default function Analytics() {
         @media print {
           @page {
             size: A4 ${printOrientation};
-            margin: 12mm;
+            margin: 15mm 15mm 15mm 15mm;
           }
 
           body {
@@ -1183,6 +1506,7 @@ export default function Analytics() {
             background: #fff !important;
             display: block !important;
             box-sizing: border-box !important;
+            padding: 5mm !important;
           }
 
           /* Header styles in print */
@@ -1275,6 +1599,10 @@ export default function Analytics() {
             text-align: center !important;
           }
 
+          .text-center-print {
+            text-align: center !important;
+          }
+
           .print-signature {
             display: grid !important;
             grid-template-columns: repeat(4, 1fr) !important;
@@ -1285,6 +1613,23 @@ export default function Analytics() {
           }
 
           .print-signature > div {
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            height: 110px !important;
+            color: #000 !important;
+          }
+
+          .print-signature-single {
+            display: flex !important;
+            justify-content: flex-end !important;
+            margin-top: 40px !important;
+            text-align: center !important;
+            page-break-inside: avoid !important;
+          }
+
+          .print-signature-single > div {
+            width: 250px !important;
             display: flex !important;
             flex-direction: column !important;
             justify-content: space-between !important;
@@ -1349,6 +1694,13 @@ export default function Analytics() {
             className="px-5 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl shadow-emerald-100 transition-all flex items-center gap-2 transform active:scale-95 cursor-pointer"
           >
             <Download className="w-4 h-4" /> Xuất Excel
+          </button>
+
+          <button 
+            onClick={handleExportWord}
+            className="px-5 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl shadow-blue-100 transition-all flex items-center gap-2 transform active:scale-95 cursor-pointer"
+          >
+            <FileText className="w-4 h-4" /> Xuất Word
           </button>
           
           <div className="flex items-center bg-white border border-slate-200 rounded-2xl p-1.5 shadow-sm gap-1 no-print">
@@ -2435,6 +2787,7 @@ export default function Analytics() {
                 <th style={{width: '120px'}} className="text-right">Tổng còn thiếu</th>
                 <th style={{width: '120px'}} className="text-center">Tỷ lệ thực nhận</th>
                 <th style={{width: '140px'}} className="text-center">Trạng thái tổng thể</th>
+                <th>Ghi chú</th>
               </tr>
             </thead>
             <tbody>
@@ -2449,6 +2802,7 @@ export default function Analytics() {
                   <td className="text-right-print">{d.remaining}</td>
                   <td className="text-center-print">{d.receiveRate}%</td>
                   <td className="text-center" style={{fontSize: '9.5pt'}}>{d.overallStatus}</td>
+                  <td style={{fontSize: '9.5pt', fontStyle: 'italic'}}>{d.generalNotes || '-'}</td>
                 </tr>
               ))}
               {/* Total Row */}
@@ -2461,6 +2815,7 @@ export default function Analytics() {
                 <td className="text-right-print">{stats.totalMissing}</td>
                 <td className="text-center-print">{stats.receiveRate}%</td>
                 <td className="text-center" style={{fontSize: '10pt'}}>{getOverallStatusLabel()}</td>
+                <td></td>
               </tr>
             </tbody>
           </table>
@@ -2519,28 +2874,38 @@ export default function Analytics() {
         )}
 
         {/* Signature Area */}
-        <div className="print-signature">
-          <div>
-            <div className="font-bold">Người lập biểu</div>
-            <div className="text-xs italic mb-10">(Ký & ghi rõ họ tên)</div>
-            <div className="font-bold text-slate-700 mt-6">{reporter}</div>
+        {selectedTicket ? (
+          <div className="print-signature">
+            <div>
+              <div className="font-bold">Người lập biểu</div>
+              <div className="text-xs italic mb-10">(Ký & ghi rõ họ tên)</div>
+              <div className="font-bold text-slate-700 mt-6">{reporter}</div>
+            </div>
+            <div>
+              <div className="font-bold">Người giao hàng</div>
+              <div className="text-xs italic mb-10">(Ký & ghi rõ họ tên)</div>
+              <div className="font-bold text-slate-700 mt-6">{selectedTicket?.deliverer || 'Lê Văn Giao'}</div>
+            </div>
+            <div>
+              <div className="font-bold">Người nhận hàng</div>
+              <div className="text-xs italic mb-10">(Ký & ghi rõ họ tên)</div>
+              <div className="font-bold text-slate-700 mt-6">{selectedTicket?.receiver || '---'}</div>
+            </div>
+            <div>
+              <div className="font-bold">Trưởng bộ phận</div>
+              <div className="text-xs italic mb-10">(Ký & đóng dấu)</div>
+              <div className="font-bold text-slate-700 mt-6">{selectedTicket?.approver || 'Trần Thị B'}</div>
+            </div>
           </div>
-          <div>
-            <div className="font-bold">Người giao hàng</div>
-            <div className="text-xs italic mb-10">(Ký & ghi rõ họ tên)</div>
-            <div className="font-bold text-slate-700 mt-6">{selectedTicket?.deliverer || 'Lê Văn Giao'}</div>
+        ) : (
+          <div className="print-signature-single">
+            <div>
+              <div className="font-bold">Người lập biểu</div>
+              <div className="text-xs italic mb-10">(Ký & ghi rõ họ tên)</div>
+              <div className="font-bold text-slate-700 mt-6">{reporter}</div>
+            </div>
           </div>
-          <div>
-            <div className="font-bold">Người nhận hàng</div>
-            <div className="text-xs italic mb-10">(Ký & ghi rõ họ tên)</div>
-            <div className="font-bold text-slate-700 mt-6">{selectedTicket?.receiver || '---'}</div>
-          </div>
-          <div>
-            <div className="font-bold">Trưởng bộ phận</div>
-            <div className="text-xs italic mb-10">(Ký & đóng dấu)</div>
-            <div className="font-bold text-slate-700 mt-6">{selectedTicket?.approver || 'Trần Thị B'}</div>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* ── MODALS SECTION ── */}
