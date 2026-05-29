@@ -288,6 +288,7 @@ export default function JanitorialReports() {
   const [reporter, setReporter] = useState(currentUser?.fullName || 'Bộ phận Hành chính');
   const [searchText, setSearchText] = useState('');
   const [printOrientation, setPrintOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  const [printType, setPrintType] = useState<'detail' | 'department'>('detail');
   
   // Modals States
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -1375,6 +1376,31 @@ export default function JanitorialReports() {
             </button>
           </div>
 
+          <div className="flex items-center bg-white border border-slate-200 rounded-2xl p-1.5 shadow-sm gap-1 no-print">
+            <button
+              type="button"
+              onClick={() => setPrintType('detail')}
+              className={`px-3.5 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer ${
+                printType === 'detail'
+                  ? 'bg-indigo-650 text-white shadow-sm'
+                  : 'bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              In Chi tiết
+            </button>
+            <button
+              type="button"
+              onClick={() => setPrintType('department')}
+              className={`px-3.5 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer ${
+                printType === 'department'
+                  ? 'bg-indigo-650 text-white shadow-sm'
+                  : 'bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              In Tổng hợp PB
+            </button>
+          </div>
+
           <button 
             onClick={handlePrint}
             className="px-5 py-3.5 bg-indigo-650 hover:bg-indigo-700 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-100 transition-all flex items-center gap-2 transform active:scale-95 cursor-pointer"
@@ -2373,7 +2399,13 @@ export default function JanitorialReports() {
         </div>
 
         <div className="print-title">
-          BÁO CÁO ĐỀ XUẤT VÀ GIAO NHẬN ĐỒ VỆ SINH
+          {selectedTicket 
+            ? "BÁO CÁO ĐỀ XUẤT VÀ GIAO NHẬN ĐỒ VỆ SINH" 
+            : (printType === 'department' 
+                ? "BÁO CÁO TỔNG HỢP SỐ LƯỢNG THEO PHÒNG BAN" 
+                : "BÁO CÁO ĐỀ XUẤT VÀ GIAO NHẬN ĐỒ VỆ SINH"
+              )
+          }
         </div>
         
         {/* Report Meta Info */}
@@ -2389,58 +2421,102 @@ export default function JanitorialReports() {
           )}
         </div>
 
-        {/* Detailed Items Table */}
-        <table className="w-full">
-          <thead>
-            <tr>
-              <th style={{width: '50px'}}>STT</th>
-              <th>Tên món hàng</th>
-              <th style={{width: '75px'}}>ĐVT</th>
-              <th style={{width: '95px'}}>SL đề xuất ban đầu</th>
-              <th style={{width: '95px'}}>SL được duyệt</th>
-              <th style={{width: '95px'}}>SL thực nhận</th>
-              <th style={{width: '95px'}}>SL còn thiếu</th>
-              <th style={{width: '130px'}}>Xác nhận nhận hàng</th>
-              <th>Ghi chú</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(selectedTicket ? selectedTicket.items : aggregatedItems).map((item, idx) => (
-              <tr key={idx}>
-                <td className="text-center">{idx + 1}</td>
-                <td style={{fontWeight: 'bold'}}>{item.name}</td>
-                <td className="text-center">{item.unit}</td>
-                <td className="text-right-print">{item.qtyRequested}</td>
-                <td className="text-right-print">{item.qtyApproved}</td>
-                <td className="text-right-print" style={{fontWeight: 'bold'}}>{item.qtyReceived}</td>
-                <td className="text-right-print">{Math.max(0, item.qtyApproved - item.qtyReceived)}</td>
-                <td className="text-center" style={{fontSize: '9.5pt'}}>{getStatusLabel(item.status)}</td>
-                <td style={{fontSize: '9.5pt', fontStyle: 'italic'}}>{item.note || '-'}</td>
+        {/* Detailed Items Table or Department Summary Table */}
+        {!selectedTicket && printType === 'department' ? (
+          <table className="w-full">
+            <thead>
+              <tr>
+                <th style={{width: '50px'}}>STT</th>
+                <th>Phòng ban</th>
+                <th style={{width: '100px'}} className="text-center">Số loại vật tư</th>
+                <th style={{width: '120px'}} className="text-right">Tổng SL đề xuất</th>
+                <th style={{width: '120px'}} className="text-right">Tổng SL được duyệt</th>
+                <th style={{width: '120px'}} className="text-right">Tổng SL thực nhận</th>
+                <th style={{width: '120px'}} className="text-right">Tổng còn thiếu</th>
+                <th style={{width: '120px'}} className="text-center">Tỷ lệ thực nhận</th>
+                <th style={{width: '140px'}} className="text-center">Trạng thái tổng thể</th>
               </tr>
-            ))}
-            {/* Total Row */}
-            <tr style={{fontWeight: 'bold', fontStyle: 'italic', background: '#fafafa'}}>
-              <td className="text-center"></td>
-              <td colSpan={2}>CỘNG TỔNG</td>
-              <td className="text-right-print">
-                {selectedTicket ? selectedTicket.items.reduce((s, i) => s + i.qtyRequested, 0) : stats.totalRequested}
-              </td>
-              <td className="text-right-print">
-                {selectedTicket ? selectedTicket.items.reduce((s, i) => s + i.qtyApproved, 0) : stats.totalApproved}
-              </td>
-              <td className="text-right-print">
-                {selectedTicket ? selectedTicket.items.reduce((s, i) => s + i.qtyReceived, 0) : stats.totalReceived}
-              </td>
-              <td className="text-right-print">
-                {selectedTicket ? selectedTicket.items.reduce((s, i) => s + Math.max(0, i.qtyApproved - i.qtyReceived), 0) : stats.totalMissing}
-              </td>
-              <td className="text-center" style={{fontSize: '10pt'}}>
-                {selectedTicket ? getStatusLabel(selectedTicket.deliveryStatus) : getOverallStatusLabel()}
-              </td>
-              <td>Tỷ lệ thực nhận: {selectedTicket ? Math.round((selectedTicket.items.reduce((s, i) => s + i.qtyReceived, 0) / (selectedTicket.items.reduce((s, i) => s + i.qtyApproved, 0) || 1)) * 100) : stats.receiveRate}%</td>
-            </tr>
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {departmentalSummary.map((d, idx) => (
+                <tr key={idx}>
+                  <td className="text-center">{idx + 1}</td>
+                  <td style={{fontWeight: 'bold'}}>{d.department}</td>
+                  <td className="text-center">{d.itemsCount}</td>
+                  <td className="text-right-print">{d.qtyRequested}</td>
+                  <td className="text-right-print">{d.qtyApproved}</td>
+                  <td className="text-right-print" style={{fontWeight: 'bold'}}>{d.qtyReceived}</td>
+                  <td className="text-right-print">{d.remaining}</td>
+                  <td className="text-center-print">{d.receiveRate}%</td>
+                  <td className="text-center" style={{fontSize: '9.5pt'}}>{d.overallStatus}</td>
+                </tr>
+              ))}
+              {/* Total Row */}
+              <tr style={{fontWeight: 'bold', fontStyle: 'italic', background: '#fafafa'}}>
+                <td className="text-center"></td>
+                <td colSpan={2}>CỘNG TỔNG</td>
+                <td className="text-right-print">{stats.totalRequested}</td>
+                <td className="text-right-print">{stats.totalApproved}</td>
+                <td className="text-right-print">{stats.totalReceived}</td>
+                <td className="text-right-print">{stats.totalMissing}</td>
+                <td className="text-center-print">{stats.receiveRate}%</td>
+                <td className="text-center" style={{fontSize: '10pt'}}>{getOverallStatusLabel()}</td>
+              </tr>
+            </tbody>
+          </table>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr>
+                <th style={{width: '50px'}}>STT</th>
+                <th>Tên món hàng</th>
+                <th style={{width: '75px'}}>ĐVT</th>
+                <th style={{width: '95px'}}>SL đề xuất ban đầu</th>
+                <th style={{width: '95px'}}>SL được duyệt</th>
+                <th style={{width: '95px'}}>SL thực nhận</th>
+                <th style={{width: '95px'}}>SL còn thiếu</th>
+                <th style={{width: '130px'}}>Xác nhận nhận hàng</th>
+                <th>Ghi chú</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(selectedTicket ? selectedTicket.items : aggregatedItems).map((item, idx) => (
+                <tr key={idx}>
+                  <td className="text-center">{idx + 1}</td>
+                  <td style={{fontWeight: 'bold'}}>{item.name}</td>
+                  <td className="text-center">{item.unit}</td>
+                  <td className="text-right-print">{item.qtyRequested}</td>
+                  <td className="text-right-print">{item.qtyApproved}</td>
+                  <td className="text-right-print" style={{fontWeight: 'bold'}}>{item.qtyReceived}</td>
+                  <td className="text-right-print">{Math.max(0, item.qtyApproved - item.qtyReceived)}</td>
+                  <td className="text-center" style={{fontSize: '9.5pt'}}>{getStatusLabel(item.status)}</td>
+                  <td style={{fontSize: '9.5pt', fontStyle: 'italic'}}>{item.note || '-'}</td>
+                </tr>
+              ))}
+              {/* Total Row */}
+              <tr style={{fontWeight: 'bold', fontStyle: 'italic', background: '#fafafa'}}>
+                <td className="text-center"></td>
+                <td colSpan={2}>CỘNG TỔNG</td>
+                <td className="text-right-print">
+                  {selectedTicket ? selectedTicket.items.reduce((s, i) => s + i.qtyRequested, 0) : stats.totalRequested}
+                </td>
+                <td className="text-right-print">
+                  {selectedTicket ? selectedTicket.items.reduce((s, i) => s + i.qtyApproved, 0) : stats.totalApproved}
+                </td>
+                <td className="text-right-print">
+                  {selectedTicket ? selectedTicket.items.reduce((s, i) => s + i.qtyReceived, 0) : stats.totalReceived}
+                </td>
+                <td className="text-right-print">
+                  {selectedTicket ? selectedTicket.items.reduce((s, i) => s + Math.max(0, i.qtyApproved - i.qtyReceived), 0) : stats.totalMissing}
+                </td>
+                <td className="text-center" style={{fontSize: '10pt'}}>
+                  {selectedTicket ? getStatusLabel(selectedTicket.deliveryStatus) : getOverallStatusLabel()}
+                </td>
+                <td>Tỷ lệ thực nhận: {selectedTicket ? Math.round((selectedTicket.items.reduce((s, i) => s + i.qtyReceived, 0) / (selectedTicket.items.reduce((s, i) => s + i.qtyApproved, 0) || 1)) * 100) : stats.receiveRate}%</td>
+              </tr>
+            </tbody>
+          </table>
+        )}
 
         {/* Signature Area */}
         <div className="print-signature">
