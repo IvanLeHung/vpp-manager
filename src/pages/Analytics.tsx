@@ -287,6 +287,7 @@ export default function Analytics() {
   const [approvalStatusFilter, setApprovalStatusFilter] = useState('ALL');
   const [reporter, setReporter] = useState(currentUser?.fullName || 'Bộ phận Hành chính');
   const [searchText, setSearchText] = useState('');
+  const [printOrientation, setPrintOrientation] = useState<'portrait' | 'landscape'>('portrait');
   
   // Modals States
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -1132,7 +1133,7 @@ export default function Analytics() {
       <style dangerouslySetInnerHTML={{__html: `
         @media print {
           @page {
-            size: A4 portrait;
+            size: A4 ${printOrientation};
             margin: 12mm;
           }
 
@@ -1349,9 +1350,34 @@ export default function Analytics() {
             <Download className="w-4 h-4" /> Xuất Excel
           </button>
           
+          <div className="flex items-center bg-white border border-slate-200 rounded-2xl p-1.5 shadow-sm gap-1 no-print">
+            <button
+              type="button"
+              onClick={() => setPrintOrientation('portrait')}
+              className={`px-3.5 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer ${
+                printOrientation === 'portrait'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              Khổ dọc
+            </button>
+            <button
+              type="button"
+              onClick={() => setPrintOrientation('landscape')}
+              className={`px-3.5 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer ${
+                printOrientation === 'landscape'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              Khổ ngang
+            </button>
+          </div>
+
           <button 
             onClick={handlePrint}
-            className="px-5 py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl shadow-slate-200 transition-all flex items-center gap-2 transform active:scale-95 cursor-pointer"
+            className="px-5 py-3.5 bg-indigo-650 hover:bg-indigo-700 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-100 transition-all flex items-center gap-2 transform active:scale-95 cursor-pointer"
           >
             <Printer className="w-4 h-4" /> In báo cáo A4
           </button>
