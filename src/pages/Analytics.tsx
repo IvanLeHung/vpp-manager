@@ -1180,6 +1180,60 @@ export default function Analytics() {
             width: 100% !important;
             background: #fff !important;
             display: block !important;
+            box-sizing: border-box !important;
+          }
+
+          /* Header styles in print */
+          .report-header {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            border-bottom: 2px solid #000 !important;
+            padding-bottom: 8px !important;
+            margin-bottom: 20px !important;
+          }
+          .report-header .company {
+            width: 38% !important;
+            text-align: left !important;
+            font-size: 11pt !important;
+            line-height: 1.4 !important;
+            color: #000 !important;
+          }
+          .report-header .company strong {
+            font-size: 11.5pt !important;
+          }
+          .report-header .company em {
+            font-weight: bold !important;
+            font-style: italic !important;
+          }
+          .report-header .qr {
+            width: 20% !important;
+            text-align: center !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+          }
+          .report-header .qr img {
+            width: 70px !important;
+            height: 70px !important;
+            border: 1px solid #000 !important;
+            padding: 2px !important;
+            background: #fff !important;
+          }
+          .report-header .national {
+            width: 42% !important;
+            text-align: center !important;
+            font-size: 11pt !important;
+            line-height: 1.4 !important;
+            color: #000 !important;
+          }
+          .report-header .national strong {
+            font-size: 11.5pt !important;
+          }
+          .report-header .national u {
+            font-weight: bold !important;
+            text-decoration: underline !important;
           }
 
           table {
@@ -1191,9 +1245,9 @@ export default function Analytics() {
 
           th,
           td {
-            border: 1px solid #000 !important;
-            padding: 4px 6px !important;
-            font-size: 11pt !important;
+            border: 1.5px solid #000 !important;
+            padding: 6px 8px !important;
+            font-size: 10.5pt !important;
             vertical-align: middle !important;
             color: #000 !important;
           }
@@ -1201,6 +1255,9 @@ export default function Analytics() {
           th {
             font-weight: bold !important;
             text-align: center !important;
+            background-color: #f2f2f2 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
 
           tr {
@@ -1208,13 +1265,29 @@ export default function Analytics() {
             page-break-after: auto !important;
           }
 
+          .text-right-print {
+            text-align: right !important;
+          }
+
+          .text-center {
+            text-align: center !important;
+          }
+
           .print-signature {
             display: grid !important;
             grid-template-columns: repeat(4, 1fr) !important;
             gap: 16px !important;
-            margin-top: 32px !important;
+            margin-top: 40px !important;
             text-align: center !important;
             page-break-inside: avoid !important;
+          }
+
+          .print-signature > div {
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            height: 110px !important;
+            color: #000 !important;
           }
 
           .print-title {
@@ -1222,13 +1295,19 @@ export default function Analytics() {
             font-weight: bold !important;
             font-size: 16pt !important;
             text-transform: uppercase !important;
-            margin-bottom: 12px !important;
+            margin-top: 15px !important;
+            margin-bottom: 15px !important;
+            letter-spacing: 0.5px !important;
           }
 
           .print-meta {
-            margin-bottom: 12px !important;
-            line-height: 1.6 !important;
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 6px 20px !important;
+            margin-bottom: 16px !important;
             font-size: 11pt !important;
+            line-height: 1.4 !important;
+            text-align: left !important;
           }
         }
       `}} />
@@ -2244,14 +2323,30 @@ export default function Analytics() {
 
       {/* ── PRINT-ONLY A4 AREA ── */}
       <div id="print-area-wrapper" className="print-area hidden">
-        <div className="text-center font-bold uppercase tracking-wide text-xl mb-1" style={{fontFamily: 'Times New Roman'}}>
-          CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
-        </div>
-        <div className="text-center font-bold text-sm border-b border-black pb-2 mb-6" style={{width: '280px', margin: '0 auto'}}>
-          Độc lập - Tự do - Hạnh phúc
+        <div className="report-header">
+          <div className="company">
+            <strong>CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</strong><br />
+            <em>{selectedTicket ? "Báo cáo đề xuất & giao nhận VPP" : "Báo cáo tổng hợp văn phòng phẩm"}</em><br />
+            Ban Hành chính Nhân sự
+          </div>
+
+          <div className="qr">
+            <img 
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(
+                selectedTicket ? selectedTicket.id : `BC-VPP-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}`
+              )}`} 
+              alt="QR Code" 
+            />
+          </div>
+
+          <div className="national">
+            <strong>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</strong><br />
+            <u>Độc lập - Tự do - Hạnh phúc</u><br />
+            <em>Hà Nội, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</em>
+          </div>
         </div>
 
-        <div className="print-title mt-4">
+        <div className="print-title">
           BÁO CÁO ĐỀ XUẤT VÀ GIAO NHẬN VĂN PHÒNG PHẨM
         </div>
         
