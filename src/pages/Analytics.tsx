@@ -739,13 +739,13 @@ export default function Analytics() {
 
     return Array.from(map.values()).map(val => {
       const remaining = Math.max(0, val.qtyApproved - val.qtyReceived);
-      let overallStatus = 'Chưa nhận';
+      let overallStatus = 'Chưa giao';
       if (val.hasWrong) {
-        overallStatus = 'Có hàng nhận sai';
+        overallStatus = 'Có hàng giao sai';
       } else if (val.qtyReceived === val.qtyApproved && val.qtyApproved > 0) {
-        overallStatus = 'Đã nhận đủ';
+        overallStatus = 'Đã giao đủ';
       } else if (val.qtyReceived > 0) {
-        overallStatus = 'Nhận thiếu';
+        overallStatus = 'Giao thiếu';
       }
 
       return {
@@ -769,7 +769,7 @@ export default function Analytics() {
       name: d.department,
       'Đề xuất ban đầu': d.qtyRequested,
       'Được duyệt': d.qtyApproved,
-      'Thực nhận': d.qtyReceived
+      'Thực giao': d.qtyReceived
     }));
   }, [departmentalSummary]);
 
@@ -784,10 +784,10 @@ export default function Analytics() {
     });
 
     return [
-      { name: 'Đã nhận đủ', value: counts.full },
-      { name: 'Nhận thiếu', value: counts.short },
-      { name: 'Nhận sai hàng', value: counts.wrong },
-      { name: 'Chưa nhận / Chờ giao', value: counts.pending + counts.none }
+      { name: 'Đã giao đủ', value: counts.full },
+      { name: 'Giao thiếu', value: counts.short },
+      { name: 'Giao sai hàng', value: counts.wrong },
+      { name: 'Chưa giao / Chờ giao', value: counts.pending + counts.none }
     ].filter(v => v.value > 0);
   }, [filteredTickets]);
 
@@ -795,19 +795,24 @@ export default function Analytics() {
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'Đã nhận đủ':
+      case 'Đã giao đủ':
       case 'RECEIVED_FULL':
         return 'bg-emerald-50 text-emerald-700 border-emerald-150';
       case 'Nhận thiếu':
+      case 'Giao thiếu':
       case 'RECEIVED_SHORT':
         return 'bg-amber-50 text-amber-700 border-amber-150';
       case 'Nhận sai hàng':
+      case 'Giao sai hàng':
       case 'WRONG_ITEMS':
       case 'Có hàng nhận sai':
+      case 'Có hàng giao sai':
         return 'bg-rose-50 text-rose-700 border-rose-150';
       case 'Chờ giao hàng':
       case 'PENDING':
         return 'bg-blue-50 text-blue-700 border-blue-150';
       case 'Chưa nhận':
+      case 'Chưa giao':
       default:
         return 'bg-slate-100 text-slate-500 border-slate-200';
     }
@@ -815,11 +820,22 @@ export default function Analytics() {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'RECEIVED_FULL': return 'Đã nhận đủ';
-      case 'RECEIVED_SHORT': return 'Nhận thiếu';
-      case 'WRONG_ITEMS': return 'Nhận sai hàng';
-      case 'PENDING': return 'Chờ giao hàng';
-      default: return status;
+      case 'RECEIVED_FULL':
+      case 'Đã nhận đủ':
+        return 'Đã giao đủ';
+      case 'RECEIVED_SHORT':
+      case 'Nhận thiếu':
+        return 'Giao thiếu';
+      case 'WRONG_ITEMS':
+      case 'Nhận sai hàng':
+        return 'Giao sai hàng';
+      case 'PENDING':
+      case 'Chờ giao hàng':
+        return 'Chờ giao hàng';
+      case 'Chưa nhận':
+        return 'Chưa giao';
+      default:
+        return status;
     }
   };
 
@@ -1395,10 +1411,10 @@ export default function Analytics() {
   // CHECK ALL OVERALL STATUS CONDITIONS
   const getOverallStatusLabel = () => {
     const hasWrong = aggregatedItems.some(i => i.status === 'Nhận sai hàng');
-    if (hasWrong) return 'Có hàng nhận sai';
-    if (stats.totalReceived === stats.totalApproved && stats.totalApproved > 0) return 'Đã nhận đủ';
-    if (stats.totalReceived > 0) return 'Nhận thiếu';
-    return 'Chưa nhận';
+    if (hasWrong) return 'Có hàng giao sai';
+    if (stats.totalReceived === stats.totalApproved && stats.totalApproved > 0) return 'Đã giao đủ';
+    if (stats.totalReceived > 0) return 'Giao thiếu';
+    return 'Chưa giao';
   };
 
   // ── DISCREPANCY ANALYSIS: dòng hàng có chênh lệch trong các phiếu đang lọc ──
@@ -1664,7 +1680,7 @@ export default function Analytics() {
           <div className="flex items-center gap-3 mb-1">
             <div className="w-2 h-8 bg-indigo-600 rounded-full"></div>
             <h2 className="text-3xl font-black text-slate-800 tracking-tighter uppercase italic">
-              Báo cáo đề xuất & giao nhận VPP
+              Báo cáo đề xuất & bàn giao VPP
             </h2>
           </div>
           <p className="text-slate-400 font-bold text-sm ml-5 uppercase tracking-widest">
@@ -1677,7 +1693,7 @@ export default function Analytics() {
             onClick={() => setIsCreateModalOpen(true)}
             className="px-5 py-3.5 bg-indigo-650 hover:bg-indigo-700 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-100 transition-all flex items-center gap-2 transform active:scale-95 cursor-pointer"
           >
-            <PlusCircle className="w-4 h-4" /> Tạo phiếu giao nhận VPP
+            <PlusCircle className="w-4 h-4" /> Tạo phiếu bàn giao VPP
           </button>
           
           <button 
@@ -1800,16 +1816,16 @@ export default function Analytics() {
           </div>
 
           <div className="space-y-1">
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">Trạng thái nhận hàng</label>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-0.5">Trạng thái bàn giao</label>
             <select 
               value={statusFilter} 
               onChange={e => setStatusFilter(e.target.value)}
               className="w-full h-[34px] px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="ALL">Tất cả trạng thái</option>
-              <option value="RECEIVED_FULL">Đã nhận đủ</option>
-              <option value="RECEIVED_SHORT">Nhận thiếu</option>
-              <option value="WRONG_ITEMS">Nhận sai hàng</option>
+              <option value="RECEIVED_FULL">Đã giao đủ</option>
+              <option value="RECEIVED_SHORT">Giao thiếu</option>
+              <option value="WRONG_ITEMS">Giao sai hàng</option>
               <option value="PENDING">Chờ giao hàng</option>
             </select>
           </div>
@@ -2240,9 +2256,9 @@ export default function Analytics() {
         <StatCard label="Tổng mặt hàng" value={stats.itemsCount} color="blue" />
         <StatCard label="Tổng đề xuất" value={stats.totalRequested} color="indigo" />
         <StatCard label="Được duyệt" value={stats.totalApproved} color="emerald" />
-        <StatCard label="Thực nhận" value={stats.totalReceived} color="emerald" />
+        <StatCard label="Thực giao" value={stats.totalReceived} color="emerald" />
         <StatCard label="Tổng còn thiếu" value={stats.totalMissing} color="amber" />
-        <StatCard label="Tỷ lệ thực nhận" value={stats.receiveRate + '%'} color={stats.receiveRate < 60 ? 'rose' : 'emerald'} />
+        <StatCard label="Tỷ lệ thực giao" value={stats.receiveRate + '%'} color={stats.receiveRate < 60 ? 'rose' : 'emerald'} />
         <StatCard label="Phiếu chưa xong" value={stats.pendingCount} color={stats.pendingCount > 0 ? 'amber' : 'slate'} />
       </div>
 
@@ -2257,7 +2273,7 @@ export default function Analytics() {
           {/* Compare Chart */}
           <div className="xl:col-span-2 bg-white rounded-3xl p-6 border border-slate-200 shadow-sm min-w-0">
             <h4 className="text-xs font-black text-slate-700 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <Activity className="w-4 h-4 text-indigo-500" /> Biến động Giao nhận theo phòng ban
+              <Activity className="w-4 h-4 text-indigo-500" /> Biến động Bàn giao theo phòng ban
             </h4>
             <div className="h-[240px] w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -2269,7 +2285,7 @@ export default function Analytics() {
                   <Legend verticalAlign="top" height={36} iconType="circle" />
                   <Bar dataKey="Đề xuất ban đầu" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="Được duyệt" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Thực nhận" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Thực giao" fill="#10b981" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -2328,9 +2344,9 @@ export default function Analytics() {
                     <th className="p-4 text-center">Số loại VPP</th>
                     <th className="p-4 text-right">Tổng SL đề xuất</th>
                     <th className="p-4 text-right">Tổng SL được duyệt</th>
-                    <th className="p-4 text-right">Tổng SL thực nhận</th>
+                    <th className="p-4 text-right">Tổng SL thực giao</th>
                     <th className="p-4 text-right">Tổng còn thiếu</th>
-                    <th className="p-4 text-center">Tỷ lệ thực nhận</th>
+                    <th className="p-4 text-center">Tỷ lệ thực giao</th>
                     <th className="p-4 text-center">Trạng thái tổng thể</th>
                     <th className="p-4 text-center w-36">Chi tiết</th>
                   </tr>
@@ -2387,9 +2403,9 @@ export default function Analytics() {
                                         <th className="p-3 text-center">Đơn vị tính</th>
                                         <th className="p-3 text-right">Số lượng đề xuất ban đầu</th>
                                         <th className="p-3 text-right">Số lượng được duyệt</th>
-                                        <th className="p-3 text-right">Số lượng thực nhận</th>
+                                        <th className="p-3 text-right">Số lượng thực giao</th>
                                         <th className="p-3 text-right">Số lượng còn thiếu</th>
-                                        <th className="p-3 text-center">Trạng thái nhận hàng</th>
+                                        <th className="p-3 text-center">Trạng thái bàn giao</th>
                                         <th className="p-3">Ghi chú</th>
                                       </tr>
                                     </thead>
@@ -2443,10 +2459,10 @@ export default function Analytics() {
                     <th className="p-4 text-center">ĐVT</th>
                     <th className="p-4 text-right">SL đề xuất</th>
                     <th className="p-4 text-right">SL được duyệt</th>
-                    <th className="p-4 text-right">SL thực nhận</th>
+                    <th className="p-4 text-right">SL thực giao</th>
                     <th className="p-4 text-right">SL còn thiếu</th>
-                    <th className="p-4 text-center">Trạng thái nhận hàng</th>
-                    <th className="p-4 text-center">Xác nhận nhận hàng</th>
+                    <th className="p-4 text-center">Trạng thái bàn giao</th>
+                    <th className="p-4 text-center">Xác nhận bàn giao</th>
                     <th className="p-4">Ghi chú</th>
                   </tr>
                 </thead>
@@ -2477,12 +2493,12 @@ export default function Analytics() {
                   <tfoot className="bg-slate-900 text-white font-black text-xs uppercase tracking-wider italic">
                     <tr>
                       <td className="p-4 text-center"></td>
-                      <td className="p-4" colSpan={2}>T\u1ed4NG C\u1ed8NG</td>
+                      <td className="p-4" colSpan={2}>TỔNG CỘNG</td>
                       <td className="p-4 text-right tabular-nums">{stats.totalRequested}</td>
                       <td className="p-4 text-right tabular-nums">{stats.totalApproved}</td>
                       <td className="p-4 text-right text-emerald-400 tabular-nums">{stats.totalReceived}</td>
                       <td className="p-4 text-right text-amber-400 tabular-nums">{stats.totalMissing}</td>
-                      <td className="p-4 text-center text-indigo-300" colSpan={2}>{stats.receiveRate}% th\u1ef1c nh\u1eadn</td>
+                      <td className="p-4 text-center text-indigo-300" colSpan={2}>{stats.receiveRate}% thực giao</td>
                       <td className="p-4"></td>
                     </tr>
                   </tfoot>
@@ -2497,7 +2513,7 @@ export default function Analytics() {
               <div className="flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-amber-500" />
                 <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest italic">3. Rà soát chênh lệch số liệu</h4>
-                <span className="text-[9px] font-bold text-slate-400 italic">(Đề xuất / Được duyệt / Thực nhận)</span>
+                <span className="text-[9px] font-bold text-slate-400 italic">(Đề xuất / Được duyệt / Thực giao)</span>
               </div>
               <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border ${discrepancyRows.length > 0 ? 'bg-amber-100 border-amber-200 text-amber-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
                 {discrepancyRows.length > 0 ? `${discrepancyRows.length} dòng có chênh lệch` : 'Không có chênh lệch'}
@@ -2522,9 +2538,9 @@ export default function Analytics() {
                       <th className="p-3 text-center">ĐVT</th>
                       <th className="p-3 text-right">Đề xuất</th>
                       <th className="p-3 text-right">Được duyệt (Admin)</th>
-                      <th className="p-3 text-right">Thực nhận</th>
+                      <th className="p-3 text-right">Thực giao</th>
                       <th className="p-3 text-right">CL ĐX⇒Duyệt</th>
-                      <th className="p-3 text-right">CL Duyệt⇒Nhận</th>
+                      <th className="p-3 text-right">CL Duyệt⇒Giao</th>
                       <th className="p-3 text-center">Trạng thái</th>
                       <th className="p-3 text-center">Thao tác</th>
                     </tr>
@@ -2560,7 +2576,7 @@ export default function Analytics() {
                               </span>
                             )}
                           </td>
-                          {/* Chênh lệch duyệt → nhận */}
+                          {/* Chênh lệch duyệt → giao */}
                           <td className="p-3 text-right">
                             {row.diffApprovedReceived === 0 ? (
                               <span className="text-emerald-500 text-[10px] font-black">✓ 0</span>
@@ -2641,7 +2657,7 @@ export default function Analytics() {
                   <th className="p-4">Người đề xuất</th>
                   <th className="p-4 text-right">Đề xuất</th>
                   <th className="p-4 text-right">Được duyệt</th>
-                  <th className="p-4 text-right">Thực nhận</th>
+                  <th className="p-4 text-right">Thực giao</th>
                   <th className="p-4 text-right">Chênh lệch</th>
                   <th className="p-4 text-center">Trạng thái</th>
                   <th className="p-4 text-right">Thao tác</th>
@@ -2712,7 +2728,7 @@ export default function Analytics() {
                           onClick={() => openConfirmModal(t)}
                           className="px-2.5 py-1.5 bg-indigo-650 text-white rounded-lg hover:bg-indigo-700 transition-colors font-black text-[10px] uppercase tracking-wider cursor-pointer"
                         >
-                          Xác nhận nhận
+                          Xác nhận bàn giao
                         </button>
                       </div>
                     </td>
@@ -2730,7 +2746,7 @@ export default function Analytics() {
         <div className="report-header">
           <div className="company">
             <strong>CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</strong><br />
-            <em>{selectedTicket ? "Báo cáo đề xuất & giao nhận VPP" : "Báo cáo tổng hợp văn phòng phẩm"}</em><br />
+            <em>{selectedTicket ? "Báo cáo đề xuất & bàn giao VPP" : "Báo cáo tổng hợp văn phòng phẩm"}</em><br />
             Ban Hành chính Nhân sự
           </div>
 
@@ -2752,10 +2768,10 @@ export default function Analytics() {
 
         <div className="print-title">
           {selectedTicket 
-            ? "BÁO CÁO ĐỀ XUẤT VÀ GIAO NHẬN VĂN PHÒNG PHẨM" 
+            ? "BÁO CÁO ĐỀ XUẤT VÀ BÀN GIAO VĂN PHÒNG PHẨM" 
             : (printType === 'department' 
                 ? "BÁO CÁO TỔNG HỢP SỐ LƯỢNG THEO PHÒNG BAN" 
-                : "BÁO CÁO ĐỀ XUẤT VÀ GIAO NHẬN VĂN PHÒNG PHẨM"
+                : "BÁO CÁO ĐỀ XUẤT VÀ BÀN GIAO VĂN PHÒNG PHẨM"
               )
           }
         </div>
@@ -2767,7 +2783,7 @@ export default function Analytics() {
           <div><strong>Ngày lập biểu:</strong> {selectedTicket ? selectedTicket.date : new Date().toLocaleDateString('vi-VN')}</div>
           <div><strong>Người lập biểu:</strong> {selectedTicket ? selectedTicket.creator || reporter : reporter}</div>
           {selectedTicket ? (
-            <div><strong>Số phiếu giao nhận:</strong> {selectedTicket.id}</div>
+            <div><strong>Số phiếu bàn giao:</strong> {selectedTicket.id}</div>
           ) : (
             <div><strong>Mã báo cáo:</strong> BC-VPP-{new Date().getFullYear()}{String(new Date().getMonth() + 1).padStart(2, '0')}{String(new Date().getDate()).padStart(2, '0')}</div>
           )}
@@ -2783,9 +2799,9 @@ export default function Analytics() {
                 <th style={{width: '100px'}} className="text-center">Số loại VPP</th>
                 <th style={{width: '120px'}} className="text-right">Tổng SL đề xuất</th>
                 <th style={{width: '120px'}} className="text-right">Tổng SL được duyệt</th>
-                <th style={{width: '120px'}} className="text-right">Tổng SL thực nhận</th>
+                <th style={{width: '120px'}} className="text-right">Tổng SL thực giao</th>
                 <th style={{width: '120px'}} className="text-right">Tổng còn thiếu</th>
-                <th style={{width: '120px'}} className="text-center">Tỷ lệ thực nhận</th>
+                <th style={{width: '120px'}} className="text-center">Tỷ lệ thực giao</th>
                 <th style={{width: '140px'}} className="text-center">Trạng thái tổng thể</th>
                 <th>Ghi chú</th>
               </tr>
@@ -2828,9 +2844,9 @@ export default function Analytics() {
                 <th style={{width: '75px'}}>ĐVT</th>
                 <th style={{width: '95px'}}>SL đề xuất ban đầu</th>
                 <th style={{width: '95px'}}>SL được duyệt</th>
-                <th style={{width: '95px'}}>SL thực nhận</th>
+                <th style={{width: '95px'}}>SL thực giao</th>
                 <th style={{width: '95px'}}>SL còn thiếu</th>
-                <th style={{width: '130px'}}>Xác nhận nhận hàng</th>
+                <th style={{width: '130px'}}>Xác nhận bàn giao</th>
                 <th>Ghi chú</th>
               </tr>
             </thead>
@@ -2867,7 +2883,7 @@ export default function Analytics() {
                 <td className="text-center" style={{fontSize: '10pt'}}>
                   {selectedTicket ? getStatusLabel(selectedTicket.deliveryStatus) : getOverallStatusLabel()}
                 </td>
-                <td>Tỷ lệ thực nhận: {selectedTicket ? Math.round((selectedTicket.items.reduce((s, i) => s + i.qtyReceived, 0) / (selectedTicket.items.reduce((s, i) => s + i.qtyApproved, 0) || 1)) * 100) : stats.receiveRate}%</td>
+                <td>Tỷ lệ thực giao: {selectedTicket ? Math.round((selectedTicket.items.reduce((s, i) => s + i.qtyReceived, 0) / (selectedTicket.items.reduce((s, i) => s + i.qtyApproved, 0) || 1)) * 100) : stats.receiveRate}%</td>
               </tr>
             </tbody>
           </table>
@@ -2887,7 +2903,7 @@ export default function Analytics() {
               <div className="font-bold text-slate-700 mt-6">{selectedTicket?.deliverer || 'Lê Văn Giao'}</div>
             </div>
             <div>
-              <div className="font-bold">Người nhận hàng</div>
+              <div className="font-bold">Người nhận</div>
               <div className="text-xs italic mb-10">(Ký & ghi rõ họ tên)</div>
               <div className="font-bold text-slate-700 mt-6">{selectedTicket?.receiver || '---'}</div>
             </div>
@@ -2910,13 +2926,13 @@ export default function Analytics() {
 
       {/* ── MODALS SECTION ── */}
 
-      {/* MODAL 1: TẠO PHIẾU GIAO NHẬN VPP */}
+      {/* MODAL 1: TẠO PHIẾU BÀN GIAO VPP */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 className="text-base font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                <PlusCircle className="w-5 h-5 text-indigo-650 animate-pulse" /> Lập phiếu giao nhận văn phòng phẩm mới
+                <PlusCircle className="w-5 h-5 text-indigo-650 animate-pulse" /> Lập phiếu bàn giao văn phòng phẩm mới
               </h3>
               <button onClick={() => setIsCreateModalOpen(false)} className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 transition-colors cursor-pointer">
                 <X className="w-5 h-5" />
@@ -2947,7 +2963,7 @@ export default function Analytics() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Người đề xuất / Nhận hàng</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Người đề xuất / Nhận bàn giao</label>
                   <input 
                     type="text" 
                     required
@@ -2992,8 +3008,8 @@ export default function Analytics() {
                         <th className="p-3 w-48">Tên món hàng</th>
                         <th className="p-3 w-28 text-right">SL Đề xuất</th>
                         <th className="p-3 w-28 text-right">SL Được duyệt</th>
-                        <th className="p-3 w-28 text-right">SL Thực nhận</th>
-                        <th className="p-3 w-28 text-center">Nhận sai hàng?</th>
+                        <th className="p-3 w-28 text-right">SL Thực giao</th>
+                        <th className="p-3 w-28 text-center">Giao sai hàng?</th>
                         <th className="p-3">Ghi chú</th>
                         <th className="p-3 w-12 text-center">Xóa</th>
                       </tr>
@@ -3089,7 +3105,7 @@ export default function Analytics() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Chữ ký Người nhận hàng (Xác nhận chữ)</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Chữ ký Người nhận (Xác nhận chữ)</label>
                   <input 
                     type="text" 
                     value={newTicketForm.receiverSignature}
@@ -3130,13 +3146,13 @@ export default function Analytics() {
         </div>
       )}
 
-      {/* MODAL 2: XEM CHI TIẾT PHIẾU GIAO NHẬN */}
+      {/* MODAL 2: XEM CHI TIẾT PHIẾU BÀN GIAO */}
       {isDetailModalOpen && selectedTicket && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 className="text-base font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                <FileText className="w-5 h-5 text-indigo-600" /> Chi tiết phiếu giao nhận {selectedTicket.id}
+                <FileText className="w-5 h-5 text-indigo-600" /> Chi tiết phiếu bàn giao {selectedTicket.id}
               </h3>
               <button onClick={() => setIsDetailModalOpen(false)} className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 transition-colors cursor-pointer">
                 <X className="w-5 h-5" />
@@ -3150,7 +3166,7 @@ export default function Analytics() {
                 <div><span className="text-slate-400 font-bold block uppercase text-[10px]">Người đề xuất / Nhận:</span> <strong className="text-slate-800">{selectedTicket.requester}</strong></div>
                 <div><span className="text-slate-400 font-bold block uppercase text-[10px]">Người duyệt:</span> <strong className="text-slate-800">{selectedTicket.approver}</strong></div>
                 <div><span className="text-slate-400 font-bold block uppercase text-[10px]">Người giao hàng:</span> <strong className="text-slate-800">{selectedTicket.deliverer || 'N/A'}</strong></div>
-                <div><span className="text-slate-400 font-bold block uppercase text-[10px]">Tình trạng nhận hàng:</span> <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black border uppercase ${getStatusBadgeClass(selectedTicket.deliveryStatus)}`}>{getStatusLabel(selectedTicket.deliveryStatus)}</span></div>
+                <div><span className="text-slate-400 font-bold block uppercase text-[10px]">Tình trạng bàn giao:</span> <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black border uppercase ${getStatusBadgeClass(selectedTicket.deliveryStatus)}`}>{getStatusLabel(selectedTicket.deliveryStatus)}</span></div>
               </div>
 
               <div className="space-y-3">
@@ -3164,7 +3180,7 @@ export default function Analytics() {
                         <th className="p-3 text-center">ĐVT</th>
                         <th className="p-3 text-right">SL Đề xuất</th>
                         <th className="p-3 text-right">SL Được duyệt</th>
-                        <th className="p-3 text-right">SL Thực nhận</th>
+                        <th className="p-3 text-right">SL Thực giao</th>
                         <th className="p-3 text-center">Tình trạng</th>
                         <th className="p-3">Ghi chú</th>
                       </tr>
@@ -3210,13 +3226,13 @@ export default function Analytics() {
         </div>
       )}
 
-      {/* MODAL 3: XÁC NHẬN NHẬN HÀNG TOÀN PHIẾU */}
+      {/* MODAL 3: XÁC NHẬN BÀN GIAO TOÀN PHIẾU */}
       {isConfirmModalOpen && selectedTicket && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 className="text-base font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Xác nhận đã nhận hàng cho phiếu {selectedTicket.id}
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Xác nhận đã bàn giao cho phiếu {selectedTicket.id}
               </h3>
               <button onClick={() => setIsConfirmModalOpen(false)} className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 transition-colors cursor-pointer">
                 <X className="w-5 h-5" />
@@ -3226,7 +3242,7 @@ export default function Analytics() {
             <form onSubmit={handleSubmitConfirmation} className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 custom-scrollbar">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Người nhận hàng / Xác nhận</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Người nhận / Xác nhận</label>
                   <input 
                     type="text" 
                     required
@@ -3249,7 +3265,7 @@ export default function Analytics() {
 
               {/* Items List to Verify */}
               <div className="space-y-3">
-                <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kiểm chứng số lượng thực nhận của từng dòng</h5>
+                <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kiểm chứng số lượng thực giao của từng dòng</h5>
                 <div className="border border-slate-200 rounded-2xl overflow-x-auto">
                   <table className="min-w-[800px] w-full text-left text-xs">
                     <thead className="bg-slate-50 font-bold text-slate-450 border-b border-slate-100">
@@ -3258,7 +3274,7 @@ export default function Analytics() {
                         <th className="p-3">Tên món hàng</th>
                         <th className="p-3 text-center">ĐVT</th>
                         <th className="p-3 text-right">SL Được duyệt</th>
-                        <th className="p-3 w-32 text-right">SL Thực nhận</th>
+                        <th className="p-3 w-32 text-right">SL Thực giao</th>
                         <th className="p-3 w-40 text-center">Xác nhận tình trạng</th>
                         <th className="p-3">Ghi chú dòng hàng</th>
                       </tr>
@@ -3287,10 +3303,10 @@ export default function Analytics() {
                               onChange={e => handleConfirmFormChange(idx, 'status', e.target.value)}
                               className="w-full px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs"
                             >
-                              <option value="Đã nhận đủ">Đã nhận đủ</option>
-                              <option value="Nhận thiếu">Nhận thiếu</option>
-                              <option value="Chưa nhận">Chưa nhận</option>
-                              <option value="Nhận sai hàng">Nhận sai hàng</option>
+                              <option value="Đã nhận đủ">Đã giao đủ</option>
+                              <option value="Nhận thiếu">Giao thiếu</option>
+                              <option value="Chưa nhận">Chưa giao</option>
+                              <option value="Nhận sai hàng">Giao sai hàng</option>
                               <option value="Chờ bổ sung">Chờ bổ sung</option>
                             </select>
                           </td>
@@ -3338,7 +3354,7 @@ export default function Analytics() {
         </div>
       )}
 
-      {/* MODAL 4: XÁC NHẬN NHẬN HÀNG CHO TỪNG DÒNG MÓN HÀNG */}
+      {/* MODAL 4: XÁC NHẬN BÀN GIAO CHO TỪNG DÒNG MÓN HÀNG */}
       {isConfirmSingleItemModalOpen && selectedItemName && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4">
@@ -3353,7 +3369,7 @@ export default function Analytics() {
             
             <form onSubmit={handleSubmitSingleItemConfirmation} className="space-y-4 text-xs font-bold">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Tổng Số lượng thực nhận</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Tổng Số lượng thực giao</label>
                 <input 
                   type="number"
                   required
@@ -3365,16 +3381,16 @@ export default function Analytics() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Tình trạng nhận hàng</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Tình trạng bàn giao</label>
                 <select
                   value={confirmSingleForm.status}
                   onChange={e => setConfirmSingleForm({ ...confirmSingleForm, status: e.target.value as any })}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none"
                 >
-                  <option value="Đã nhận đủ">Đã nhận đủ</option>
-                  <option value="Nhận thiếu">Nhận thiếu</option>
-                  <option value="Chưa nhận">Chưa nhận</option>
-                  <option value="Nhận sai hàng">Nhận sai hàng</option>
+                  <option value="Đã nhận đủ">Đã giao đủ</option>
+                  <option value="Nhận thiếu">Giao thiếu</option>
+                  <option value="Chưa nhận">Chưa giao</option>
+                  <option value="Nhận sai hàng">Giao sai hàng</option>
                   <option value="Chờ bổ sung">Chờ bổ sung</option>
                 </select>
               </div>
