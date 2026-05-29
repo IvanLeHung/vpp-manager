@@ -1221,6 +1221,11 @@ export default function Users() {
                          <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest pl-1 flex justify-between">Quản lý trực tiếp</label>
                          <select required={userFormData.role === 'EMPLOYEE'} value={userFormData.managerId} onChange={e => setUserFormData({...userFormData, managerId: e.target.value})} className="w-full px-5 py-4 bg-indigo-50/50 border-2 border-indigo-100 focus:border-indigo-500 rounded-2xl outline-none font-bold text-slate-700 appearance-none shadow-sm">
                             <option value="">-- {userFormData.role === 'MANAGER' ? 'Cấp cao nhất' : 'Tìm người quản lý...'} --</option>
+                            {editingUser && editingUser.managerId && !managers.some(m => m.id === editingUser.managerId) && (
+                               <option value={editingUser.managerId}>
+                                  {editingUser.managerName || 'Quản lý hiện tại'} (Đã khóa)
+                               </option>
+                            )}
                             {managers.filter(m => m.id !== editingUser?.id).map(m => ( <option key={m.id} value={m.id}>{m.fullName} (@{m.username})</option> ))}
                          </select>
                       </div>

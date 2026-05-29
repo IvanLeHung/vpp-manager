@@ -683,10 +683,10 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
   return (
     <>
-      <Layout className="flex-1 min-h-0 overflow-visible bg-slate-100 RequestsDetail print:bg-white print:overflow-visible print:h-auto flex flex-row">
+      <Layout className="flex-1 min-h-0 overflow-visible bg-slate-100 RequestsDetail print:bg-white print:overflow-visible print:h-auto flex flex-row items-start">
         
         {/* LEFT COLUMN: Main Info & Lines */}
-        <Layout.Content className="no-print flex-1 min-h-0 overflow-visible p-6 flex flex-col gap-6">
+        <Layout.Content className="no-print flex-1 min-h-0 overflow-visible p-6 pb-24 flex flex-col gap-6">
           
           {/* TITLE BLOCK CARD */}
           <Card size="small" bodyStyle={{ padding: '16px 24px' }} className="shadow-sm border-slate-200">
@@ -986,13 +986,13 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Chi tiết Vật tư Xin Cấp</h3>
                                 {data.lines.some((l:any) => (l.qtyApproved ?? l.qtyRequested) > (l.item.stocks?.find((s:any)=>s.warehouseCode===data.warehouseCode)?.quantityOnHand||0)) && <span className="text-[10px] font-bold text-rose-600 bg-rose-100 px-3 py-1 rounded border border-rose-200 flex items-center print:hidden"><AlertTriangle className="w-3.5 h-3.5 mr-1"/> Cảnh báo thiếu Tồn Kho (Kho yêu cầu)</span>}
                             </div>
-                            <div className="p-4">
+                            <div className="p-4 overflow-visible">
                                 <Table
                                     dataSource={data.lines}
                                     columns={columns}
                                     rowKey="id"
                                     pagination={false}
-                                    sticky={true}
+                                    sticky={false}
                                     scroll={{ x: 'max-content' }}
                                     rowClassName={(record: any) => {
                                         const stocks = record.item.stocks || [];
