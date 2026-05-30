@@ -297,9 +297,21 @@ export default function Analytics() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isConfirmSingleItemModalOpen, setIsConfirmSingleItemModalOpen] = useState(false);
+  const [isCorrectQtyModalOpen, setIsCorrectQtyModalOpen] = useState(false);
   
   const [selectedTicket, setSelectedTicket] = useState<DeliveryTicket | null>(null);
   const [selectedItemName, setSelectedItemName] = useState<string>('');
+  const [correctQtyForm, setCorrectQtyForm] = useState<{
+    itemName: string;
+    newQty: number;
+    note: string;
+    correctedBy: string;
+  }>({
+    itemName: '',
+    newQty: 0,
+    note: '',
+    correctedBy: ''
+  });
   
   // Form States
   const [newTicketForm, setNewTicketForm] = useState<{
@@ -1405,6 +1417,42 @@ export default function Analytics() {
     } catch (err: any) {
       console.error('Lỗi cập nhật mặt hàng:', err);
       toast.error('Không thể xác nhận giao nhận mặt hàng: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // OPEN CORRECT QTY MODAL
+  const openCorrectQtyModal = (ticket: DeliveryTicket, item: DeliveryTicket['items'][0]) => {
+    setSelectedTicket(ticket);
+    setCorrectQtyForm({
+      itemName: item.name,
+      newQty: item.qtyReceived,
+      note: '',
+      correctedBy: currentUser?.fullName || ''
+    });
+    setIsCorrectQtyModalOpen(true);
+  };
+
+  // SUBMIT CORRECT QTY
+  const handleSubmitCorrectQty = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTicket) return;
+    try {
+      setLoading(true);
+      await api.post('/reports/vpp-correct-qty', {
+        requestId: selectedTicket.id,
+        itemName: correctQtyForm.itemName,
+        newQtyReceived: Number(correctQtyForm.newQty),
+        note: correctQtyForm.note,
+        correctedBy: correctQtyForm.correctedBy
+      });
+      toast.success(`Đã sửa SL thực giao "${correctQtyForm.itemName}" thành ${correctQtyForm.newQty}`);
+      setIsCorrectQtyModalOpen(false);
+      setIsDetailModalOpen(false);
+      fetchTickets();
+    } catch (err: any) {
+      toast.error('Lỗi sửa số lượng: ' + (err.response?.data?.error || err.message));
     } finally {
       setLoading(false);
     }
@@ -3202,6 +3250,7 @@ export default function Analytics() {
                         <th className="p-3 text-right">SL Thực giao</th>
                         <th className="p-3 text-center">Tình trạng</th>
                         <th className="p-3">Ghi chú</th>
+                        {(currentUser?.role === 'ADMIN' || currentUser?.role === 'WAREHOUSE') && <th className="p-3 text-center w-16">Sửa</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -3219,6 +3268,17 @@ export default function Analytics() {
                             </span>
                           </td>
                           <td className="p-3 text-slate-400 italic text-[11px] max-w-xs truncate">{item.note || '-'}</td>
+                          {(currentUser?.role === 'ADMIN' || currentUser?.role === 'WAREHOUSE') && (
+                            <td className="p-3 text-center">
+                              <button
+                                title="Sửa số lượng thực giao"
+                                onClick={() => openCorrectQtyModal(selectedTicket!, item)}
+                                className="p-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-600 rounded-lg transition-colors cursor-pointer"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -3466,9 +3526,72 @@ export default function Analytics() {
         </div>
       )}
 
+
+      {/* MODAL 5: SỬA SỐ LƯỢNG THỰC GIAO */}
+      {isCorrectQtyModalOpen && selectedTicket && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-[60] animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-amber-50">
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                Sửa SL thực giao
+              </h3>
+              <button onClick={() => setIsCorrectQtyModalOpen(false)} className="p-1 hover:bg-amber-100 rounded-full text-slate-400 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmitCorrectQty} className="p-6 space-y-4">
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+                <span className="text-slate-400 font-bold uppercase tracking-widest block mb-1">Phiếu</span>
+                <strong className="text-slate-800">{selectedTicket.id}</strong>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Tên mặt hàng</label>
+                <div className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700">{correctQtyForm.itemName}</div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">SL thực giao (mới)</label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  value={correctQtyForm.newQty}
+                  onChange={e => setCorrectQtyForm({ ...correctQtyForm, newQty: Number(e.target.value) })}
+                  className="w-full px-4 py-2.5 bg-white border-2 border-amber-300 rounded-xl text-sm font-black text-amber-700 text-right outline-none focus:border-amber-500"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Người sửa</label>
+                <input
+                  type="text"
+                  required
+                  value={correctQtyForm.correctedBy}
+                  onChange={e => setCorrectQtyForm({ ...correctQtyForm, correctedBy: e.target.value })}
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Lý do sửa</label>
+                <textarea
+                  value={correctQtyForm.note}
+                  onChange={e => setCorrectQtyForm({ ...correctQtyForm, note: e.target.value })}
+                  placeholder="Vd: Chỉ nhận được 2, không phải 10..."
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 h-20 resize-none outline-none"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button type="button" onClick={() => setIsCorrectQtyModalOpen(false)} className="px-5 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 cursor-pointer">Hủy</button>
+                <button type="submit" className="px-6 py-2.5 bg-amber-500 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-md hover:bg-amber-600 cursor-pointer">Lưu chỉnh sửa</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
+
 
 // ── REUSABLE KPI CARD ──
 function StatCard({ label, value, color }: { label: string, value: any, color: string }) {
