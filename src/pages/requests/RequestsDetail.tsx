@@ -1400,7 +1400,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                             <thead className="bg-slate-100 text-[10px] uppercase font-black text-slate-500 sticky top-0 z-10">
                                <tr>
                                   <th className="p-4 rounded-tl-xl w-12 text-center">Chọn</th>
-                                  <th className="p-4">Hàng Hóa</th>
+                                  <th className="p-4 min-w-[280px] max-w-[360px]">Hàng Hóa</th>
                                   <th className="p-4 text-center">Tồn Kho</th>
                                   <th className="p-4 text-center">SL Yêu cầu</th>
                                   <th className="p-4 text-center">SL Duyệt</th>
@@ -1436,7 +1436,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                               <Check className="w-4 h-4 stroke-[4]" />
                                             </button>
                                         </td>
-                                        <td className="p-4 align-top">
+                                        <td className="p-4 align-top whitespace-normal min-w-[280px] max-w-[360px]">
                                             <div className="flex flex-col">
                                               {l.item ? (
                                                 <GoodsNameWithPreview 
@@ -1451,53 +1451,64 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                               ) : (
                                                 <span className="font-bold text-slate-700 text-sm whitespace-normal max-w-[300px]">{l.item?.name || 'N/A'}</span>
                                               )}
-                                              <span className="text-[10px] font-black text-slate-400 uppercase mt-0.5">{l.item.mvpp}</span>
+                                              
+                                              <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                                <span className="text-[9px] font-extrabold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md uppercase tracking-wider">{l.item.mvpp}</span>
+                                                {currentUser.role === 'ADMIN' && approval.selected && (
+                                                  <button 
+                                                    type="button"
+                                                    onClick={() => {
+                                                      setApprovalSwapMode(true);
+                                                      setSwapModalLineId(l.id);
+                                                      setSwapSearch('');
+                                                      setSwapSearchResults([]);
+                                                      setSwapSelectedItem(null);
+                                                    }}
+                                                    className="text-[9px] font-black bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-600 px-2 py-0.5 rounded-md border border-indigo-150 transition-all flex items-center gap-0.5 shadow-sm"
+                                                  >
+                                                    ⇄ Đổi vật tư
+                                                  </button>
+                                                )}
+                                              </div>
+
+                                              {/* Replacement badge if selected */}
+                                              {approval.replacementItemId && (
+                                                <div className="mt-1.5 flex items-center gap-1.5 p-1.5 px-2 bg-indigo-50 border border-indigo-200 rounded-xl max-w-fit shadow-sm animate-fade-in self-start">
+                                                  <span className="text-[9px] font-black text-indigo-500 uppercase tracking-wider">→ Thay bằng:</span>
+                                                  <span className="text-[10px] font-extrabold text-indigo-800">{approval.replacementItemName}</span>
+                                                  <button 
+                                                    type="button"
+                                                    onClick={() => setApprovals(approvals.map(a => a.lineId === l.id ? {...a, replacementItemId: null, replacementItemName: null, note: a.note === 'Thay thế' ? '' : a.note} : a))}
+                                                    className="ml-1 text-[11px] font-black text-slate-400 hover:text-rose-600 p-0.5 rounded transition"
+                                                    title="Hủy đổi vật tư"
+                                                  >✕</button>
+                                                </div>
+                                              )}
                                               
                                               {approval.selected && (isChanged || currentStock === 0) && (
-                                                <div className={`mt-3 p-3 rounded-xl border-2 transition-all ${noteRequired ? 'bg-rose-50 border-rose-200 ring-2 ring-rose-100' : 'bg-slate-50 border-slate-200'}`}>
+                                                <div className={`mt-3.5 p-2.5 rounded-xl border transition-all ${noteRequired ? 'bg-rose-50/70 border-rose-200 ring-2 ring-rose-100/50' : 'bg-slate-50 border-slate-200'}`}>
                                                    <div className="flex justify-between items-center mb-1.5">
-                                                      <p className={`text-[10px] font-black uppercase tracking-widest ${noteRequired ? 'text-rose-500' : 'text-slate-400'}`}>Lý do điều chỉnh {noteRequired && ' (Bắt buộc)'}</p>
-                                                      <div className="flex gap-1">
-                                                         {['Hết hàng', 'Không đủ tồn'].map(preset => (
-                                                            <button 
-                                                               key={preset}
-                                                               onClick={() => setApprovals(approvals.map(a => a.lineId === l.id ? {...a, note: preset} : a))}
-                                                               className="text-[8px] font-bold bg-white border border-slate-200 px-1.5 py-0.5 rounded hover:bg-indigo-50 hover:text-indigo-600 transition"
-                                                            >
-                                                               {preset}
-                                                            </button>
-                                                         ))}
-                                                         <button 
-                                                            onClick={() => {
-                                                              setApprovalSwapMode(true);
-                                                              setSwapModalLineId(l.id);
-                                                              setSwapSearch('');
-                                                              setSwapSearchResults([]);
-                                                              setSwapSelectedItem(null);
-                                                            }}
-                                                            className="text-[8px] font-bold bg-indigo-600 text-white border border-indigo-600 px-1.5 py-0.5 rounded hover:bg-indigo-700 transition flex items-center gap-0.5"
-                                                         >
-                                                            ⇄ Thay thế
-                                                         </button>
-                                                      </div>
-                                                   </div>
-                                                   {approval.replacementItemId && (
-                                                     <div className="mb-2 flex items-center gap-2 p-2 bg-indigo-50 border border-indigo-200 rounded-lg">
-                                                       <span className="text-[9px] font-black text-indigo-500 uppercase">→ Thay bằng:</span>
-                                                       <span className="text-[10px] font-bold text-indigo-700">{approval.replacementItemName}</span>
-                                                       <button 
-                                                         onClick={() => setApprovals(approvals.map(a => a.lineId === l.id ? {...a, replacementItemId: null, replacementItemName: null, note: a.note === 'Thay thế' ? '' : a.note} : a))}
-                                                         className="ml-auto text-[8px] font-bold text-rose-400 hover:text-rose-600 transition"
-                                                       >✕ Xóa</button>
-                                                     </div>
-                                                   )}
-                                                   <textarea 
-                                                      value={approval.note}
-                                                      onChange={(e) => setApprovals(approvals.map(a => a.lineId === l.id ? {...a, note: e.target.value} : a))}
-                                                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-medium outline-none focus:border-indigo-400 h-16 resize-none"
-                                                      placeholder="Nhập lý do tại sao thay đổi số lượng..."
-                                                   />
-                                                </div>
+                                                       <p className={`text-[9px] font-black uppercase tracking-wider ${noteRequired ? 'text-rose-500' : 'text-slate-400'}`}>Lý do điều chỉnh {noteRequired && ' (Bắt buộc)'}</p>
+                                                       <div className="flex gap-1">
+                                                          {['Hết hàng', 'Không đủ tồn'].map(preset => (
+                                                             <button 
+                                                                key={preset}
+                                                                type="button"
+                                                                onClick={() => setApprovals(approvals.map(a => a.lineId === l.id ? {...a, note: preset} : a))}
+                                                                className="text-[8px] font-bold bg-white border border-slate-200 px-1.5 py-0.5 rounded-md hover:bg-indigo-50 hover:text-indigo-600 transition"
+                                                             >
+                                                                {preset}
+                                                             </button>
+                                                          ))}
+                                                       </div>
+                                                    </div>
+                                                    <textarea 
+                                                       value={approval.note}
+                                                       onChange={(e) => setApprovals(approvals.map(a => a.lineId === l.id ? {...a, note: e.target.value} : a))}
+                                                       className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-medium outline-none focus:border-indigo-400 h-14 resize-none shadow-inner"
+                                                       placeholder="Nhập lý do tại sao thay đổi số lượng..."
+                                                    />
+                                                 </div>
                                               )}
                                             </div>
                                         </td>
@@ -1599,7 +1610,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                               <button 
                                 disabled={approvals.filter(a => a.selected).some(a => {
                                    const line = data.lines.find((l:any)=>l.id === a.lineId);
-                                   return a.qtyApproved !== line.qtyRequested && !a.note.trim();
+                                   return a.qtyApproved !== line.qtyRequested && !a.note.trim() && !a.replacementItemId;
                                 })}
                                 onClick={() => {
                                   const selectedApprovals = approvals.filter(a => a.selected);
@@ -1609,7 +1620,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                   
                                   const missingNotes = selectedApprovals.filter(a => {
                                      const line = data.lines.find((l:any)=>l.id === a.lineId);
-                                     return a.qtyApproved !== line.qtyRequested && !a.note.trim();
+                                     return a.qtyApproved !== line.qtyRequested && !a.note.trim() && !a.replacementItemId;
                                   });
 
                                   if (missingNotes.length > 0) {
