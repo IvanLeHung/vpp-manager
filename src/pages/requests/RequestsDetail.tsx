@@ -734,7 +734,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                           <button 
                             onClick={goNext} 
                             disabled={!canGoNext} 
-                            className={`p-1 rounded transition-all ${canGoNext ? 'hover:bg-white text-indigo-600 shadow-sm' : 'text-slate-300 cursor-not-allowed'}`}
+                             className={`p-1 rounded transition-all ${canGoNext ? 'hover:bg-white text-indigo-600 shadow-sm' : 'text-slate-300 cursor-not-allowed'}`}
                             title="Phiếu sau (Arrow Right)"
                           >
                             <ChevronRight className="w-4 h-4" />
@@ -2068,6 +2068,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                    </div>
                 </div>
               )}
+          </div>
+      )}
 
               {/* SWAP ITEM MODAL */}
               {swapModalLineId && (
@@ -2240,8 +2242,6 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                   </div>
                 </div>
               )}
-          </div>
-      )}
       {/* FORMAL PRINT-ONLY SECTION (A4 Standard) */}
       <div className="hidden print:block print-area">
           <div className="print-sheet text-black font-sans leading-tight">
