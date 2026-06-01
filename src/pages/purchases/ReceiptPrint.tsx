@@ -238,14 +238,14 @@ const ReceiptPrint: React.FC = () => {
         .print-table {
           width: 100%;
           border-collapse: collapse;
-          margin-top: 15px;
-          margin-bottom: 25px;
+          margin-top: 10px;
+          margin-bottom: 10px;
         }
         .print-table th, .print-table td {
           border: 1px solid #000;
-          padding: 6px 8px;
-          font-size: 11px;
-          line-height: 1.4;
+          padding: 4px 6px;
+          font-size: 10px;
+          line-height: 1.3;
         }
         .print-table th {
           background-color: #f2f2f2 !important;
@@ -270,7 +270,9 @@ const ReceiptPrint: React.FC = () => {
           display: table;
           width: 100%;
           table-layout: fixed;
-          margin-top: 40px;
+          margin-top: 20px;
+          page-break-before: avoid;
+          break-before: avoid;
           page-break-inside: avoid;
           break-inside: avoid;
         }
@@ -300,7 +302,7 @@ const ReceiptPrint: React.FC = () => {
           display: block;
           border-bottom: 1px dashed #000;
           width: 80%;
-          margin: 50px auto 4px;
+          margin: 40px auto 4px;
         }
         .signature-name {
           font-weight: bold;
