@@ -267,30 +267,46 @@ const ReceiptPrint: React.FC = () => {
           padding-bottom: 4px;
         }
         .signature-section {
-          display: grid;
-          grid-template-cols: 1fr 1fr;
+          display: table;
+          width: 100%;
+          table-layout: fixed;
           margin-top: 40px;
           page-break-inside: avoid;
+          break-inside: avoid;
         }
         .signature-col {
+          display: table-cell;
+          width: 25%;
           text-align: center;
+          vertical-align: top;
+          padding: 0 8px;
         }
         .signature-title {
           font-weight: bold;
           text-transform: uppercase;
-          font-size: 13px;
+          font-size: 12px;
+          display: block;
+          line-height: 1.4;
         }
         .signature-sub {
-          font-size: 11px;
+          font-size: 10px;
           font-style: italic;
           color: #555;
           margin-top: 2px;
-          margin-bottom: 70px;
+          margin-bottom: 0;
+          display: block;
+        }
+        .signature-line {
+          display: block;
+          border-bottom: 1px dashed #000;
+          width: 80%;
+          margin: 50px auto 4px;
         }
         .signature-name {
           font-weight: bold;
-          font-size: 13px;
+          font-size: 12px;
           text-transform: uppercase;
+          display: block;
         }
       `}</style>
 
@@ -454,14 +470,32 @@ const ReceiptPrint: React.FC = () => {
         {/* Signatures */}
         <div className="signature-section">
           <div className="signature-col">
-            <span className="signature-title">Bên giao / Đơn vị cung cấp</span>
-            <p className="signature-sub">(Ký và xác nhận đối chiếu đúng hàng)</p>
-            <div className="signature-name" style={{ marginTop: '70px' }}>....................................</div>
+            <span className="signature-title">BÊN GIAO</span>
+            <span className="signature-title">ĐƠN VỊ CUNG CẤP</span>
+            <span className="signature-sub">(Ký và xác nhận đối chiếu đúng hàng)</span>
+            <span className="signature-line"></span>
+            <span className="signature-name"> </span>
           </div>
           <div className="signature-col">
-            <span className="signature-title">Thủ kho / Người kiểm định</span>
-            <p className="signature-sub">(Ký, ghi rõ họ tên xác nhận nhận hàng)</p>
-            <div className="signature-name" style={{ marginTop: '70px' }}>{data.receiver?.fullName || '....................................'}</div>
+            <span className="signature-title">THỦ KHO</span>
+            <span className="signature-title">NGƯỜI KIỂM ĐỊNH</span>
+            <span className="signature-sub">(Ký, ghi rõ họ tên xác nhận nhận hàng)</span>
+            <span className="signature-line"></span>
+            <span className="signature-name">{data.receiver?.fullName || ' '}</span>
+          </div>
+          <div className="signature-col">
+            <span className="signature-title">NGƯỜI LẬP PHIẾU</span>
+            <span className="signature-title"> </span>
+            <span className="signature-sub">(Ký &amp; ghi rõ họ tên)</span>
+            <span className="signature-line"></span>
+            <span className="signature-name"> </span>
+          </div>
+          <div className="signature-col">
+            <span className="signature-title">TRƯỞNG BỘ PHẬN</span>
+            <span className="signature-title"> </span>
+            <span className="signature-sub">(Ký &amp; đóng dấu)</span>
+            <span className="signature-line"></span>
+            <span className="signature-name"> </span>
           </div>
         </div>
       </div>
