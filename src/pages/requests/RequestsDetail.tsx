@@ -161,6 +161,11 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
   const [swapSelectedItem, setSwapSelectedItem] = useState<any | null>(null);
   const [loadingSwapSearch, setLoadingSwapSearch] = useState<boolean>(false);
 
+  const closeSwapModal = () => {
+    setSwapModalLineId(null);
+    setApprovalSwapMode(false);
+  };
+
   const [showOnlyErrors, setShowOnlyErrors] = useState(false);
   const [selectedWarehouse, setSelectedWarehouse] = useState('MAIN');
   const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH'>('ALL');
@@ -2068,7 +2073,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                       </div>
                       <button 
                         type="button" 
-                        onClick={() => setSwapModalLineId(null)} 
+                        onClick={closeSwapModal} 
                         className="text-indigo-200 hover:text-white transition"
                       >
                         <XCircle className="w-6 h-6"/>
@@ -2157,7 +2162,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                     <div className="p-6 border-t border-slate-100 flex gap-3 bg-slate-50">
                        <button
                         type="button"
-                        onClick={() => setSwapModalLineId(null)}
+                        onClick={closeSwapModal}
                         className="flex-1 py-3 bg-white border border-slate-200 text-slate-500 font-bold rounded-2xl text-sm hover:bg-slate-100 hover:text-slate-700 transition"
                       >
                         HỦY BỎ
@@ -2176,8 +2181,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                               replacementItemName: swapSelectedItem.name,
                               note: a.note || 'Thay thế'
                             } : a));
-                            setApprovalSwapMode(false);
-                            setSwapModalLineId(null);
+                            closeSwapModal();
                             showToast(`Đã chọn "${swapSelectedItem.name}" làm hàng thay thế!`, 'success');
                             return;
                           }
@@ -2214,7 +2218,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                           });
 
                           setIssues(updatedIssues);
-                          setSwapModalLineId(null);
+                          closeSwapModal();
                           showToast('Đã đổi sang vật tư thay thế thành công!', 'success');
                         }}
                         className={`flex-1 py-3 font-black rounded-2xl text-sm transition flex items-center justify-center gap-2 ${swapSelectedItem ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
