@@ -187,14 +187,30 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
         console.error("Failed to load chain data", e);
       }
       // Init modal states
-      setApprovals(res.data.lines.map((l:any) => ({ 
-        lineId: l.id, 
-        qtyApproved: l.qtyApproved ?? l.qtyRequested,
-        selected: l.status !== 'REJECTED',
-        note: l.approvalNote || '',
-        replacementItemId: null,
-        replacementItemName: null
-      })));
+      setApprovals(res.data.lines.map((l:any) => {
+        let initialQty = l.qtyRequested;
+        let isSelected = l.status !== 'REJECTED';
+        
+        if (res.data.status === 'PENDING_ADMIN') {
+          initialQty = l.qtyAdminApproved !== null ? l.qtyAdminApproved : (l.qtyManagerApproved !== null ? l.qtyManagerApproved : (l.qtyApproved ?? l.qtyRequested));
+          isSelected = l.qtyAdminApproved !== null ? l.qtyAdminApproved > 0 : (l.status !== 'REJECTED');
+        } else if (res.data.status === 'PENDING_MANAGER') {
+          initialQty = l.qtyManagerApproved !== null ? l.qtyManagerApproved : l.qtyRequested;
+          isSelected = l.qtyManagerApproved !== null ? l.qtyManagerApproved > 0 : (l.status !== 'REJECTED');
+        } else {
+          initialQty = l.qtyApproved ?? l.qtyRequested;
+          isSelected = l.status !== 'REJECTED';
+        }
+
+        return { 
+          lineId: l.id, 
+          qtyApproved: initialQty,
+          selected: isSelected,
+          note: l.approvalNote || '',
+          replacementItemId: l.replacementItemId || null,
+          replacementItemName: l.replacementItem?.name || null
+        };
+      }));
       setIssues(res.data.lines.map((l:any) => {
         const primaryWh = res.data.warehouseCode || 'MAIN';
         const hasStockPrimary = l.issue_item?.stocks?.find((s:any) => s.warehouseCode === primaryWh)?.quantityOnHand > 0;
@@ -1606,6 +1622,31 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                 className="flex-1 md:flex-none px-6 py-3 font-bold text-rose-500 hover:bg-rose-50 border border-rose-200 rounded-xl transition"
                               >
                                 Từ Chối
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  const finalApprovals = approvals.map(a => {
+                                      if (!a.selected) {
+                                          return { ...a, qtyApproved: 0, note: a.note || 'Bỏ qua (Reject)' };
+                                      }
+                                      return a;
+                                  });
+
+                                  handleAction('/save-draft-approval', { 
+                                      lineApprovals: finalApprovals.map(a => ({
+                                        lineId: a.lineId,
+                                        qtyApproved: a.qtyApproved,
+                                        selected: a.selected,
+                                        note: a.note,
+                                        replacementItemId: a.replacementItemId || null
+                                      }))
+                                   }, 'Đã lưu nháp phê duyệt thành công!');
+                                  setShowApproveModal(false);
+                                }}
+                                className="flex-1 md:flex-none px-6 py-3 font-bold text-indigo-650 hover:bg-indigo-50 border border-indigo-200 rounded-xl transition"
+                              >
+                                Lưu Nháp
                               </button>
                               <button 
                                 disabled={approvals.filter(a => a.selected).some(a => {
