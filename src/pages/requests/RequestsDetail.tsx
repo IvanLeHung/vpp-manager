@@ -1376,7 +1376,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
       {/* MODAL PHÊ DUYỆT (Manager) */}
       {showApproveModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
               <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[95vh] animate-slide-up">
                   <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-emerald-500 text-white shrink-0">
                       <div>
@@ -1713,7 +1713,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
       {/* MODAL TỪ CHỐI */}
       {showRejectModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[160] flex items-center justify-center p-4">
               <div className="bg-white rounded-3xl shadow-2xl w-full max-md overflow-hidden animate-slide-up">
                   <div className="p-6 border-b border-slate-100 flex items-center bg-rose-50 text-rose-600">
                       <StopCircle className="w-7 h-7 mr-3"/>
@@ -1737,7 +1737,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
       {/* MODAL XUẤT KHO (New Upgrade) */}
       {showIssueModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
               <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[95vh] animate-slide-up">
                   <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-600 text-white">
                       <div className="flex items-center gap-3">
@@ -2063,7 +2063,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
               {/* Confirmation Overlay */}
               {isConfirmingIssue && (
-                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[60] flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[160] flex items-center justify-center p-4">
                    <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl animate-scale-in">
                       <div className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6">
                         <Archive className="w-10 h-10"/>
@@ -2114,7 +2114,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
               {/* SWAP ITEM MODAL */}
               {swapModalLineId && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[170] flex items-center justify-center p-4">
                   <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-in">
                     {/* Header */}
                     <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-700 text-white">
@@ -2592,7 +2592,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
       {/* MODAL: FULL AUDIT TRAIL */}
       {showFullHistory && (
-          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[150] flex items-center justify-center p-4">
               <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-300">
                   <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-indigo-600 text-white shrink-0">
                       <div>
