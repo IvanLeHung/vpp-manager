@@ -8,8 +8,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import DocumentChainMap from '../../components/DocumentChainMap';
 import type { User } from '../../context/AppContext';
 import type { ViewMode } from '../Requests';
-import { Layout, Card, Table, Dropdown, Tooltip } from 'antd';
+import { Layout, Card, Table, Dropdown, Tooltip, Space, Button } from 'antd';
 import { PrinterOutlined, DownOutlined } from '@ant-design/icons';
+
 
 interface Props {
   requestId: string;
@@ -83,7 +84,7 @@ function InfoCard({ label, value, subValue, tone, isTooltip, tooltipText }: Info
 
   if (isTooltip && tooltipText) {
     return (
-      <Tooltip title={tooltipText} overlayClassName="max-w-xs">
+      <Tooltip title={tooltipText} classNames={{ root: 'max-w-xs' }}>
         <div className="cursor-help h-full">{cardContent}</div>
       </Tooltip>
     );
@@ -713,20 +714,10 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
         <Layout.Content className="no-print flex-1 min-h-0 overflow-visible p-6 pb-24 flex flex-col gap-6">
           
           {/* TITLE BLOCK CARD */}
-          <Card size="small" bodyStyle={{ padding: '16px 24px' }} className="shadow-sm border-slate-200">
+          <Card size="small" styles={{ body: { padding: '16px 24px' } }} className="shadow-sm border-slate-200">
             <div className="flex flex-col gap-3">
-              {/* System title row */}
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <span className="text-lg font-black text-slate-800">Hệ thống Quản trị VPP nội bộ</span>
-                  {currentUser.role === 'ADMIN' && (
-                    <span className="text-[10px] bg-rose-50 text-rose-600 border border-rose-200 px-2 py-0.5 rounded font-black">Quyền Admin</span>
-                  )}
-                </div>
-              </div>
-              
               {/* Ticket row */}
-              <div className="flex justify-between items-center border-t border-slate-100 pt-3">
+              <div className="flex justify-between items-center">
                 <div className="flex items-center gap-4">
                   <button onClick={handleBack} className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition shadow-inner">
                     <ArrowLeft className="w-4 h-4"/>
@@ -1175,7 +1166,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
             </Layout.Content>
 
           {/* RIGHT COLUMN: Actions & History */}
-          <Layout.Sider width={260} theme="light" className="no-print border-l border-slate-200 sticky top-0 h-screen overflow-y-auto">
+          <Layout.Sider width={260} theme="light" className="no-print border-l border-slate-200 sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto">
               <div className="p-6 flex flex-col gap-6">
                   <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 relative overflow-hidden text-slate-800">
                       <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500 rounded-full blur-[80px] opacity-10 transform translate-x-1/2 -translate-y-1/2"></div>
@@ -1285,18 +1276,28 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                             };
                             return (
                               <div className="w-full flex justify-center [&>div]:w-full">
-                                <Dropdown.Button
-                                  menu={printMenu}
-                                  onClick={() => printDocument('ALL')}
-                                  icon={<DownOutlined />}
-                                  type="primary"
-                                  disabled={hasPendingReplacement}
-                                  className="w-full font-bold h-11 flex items-center [&>button:first-child]:flex-1"
-                                >
-                                  <span className="flex items-center gap-2">
+                                <Space.Compact className="w-full flex">
+                                  <Button
+                                    type="primary"
+                                    onClick={() => printDocument('ALL')}
+                                    disabled={hasPendingReplacement}
+                                    className="flex-1 font-bold h-11 flex items-center justify-center gap-2"
+                                  >
                                     <PrinterOutlined /> IN CẢ PHIẾU (A4 FULL)
-                                  </span>
-                                </Dropdown.Button>
+                                  </Button>
+                                  <Dropdown
+                                    menu={printMenu}
+                                    disabled={hasPendingReplacement}
+                                    trigger={['click']}
+                                    placement="bottomRight"
+                                  >
+                                    <Button
+                                      type="primary"
+                                      icon={<DownOutlined />}
+                                      className="h-11 flex items-center justify-center"
+                                    />
+                                  </Dropdown>
+                                </Space.Compact>
                               </div>
                             );
                           })()}
