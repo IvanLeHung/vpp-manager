@@ -209,7 +209,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
           selected: isSelected,
           note: l.approvalNote || '',
           replacementItemId: l.replacementItemId || null,
-          replacementItemName: l.replacementItem?.name || null
+          replacementItemName: l.replacementItem?.name || null,
+          replacementItem: l.replacementItem || null
         };
       }));
       setIssues(res.data.lines.map((l:any) => {
@@ -1454,23 +1455,35 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                             </button>
                                         </td>
                                         <td className="p-4 align-top whitespace-normal min-w-[280px] max-w-[360px]">
-                                            <div className="flex flex-col">
-                                              {l.item ? (
-                                                <GoodsNameWithPreview 
-                                                  itemId={l.item.id}
-                                                  itemCode={l.item.mvpp}
-                                                  itemName={l.item.name}
-                                                  imageUrl={l.item.imageUrl}
-                                                  thumbnailUrl={l.item.thumbnailUrl}
-                                                  categoryName={l.item.category}
-                                                  unit={l.item.unit}
-                                                />
-                                              ) : (
-                                                <span className="font-bold text-slate-700 text-sm whitespace-normal max-w-[300px]">{l.item?.name || 'N/A'}</span>
-                                              )}
+                                             <div className="flex flex-col">
+                                               {approval.replacementItemId && (approval.replacementItem || approval.replacementItemName) ? (
+                                                 <GoodsNameWithPreview 
+                                                   itemId={approval.replacementItemId}
+                                                   itemCode={approval.replacementItem?.mvpp || ''}
+                                                   itemName={approval.replacementItemName || approval.replacementItem?.name}
+                                                   imageUrl={approval.replacementItem?.imageUrl}
+                                                   thumbnailUrl={approval.replacementItem?.thumbnailUrl}
+                                                   categoryName={approval.replacementItem?.category}
+                                                   unit={approval.replacementItem?.unit}
+                                                 />
+                                               ) : l.item ? (
+                                                 <GoodsNameWithPreview 
+                                                   itemId={l.item.id}
+                                                   itemCode={l.item.mvpp}
+                                                   itemName={l.item.name}
+                                                   imageUrl={l.item.imageUrl}
+                                                   thumbnailUrl={l.item.thumbnailUrl}
+                                                   categoryName={l.item.category}
+                                                   unit={l.item.unit}
+                                                 />
+                                               ) : (
+                                                 <span className="font-bold text-slate-700 text-sm whitespace-normal max-w-[300px]">{l.item?.name || 'N/A'}</span>
+                                               )}
                                               
                                               <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                                                <span className="text-[9px] font-extrabold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md uppercase tracking-wider">{l.item.mvpp}</span>
+                                                 <span className="text-[9px] font-extrabold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                                                   {approval.replacementItemId && approval.replacementItem ? approval.replacementItem.mvpp : l.item.mvpp}
+                                                 </span>
                                                 {currentUser.role === 'ADMIN' && approval.selected && (
                                                   <button 
                                                     type="button"
@@ -1489,13 +1502,13 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                               </div>
 
                                               {/* Replacement badge if selected */}
-                                              {approval.replacementItemId && (
-                                                <div className="mt-1.5 flex items-center gap-1.5 p-1.5 px-2 bg-indigo-50 border border-indigo-200 rounded-xl max-w-fit shadow-sm animate-fade-in self-start">
-                                                  <span className="text-[9px] font-black text-indigo-500 uppercase tracking-wider">→ Thay bằng:</span>
-                                                  <span className="text-[10px] font-extrabold text-indigo-800">{approval.replacementItemName}</span>
-                                                  <button 
-                                                    type="button"
-                                                    onClick={() => setApprovals(approvals.map(a => a.lineId === l.id ? {...a, replacementItemId: null, replacementItemName: null, note: a.note === 'Thay thế' ? '' : a.note} : a))}
+                                               {approval.replacementItemId && (
+                                                 <div className="mt-1.5 flex items-center gap-1.5 p-1.5 px-2 bg-slate-100 border border-slate-200 rounded-xl max-w-fit shadow-sm animate-fade-in self-start text-[10px] font-semibold text-slate-400">
+                                                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">← Thay cho:</span>
+                                                   <span className="text-[10px] font-bold text-slate-500">{l.item?.name || 'Vật tư gốc'}</span>
+                                                   <button 
+                                                     type="button"
+                                                     onClick={() => setApprovals(approvals.map(a => a.lineId === l.id ? {...a, replacementItemId: null, replacementItemName: null, replacementItem: null, note: a.note === 'Thay thế' ? '' : a.note} : a))}
                                                     className="ml-1 text-[11px] font-black text-slate-400 hover:text-rose-600 p-0.5 rounded transition"
                                                     title="Hủy đổi vật tư"
                                                   >✕</button>
@@ -2234,6 +2247,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                               ...a,
                               replacementItemId: swapSelectedItem.id,
                               replacementItemName: swapSelectedItem.name,
+                              replacementItem: swapSelectedItem,
                               note: a.note || 'Thay thế'
                             } : a));
                             closeSwapModal();
