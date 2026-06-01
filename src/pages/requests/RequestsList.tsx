@@ -187,14 +187,12 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   };
 
   const toggleBulkMode = () => {
-    if (isBulkMode && selectedIds.length > 0) {
-      if (window.confirm(`Bạn đang chọn ${selectedIds.length} phiếu. Ẩn ô chọn sẽ bỏ chọn tất cả phiếu. Bạn có muốn tiếp tục?`)) {
-        setSelectedIds([]);
-        setIsBulkMode(false);
-      }
+    if (isBulkMode) {
+      setSelectedIds([]);
+      setIsBulkMode(false);
     } else {
-      setIsBulkMode(!isBulkMode);
-      if (!isBulkMode) setSelectedIds([]);
+      setIsBulkMode(true);
+      setSelectedIds([]);
     }
   };
 
