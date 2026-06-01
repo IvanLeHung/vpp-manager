@@ -1059,48 +1059,61 @@ export default function JanitorialReports() {
     let signatureHtml = "";
     if (selectedTicket) {
       signatureHtml = `
-        <table class="layout-grid" style="width: 100%; margin-top: 40px; text-align: center; border: none;">
-          <tr>
-            <td style="width: 25%; border: none; text-align: center;">
-              <strong style="font-size: 11pt;">Người lập biểu</strong><br/>
-              <span style="font-size: 9pt; font-style: italic;">(Ký & ghi rõ họ tên)</span>
-              <br/><br/><br/><br/>
-              <strong style="font-size: 11pt;">${reporterName}</strong>
-            </td>
-            <td style="width: 25%; border: none; text-align: center;">
-              <strong style="font-size: 11pt;">Người giao hàng</strong><br/>
-              <span style="font-size: 9pt; font-style: italic;">(Ký & ghi rõ họ tên)</span>
-              <br/><br/><br/><br/>
-              <strong style="font-size: 11pt;">${selectedTicket.deliverer || 'Lê Văn Giao'}</strong>
-            </td>
-            <td style="width: 25%; border: none; text-align: center;">
-              <strong style="font-size: 11pt;">Người nhận hàng</strong><br/>
-              <span style="font-size: 9pt; font-style: italic;">(Ký & ghi rõ họ tên)</span>
-              <br/><br/><br/><br/>
-              <strong style="font-size: 11pt;">${selectedTicket.receiver || '---'}</strong>
-            </td>
-            <td style="width: 25%; border: none; text-align: center;">
-              <strong style="font-size: 11pt;">Trưởng bộ phận</strong><br/>
-              <span style="font-size: 9pt; font-style: italic;">(Ký & đóng dấu)</span>
-              <br/><br/><br/><br/>
-              <strong style="font-size: 11pt;">${selectedTicket.approver || 'Trần Thị B'}</strong>
-            </td>
-          </tr>
-        </table>
+        <div style="page-break-inside: avoid; margin-top: 30px;">
+          <table class="layout-grid" style="width: 100%; border: none; border-collapse: collapse;">
+            <tr>
+              <td style="width: 25%; border: none; text-align: center; padding: 0 8px; vertical-align: top;">
+                <strong style="font-size: 11pt;">BÊN GIAO</strong><br/>
+                <strong style="font-size: 11pt;">ĐƠN VỊ CUNG CẤP</strong><br/>
+                <span style="font-size: 9pt; font-style: italic;">(Ký và xác nhận đối chiếu đúng hàng)</span>
+                <br/><br/><br/>
+                <div style="border-bottom: 1px dashed #000; width: 80%; margin: 0 auto 4px;"></div>
+                <strong style="font-size: 11pt;">${selectedTicket.deliverer || '---'}</strong>
+              </td>
+              <td style="width: 25%; border: none; text-align: center; padding: 0 8px; vertical-align: top;">
+                <strong style="font-size: 11pt;">THỦ KHO</strong><br/>
+                <strong style="font-size: 11pt;">NGƯỜI KIỂM ĐỊNH</strong><br/>
+                <span style="font-size: 9pt; font-style: italic;">(Ký, ghi rõ họ tên xác nhận nhận hàng)</span>
+                <br/><br/><br/>
+                <div style="border-bottom: 1px dashed #000; width: 80%; margin: 0 auto 4px;"></div>
+                <strong style="font-size: 11pt;">${selectedTicket.receiver || '---'}</strong>
+              </td>
+              <td style="width: 25%; border: none; text-align: center; padding: 0 8px; vertical-align: top;">
+                <strong style="font-size: 11pt;">NGƯỜI LẬP BIỂU</strong><br/>
+                <br/>
+                <span style="font-size: 9pt; font-style: italic;">(Ký &amp; ghi rõ họ tên)</span>
+                <br/><br/><br/>
+                <div style="border-bottom: 1px dashed #000; width: 80%; margin: 0 auto 4px;"></div>
+                <strong style="font-size: 11pt;">${reporterName}</strong>
+              </td>
+              <td style="width: 25%; border: none; text-align: center; padding: 0 8px; vertical-align: top;">
+                <strong style="font-size: 11pt;">TRƯỞNG BỘ PHẬN</strong><br/>
+                <br/>
+                <span style="font-size: 9pt; font-style: italic;">(Ký &amp; đóng dấu)</span>
+                <br/><br/><br/>
+                <div style="border-bottom: 1px dashed #000; width: 80%; margin: 0 auto 4px;"></div>
+                <strong style="font-size: 11pt;">${selectedTicket.approver || '---'}</strong>
+              </td>
+            </tr>
+          </table>
+        </div>
       `;
     } else {
       signatureHtml = `
-        <table class="layout-grid" style="width: 100%; margin-top: 40px; border: none;">
-          <tr>
-            <td style="width: 60%; border: none;"></td>
-            <td style="width: 40%; text-align: center; border: none;">
-              <strong style="font-size: 11pt;">Người lập biểu</strong><br/>
-              <span style="font-size: 9pt; font-style: italic;">(Ký & ghi rõ họ tên)</span>
-              <br/><br/><br/><br/>
-              <strong style="font-size: 11pt;">${reporterName}</strong>
-            </td>
-          </tr>
-        </table>
+        <div style="page-break-inside: avoid; margin-top: 30px;">
+          <table class="layout-grid" style="width: 100%; border: none;">
+            <tr>
+              <td style="width: 60%; border: none;"></td>
+              <td style="width: 40%; text-align: center; border: none; padding: 0 8px; vertical-align: top;">
+                <strong style="font-size: 11pt;">NGƯỜI LẬP BIỂU</strong><br/>
+                <span style="font-size: 9pt; font-style: italic;">(Ký &amp; ghi rõ họ tên)</span>
+                <br/><br/><br/>
+                <div style="border-bottom: 1px dashed #000; width: 80%; margin: 0 auto 4px;"></div>
+                <strong style="font-size: 11pt;">${reporterName}</strong>
+              </td>
+            </tr>
+          </table>
+        </div>
       `;
     }
 
@@ -1621,33 +1634,58 @@ export default function JanitorialReports() {
             display: grid !important;
             grid-template-columns: repeat(4, 1fr) !important;
             gap: 16px !important;
-            margin-top: 40px !important;
+            margin-top: 30px !important;
             text-align: center !important;
             page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
 
           .print-signature > div {
             display: flex !important;
             flex-direction: column !important;
-            justify-content: space-between !important;
-            height: 110px !important;
+            justify-content: flex-start !important;
+            min-height: 120px !important;
             color: #000 !important;
+          }
+
+          .print-signature > div .sig-title {
+            font-weight: bold !important;
+            font-size: 11pt !important;
+            line-height: 1.4 !important;
+          }
+
+          .print-signature > div .sig-note {
+            font-size: 9pt !important;
+            font-style: italic !important;
+            margin-bottom: 4px !important;
+          }
+
+          .print-signature > div .sig-line {
+            border-bottom: 1px dashed #000 !important;
+            width: 80% !important;
+            margin: 32px auto 4px !important;
+          }
+
+          .print-signature > div .sig-name {
+            font-weight: bold !important;
+            font-size: 11pt !important;
           }
 
           .print-signature-single {
             display: flex !important;
             justify-content: flex-end !important;
-            margin-top: 40px !important;
+            margin-top: 30px !important;
             text-align: center !important;
             page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
 
           .print-signature-single > div {
             width: 250px !important;
             display: flex !important;
             flex-direction: column !important;
-            justify-content: space-between !important;
-            height: 110px !important;
+            justify-content: flex-start !important;
+            min-height: 120px !important;
             color: #000 !important;
           }
 
