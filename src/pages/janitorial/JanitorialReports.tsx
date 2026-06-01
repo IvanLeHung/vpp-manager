@@ -1631,20 +1631,21 @@ export default function JanitorialReports() {
           }
 
           .print-signature {
-            display: grid !important;
-            grid-template-columns: repeat(4, 1fr) !important;
-            gap: 16px !important;
+            display: table !important;
+            width: 100% !important;
+            table-layout: fixed !important;
+            border-collapse: collapse !important;
             margin-top: 30px !important;
-            text-align: center !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
           }
 
           .print-signature > div {
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: flex-start !important;
-            min-height: 120px !important;
+            display: table-cell !important;
+            width: 25% !important;
+            text-align: center !important;
+            vertical-align: top !important;
+            padding: 0 10px !important;
             color: #000 !important;
           }
 
@@ -1652,41 +1653,49 @@ export default function JanitorialReports() {
             font-weight: bold !important;
             font-size: 11pt !important;
             line-height: 1.4 !important;
+            display: block !important;
           }
 
           .print-signature > div .sig-note {
             font-size: 9pt !important;
             font-style: italic !important;
-            margin-bottom: 4px !important;
+            display: block !important;
+            margin-bottom: 0 !important;
           }
 
           .print-signature > div .sig-line {
+            display: block !important;
             border-bottom: 1px dashed #000 !important;
             width: 80% !important;
-            margin: 32px auto 4px !important;
+            margin: 36px auto 4px !important;
           }
 
           .print-signature > div .sig-name {
+            display: block !important;
             font-weight: bold !important;
             font-size: 11pt !important;
           }
 
           .print-signature-single {
-            display: flex !important;
-            justify-content: flex-end !important;
+            display: table !important;
+            width: 100% !important;
             margin-top: 30px !important;
-            text-align: center !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
           }
 
           .print-signature-single > div {
-            width: 250px !important;
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: flex-start !important;
-            min-height: 120px !important;
+            display: table-cell !important;
+            width: 40% !important;
+            text-align: center !important;
+            vertical-align: top !important;
+            padding: 0 10px !important;
             color: #000 !important;
+          }
+
+          .print-signature-single > .sig-spacer {
+            display: table-cell !important;
+            width: 60% !important;
           }
 
           .print-title {
@@ -2940,41 +2949,50 @@ export default function JanitorialReports() {
             </tbody>
           </table>
         )}
-
         {/* Signature Area */}
         {selectedTicket ? (
           <div className="print-signature">
             <div>
-              <div className="font-bold">Người lập biểu</div>
-              <div className="text-xs italic mb-10">(Ký & ghi rõ họ tên)</div>
-              <div className="font-bold text-slate-700 mt-6">{reporter}</div>
+              <span className="sig-title">BÊN GIAO</span>
+              <span className="sig-title">ĐƠN VẸ CUNG CẤP</span>
+              <span className="sig-note">(Ký và xác nhận đối chiếu đúng hàng)</span>
+              <span className="sig-line"></span>
+              <span className="sig-name">{selectedTicket?.deliverer || '---'}</span>
             </div>
             <div>
-              <div className="font-bold">Người giao hàng</div>
-              <div className="text-xs italic mb-10">(Ký & ghi rõ họ tên)</div>
-              <div className="font-bold text-slate-700 mt-6">{selectedTicket?.deliverer || 'Lê Văn Giao'}</div>
+              <span className="sig-title">THỦ KHO</span>
+              <span className="sig-title">NGƯỜI KIỂM ĐịNH</span>
+              <span className="sig-note">(Ký, ghi rõ họ tên xác nhận nhận hàng)</span>
+              <span className="sig-line"></span>
+              <span className="sig-name">{selectedTicket?.receiver || '---'}</span>
             </div>
             <div>
-              <div className="font-bold">Người nhận</div>
-              <div className="text-xs italic mb-10">(Ký & ghi rõ họ tên)</div>
-              <div className="font-bold text-slate-700 mt-6">{selectedTicket?.receiver || '---'}</div>
+              <span className="sig-title">NGƯỜI LậP BIỂU</span>
+              <span className="sig-title">&nbsp;</span>
+              <span className="sig-note">(Ký &amp; ghi rõ họ tên)</span>
+              <span className="sig-line"></span>
+              <span className="sig-name">{reporter}</span>
             </div>
             <div>
-              <div className="font-bold">Trưởng bộ phận</div>
-              <div className="text-xs italic mb-10">(Ký & đóng dấu)</div>
-              <div className="font-bold text-slate-700 mt-6">{selectedTicket?.approver || 'Trần Thị B'}</div>
+              <span className="sig-title">TRƯỞNG BỘ PHẪN</span>
+              <span className="sig-title">&nbsp;</span>
+              <span className="sig-note">(Ký &amp; đóng dấu)</span>
+              <span className="sig-line"></span>
+              <span className="sig-name">{selectedTicket?.approver || '---'}</span>
             </div>
           </div>
         ) : (
           <div className="print-signature-single">
+            <div className="sig-spacer"></div>
             <div>
-              <div className="font-bold">Người lập biểu</div>
-              <div className="text-xs italic mb-10">(Ký & ghi rõ họ tên)</div>
-              <div className="font-bold text-slate-700 mt-6">{reporter}</div>
+              <span className="sig-title">NGƯỜI LậP BIỂU</span>
+              <span className="sig-note">(Ký &amp; ghi rõ họ tên)</span>
+              <span className="sig-line"></span>
+              <span className="sig-name">{reporter}</span>
             </div>
           </div>
         )}
-      </div>
+</div>
 
       {/* ── MODALS SECTION ── */}
 
