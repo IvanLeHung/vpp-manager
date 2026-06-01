@@ -1429,7 +1429,10 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {data.lines.map((l:any) => {
-                                    const approval = approvals.find((a:any)=>a.lineId===l.id) || { selected: false, qtyApproved: 0, note: '', replacementItemId: null, replacementItemName: null };
+                                    const approval = approvals.find((a:any)=>a.lineId===l.id) || { selected: false, qtyApproved: 0, note: '', replacementItemId: null, replacementItemName: null, replacementItem: null };
+                                    const effectivePrice = (approval.replacementItemId && approval.replacementItem)
+                                      ? (approval.replacementItem.price || 0)
+                                      : (l.item.price || 0);
                                     const currentStock = l.item.stocks?.find((s:any)=>s.warehouseCode===data.warehouseCode)?.quantityOnHand || 0;
                                     const overStock = (approval.selected && approval.qtyApproved > currentStock);
                                     const isChanged = approval.qtyApproved !== l.qtyRequested;
@@ -1575,15 +1578,10 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                         </td>
 
                                         <td className="p-4 text-right font-medium align-top pt-5">
-
-                                            {(l.item.price || 0).toLocaleString('vi-VN')}
-
+                                            {effectivePrice.toLocaleString('vi-VN')}
                                         </td>
-
                                         <td className="p-4 text-right font-black text-slate-800 align-top pt-5">
-
-                                            {((l.item.price || 0) * (approval.selected ? approval.qtyApproved : 0)).toLocaleString('vi-VN')}
-
+                                            {(effectivePrice * (approval.selected ? approval.qtyApproved : 0)).toLocaleString('vi-VN')}
                                         </td>
                                         <td className="px-3 py-3 text-center align-top pt-5">
                                             {getStatusBadge()}
