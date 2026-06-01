@@ -141,7 +141,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
   const [showFullHistory, setShowFullHistory] = useState(false);
   
   // Custom approvals
-  const [approvals, setApprovals] = useState<{lineId: string, qtyApproved: number, selected: boolean, note: string}[]>([]);
+  const [approvals, setApprovals] = useState<{lineId: string, qtyApproved: number, selected: boolean, note: string, replacementItemId?: string | null, replacementItemName?: string | null}[]>([]);
+  const [approvalSwapMode, setApprovalSwapMode] = useState<boolean>(false);
   // Custom issues
   const [issues, setIssues] = useState<{
     lineId: string;
@@ -185,7 +186,9 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
         lineId: l.id, 
         qtyApproved: l.qtyApproved ?? l.qtyRequested,
         selected: l.status !== 'REJECTED',
-        note: l.approvalNote || ''
+        note: l.approvalNote || '',
+        replacementItemId: null,
+        replacementItemName: null
       })));
       setIssues(res.data.lines.map((l:any) => {
         const primaryWh = res.data.warehouseCode || 'MAIN';
@@ -1403,15 +1406,16 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {data.lines.map((l:any) => {
-                                    const approval = approvals.find((a:any)=>a.lineId===l.id) || { selected: false, qtyApproved: 0, note: '' };
+                                    const approval = approvals.find((a:any)=>a.lineId===l.id) || { selected: false, qtyApproved: 0, note: '', replacementItemId: null, replacementItemName: null };
                                     const currentStock = l.item.stocks?.find((s:any)=>s.warehouseCode===data.warehouseCode)?.quantityOnHand || 0;
                                     const overStock = (approval.selected && approval.qtyApproved > currentStock);
                                     const isChanged = approval.qtyApproved !== l.qtyRequested;
-                                    const noteRequired = isChanged && !approval.note.trim();
+                                    const noteRequired = isChanged && !approval.note.trim() && !approval.replacementItemId;
                                     
                                     const getStatusBadge = () => {
                                       if (!approval.selected) return <span className="px-3 py-1 bg-slate-100 text-slate-400 rounded-full text-[10px] font-black uppercase tracking-widest">Bỏ qua</span>;
                                       if (approval.qtyApproved === 0) return <span className="px-3 py-1 bg-rose-100 text-rose-500 rounded-full text-[10px] font-black uppercase tracking-widest">Không duyệt</span>;
+                                      if (approval.replacementItemId) return <span className="px-3 py-1 bg-indigo-100 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest">⇄ Thay thế</span>;
                                       if (currentStock === 0) return <span className="px-3 py-1 bg-rose-100 text-rose-600 rounded-full text-[10px] font-black uppercase tracking-widest">Hết hàng</span>;
                                       if (approval.qtyApproved >= l.qtyRequested) return <span className="px-3 py-1 bg-emerald-100 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest">Duyệt đủ</span>;
                                       return <span className="px-3 py-1 bg-amber-100 text-amber-600 rounded-full text-[10px] font-black uppercase tracking-widest">Duyệt 1 phần</span>;
@@ -1449,7 +1453,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                                    <div className="flex justify-between items-center mb-1.5">
                                                       <p className={`text-[10px] font-black uppercase tracking-widest ${noteRequired ? 'text-rose-500' : 'text-slate-400'}`}>Lý do điều chỉnh {noteRequired && ' (Bắt buộc)'}</p>
                                                       <div className="flex gap-1">
-                                                         {['Hết hàng', 'Không đủ tồn', 'Thay thế'].map(preset => (
+                                                         {['Hết hàng', 'Không đủ tồn'].map(preset => (
                                                             <button 
                                                                key={preset}
                                                                onClick={() => setApprovals(approvals.map(a => a.lineId === l.id ? {...a, note: preset} : a))}
@@ -1458,8 +1462,30 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                                                {preset}
                                                             </button>
                                                          ))}
+                                                         <button 
+                                                            onClick={() => {
+                                                              setApprovalSwapMode(true);
+                                                              setSwapModalLineId(l.id);
+                                                              setSwapSearch('');
+                                                              setSwapSearchResults([]);
+                                                              setSwapSelectedItem(null);
+                                                            }}
+                                                            className="text-[8px] font-bold bg-indigo-600 text-white border border-indigo-600 px-1.5 py-0.5 rounded hover:bg-indigo-700 transition flex items-center gap-0.5"
+                                                         >
+                                                            ⇄ Thay thế
+                                                         </button>
                                                       </div>
                                                    </div>
+                                                   {approval.replacementItemId && (
+                                                     <div className="mb-2 flex items-center gap-2 p-2 bg-indigo-50 border border-indigo-200 rounded-lg">
+                                                       <span className="text-[9px] font-black text-indigo-500 uppercase">→ Thay bằng:</span>
+                                                       <span className="text-[10px] font-bold text-indigo-700">{approval.replacementItemName}</span>
+                                                       <button 
+                                                         onClick={() => setApprovals(approvals.map(a => a.lineId === l.id ? {...a, replacementItemId: null, replacementItemName: null, note: a.note === 'Thay thế' ? '' : a.note} : a))}
+                                                         className="ml-auto text-[8px] font-bold text-rose-400 hover:text-rose-600 transition"
+                                                       >✕ Xóa</button>
+                                                     </div>
+                                                   )}
                                                    <textarea 
                                                       value={approval.note}
                                                       onChange={(e) => setApprovals(approvals.map(a => a.lineId === l.id ? {...a, note: e.target.value} : a))}
@@ -1604,7 +1630,13 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                   });
 
                                   handleAction('/approve', { 
-                                      lineApprovals: finalApprovals, 
+                                      lineApprovals: finalApprovals.map(a => ({
+                                        lineId: a.lineId,
+                                        qtyApproved: a.qtyApproved,
+                                        selected: a.selected,
+                                        note: a.note,
+                                        replacementItemId: a.replacementItemId || null
+                                      })), 
                                       reason: globalApproveReason,
                                       createBackorder: autoCreateBackorder 
                                    }, 'Đã duyệt thành công!');
@@ -2123,7 +2155,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
                     {/* Footer */}
                     <div className="p-6 border-t border-slate-100 flex gap-3 bg-slate-50">
-                      <button
+                       <button
                         type="button"
                         onClick={() => setSwapModalLineId(null)}
                         className="flex-1 py-3 bg-white border border-slate-200 text-slate-500 font-bold rounded-2xl text-sm hover:bg-slate-100 hover:text-slate-700 transition"
@@ -2136,7 +2168,21 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                         onClick={() => {
                           if (!swapSelectedItem || !swapModalLineId) return;
                           
-                          // Update issues state
+                          if (approvalSwapMode) {
+                            // ── Approval mode: save replacement item into approvals state ──
+                            setApprovals(approvals.map(a => a.lineId === swapModalLineId ? {
+                              ...a,
+                              replacementItemId: swapSelectedItem.id,
+                              replacementItemName: swapSelectedItem.name,
+                              note: a.note || 'Thay thế'
+                            } : a));
+                            setApprovalSwapMode(false);
+                            setSwapModalLineId(null);
+                            showToast(`Đã chọn "${swapSelectedItem.name}" làm hàng thay thế!`, 'success');
+                            return;
+                          }
+
+                          // ── Issue mode: update issues state (original behavior) ──
                           const line = data.lines.find((l: any) => l.id === swapModalLineId);
                           const firstWhWithStock = swapSelectedItem.stocks?.find((s: any) => s.quantityOnHand > 0)?.warehouseCode || 'MAIN';
                           const primaryWh = data.warehouseCode || 'MAIN';
