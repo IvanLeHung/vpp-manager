@@ -38,6 +38,62 @@ const formatDigitalSignatureDate = (date?: string | Date) => {
     return `${day}/${month}/${year} ${hours}:${minutes}`;
 };
 
+function numberToVietnameseWords(num: number): string {
+    if (num === 0) return 'không';
+    
+    const units = ['', 'nghìn', 'triệu', 'tỷ', 'nghìn tỷ', 'triệu tỷ'];
+    const digitNames = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
+    
+    function readGroup(n: number): string {
+        let s = '';
+        const hundreds = Math.floor(n / 100);
+        const tens = Math.floor((n % 100) / 10);
+        const ones = n % 10;
+        
+        if (hundreds > 0) {
+            s += digitNames[hundreds] + ' trăm ';
+        } else if (s !== '') {
+            s += 'không trăm ';
+        }
+        
+        if (tens > 1) {
+            s += digitNames[tens] + ' mươi ';
+        } else if (tens === 1) {
+            s += 'mười ';
+        } else if (tens === 0 && ones > 0 && hundreds > 0) {
+            s += 'linh ';
+        }
+        
+        if (ones > 0) {
+            if (ones === 1 && tens > 1) {
+                s += 'mốt';
+            } else if (ones === 5 && tens > 0) {
+                s += 'lăm';
+            } else {
+                s += digitNames[ones];
+            }
+        }
+        return s.trim();
+    }
+    
+    let str = '';
+    let temp = Math.round(num);
+    let groupIdx = 0;
+    
+    while (temp > 0) {
+        const groupValue = temp % 1000;
+        if (groupValue > 0) {
+            const groupStr = readGroup(groupValue);
+            str = groupStr + ' ' + (units[groupIdx] ? units[groupIdx] + ' ' : '') + str;
+        }
+        temp = Math.floor(temp / 1000);
+        groupIdx++;
+    }
+    
+    str = str.trim();
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
 function sortItemsForPrinting(items: any[]) {
   return [...items].sort((a, b) => {
     const groupA = a.printSortGroup || getItemSortGroupName(a.name || '');
@@ -460,6 +516,121 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
         optimizedPoCount
     };
   }, [data, selectedIds]);
+
+  const deptReportData = useMemo(() => {
+      const targetData = selectedIds.length > 0 
+        ? data.filter(d => selectedIds.includes(d.id))
+        : filteredData;
+
+      const map = new Map<string, {
+          name: string;
+          requestCodes: Set<string>;
+          items: Set<string>;
+          actualTotal: number;
+          notes: Set<string>;
+      }>();
+
+      targetData.forEach(po => {
+          po.lines?.forEach((line: any) => {
+              if (!line.item) return;
+
+              const isReplaced = !!line.requestLine?.replacementItemId;
+              const effectiveItem = isReplaced ? line.requestLine.replacementItem : line.item;
+              if (!effectiveItem) return;
+
+              const originalRequest = line.requestLine?.request;
+              const deptName = line.originalDept || 
+                               originalRequest?.department || 
+                               originalRequest?.requester?.department?.name ||
+                               po.department || 
+                               po.requesterDepartment || 
+                               'Khác';
+
+              const requestCode = line.fuzzyRequestCode || originalRequest?.id || po.id;
+
+              const effectiveQty = Number(line.qtyOrdered || line.qtyApproved || line.qtyRequested || 0);
+              const effectivePrice = Number(isReplaced ? (line.requestLine?.replacementPrice || line.unitPrice || line.item?.price || 0) : (line.unitPrice || line.item?.price || 0));
+              const lineActualTotal = effectiveQty * effectivePrice;
+
+              let specificNote = line.originalNote || 
+                                 line.requestLine?.note || 
+                                 line.requestLine?.approvalNote || 
+                                 originalRequest?.purpose || 
+                                 po.purpose || 
+                                 line.note ||
+                                 '';
+              
+              if (!map.has(deptName)) {
+                  map.set(deptName, {
+                      name: deptName,
+                      requestCodes: new Set(),
+                      items: new Set(),
+                      actualTotal: 0,
+                      notes: new Set()
+                  });
+              }
+
+              const deptStats = map.get(deptName)!;
+              deptStats.requestCodes.add(requestCode);
+              deptStats.items.add(effectiveItem.mvpp || effectiveItem.id);
+              deptStats.actualTotal += lineActualTotal;
+              if (specificNote && specificNote.trim()) {
+                  deptStats.notes.add(specificNote.trim());
+              }
+          });
+      });
+
+      const list = Array.from(map.values()).map(dept => {
+          return {
+              name: dept.name,
+              requestCount: dept.requestCodes.size,
+              itemCount: dept.items.size,
+              actualTotal: dept.actualTotal,
+              notes: Array.from(dept.notes).slice(0, 3).join('; ')
+          };
+      });
+
+      list.sort((a, b) => b.actualTotal - a.actualTotal);
+
+      const totalActual = list.reduce((sum, d) => sum + d.actualTotal, 0);
+      const totalRequests = list.reduce((sum, d) => sum + d.requestCount, 0);
+      
+      const globalUniqueItems = new Set<string>();
+      const globalUniqueRequests = new Set<string>();
+      targetData.forEach(po => {
+          globalUniqueRequests.add(po.id);
+          po.lines?.forEach((line: any) => {
+              if (line.item) {
+                  const isReplaced = !!line.requestLine?.replacementItemId;
+                  const effectiveItem = isReplaced ? line.requestLine.replacementItem : line.item;
+                  if (effectiveItem) {
+                      globalUniqueItems.add(effectiveItem.mvpp || effectiveItem.id);
+                  }
+              }
+              const originalRequest = line.requestLine?.request;
+              const requestCode = line.fuzzyRequestCode || originalRequest?.id;
+              if (requestCode) globalUniqueRequests.add(requestCode);
+          });
+      });
+
+      const listWithPercentage = list.map(d => ({
+          ...d,
+          percentage: totalActual > 0 ? (d.actualTotal / totalActual) * 100 : 0
+      }));
+
+      const highestDept = listWithPercentage.length > 0 ? listWithPercentage[0] : null;
+      
+      return {
+          departments: listWithPercentage,
+          totalActual,
+          totalRequests,
+          totalUniqueItems: globalUniqueItems.size,
+          totalUniqueRequests: globalUniqueRequests.size,
+          highestDeptName: highestDept ? highestDept.name : '—',
+          highestDeptValue: highestDept ? highestDept.actualTotal : 0,
+          poCount: targetData.length
+      };
+  }, [data, filteredData, selectedIds]);
 
   const handlePrintSummary = (type: 'ALL' | 'VPP' | 'VE_SINH' | 'DEPT' = 'ALL') => {
       setSelectedPrintType(type);
@@ -1734,6 +1905,27 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
           {selectedPrintType === 'DEPT' && (
             <div className="print-sheet p-4">
                 {(() => {
+                    const targetData = selectedIds.length > 0 
+                      ? data.filter(d => selectedIds.includes(d.id))
+                      : filteredData;
+                    
+                    let periodLabel = "Tất cả các kỳ";
+                    if (selectedMonth) {
+                        const [year, month] = selectedMonth.split('-');
+                        periodLabel = `Tháng ${month}/${year}`;
+                    } else {
+                        const dates = targetData.map(d => new Date(d.createdAt || d.orderDate).getTime()).filter(Boolean);
+                        if (dates.length > 0) {
+                            const minDate = new Date(Math.min(...dates));
+                            const maxDate = new Date(Math.max(...dates));
+                            if (minDate.toDateString() === maxDate.toDateString()) {
+                                periodLabel = minDate.toLocaleDateString('vi-VN');
+                            } else {
+                                periodLabel = `Từ ${minDate.toLocaleDateString('vi-VN')} đến ${maxDate.toLocaleDateString('vi-VN')}`;
+                            }
+                        }
+                    }
+
                     const summaryCode = `THMS-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-PB`;
                     return (
                         <>
@@ -1755,17 +1947,51 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                             </div>
 
                             {/* TITLE */}
-                            <h2 className="title-main">PHIẾU TỔNG HỢP TIÊU THỤ THEO PHÒNG BAN</h2>
-                            <p className="title-sub">(Tổng hợp từ {executiveData.optimizedPoCount} phiếu mua sắm / đề nghị đang lọc)</p>
+                            <h2 className="title-main uppercase">TỔNG HỢP TIÊU THỤ VĂN PHÒNG PHẨM THEO PHÒNG BAN</h2>
+                            <p className="title-sub">(Kèm theo Tờ trình quyết toán chi phí mua sắm/tiêu dùng thực tế)</p>
 
-                            {/* OVERVIEW INFO BLOCK */}
-                            <div className="info-grid">
-                               <div className="info-item"><span className="info-label">Mã tổng hợp:</span> <span>{summaryCode}</span></div>
-                               <div className="info-item"><span className="info-label">Người lập:</span> <span>Quản lý Hành chính</span></div>
-                               <div className="info-item"><span className="info-label">Phạm vi:</span> <span>Toàn bộ phòng ban</span></div>
-                               <div className="info-item"><span className="info-label">Ngày in:</span> <span>{new Date().toLocaleDateString('vi-VN')}</span></div>
-                               <div className="info-item"><span className="info-label">Tổng số phòng ban:</span> <span>{executiveData.deptArray.length} đơn vị</span></div>
+                            {/* KÍNH TRÌNH TỔNG GIÁM ĐỐC */}
+                            <div className="border border-black p-3 mb-4 bg-slate-50/50 header-text" style={{ fontSize: '9.5pt', lineHeight: '1.4' }}>
+                                <p className="font-bold uppercase mb-1">KÍNH TRÌNH TỔNG GIÁM ĐỐC:</p>
+                                <p>
+                                    Ban Hành chính Nhân sự kính trình Tổng Giám đốc xem xét phê duyệt quyết toán chi phí tiêu thụ Văn phòng phẩm thực tế kỳ <strong>{periodLabel}</strong> với tổng số tiền là <strong>{Number(deptReportData.totalActual).toLocaleString('vi-VN')} đ</strong> (bằng chữ: <em>{numberToVietnameseWords(deptReportData.totalActual)} đồng</em>). Số liệu tổng hợp nhanh và chi tiết theo phòng ban phát sinh chi tiết dưới đây:
+                                </p>
                             </div>
+
+                            {/* TỔNG HỢP NHANH SỐ LIỆU */}
+                            <table className="print-table mb-4" style={{ fontSize: '8.5pt' }}>
+                                <thead>
+                                    <tr className="bg-slate-100 font-bold text-center text-[9pt]">
+                                        <th colSpan={4} style={{ padding: '4px', border: '1px solid #000' }}>TỔNG HỢP NHANH SỐ LIỆU TIÊU THỤ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td className="font-bold" style={{ width: '25%' }}>Kỳ tổng hợp:</td>
+                                        <td style={{ width: '25%' }}>{periodLabel}</td>
+                                        <td className="font-bold" style={{ width: '25%' }}>Phạm vi:</td>
+                                        <td style={{ width: '25%' }}>{selectedIds.length > 0 ? "Theo danh sách chọn" : "Toàn hệ thống (Bộ lọc)"}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="font-bold">Số phòng ban phát sinh:</td>
+                                        <td>{deptReportData.departments.length} đơn vị</td>
+                                        <td className="font-bold">Tổng số lượt yêu cầu/cấp phát:</td>
+                                        <td>{deptReportData.totalUniqueRequests} lượt</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="font-bold">Tổng số mặt hàng tiêu thụ:</td>
+                                        <td>{deptReportData.totalUniqueItems} mặt hàng</td>
+                                        <td className="font-bold">Tổng giá trị tiêu thụ:</td>
+                                        <td className="font-bold text-indigo-700">{Number(deptReportData.totalActual).toLocaleString('vi-VN')} đ</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="font-bold">Phòng ban tiêu thụ cao nhất:</td>
+                                        <td className="font-bold text-rose-700">{deptReportData.highestDeptName}</td>
+                                        <td className="font-bold">Giá trị cao nhất:</td>
+                                        <td className="font-bold text-rose-700">{Number(deptReportData.highestDeptValue).toLocaleString('vi-VN')} đ</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </>
                     );
                 })()}
@@ -1774,52 +2000,64 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                 <table className="print-table">
                     <thead>
                         <tr className="bg-slate-100 font-bold text-[8pt] text-center">
-                            <th style={{width: '6%'}}>STT</th>
-                            <th style={{width: '34%'}}>TÊN PHÒNG BAN / ĐƠN VỊ</th>
-                            <th style={{width: '15%'}}>GIÁ TRỊ ĐỀ XUẤT</th>
-                            <th style={{width: '15%'}}>GIÁ TRỊ THỰC TẾ</th>
-                            <th style={{width: '15%'}}>GIÁ TRỊ TỐI ƯU</th>
-                            <th style={{width: '15%'}}>TỶ LỆ TỐI ƯU</th>
+                            <th style={{width: '5%'}}>STT</th>
+                            <th style={{width: '32%'}}>PHÒNG BAN / ĐƠN VỊ</th>
+                            <th style={{width: '13%'}}>SỐ LƯỢT YÊU CẦU</th>
+                            <th style={{width: '12%'}}>SỐ MẶT HÀNG</th>
+                            <th style={{width: '16%'}}>GIÁ TRỊ TIÊU THỤ</th>
+                            <th style={{width: '10%'}}>TỶ TRỌNG</th>
+                            <th style={{width: '12%'}}>GHI CHÚ</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {executiveData.deptArray.map((dept: any, idx: number) => (
-                            <tr key={dept.name} className="item-main-row text-[9pt]">
+                        {deptReportData.departments.map((dept: any, idx: number) => (
+                            <tr key={dept.name} className="item-main-row text-[8.5pt]">
                                 <td className="text-center">{idx + 1}</td>
                                 <td className="font-bold">{dept.name}</td>
-                                <td className="text-right">{Number(dept.proposed).toLocaleString('vi-VN')} đ</td>
-                                <td className="text-right">{Number(dept.actual).toLocaleString('vi-VN')} đ</td>
-                                <td className="text-right font-bold text-emerald-700">{Number(dept.savings).toLocaleString('vi-VN')} đ</td>
+                                <td className="text-center">{dept.requestCount} lượt</td>
+                                <td className="text-center">{dept.itemCount} mặt hàng</td>
+                                <td className="text-right font-bold">{Number(dept.actualTotal).toLocaleString('vi-VN')} đ</td>
                                 <td className="text-center font-bold">{dept.percentage.toFixed(2)}%</td>
+                                <td className="text-[7.2pt] italic truncate max-w-[120px]" title={dept.notes}>{dept.notes || '—'}</td>
                             </tr>
                         ))}
                         
                         {/* TOTAL ROW */}
-                        <tr className="item-main-row print-highlight-row font-bold text-[9pt]">
+                        <tr className="item-main-row print-highlight-row font-bold text-[8.5pt]">
                             <td className="text-center" colSpan={2}>TỔNG CỘNG</td>
-                            <td className="text-right">{Number(executiveData.totalProposed).toLocaleString('vi-VN')} đ</td>
-                            <td className="text-right">{Number(executiveData.totalActual).toLocaleString('vi-VN')} đ</td>
-                            <td className="text-right text-emerald-700">{Number(executiveData.totalSavings).toLocaleString('vi-VN')} đ</td>
-                            <td className="text-center">
-                                {executiveData.totalProposed > 0 
-                                    ? ((executiveData.totalSavings / executiveData.totalProposed) * 100).toFixed(2)
-                                    : '0.00'}%
-                            </td>
+                            <td className="text-center">{deptReportData.departments.reduce((sum: number, d: any) => sum + d.requestCount, 0)} lượt</td>
+                            <td className="text-center">{deptReportData.totalUniqueItems} mặt hàng</td>
+                            <td className="text-right text-indigo-700">{Number(deptReportData.totalActual).toLocaleString('vi-VN')} đ</td>
+                            <td className="text-center">100.00%</td>
+                            <td></td>
                         </tr>
                     </tbody>
                 </table>
 
+                {/* NHẬN XÉT / LƯU Ý PHÊ DUYỆT */}
+                <div className="mt-4 p-3 border border-black text-[8.5pt]" style={{ lineHeight: '1.45' }}>
+                   <p className="font-bold uppercase mb-1">NHẬN XÉT / LƯU Ý PHÊ DUYỆT:</p>
+                   <ul className="list-disc pl-4 space-y-1">
+                      <li><strong>Đơn vị tiêu thụ cao nhất:</strong> Phòng ban <strong>{deptReportData.highestDeptName}</strong> là đơn vị có chi phí tiêu dùng cao nhất trong kỳ với tổng giá trị <strong>{Number(deptReportData.highestDeptValue).toLocaleString('vi-VN')} đ</strong>, chiếm tỷ trọng <strong>{(deptReportData.totalActual > 0 ? (deptReportData.highestDeptValue / deptReportData.totalActual * 100) : 0).toFixed(2)}%</strong> tổng chi phí tiêu thụ toàn hệ thống.</li>
+                      <li><strong>Bộ phận không phát sinh nhu cầu:</strong> Các phòng ban không nằm trong danh sách trên không phát sinh nhu cầu sử dụng hoặc không gửi đề xuất VPP trong kỳ tổng hợp này.</li>
+                      <li><strong>Nguồn dữ liệu đối chiếu:</strong> Số liệu tổng hợp tự động dựa trên hóa đơn thực tế và dữ liệu xuất kho đã được ký duyệt số từ Hệ thống Quản trị VPP nội bộ Danko Group.</li>
+                      <li><strong>Đề xuất trình duyệt:</strong> Kính trình Tổng Giám đốc phê duyệt quyết toán chi phí Văn phòng phẩm nêu trên để làm căn cứ làm thủ tục thanh toán cho nhà cung cấp theo đúng kế hoạch.</li>
+                   </ul>
+                </div>
+
                 {/* FOOTER SIGNATURES */}
                 <div className="footer-sign">
                    <div>
-                      <p className="font-bold uppercase">Người lập phiếu</p>
+                      <p className="font-bold uppercase">Người lập báo cáo</p>
+                      <p className="text-[7.5pt] italic text-slate-500">(Ký và ghi rõ họ tên)</p>
                       <div className="mt-16">
                          <p className="font-bold">..........................</p>
                          <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
                       </div>
                    </div>
                    <div>
-                      <p className="font-bold uppercase">Trưởng bộ phận</p>
+                      <p className="font-bold uppercase">Trưởng bộ phận HCNS</p>
+                      <p className="text-[7.5pt] italic text-slate-500">(Ký và duyệt)</p>
                       <div className="mt-16">
                          <p className="font-bold">..........................</p>
                          <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
