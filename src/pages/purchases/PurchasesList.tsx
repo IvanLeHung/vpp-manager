@@ -1920,7 +1920,35 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                          <div className="total-value text-right text-indigo-700">{Number(group.actualTotal).toLocaleString('vi-VN')} đ</div>
                       </div>
                       <div className="total-row text-[10pt] font-black border-t border-slate-200 mt-1 pt-1">
-                         <div className="total-label uppercase tracking-tight">{group.savings >= 0 ? 'HIỆU QUẢ TỐI ƯU C          {/* VPP Department Summary Sheet */}
+                         <div className="total-label uppercase tracking-tight">{group.savings >= 0 ? 'HIỆU QUẢ TỐI ƯU CHI PHÍ MUA SẮM:' : 'CHÊNH LỆCH CHI PHÍ TĂNG:'}</div>
+                         <div className={`total-value text-right ${group.savings >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {Number(Math.abs(group.savings)).toLocaleString('vi-VN')} đ
+                         </div>
+                      </div>
+                   </div>
+                </div>
+
+                {/* FOOTER SIGNATURES */}
+                <div className="footer-sign">
+                   <div>
+                      <p className="font-bold uppercase">Người lập phiếu</p>
+                      <div className="mt-16">
+                         <p className="font-bold">..........................</p>
+                         <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
+                      </div>
+                   </div>
+                   <div>
+                      <p className="font-bold uppercase">Trưởng bộ phận</p>
+                      <div className="mt-16">
+                         <p className="font-bold">..........................</p>
+                         <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
+                      </div>
+                   </div>
+                </div>
+            </div>
+          ))}
+
+          {/* VPP Department Summary Sheet */}
           {(selectedPrintType === 'DEPT_VPP' || selectedPrintType === 'ALL') && deptReportDataVPP.totalActual > 0 && (
             <div className="print-sheet p-4">
                 {(() => {
