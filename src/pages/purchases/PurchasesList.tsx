@@ -212,15 +212,15 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               const effectiveItem = isReplaced ? line.requestLine.replacementItem : line.item;
               if (!effectiveItem) return;
 
-              const mvpp = effectiveItem.mvpp || '';
-              let type = effectiveItem.itemType || effectiveItem.category || 'UNKNOWN';
-              const upperType = type.toString().toUpperCase();
-              if (upperType.includes('VPP') || upperType.includes('VĂN PHÒNG PHẨM')) type = 'VPP';
-              else if (upperType.includes('VS') || upperType.includes('VỆ SINH')) type = 'VE_SINH';
+              // Resolve line warehouse code
+              const lineWarehouse = line.requestLine?.request?.warehouseCode || 
+                                    (effectiveItem.mvpp?.startsWith('VS') ? 'VE_SINH' : 'MAIN');
               
-              if (type === 'UNKNOWN') {
-                  if (mvpp.startsWith('VPP')) type = 'VPP';
-                  else if (mvpp.startsWith('VS')) type = 'VE_SINH';
+              let type = 'VPP';
+              if (lineWarehouse === 'VE_SINH') {
+                  type = 'VE_SINH';
+              } else if (lineWarehouse !== 'MAIN') {
+                  type = lineWarehouse;
               }
 
               if (!groups.has(type)) groups.set(type, new Map());
@@ -538,6 +538,14 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               const effectiveItem = isReplaced ? line.requestLine.replacementItem : line.item;
               if (!effectiveItem) return;
 
+              // Resolve line warehouse code
+              const lineWarehouse = line.requestLine?.request?.warehouseCode || 
+                                    (effectiveItem.mvpp?.startsWith('VS') ? 'VE_SINH' : 'MAIN');
+
+              // Filter based on selected print type
+              if (selectedPrintType === 'DEPT_VPP' && lineWarehouse !== 'MAIN') return;
+              if (selectedPrintType === 'DEPT_VS' && lineWarehouse !== 'VE_SINH') return;
+
               const originalRequest = line.requestLine?.request;
               const deptName = line.originalDept || 
                                originalRequest?.department || 
@@ -598,18 +606,24 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       const globalUniqueItems = new Set<string>();
       const globalUniqueRequests = new Set<string>();
       targetData.forEach(po => {
-          globalUniqueRequests.add(po.id);
           po.lines?.forEach((line: any) => {
-              if (line.item) {
-                  const isReplaced = !!line.requestLine?.replacementItemId;
-                  const effectiveItem = isReplaced ? line.requestLine.replacementItem : line.item;
-                  if (effectiveItem) {
-                      globalUniqueItems.add(effectiveItem.mvpp || effectiveItem.id);
-                  }
-              }
+              if (!line.item) return;
+              const isReplaced = !!line.requestLine?.replacementItemId;
+              const effectiveItem = isReplaced ? line.requestLine.replacementItem : line.item;
+              if (!effectiveItem) return;
+
+              // Resolve line warehouse
+              const lineWarehouse = line.requestLine?.request?.warehouseCode || 
+                                    (effectiveItem.mvpp?.startsWith('VS') ? 'VE_SINH' : 'MAIN');
+
+              if (selectedPrintType === 'DEPT_VPP' && lineWarehouse !== 'MAIN') return;
+              if (selectedPrintType === 'DEPT_VS' && lineWarehouse !== 'VE_SINH') return;
+
+              globalUniqueItems.add(effectiveItem.mvpp || effectiveItem.id);
+              
               const originalRequest = line.requestLine?.request;
-              const requestCode = line.fuzzyRequestCode || originalRequest?.id;
-              if (requestCode) globalUniqueRequests.add(requestCode);
+              const requestCode = line.fuzzyRequestCode || originalRequest?.id || po.id;
+              globalUniqueRequests.add(requestCode);
           });
       });
 
@@ -630,7 +644,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
           highestDeptValue: highestDept ? highestDept.actualTotal : 0,
           poCount: targetData.length
       };
-  }, [data, filteredData, selectedIds]);
+  }, [data, filteredData, selectedIds, selectedPrintType]);
 
   const handlePrintSummary = (type: 'ALL' | 'VPP' | 'VE_SINH' | 'DEPT_VPP' | 'DEPT_VS' = 'ALL') => {
       setSelectedPrintType(type);
