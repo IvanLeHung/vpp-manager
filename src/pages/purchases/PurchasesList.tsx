@@ -57,7 +57,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   // Bulk Selection & Printing states
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkMode, setIsBulkMode] = useState(false);
-  const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH'>('ALL');
+  const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH' | 'DEPT'>('ALL');
   const [showPrintMenu, setShowPrintMenu] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showPrintConfirm, setShowPrintConfirm] = useState(false);
@@ -461,7 +461,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
     };
   }, [data, selectedIds]);
 
-  const handlePrintSummary = (type: 'ALL' | 'VPP' | 'VE_SINH' = 'ALL') => {
+  const handlePrintSummary = (type: 'ALL' | 'VPP' | 'VE_SINH' | 'DEPT' = 'ALL') => {
       setSelectedPrintType(type);
       setShowPrintMenu(false);
       setShowPrintConfirm(false);
@@ -1062,6 +1062,18 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                            <span className="text-xs font-bold text-slate-700">Phiếu tổng hợp Mua sắm Vệ sinh</span>
                                         </div>
                                         <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{printStats.vsCount}</span>
+                                     </button>
+
+                                     <button 
+                                       disabled={executiveData.deptArray.length === 0}
+                                       onClick={() => handlePrintSummary('DEPT')}
+                                       className={`w-full px-4 py-2.5 text-left flex items-center justify-between transition ${executiveData.deptArray.length === 0 ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-violet-50 group'}`}
+                                     >
+                                        <div className="flex items-center gap-3">
+                                           <div className="p-1.5 bg-violet-50 text-violet-600 rounded-lg group-hover:bg-violet-600 group-hover:text-white transition-colors"><FileText className="w-3.5 h-3.5"/></div>
+                                           <span className="text-xs font-bold text-slate-700">In Tổng hợp tiêu thụ theo phòng ban</span>
+                                        </div>
+                                        <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{executiveData.deptArray.length}</span>
                                      </button>
 
                                      <div className="mx-3 my-2 border-t border-slate-100"></div>
@@ -1719,45 +1731,145 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
             </div>
           ))}
 
+          {selectedPrintType === 'DEPT' && (
+            <div className="print-sheet p-4">
+                {(() => {
+                    const summaryCode = `THMS-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-PB`;
+                    return (
+                        <>
+                            {/* HEADER SECTION */}
+                            <div className="flex justify-between items-start w-full border-b pb-4 mb-4">
+                                <div className="w-[35%] text-left header-text">
+                                    <p className="font-bold uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
+                                    <p className="font-bold italic">Báo cáo tổng hợp đơn mua sắm</p>
+                                    <p>Ban Hành chính Nhân sự</p>
+                                </div>
+                                <div className="w-[15%] flex flex-col items-center">
+                                     <img src={`https://api.qrserver.com/v1/create-qr-code/?size=65x65&data=${encodeURIComponent(summaryCode)}`} alt="QR" className="w-12 h-12 border border-slate-100" />
+                                 </div>
+                                <div className="w-[50%] text-center header-text">
+                                    <p className="font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+                                    <p className="font-bold underline underline-offset-[4px] mt-1">Độc lập - Tự do - Hạnh phúc</p>
+                                    <p className="mt-3 italic text-right mr-10">Hà Nội, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
+                                </div>
+                            </div>
+
+                            {/* TITLE */}
+                            <h2 className="title-main">PHIẾU TỔNG HỢP TIÊU THỤ THEO PHÒNG BAN</h2>
+                            <p className="title-sub">(Tổng hợp từ {executiveData.optimizedPoCount} phiếu mua sắm / đề nghị đang lọc)</p>
+
+                            {/* OVERVIEW INFO BLOCK */}
+                            <div className="info-grid">
+                               <div className="info-item"><span className="info-label">Mã tổng hợp:</span> <span>{summaryCode}</span></div>
+                               <div className="info-item"><span className="info-label">Người lập:</span> <span>Quản lý Hành chính</span></div>
+                               <div className="info-item"><span className="info-label">Phạm vi:</span> <span>Toàn bộ phòng ban</span></div>
+                               <div className="info-item"><span className="info-label">Ngày in:</span> <span>{new Date().toLocaleDateString('vi-VN')}</span></div>
+                               <div className="info-item"><span className="info-label">Tổng số phòng ban:</span> <span>{executiveData.deptArray.length} đơn vị</span></div>
+                            </div>
+                        </>
+                    );
+                })()}
+
+                {/* MAIN TABLE */}
+                <table className="print-table">
+                    <thead>
+                        <tr className="bg-slate-100 font-bold text-[8pt] text-center">
+                            <th style={{width: '6%'}}>STT</th>
+                            <th style={{width: '34%'}}>TÊN PHÒNG BAN / ĐƠN VỊ</th>
+                            <th style={{width: '15%'}}>GIÁ TRỊ ĐỀ XUẤT</th>
+                            <th style={{width: '15%'}}>GIÁ TRỊ THỰC TẾ</th>
+                            <th style={{width: '15%'}}>GIÁ TRỊ TỐI ƯU</th>
+                            <th style={{width: '15%'}}>TỶ LỆ TỐI ƯU</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {executiveData.deptArray.map((dept: any, idx: number) => (
+                            <tr key={dept.name} className="item-main-row text-[9pt]">
+                                <td className="text-center">{idx + 1}</td>
+                                <td className="font-bold">{dept.name}</td>
+                                <td className="text-right">{Number(dept.proposed).toLocaleString('vi-VN')} đ</td>
+                                <td className="text-right">{Number(dept.actual).toLocaleString('vi-VN')} đ</td>
+                                <td className="text-right font-bold text-emerald-700">{Number(dept.savings).toLocaleString('vi-VN')} đ</td>
+                                <td className="text-center font-bold">{dept.percentage.toFixed(2)}%</td>
+                            </tr>
+                        ))}
+                        
+                        {/* TOTAL ROW */}
+                        <tr className="item-main-row print-highlight-row font-bold text-[9pt]">
+                            <td className="text-center" colSpan={2}>TỔNG CỘNG</td>
+                            <td className="text-right">{Number(executiveData.totalProposed).toLocaleString('vi-VN')} đ</td>
+                            <td className="text-right">{Number(executiveData.totalActual).toLocaleString('vi-VN')} đ</td>
+                            <td className="text-right text-emerald-700">{Number(executiveData.totalSavings).toLocaleString('vi-VN')} đ</td>
+                            <td className="text-center">
+                                {executiveData.totalProposed > 0 
+                                    ? ((executiveData.totalSavings / executiveData.totalProposed) * 100).toFixed(2)
+                                    : '0.00'}%
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {/* FOOTER SIGNATURES */}
+                <div className="footer-sign">
+                   <div>
+                      <p className="font-bold uppercase">Người lập phiếu</p>
+                      <div className="mt-16">
+                         <p className="font-bold">..........................</p>
+                         <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
+                      </div>
+                   </div>
+                   <div>
+                      <p className="font-bold uppercase">Trưởng bộ phận</p>
+                      <div className="mt-16">
+                         <p className="font-bold">..........................</p>
+                         <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
+                      </div>
+                   </div>
+                </div>
+            </div>
+          )}
+
           {/* EXECUTIVE REPORT PAGE */}
           {/* EXECUTIVE REPORT PAGE */}
-          <div className="print-sheet p-8 break-before-page flex flex-col justify-center min-h-[500px]">
-              <div className="max-w-2xl mx-auto w-full">
-                  <div className="text-center mb-10">
-                     <h2 className="text-[16pt] font-black uppercase text-slate-800 tracking-wider">{dashboardTitle}</h2>
-                     <div className="w-16 h-1 bg-slate-800 mx-auto mt-4 mb-2"></div>
-                  </div>
-  
-                  <table className="w-full border-collapse text-[11pt] mb-8">
-                      <tbody>
-                          <tr className="border-b border-slate-200">
-                              <td className="py-4 pl-4 text-slate-600 font-medium">Tổng giá trị đề xuất</td>
-                              <td className="py-4 pr-4 text-right font-bold text-slate-800">{printDashboardSummary.proposed.toLocaleString('vi-VN')} đ</td>
-                          </tr>
-                          <tr className="border-b border-slate-200">
-                              <td className="py-4 pl-4 text-slate-600 font-medium">Tổng giá trị mua thực tế</td>
-                              <td className="py-4 pr-4 text-right font-bold text-slate-800">{printDashboardSummary.actual.toLocaleString('vi-VN')} đ</td>
-                          </tr>
-                          <tr className="border-b border-slate-200">
-                              <td className="py-4 pl-4 text-slate-600 font-medium">{dashboardDiffLabel}</td>
-                              <td className={`py-4 pr-4 text-right font-black ${dashboardDiffClass}`}>
-                                {printDashboardSummary.absDiff.toLocaleString('vi-VN')} đ
-                              </td>
-                          </tr>
-                          <tr className="border-b border-slate-200 bg-slate-50">
-                              <td className="py-4 pl-4 text-slate-800 font-black">{dashboardRateLabel}</td>
-                              <td className={`py-4 pr-4 text-right font-black ${dashboardDiffClass}`}>
-                                  {printDashboardSummary.rate.toFixed(2)}%
-                              </td>
-                          </tr>
-                      </tbody>
-                  </table>
-  
-                  <div className="text-center italic text-slate-500 text-[10pt] px-12 mt-12">
-                      Các phương án mua sắm đã được Hành chính rà soát và tối ưu chi phí trước khi trình phê duyệt.
-                  </div>
-              </div>
-          </div>
+          {selectedPrintType !== 'DEPT' && (
+            <div className="print-sheet p-8 break-before-page flex flex-col justify-center min-h-[500px]">
+                <div className="max-w-2xl mx-auto w-full">
+                    <div className="text-center mb-10">
+                       <h2 className="text-[16pt] font-black uppercase text-slate-800 tracking-wider">{dashboardTitle}</h2>
+                       <div className="w-16 h-1 bg-slate-800 mx-auto mt-4 mb-2"></div>
+                    </div>
+    
+                    <table className="w-full border-collapse text-[11pt] mb-8">
+                        <tbody>
+                            <tr className="border-b border-slate-200">
+                                <td className="py-4 pl-4 text-slate-600 font-medium">Tổng giá trị đề xuất</td>
+                                <td className="py-4 pr-4 text-right font-bold text-slate-800">{printDashboardSummary.proposed.toLocaleString('vi-VN')} đ</td>
+                            </tr>
+                            <tr className="border-b border-slate-200">
+                                <td className="py-4 pl-4 text-slate-600 font-medium">Tổng giá trị mua thực tế</td>
+                                <td className="py-4 pr-4 text-right font-bold text-slate-800">{printDashboardSummary.actual.toLocaleString('vi-VN')} đ</td>
+                            </tr>
+                            <tr className="border-b border-slate-200">
+                                <td className="py-4 pl-4 text-slate-600 font-medium">{dashboardDiffLabel}</td>
+                                <td className={`py-4 pr-4 text-right font-black ${dashboardDiffClass}`}>
+                                  {printDashboardSummary.absDiff.toLocaleString('vi-VN')} đ
+                                </td>
+                            </tr>
+                            <tr className="border-b border-slate-200 bg-slate-50">
+                                <td className="py-4 pl-4 text-slate-800 font-black">{dashboardRateLabel}</td>
+                                <td className={`py-4 pr-4 text-right font-black ${dashboardDiffClass}`}>
+                                    {printDashboardSummary.rate.toFixed(2)}%
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+    
+                    <div className="text-center italic text-slate-500 text-[10pt] px-12 mt-12">
+                        Các phương án mua sắm đã được Hành chính rà soát và tối ưu chi phí trước khi trình phê duyệt.
+                    </div>
+                </div>
+            </div>
+          )}
         </div>
     </div>
   );
