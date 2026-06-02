@@ -368,6 +368,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
           await refreshData();
           if (['/submit', '/withdraw'].includes(actionPath)) {
             setViewMode('LIST');
+          } else {
+            await fetchDetail();
           }
       }
     } catch (err: any) {

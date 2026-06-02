@@ -777,30 +777,41 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {(previewReq.lines || []).map((line: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-4 py-2.5 text-center text-xs font-bold text-slate-400">{idx+1}</td>
-                      <td className="px-4 py-2.5">
-                        {line.item ? (
-                          <GoodsNameWithPreview 
-                            itemId={line.item.id}
-                            itemCode={line.item.mvpp}
-                            itemName={line.item.name}
-                            imageUrl={line.item.imageUrl}
-                            thumbnailUrl={line.item.thumbnailUrl}
-                            categoryName={line.item.category}
-                            unit={line.item.unit}
-                          />
-                        ) : (
-                          <p className="font-bold text-slate-800 text-sm whitespace-normal leading-snug">N/A</p>
-                        )}
-                        <span className="text-[9px] font-black text-slate-400 tracking-wider">{line.item?.mvpp || '-'}</span>
-                      </td>
-                      <td className="px-4 py-2.5 text-center"><span className="font-black text-base text-indigo-600">{line.qtyRequested}</span></td>
-                      <td className="px-4 py-2.5 text-center text-xs font-bold text-slate-500">{line.item?.unit || '—'}</td>
-                      <td className="px-4 py-2.5 text-right text-xs font-bold text-slate-600">{line.item?.price ? Number(line.item.price).toLocaleString('vi-VN') : '—'}</td>
-                    </tr>
-                  ))}
+                  {(previewReq.lines || []).map((line: any, idx: number) => {
+                    const displayItem = line.issue_item || line.item;
+                    const isReplaced = line.issue_item && line.item && line.issue_item.id !== line.item.id;
+                    return (
+                      <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-4 py-2.5 text-center text-xs font-bold text-slate-400">{idx+1}</td>
+                        <td className="px-4 py-2.5">
+                          {displayItem ? (
+                            <div className="flex flex-col">
+                              <GoodsNameWithPreview 
+                                itemId={displayItem.id}
+                                itemCode={displayItem.mvpp}
+                                itemName={displayItem.name}
+                                imageUrl={displayItem.imageUrl}
+                                thumbnailUrl={displayItem.thumbnailUrl}
+                                categoryName={displayItem.category}
+                                unit={displayItem.unit}
+                              />
+                              {isReplaced && (
+                                <span className="text-[9px] text-slate-400 italic mt-0.5">
+                                  Thay thế cho: {line.item.name} ({line.item.mvpp})
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="font-bold text-slate-800 text-sm whitespace-normal leading-snug">N/A</p>
+                          )}
+                          <span className="text-[9px] font-black text-slate-400 tracking-wider">{displayItem?.mvpp || '-'}</span>
+                        </td>
+                        <td className="px-4 py-2.5 text-center"><span className="font-black text-base text-indigo-600">{line.qtyRequested}</span></td>
+                        <td className="px-4 py-2.5 text-center text-xs font-bold text-slate-500">{displayItem?.unit || '—'}</td>
+                        <td className="px-4 py-2.5 text-right text-xs font-bold text-slate-600">{displayItem?.price ? Number(displayItem.price).toLocaleString('vi-VN') : '—'}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
