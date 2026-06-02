@@ -1789,15 +1789,15 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                         <>
                             {/* HEADER SECTION */}
                             <div className="flex justify-between items-start w-full border-b pb-4 mb-4">
-                                <div className="w-[35%] text-left header-text">
+                                <div className="w-[45%] text-left header-text">
                                     <p className="font-bold uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
                                     <p className="font-bold italic">Báo cáo tổng hợp đơn mua sắm</p>
                                     <p>Ban Hành chính Nhân sự</p>
                                 </div>
-                                <div className="w-[15%] flex flex-col items-center">
+                                <div className="w-[10%] flex flex-col items-center">
                                      <img src={`https://api.qrserver.com/v1/create-qr-code/?size=65x65&data=${encodeURIComponent(summaryCode)}`} alt="QR" className="w-12 h-12 border border-slate-100" />
                                  </div>
-                                <div className="w-[50%] text-center header-text">
+                                <div className="w-[45%] text-center header-text">
                                     <p className="font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
                                     <p className="font-bold underline underline-offset-[4px] mt-1">Độc lập - Tự do - Hạnh phúc</p>
                                     <p className="mt-3 italic text-right mr-10">Hà Nội, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
@@ -1982,15 +1982,15 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                         <>
                             {/* HEADER SECTION */}
                             <div className="flex justify-between items-start w-full border-b pb-4 mb-4">
-                                <div className="w-[35%] text-left header-text">
+                                <div className="w-[45%] text-left header-text">
                                     <p className="font-bold uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
                                     <p className="font-bold italic">Báo cáo tổng hợp đơn mua sắm</p>
                                     <p>Ban Hành chính Nhân sự</p>
                                 </div>
-                                <div className="w-[15%] flex flex-col items-center">
+                                <div className="w-[10%] flex flex-col items-center">
                                      <img src={`https://api.qrserver.com/v1/create-qr-code/?size=65x65&data=${encodeURIComponent(summaryCode)}`} alt="QR" className="w-12 h-12 border border-slate-100" />
                                  </div>
-                                <div className="w-[50%] text-center header-text">
+                                <div className="w-[45%] text-center header-text">
                                     <p className="font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
                                     <p className="font-bold underline underline-offset-[4px] mt-1">Độc lập - Tự do - Hạnh phúc</p>
                                     <p className="mt-3 italic text-right mr-10">Hà Nội, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
@@ -1998,7 +1998,9 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                             </div>
 
                             {/* TITLE */}
-                            <h2 className="title-main uppercase">{printTitle}</h2>
+                            <h2 className="title-main uppercase text-center">
+                                TỔNG HỢP TIÊU THỤ ĐỒ VĂN PHÒNG PHẨM <br /> THEO PHÒNG BAN
+                            </h2>
 
 
                             {/* TỔNG HỢP NHANH SỐ LIỆU */}
@@ -2130,15 +2132,15 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                         <>
                             {/* HEADER SECTION */}
                             <div className="flex justify-between items-start w-full border-b pb-4 mb-4">
-                                <div className="w-[35%] text-left header-text">
+                                <div className="w-[45%] text-left header-text">
                                     <p className="font-bold uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
                                     <p className="font-bold italic">Báo cáo tổng hợp đơn mua sắm</p>
                                     <p>Ban Hành chính Nhân sự</p>
                                 </div>
-                                <div className="w-[15%] flex flex-col items-center">
+                                <div className="w-[10%] flex flex-col items-center">
                                      <img src={`https://api.qrserver.com/v1/create-qr-code/?size=65x65&data=${encodeURIComponent(summaryCode)}`} alt="QR" className="w-12 h-12 border border-slate-100" />
                                  </div>
-                                <div className="w-[50%] text-center header-text">
+                                <div className="w-[45%] text-center header-text">
                                     <p className="font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
                                     <p className="font-bold underline underline-offset-[4px] mt-1">Độc lập - Tự do - Hạnh phúc</p>
                                     <p className="mt-3 italic text-right mr-10">Hà Nội, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
@@ -2146,7 +2148,9 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                             </div>
 
                             {/* TITLE */}
-                            <h2 className="title-main uppercase">{printTitle}</h2>
+                            <h2 className="title-main uppercase text-center">
+                                TỔNG HỢP TIÊU THỤ ĐỒ VỆ SINH <br /> THEO PHÒNG BAN
+                            </h2>
 
 
                             {/* TỔNG HỢP NHANH SỐ LIỆU */}
