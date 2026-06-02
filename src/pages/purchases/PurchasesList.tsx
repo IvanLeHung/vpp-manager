@@ -1242,7 +1242,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                      >
                                         <div className="flex items-center gap-3">
                                            <div className="p-1.5 bg-violet-50 text-violet-600 rounded-lg group-hover:bg-violet-600 group-hover:text-white transition-colors"><FileText className="w-3.5 h-3.5"/></div>
-                                           <span className="text-xs font-bold text-slate-700">In Tổng hợp tiêu thụ VPP theo phòng ban</span>
+                                           <span className="text-xs font-bold text-slate-700">In Tổng hợp tiêu thụ đồ Văn phòng phẩm theo phòng ban</span>
                                         </div>
                                      </button>
 
@@ -1253,7 +1253,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                      >
                                         <div className="flex items-center gap-3">
                                            <div className="p-1.5 bg-violet-50 text-violet-600 rounded-lg group-hover:bg-violet-600 group-hover:text-white transition-colors"><FileText className="w-3.5 h-3.5"/></div>
-                                           <span className="text-xs font-bold text-slate-700">In Tổng hợp tiêu thụ Vệ sinh theo phòng ban</span>
+                                           <span className="text-xs font-bold text-slate-700">In Tổng hợp tiêu thụ đồ vệ sinh theo phòng ban</span>
                                         </div>
                                      </button>
 
@@ -1939,9 +1939,9 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                     const categoryCodeShort = selectedPrintType === 'DEPT_VPP' ? 'VPP' : 'VS';
                     const summaryCode = `THMS-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-PB-${categoryCodeShort}`;
                     const printTitle = selectedPrintType === 'DEPT_VPP' 
-                        ? 'TỔNG HỢP TIÊU THỤ VĂN PHÒNG PHẨM THEO PHÒNG BAN'
+                        ? 'TỔNG HỢP TIÊU THỤ ĐỒ VĂN PHÒNG PHẨM THEO PHÒNG BAN'
                         : 'TỔNG HỢP TIÊU THỤ ĐỒ VỆ SINH THEO PHÒNG BAN';
-                    const categoryLabel = selectedPrintType === 'DEPT_VPP' ? 'Văn phòng phẩm' : 'đồ Vệ sinh';
+                    const categoryLabel = selectedPrintType === 'DEPT_VPP' ? 'đồ Văn phòng phẩm' : 'đồ vệ sinh';
 
                     return (
                         <>
