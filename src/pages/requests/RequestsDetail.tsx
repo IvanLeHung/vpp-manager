@@ -93,6 +93,12 @@ function InfoCard({ label, value, subValue, tone, isTooltip, tooltipText }: Info
   return cardContent;
 }
 
+const getEffectiveWarehouseCode = (item: any, defaultWh: string): string => {
+  if (!item) return defaultWh;
+  const isVeSinh = item.itemType === 'VE_SINH' || item.mvpp?.startsWith('VS-') || item.category === 'VE_SINH';
+  return isVeSinh ? 'VE_SINH' : defaultWh;
+};
+
 export default function RequestsDetail({ requestId, navigationIds, onNavigate, setViewMode, setActiveRequest, refreshData, showToast, currentUser }: Props) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -214,7 +220,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
         };
       }));
       setIssues(res.data.lines.map((l:any) => {
-        const primaryWh = res.data.warehouseCode || 'MAIN';
+        const primaryWh = getEffectiveWarehouseCode(l.issue_item || l.item, res.data.warehouseCode || 'MAIN');
         const hasStockPrimary = l.issue_item?.stocks?.find((s:any) => s.warehouseCode === primaryWh)?.quantityOnHand > 0;
         // Find first warehouse with stock if primary has 0
         const firstWhWithStock = l.issue_item?.stocks?.find((s:any) => s.quantityOnHand > 0)?.warehouseCode;
@@ -552,7 +558,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                        {l.replacement_source === 'receipt_replacement' || l.replacement_source === 'receipt' ? 'Đã đổi ở kho' : 'Đã thay thế'}
                    </span>
                )}
-               <span className="text-[10px] font-bold text-indigo-500 flex items-center gap-1"><Archive className="w-3 h-3"/> Kho: {data.warehouseCode}</span>
+               <span className="text-[10px] font-bold text-indigo-500 flex items-center gap-1"><Archive className="w-3 h-3"/> Kho: {getEffectiveWarehouseCode(l.issue_item || l.item, data.warehouseCode || 'MAIN')}</span>
             </div>
             {l.issue_item?.id !== l.item.id && (
                  <div className="text-[10px] text-slate-400 italic mt-0.5">
@@ -568,8 +574,10 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       key: 'stocks',
       align: 'center' as const,
       render: (l: any) => {
-        const stocks = l.item.stocks || [];
-        const reqStock = stocks.find((s:any) => s.warehouseCode === data.warehouseCode) || { quantityOnHand: 0, quantityReserved: 0 };
+        const displayItem = l.issue_item || l.item;
+        const stocks = displayItem?.stocks || [];
+        const whCode = getEffectiveWarehouseCode(displayItem, data.warehouseCode || 'MAIN');
+        const reqStock = stocks.find((s:any) => s.warehouseCode === whCode) || { quantityOnHand: 0, quantityReserved: 0 };
         const totalOnHand = stocks.reduce((sum:number, s:any) => sum + s.quantityOnHand, 0);
         const available = reqStock.quantityOnHand - reqStock.quantityReserved;
         return (
@@ -1002,7 +1010,12 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                         <>
                             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white">
                                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Chi tiết Vật tư Xin Cấp</h3>
-                                {data.lines.some((l:any) => (l.qtyApproved ?? l.qtyRequested) > (l.item.stocks?.find((s:any)=>s.warehouseCode===data.warehouseCode)?.quantityOnHand||0)) && <span className="text-[10px] font-bold text-rose-600 bg-rose-100 px-3 py-1 rounded border border-rose-200 flex items-center print:hidden"><AlertTriangle className="w-3.5 h-3.5 mr-1"/> Cảnh báo thiếu Tồn Kho (Kho yêu cầu)</span>}
+                                {data.lines.some((l:any) => {
+                                  const displayItem = l.issue_item || l.item;
+                                  const wh = getEffectiveWarehouseCode(displayItem, data.warehouseCode || 'MAIN');
+                                  const stock = displayItem?.stocks?.find((s:any)=>s.warehouseCode===wh)?.quantityOnHand || 0;
+                                  return (l.qtyApproved ?? l.qtyRequested) > stock;
+                                }) && <span className="text-[10px] font-bold text-rose-600 bg-rose-100 px-3 py-1 rounded border border-rose-200 flex items-center print:hidden"><AlertTriangle className="w-3.5 h-3.5 mr-1"/> Cảnh báo thiếu Tồn Kho (Kho yêu cầu)</span>}
                             </div>
                             <div className="p-4 overflow-visible">
                                 <Table
@@ -1013,8 +1026,10 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                     sticky={false}
                                     scroll={{ x: 'max-content' }}
                                     rowClassName={(record: any) => {
-                                        const stocks = record.item.stocks || [];
-                                        const reqStock = stocks.find((s: any) => s.warehouseCode === data.warehouseCode) || { quantityOnHand: 0, quantityReserved: 0 };
+                                         const displayItem = record.issue_item || record.item;
+                                         const stocks = displayItem?.stocks || [];
+                                         const wh = getEffectiveWarehouseCode(displayItem, data.warehouseCode || 'MAIN');
+                                         const reqStock = stocks.find((s: any) => s.warehouseCode === wh) || { quantityOnHand: 0, quantityReserved: 0 };
                                         const available = reqStock.quantityOnHand - reqStock.quantityReserved;
                                         const outOfStock = (record.qtyApproved ?? record.qtyRequested) > available;
                                         return `hover:bg-slate-50 transition border-l-4 ${outOfStock && data.status.startsWith('PENDING') ? 'border-l-rose-500 bg-rose-50/30' : 'border-l-transparent'}`;
@@ -1403,7 +1418,12 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                           </div>
                           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Thiếu tồn</p>
-                             <p className="text-xl font-black text-rose-500">{data.lines.filter((l:any) => l.qtyRequested > (l.item.stocks?.find((s:any)=>s.warehouseCode===data.warehouseCode)?.quantityOnHand || 0)).length}</p>
+                              <p className="text-xl font-black text-rose-500">{data.lines.filter((l:any) => {
+                                const displayItem = l.issue_item || l.item;
+                                const wh = getEffectiveWarehouseCode(displayItem, data.warehouseCode || 'MAIN');
+                                const stock = displayItem?.stocks?.find((s:any)=>s.warehouseCode===wh)?.quantityOnHand || 0;
+                                return l.qtyRequested > stock;
+                              }).length}</p>
                           </div>
                           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tổng SL Xin</p>
@@ -1435,7 +1455,9 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                     const effectivePrice = (approval.replacementItemId && approval.replacementItem)
                                       ? (approval.replacementItem.price || 0)
                                       : (l.item.price || 0);
-                                    const currentStock = l.item.stocks?.find((s:any)=>s.warehouseCode===data.warehouseCode)?.quantityOnHand || 0;
+                                    const displayItem = (approval.replacementItemId && approval.replacementItem) ? approval.replacementItem : l.item;
+                                    const wh = getEffectiveWarehouseCode(displayItem, data.warehouseCode || 'MAIN');
+                                    const currentStock = displayItem.stocks?.find((s:any)=>s.warehouseCode===wh)?.quantityOnHand || 0;
                                     const overStock = (approval.selected && approval.qtyApproved > currentStock);
                                     const isChanged = approval.qtyApproved !== l.qtyRequested;
                                     const noteRequired = isChanged && !approval.note.trim() && !approval.replacementItemId;
@@ -1686,7 +1708,10 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                   if (data.status === 'PENDING_ADMIN') {
                                       const hasOverStock = data.lines.some((l:any) => {
                                           const app = approvals.find((a:any)=>a.lineId===l.id);
-                                          return app?.selected && app.qtyApproved > (l.item.stocks?.find((s:any)=>s.warehouseCode===data.warehouseCode)?.quantityOnHand || 0);
+                                          const displayItem = (app?.replacementItemId && app.replacementItem) ? app.replacementItem : l.item;
+                                          const wh = getEffectiveWarehouseCode(displayItem, data.warehouseCode || 'MAIN');
+                                          const stock = displayItem.stocks?.find((s:any)=>s.warehouseCode===wh)?.quantityOnHand || 0;
+                                          return app?.selected && app.qtyApproved > stock;
                                       });
                                       if (hasOverStock) {
                                           if (!window.confirm('Cảnh báo: Bạn đang duyệt Số lượng vượt quá Tồn Kho thực tế. Hệ thống sẽ báo nợ (Backorder) hoặc Kho không thể xuất dòng này. Vẫn tiếp tục?')) return;
