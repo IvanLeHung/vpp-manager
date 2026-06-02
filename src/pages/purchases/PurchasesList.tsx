@@ -1999,15 +1999,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
                             {/* TITLE */}
                             <h2 className="title-main uppercase">{printTitle}</h2>
-                            <p className="title-sub">(Kèm theo Tờ trình quyết toán chi phí mua sắm/tiêu dùng thực tế)</p>
 
-                            {/* KÍNH TRÌNH TỔNG GIÁM ĐỐC */}
-                            <div className="border border-black p-3 mb-4 bg-slate-50/50 header-text" style={{ fontSize: '9.5pt', lineHeight: '1.4' }}>
-                                <p className="font-bold uppercase mb-1">KÍNH TRÌNH TỔNG GIÁM ĐỐC:</p>
-                                <p>
-                                    Ban Hành chính Nhân sự kính trình Tổng Giám đốc xem xét phê duyệt quyết toán chi phí tiêu thụ {categoryLabel} thực tế kỳ <strong>{periodLabel}</strong> với tổng số tiền là <strong>{Number(deptReportDataVPP.totalActual).toLocaleString('vi-VN')} đ</strong> (bằng chữ: <em>{numberToVietnameseWords(deptReportDataVPP.totalActual)} đồng</em>). Số liệu tổng hợp nhanh và chi tiết theo phòng ban phát sinh chi tiết dưới đây:
-                                </p>
-                            </div>
 
                             {/* TỔNG HỢP NHANH SỐ LIỆU */}
                             <table className="print-table mb-4" style={{ fontSize: '8.5pt' }}>
@@ -2155,15 +2147,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
                             {/* TITLE */}
                             <h2 className="title-main uppercase">{printTitle}</h2>
-                            <p className="title-sub">(Kèm theo Tờ trình quyết toán chi phí mua sắm/tiêu dùng thực tế)</p>
 
-                            {/* KÍNH TRÌNH TỔNG GIÁM ĐỐC */}
-                            <div className="border border-black p-3 mb-4 bg-slate-50/50 header-text" style={{ fontSize: '9.5pt', lineHeight: '1.4' }}>
-                                <p className="font-bold uppercase mb-1">KÍNH TRÌNH TỔNG GIÁM ĐỐC:</p>
-                                <p>
-                                    Ban Hành chính Nhân sự kính trình Tổng Giám đốc xem xét phê duyệt quyết toán chi phí tiêu thụ {categoryLabel} thực tế kỳ <strong>{periodLabel}</strong> với tổng số tiền là <strong>{Number(deptReportDataVS.totalActual).toLocaleString('vi-VN')} đ</strong> (bằng chữ: <em>{numberToVietnameseWords(deptReportDataVS.totalActual)} đồng</em>). Số liệu tổng hợp nhanh và chi tiết theo phòng ban phát sinh chi tiết dưới đây:
-                                </p>
-                            </div>
 
                             {/* TỔNG HỢP NHANH SỐ LIỆU */}
                             <table className="print-table mb-4" style={{ fontSize: '8.5pt' }}>
