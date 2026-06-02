@@ -2001,12 +2001,11 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                     <thead>
                         <tr className="bg-slate-100 font-bold text-[8pt] text-center">
                             <th style={{width: '5%'}}>STT</th>
-                            <th style={{width: '32%'}}>PHÒNG BAN / ĐƠN VỊ</th>
-                            <th style={{width: '13%'}}>SỐ LƯỢT YÊU CẦU</th>
-                            <th style={{width: '12%'}}>SỐ MẶT HÀNG</th>
+                            <th style={{width: '39%'}}>PHÒNG BAN / ĐƠN VỊ</th>
+                            <th style={{width: '14%'}}>SỐ LƯỢT YÊU CẦU</th>
+                            <th style={{width: '14%'}}>SỐ MẶT HÀNG</th>
                             <th style={{width: '16%'}}>GIÁ TRỊ TIÊU THỤ</th>
-                            <th style={{width: '10%'}}>TỶ TRỌNG</th>
-                            <th style={{width: '12%'}}>GHI CHÚ</th>
+                            <th style={{width: '12%'}}>TỶ TRỌNG</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -2018,7 +2017,6 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                 <td className="text-center">{dept.itemCount} mặt hàng</td>
                                 <td className="text-right font-bold">{Number(dept.actualTotal).toLocaleString('vi-VN')} đ</td>
                                 <td className="text-center font-bold">{dept.percentage.toFixed(2)}%</td>
-                                <td className="text-[7.2pt] italic truncate max-w-[120px]" title={dept.notes}>{dept.notes || '—'}</td>
                             </tr>
                         ))}
                         
@@ -2029,7 +2027,6 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                             <td className="text-center">{deptReportData.totalUniqueItems} mặt hàng</td>
                             <td className="text-right text-indigo-700">{Number(deptReportData.totalActual).toLocaleString('vi-VN')} đ</td>
                             <td className="text-center">100.00%</td>
-                            <td></td>
                         </tr>
                     </tbody>
                 </table>
