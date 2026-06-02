@@ -113,7 +113,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   // Bulk Selection & Printing states
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkMode, setIsBulkMode] = useState(false);
-  const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH' | 'DEPT'>('ALL');
+  const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH' | 'DEPT_VPP' | 'DEPT_VS'>('ALL');
   const [showPrintMenu, setShowPrintMenu] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showPrintConfirm, setShowPrintConfirm] = useState(false);
@@ -632,7 +632,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       };
   }, [data, filteredData, selectedIds]);
 
-  const handlePrintSummary = (type: 'ALL' | 'VPP' | 'VE_SINH' | 'DEPT' = 'ALL') => {
+  const handlePrintSummary = (type: 'ALL' | 'VPP' | 'VE_SINH' | 'DEPT_VPP' | 'DEPT_VS' = 'ALL') => {
       setSelectedPrintType(type);
       setShowPrintMenu(false);
       setShowPrintConfirm(false);
@@ -1237,14 +1237,24 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
                                      <button 
                                        disabled={executiveData.deptArray.length === 0}
-                                       onClick={() => handlePrintSummary('DEPT')}
+                                       onClick={() => handlePrintSummary('DEPT_VPP')}
                                        className={`w-full px-4 py-2.5 text-left flex items-center justify-between transition ${executiveData.deptArray.length === 0 ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-violet-50 group'}`}
                                      >
                                         <div className="flex items-center gap-3">
                                            <div className="p-1.5 bg-violet-50 text-violet-600 rounded-lg group-hover:bg-violet-600 group-hover:text-white transition-colors"><FileText className="w-3.5 h-3.5"/></div>
-                                           <span className="text-xs font-bold text-slate-700">In Tổng hợp tiêu thụ theo phòng ban</span>
+                                           <span className="text-xs font-bold text-slate-700">In Tổng hợp tiêu thụ VPP theo phòng ban</span>
                                         </div>
-                                        <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{executiveData.deptArray.length}</span>
+                                     </button>
+
+                                     <button 
+                                       disabled={executiveData.deptArray.length === 0}
+                                       onClick={() => handlePrintSummary('DEPT_VS')}
+                                       className={`w-full px-4 py-2.5 text-left flex items-center justify-between transition ${executiveData.deptArray.length === 0 ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-violet-50 group'}`}
+                                     >
+                                        <div className="flex items-center gap-3">
+                                           <div className="p-1.5 bg-violet-50 text-violet-600 rounded-lg group-hover:bg-violet-600 group-hover:text-white transition-colors"><FileText className="w-3.5 h-3.5"/></div>
+                                           <span className="text-xs font-bold text-slate-700">In Tổng hợp tiêu thụ Vệ sinh theo phòng ban</span>
+                                        </div>
                                      </button>
 
                                      <div className="mx-3 my-2 border-t border-slate-100"></div>
@@ -1902,7 +1912,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
             </div>
           ))}
 
-          {selectedPrintType === 'DEPT' && (
+          {(selectedPrintType === 'DEPT_VPP' || selectedPrintType === 'DEPT_VS') && (
             <div className="print-sheet p-4">
                 {(() => {
                     const targetData = selectedIds.length > 0 
@@ -1926,7 +1936,13 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                         }
                     }
 
-                    const summaryCode = `THMS-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-PB`;
+                    const categoryCodeShort = selectedPrintType === 'DEPT_VPP' ? 'VPP' : 'VS';
+                    const summaryCode = `THMS-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-PB-${categoryCodeShort}`;
+                    const printTitle = selectedPrintType === 'DEPT_VPP' 
+                        ? 'TỔNG HỢP TIÊU THỤ VĂN PHÒNG PHẨM THEO PHÒNG BAN'
+                        : 'TỔNG HỢP TIÊU THỤ ĐỒ VỆ SINH THEO PHÒNG BAN';
+                    const categoryLabel = selectedPrintType === 'DEPT_VPP' ? 'Văn phòng phẩm' : 'đồ Vệ sinh';
+
                     return (
                         <>
                             {/* HEADER SECTION */}
@@ -1947,14 +1963,14 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                             </div>
 
                             {/* TITLE */}
-                            <h2 className="title-main uppercase">TỔNG HỢP TIÊU THỤ VĂN PHÒNG PHẨM THEO PHÒNG BAN</h2>
+                            <h2 className="title-main uppercase">{printTitle}</h2>
                             <p className="title-sub">(Kèm theo Tờ trình quyết toán chi phí mua sắm/tiêu dùng thực tế)</p>
 
                             {/* KÍNH TRÌNH TỔNG GIÁM ĐỐC */}
                             <div className="border border-black p-3 mb-4 bg-slate-50/50 header-text" style={{ fontSize: '9.5pt', lineHeight: '1.4' }}>
                                 <p className="font-bold uppercase mb-1">KÍNH TRÌNH TỔNG GIÁM ĐỐC:</p>
                                 <p>
-                                    Ban Hành chính Nhân sự kính trình Tổng Giám đốc xem xét phê duyệt quyết toán chi phí tiêu thụ Văn phòng phẩm thực tế kỳ <strong>{periodLabel}</strong> với tổng số tiền là <strong>{Number(deptReportData.totalActual).toLocaleString('vi-VN')} đ</strong> (bằng chữ: <em>{numberToVietnameseWords(deptReportData.totalActual)} đồng</em>). Số liệu tổng hợp nhanh và chi tiết theo phòng ban phát sinh chi tiết dưới đây:
+                                    Ban Hành chính Nhân sự kính trình Tổng Giám đốc xem xét phê duyệt quyết toán chi phí tiêu thụ {categoryLabel} thực tế kỳ <strong>{periodLabel}</strong> với tổng số tiền là <strong>{Number(deptReportData.totalActual).toLocaleString('vi-VN')} đ</strong> (bằng chữ: <em>{numberToVietnameseWords(deptReportData.totalActual)} đồng</em>). Số liệu tổng hợp nhanh và chi tiết theo phòng ban phát sinh chi tiết dưới đây:
                                 </p>
                             </div>
 
@@ -2031,17 +2047,6 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                     </tbody>
                 </table>
 
-                {/* NHẬN XÉT / LƯU Ý PHÊ DUYỆT */}
-                <div className="mt-4 p-3 border border-black text-[8.5pt]" style={{ lineHeight: '1.45' }}>
-                   <p className="font-bold uppercase mb-1">NHẬN XÉT / LƯU Ý PHÊ DUYỆT:</p>
-                   <ul className="list-disc pl-4 space-y-1">
-                      <li><strong>Đơn vị tiêu thụ cao nhất:</strong> Phòng ban <strong>{deptReportData.highestDeptName}</strong> là đơn vị có chi phí tiêu dùng cao nhất trong kỳ với tổng giá trị <strong>{Number(deptReportData.highestDeptValue).toLocaleString('vi-VN')} đ</strong>, chiếm tỷ trọng <strong>{(deptReportData.totalActual > 0 ? (deptReportData.highestDeptValue / deptReportData.totalActual * 100) : 0).toFixed(2)}%</strong> tổng chi phí tiêu thụ toàn hệ thống.</li>
-                      <li><strong>Bộ phận không phát sinh nhu cầu:</strong> Các phòng ban không nằm trong danh sách trên không phát sinh nhu cầu sử dụng hoặc không gửi đề xuất VPP trong kỳ tổng hợp này.</li>
-                      <li><strong>Nguồn dữ liệu đối chiếu:</strong> Số liệu tổng hợp tự động dựa trên hóa đơn thực tế và dữ liệu xuất kho đã được ký duyệt số từ Hệ thống Quản trị VPP nội bộ Danko Group.</li>
-                      <li><strong>Đề xuất trình duyệt:</strong> Kính trình Tổng Giám đốc phê duyệt quyết toán chi phí Văn phòng phẩm nêu trên để làm căn cứ làm thủ tục thanh toán cho nhà cung cấp theo đúng kế hoạch.</li>
-                   </ul>
-                </div>
-
                 {/* FOOTER SIGNATURES */}
                 <div className="footer-sign">
                    <div>
@@ -2066,7 +2071,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
           {/* EXECUTIVE REPORT PAGE */}
           {/* EXECUTIVE REPORT PAGE */}
-          {selectedPrintType !== 'DEPT' && (
+          {selectedPrintType !== 'DEPT_VPP' && selectedPrintType !== 'DEPT_VS' && (
             <div className="print-sheet p-8 break-before-page flex flex-col justify-center min-h-[500px]">
                 <div className="max-w-2xl mx-auto w-full">
                     <div className="text-center mb-10">
