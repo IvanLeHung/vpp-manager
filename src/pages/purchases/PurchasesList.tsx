@@ -100,8 +100,28 @@ function sortItemsForPrinting(items: any[]) {
     const groupB = b.printSortGroup || getItemSortGroupName(b.name || '');
     if (groupA !== groupB) return groupA.localeCompare(groupB, "vi");
     if (a.name !== b.name) return (a.name || '').localeCompare(b.name || '', "vi");
+    if ((a.mvpp || '').startsWith('VS') && !(b.mvpp || '').startsWith('VS')) return 1;
+    if (!(a.mvpp || '').startsWith('VS') && (b.mvpp || '').startsWith('VS')) return -1;
     return (a.mvpp || '').localeCompare(b.mvpp || '', "vi");
   });
+}
+
+function getItemCategoryType(item: any): 'VPP' | 'VE_SINH' | 'OTHER' {
+  if (!item) return 'OTHER';
+  
+  const type = (item.itemType || '').toString().toUpperCase();
+  if (type === 'VPP' || type.includes('VĂN PHÒNG PHẨM')) return 'VPP';
+  if (type === 'VE_SINH' || type.includes('VỆ SINH')) return 'VE_SINH';
+  
+  const cat = (item.category || '').toString().toUpperCase();
+  if (cat.includes('VPP') || cat.includes('VĂN PHÒNG PHẨM')) return 'VPP';
+  if (cat.includes('VE_SINH') || cat.includes('VỆ SINH') || cat.includes('TẠP HÓA')) return 'VE_SINH';
+  
+  const mvpp = (item.mvpp || '').toString().toUpperCase();
+  if (mvpp.startsWith('VPP')) return 'VPP';
+  if (mvpp.startsWith('VS')) return 'VE_SINH';
+  
+  return 'OTHER';
 }
 
 const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail }) => {
@@ -212,15 +232,16 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               const effectiveItem = isReplaced ? line.requestLine.replacementItem : line.item;
               if (!effectiveItem) return;
 
-              // Resolve line warehouse code
-              const lineWarehouse = line.requestLine?.request?.warehouseCode || 
-                                    (effectiveItem.mvpp?.startsWith('VS') ? 'VE_SINH' : 'MAIN');
-              
-              let type = 'VPP';
-              if (lineWarehouse === 'VE_SINH') {
-                  type = 'VE_SINH';
-              } else if (lineWarehouse !== 'MAIN') {
-                  type = lineWarehouse;
+              const type = getItemCategoryType(effectiveItem);
+
+              // Console warning for mismatch
+              const reqWarehouse = line.requestLine?.request?.warehouseCode;
+              if (reqWarehouse) {
+                  if (type === 'VE_SINH' && reqWarehouse === 'MAIN') {
+                      console.warn(`Mismatch: Item ${effectiveItem.mvpp} (${effectiveItem.name}) is classified as VE_SINH but requested for MAIN warehouse.`);
+                  } else if (type === 'VPP' && reqWarehouse === 'VE_SINH') {
+                      console.warn(`Mismatch: Item ${effectiveItem.mvpp} (${effectiveItem.name}) is classified as VPP but requested for VE_SINH warehouse.`);
+                  }
               }
 
               if (!groups.has(type)) groups.set(type, new Map());
@@ -373,7 +394,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
           return {
               type,
               label: (type.toUpperCase() === 'VPP') ? 'VĂN PHÒNG PHẨM' : 
-                     (type.toUpperCase() === 'VE_SINH') ? 'VỆ SINH' : 'HÀNG HÓA KHÁC',
+                     (type.toUpperCase() === 'VE_SINH') ? 'VỆ SINH' : 'CHƯA PHÂN LOẠI',
               items,
               approvedTotal: groupApprovedTotal,
               actualTotal: groupActualTotal,
@@ -517,7 +538,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
     };
   }, [data, selectedIds]);
 
-  const deptReportData = useMemo(() => {
+  const getDeptReportData = (printType: 'DEPT_VPP' | 'DEPT_VS') => {
       const targetData = selectedIds.length > 0 
         ? data.filter(d => selectedIds.includes(d.id))
         : filteredData;
@@ -538,13 +559,11 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               const effectiveItem = isReplaced ? line.requestLine.replacementItem : line.item;
               if (!effectiveItem) return;
 
-              // Resolve line warehouse code
-              const lineWarehouse = line.requestLine?.request?.warehouseCode || 
-                                    (effectiveItem.mvpp?.startsWith('VS') ? 'VE_SINH' : 'MAIN');
+              const categoryType = getItemCategoryType(effectiveItem);
 
-              // Filter based on selected print type
-              if (selectedPrintType === 'DEPT_VPP' && lineWarehouse !== 'MAIN') return;
-              if (selectedPrintType === 'DEPT_VS' && lineWarehouse !== 'VE_SINH') return;
+              // Filter based on printType (VPP vs VE_SINH)
+              if (printType === 'DEPT_VPP' && categoryType !== 'VPP') return;
+              if (printType === 'DEPT_VS' && categoryType !== 'VE_SINH') return;
 
               const originalRequest = line.requestLine?.request;
               const deptName = line.originalDept || 
@@ -612,12 +631,10 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               const effectiveItem = isReplaced ? line.requestLine.replacementItem : line.item;
               if (!effectiveItem) return;
 
-              // Resolve line warehouse
-              const lineWarehouse = line.requestLine?.request?.warehouseCode || 
-                                    (effectiveItem.mvpp?.startsWith('VS') ? 'VE_SINH' : 'MAIN');
+              const categoryType = getItemCategoryType(effectiveItem);
 
-              if (selectedPrintType === 'DEPT_VPP' && lineWarehouse !== 'MAIN') return;
-              if (selectedPrintType === 'DEPT_VS' && lineWarehouse !== 'VE_SINH') return;
+              if (printType === 'DEPT_VPP' && categoryType !== 'VPP') return;
+              if (printType === 'DEPT_VS' && categoryType !== 'VE_SINH') return;
 
               globalUniqueItems.add(effectiveItem.mvpp || effectiveItem.id);
               
@@ -644,7 +661,10 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
           highestDeptValue: highestDept ? highestDept.actualTotal : 0,
           poCount: targetData.length
       };
-  }, [data, filteredData, selectedIds, selectedPrintType]);
+  };
+
+  const deptReportDataVPP = useMemo(() => getDeptReportData('DEPT_VPP'), [data, filteredData, selectedIds]);
+  const deptReportDataVS = useMemo(() => getDeptReportData('DEPT_VS'), [data, filteredData, selectedIds]);
 
   const handlePrintSummary = (type: 'ALL' | 'VPP' | 'VE_SINH' | 'DEPT_VPP' | 'DEPT_VS' = 'ALL') => {
       setSelectedPrintType(type);
@@ -1223,7 +1243,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                   <div className="fixed inset-0 z-40" onClick={() => setShowPrintMenu(false)}></div>
                                   <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 py-3 animate-in fade-in slide-in-from-top-2 duration-200">
                                      <div className="px-4 pb-2 mb-2 border-b border-slate-100">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tùy chọn in tổng hợp</p>
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">TỜ CHỌN IN TỔNG HỢP</p>
                                      </div>
                                      <button 
                                        disabled={printStats.vppCount === 0}
@@ -1232,7 +1252,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                      >
                                         <div className="flex items-center gap-3">
                                            <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg"><FileText className="w-3.5 h-3.5"/></div>
-                                           <span className="text-xs font-bold text-slate-700">Phiếu tổng hợp Mua sắm VPP</span>
+                                           <span className="text-xs font-bold text-slate-700">Phiếu tổng hợp mua sắm VPP</span>
                                         </div>
                                         <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{printStats.vppCount}</span>
                                      </button>
@@ -1244,30 +1264,30 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                      >
                                         <div className="flex items-center gap-3">
                                            <div className="p-1.5 bg-cyan-50 text-cyan-600 rounded-lg"><FileText className="w-3.5 h-3.5"/></div>
-                                           <span className="text-xs font-bold text-slate-700">Phiếu tổng hợp Mua sắm Vệ sinh</span>
+                                           <span className="text-xs font-bold text-slate-700">Phiếu tổng hợp mua sắm Vệ sinh</span>
                                         </div>
                                         <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{printStats.vsCount}</span>
                                      </button>
 
                                      <button 
-                                       disabled={executiveData.deptArray.length === 0}
+                                       disabled={deptReportDataVPP.departments.length === 0}
                                        onClick={() => handlePrintSummary('DEPT_VPP')}
-                                       className={`w-full px-4 py-2.5 text-left flex items-center justify-between transition ${executiveData.deptArray.length === 0 ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-violet-50 group'}`}
+                                       className={`w-full px-4 py-2.5 text-left flex items-center justify-between transition ${deptReportDataVPP.departments.length === 0 ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-violet-50 group'}`}
                                      >
                                         <div className="flex items-center gap-3">
                                            <div className="p-1.5 bg-violet-50 text-violet-600 rounded-lg group-hover:bg-violet-600 group-hover:text-white transition-colors"><FileText className="w-3.5 h-3.5"/></div>
-                                           <span className="text-xs font-bold text-slate-700">In Tổng hợp tiêu thụ đồ Văn phòng phẩm theo phòng ban</span>
+                                           <span className="text-xs font-bold text-slate-700">Tổng hợp tiêu thụ VPP theo phòng ban</span>
                                         </div>
                                      </button>
 
                                      <button 
-                                       disabled={executiveData.deptArray.length === 0}
+                                       disabled={deptReportDataVS.departments.length === 0}
                                        onClick={() => handlePrintSummary('DEPT_VS')}
-                                       className={`w-full px-4 py-2.5 text-left flex items-center justify-between transition ${executiveData.deptArray.length === 0 ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-violet-50 group'}`}
+                                       className={`w-full px-4 py-2.5 text-left flex items-center justify-between transition ${deptReportDataVS.departments.length === 0 ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-violet-50 group'}`}
                                      >
                                         <div className="flex items-center gap-3">
                                            <div className="p-1.5 bg-violet-50 text-violet-600 rounded-lg group-hover:bg-violet-600 group-hover:text-white transition-colors"><FileText className="w-3.5 h-3.5"/></div>
-                                           <span className="text-xs font-bold text-slate-700">In Tổng hợp tiêu thụ đồ vệ sinh theo phòng ban</span>
+                                           <span className="text-xs font-bold text-slate-700">Tổng hợp tiêu thụ Vệ sinh theo phòng ban</span>
                                         </div>
                                      </button>
 
@@ -1280,7 +1300,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                      >
                                         <div className="flex items-center gap-3">
                                            <div className="p-1.5 bg-violet-50 text-violet-600 rounded-lg group-hover:bg-violet-600 group-hover:text-white transition-colors"><Printer className="w-3.5 h-3.5"/></div>
-                                           <span className="text-xs font-black text-slate-800">In tất cả (Tách theo kho)</span>
+                                           <span className="text-xs font-black text-slate-800">In tất cả, tách theo loại hàng</span>
                                         </div>
                                         <span className="text-[10px] font-black text-violet-500 bg-violet-50 px-2 py-0.5 rounded-full">{printStats.total}</span>
                                      </button>
@@ -1303,9 +1323,11 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                      </button>
 
                                      {printStats.otherCount > 0 && (
-                                       <div className="px-4 mt-2 py-2 bg-amber-50 rounded-xl mx-3 border border-amber-100 flex items-center gap-2">
-                                          <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0"/>
-                                          <p className="text-[9px] font-bold text-amber-700">Có {printStats.otherCount} vật tư chưa phân loại.</p>
+                                       <div className="px-4 mt-2 py-2.5 bg-amber-50 rounded-xl mx-3 border border-amber-100 flex items-start gap-2">
+                                          <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5"/>
+                                          <p className="text-[10px] font-bold text-amber-800 leading-normal">
+                                             Có {printStats.otherCount} hàng hóa chưa phân loại VPP/Vệ sinh. Vui lòng cập nhật danh mục hàng hóa để in báo cáo chính xác.
+                                          </p>
                                        </div>
                                      )}
                                   </div>
@@ -1750,7 +1772,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
           `}} />
           
           {summaryGroups
-            .filter(g => selectedPrintType === 'ALL' || g.type === selectedPrintType)
+            .filter(g => selectedPrintType === 'ALL' ? (g.type === 'VPP' || g.type === 'VE_SINH') : g.type === selectedPrintType)
             .map((group) => (
             <div key={group.type} className="print-sheet p-4">
                 {(() => {
@@ -1898,35 +1920,8 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                          <div className="total-value text-right text-indigo-700">{Number(group.actualTotal).toLocaleString('vi-VN')} đ</div>
                       </div>
                       <div className="total-row text-[10pt] font-black border-t border-slate-200 mt-1 pt-1">
-                         <div className="total-label uppercase tracking-tight">{group.savings >= 0 ? 'HIỆU QUẢ TỐI ƯU CHI PHÍ MUA SẮM:' : 'CHÊNH LỆCH CHI PHÍ TĂNG:'}</div>
-                         <div className={`total-value text-right ${group.savings >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                            {Number(Math.abs(group.savings)).toLocaleString('vi-VN')} đ
-                         </div>
-                      </div>
-                   </div>
-                </div>
-
-                {/* FOOTER SIGNATURES */}
-                <div className="footer-sign">
-                   <div>
-                      <p className="font-bold uppercase">Người lập phiếu</p>
-                      <div className="mt-16">
-                         <p className="font-bold">..........................</p>
-                         <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
-                      </div>
-                   </div>
-                   <div>
-                      <p className="font-bold uppercase">Trưởng bộ phận</p>
-                      <div className="mt-16">
-                         <p className="font-bold">..........................</p>
-                         <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
-                      </div>
-                   </div>
-                </div>
-            </div>
-          ))}
-
-          {(selectedPrintType === 'DEPT_VPP' || selectedPrintType === 'DEPT_VS') && (
+                         <div className="total-label uppercase tracking-tight">{group.savings >= 0 ? 'HIỆU QUẢ TỐI ƯU C          {/* VPP Department Summary Sheet */}
+          {(selectedPrintType === 'DEPT_VPP' || selectedPrintType === 'ALL') && deptReportDataVPP.totalActual > 0 && (
             <div className="print-sheet p-4">
                 {(() => {
                     const targetData = selectedIds.length > 0 
@@ -1950,12 +1945,10 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                         }
                     }
 
-                    const categoryCodeShort = selectedPrintType === 'DEPT_VPP' ? 'VPP' : 'VS';
+                    const categoryCodeShort = 'VPP';
                     const summaryCode = `THMS-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-PB-${categoryCodeShort}`;
-                    const printTitle = selectedPrintType === 'DEPT_VPP' 
-                        ? 'TỔNG HỢP TIÊU THỤ ĐỒ VĂN PHÒNG PHẨM THEO PHÒNG BAN'
-                        : 'TỔNG HỢP TIÊU THỤ ĐỒ VỆ SINH THEO PHÒNG BAN';
-                    const categoryLabel = selectedPrintType === 'DEPT_VPP' ? 'đồ Văn phòng phẩm' : 'đồ vệ sinh';
+                    const printTitle = 'TỔNG HỢP TIÊU THỤ ĐỒ VĂN PHÒNG PHẨM THEO PHÒNG BAN';
+                    const categoryLabel = 'đồ Văn phòng phẩm';
 
                     return (
                         <>
@@ -1984,7 +1977,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                             <div className="border border-black p-3 mb-4 bg-slate-50/50 header-text" style={{ fontSize: '9.5pt', lineHeight: '1.4' }}>
                                 <p className="font-bold uppercase mb-1">KÍNH TRÌNH TỔNG GIÁM ĐỐC:</p>
                                 <p>
-                                    Ban Hành chính Nhân sự kính trình Tổng Giám đốc xem xét phê duyệt quyết toán chi phí tiêu thụ {categoryLabel} thực tế kỳ <strong>{periodLabel}</strong> với tổng số tiền là <strong>{Number(deptReportData.totalActual).toLocaleString('vi-VN')} đ</strong> (bằng chữ: <em>{numberToVietnameseWords(deptReportData.totalActual)} đồng</em>). Số liệu tổng hợp nhanh và chi tiết theo phòng ban phát sinh chi tiết dưới đây:
+                                    Ban Hành chính Nhân sự kính trình Tổng Giám đốc xem xét phê duyệt quyết toán chi phí tiêu thụ {categoryLabel} thực tế kỳ <strong>{periodLabel}</strong> với tổng số tiền là <strong>{Number(deptReportDataVPP.totalActual).toLocaleString('vi-VN')} đ</strong> (bằng chữ: <em>{numberToVietnameseWords(deptReportDataVPP.totalActual)} đồng</em>). Số liệu tổng hợp nhanh và chi tiết theo phòng ban phát sinh chi tiết dưới đây:
                                 </p>
                             </div>
 
@@ -2004,21 +1997,21 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                     </tr>
                                     <tr>
                                         <td className="font-bold">Số phòng ban phát sinh:</td>
-                                        <td>{deptReportData.departments.length} đơn vị</td>
+                                        <td>{deptReportDataVPP.departments.length} đơn vị</td>
                                         <td className="font-bold">Tổng số lượt yêu cầu/cấp phát:</td>
-                                        <td>{deptReportData.totalUniqueRequests} lượt</td>
+                                        <td>{deptReportDataVPP.totalUniqueRequests} lượt</td>
                                     </tr>
                                     <tr>
                                         <td className="font-bold">Tổng số mặt hàng tiêu thụ:</td>
-                                        <td>{deptReportData.totalUniqueItems} mặt hàng</td>
+                                        <td>{deptReportDataVPP.totalUniqueItems} mặt hàng</td>
                                         <td className="font-bold">Tổng giá trị tiêu thụ:</td>
-                                        <td className="font-bold text-indigo-700">{Number(deptReportData.totalActual).toLocaleString('vi-VN')} đ</td>
+                                        <td className="font-bold text-indigo-700">{Number(deptReportDataVPP.totalActual).toLocaleString('vi-VN')} đ</td>
                                     </tr>
                                     <tr>
                                         <td className="font-bold">Phòng ban tiêu thụ cao nhất:</td>
-                                        <td className="font-bold text-rose-700">{deptReportData.highestDeptName}</td>
+                                        <td className="font-bold text-rose-700">{deptReportDataVPP.highestDeptName}</td>
                                         <td className="font-bold">Giá trị cao nhất:</td>
-                                        <td className="font-bold text-rose-700">{Number(deptReportData.highestDeptValue).toLocaleString('vi-VN')} đ</td>
+                                        <td className="font-bold text-rose-700">{Number(deptReportDataVPP.highestDeptValue).toLocaleString('vi-VN')} đ</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -2039,7 +2032,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                         </tr>
                     </thead>
                     <tbody>
-                        {deptReportData.departments.map((dept: any, idx: number) => (
+                        {deptReportDataVPP.departments.map((dept: any, idx: number) => (
                             <tr key={dept.name} className="item-main-row text-[8.5pt]">
                                 <td className="text-center">{idx + 1}</td>
                                 <td className="font-bold">{dept.name}</td>
@@ -2053,9 +2046,165 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                         {/* TOTAL ROW */}
                         <tr className="item-main-row print-highlight-row font-bold text-[8.5pt]">
                             <td className="text-center" colSpan={2}>TỔNG CỘNG</td>
-                            <td className="text-center">{deptReportData.departments.reduce((sum: number, d: any) => sum + d.requestCount, 0)} lượt</td>
-                            <td className="text-center">{deptReportData.totalUniqueItems} mặt hàng</td>
-                            <td className="text-right text-indigo-700">{Number(deptReportData.totalActual).toLocaleString('vi-VN')} đ</td>
+                            <td className="text-center">{deptReportDataVPP.departments.reduce((sum: number, d: any) => sum + d.requestCount, 0)} lượt</td>
+                            <td className="text-center">{deptReportDataVPP.totalUniqueItems} mặt hàng</td>
+                            <td className="text-right text-indigo-700">{Number(deptReportDataVPP.totalActual).toLocaleString('vi-VN')} đ</td>
+                            <td className="text-center">100.00%</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {/* FOOTER SIGNATURES */}
+                <div className="footer-sign">
+                   <div>
+                      <p className="font-bold uppercase">Người lập báo cáo</p>
+                      <p className="text-[7.5pt] italic text-slate-500">(Ký và ghi rõ họ tên)</p>
+                      <div className="mt-16">
+                         <p className="font-bold">..........................</p>
+                         <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
+                      </div>
+                   </div>
+                   <div>
+                      <p className="font-bold uppercase">Trưởng bộ phận HCNS</p>
+                      <p className="text-[7.5pt] italic text-slate-500">(Ký và duyệt)</p>
+                      <div className="mt-16">
+                         <p className="font-bold">..........................</p>
+                         <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
+                      </div>
+                   </div>
+                </div>
+            </div>
+          )}
+
+          {/* VE_SINH Department Summary Sheet */}
+          {(selectedPrintType === 'DEPT_VS' || selectedPrintType === 'ALL') && deptReportDataVS.totalActual > 0 && (
+            <div className="print-sheet p-4">
+                {(() => {
+                    const targetData = selectedIds.length > 0 
+                      ? data.filter(d => selectedIds.includes(d.id))
+                      : filteredData;
+                    
+                    let periodLabel = "Tất cả các kỳ";
+                    if (selectedMonth) {
+                        const [year, month] = selectedMonth.split('-');
+                        periodLabel = `Tháng ${month}/${year}`;
+                    } else {
+                        const dates = targetData.map(d => new Date(d.createdAt || d.orderDate).getTime()).filter(Boolean);
+                        if (dates.length > 0) {
+                            const minDate = new Date(Math.min(...dates));
+                            const maxDate = new Date(Math.max(...dates));
+                            if (minDate.toDateString() === maxDate.toDateString()) {
+                                periodLabel = minDate.toLocaleDateString('vi-VN');
+                            } else {
+                                periodLabel = `Từ ${minDate.toLocaleDateString('vi-VN')} đến ${maxDate.toLocaleDateString('vi-VN')}`;
+                            }
+                        }
+                    }
+
+                    const categoryCodeShort = 'VS';
+                    const summaryCode = `THMS-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-PB-${categoryCodeShort}`;
+                    const printTitle = 'TỔNG HỢP TIÊU THỤ ĐỒ VỆ SINH THEO PHÒNG BAN';
+                    const categoryLabel = 'đồ vệ sinh';
+
+                    return (
+                        <>
+                            {/* HEADER SECTION */}
+                            <div className="flex justify-between items-start w-full border-b pb-4 mb-4">
+                                <div className="w-[35%] text-left header-text">
+                                    <p className="font-bold uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
+                                    <p className="font-bold italic">Báo cáo tổng hợp đơn mua sắm</p>
+                                    <p>Ban Hành chính Nhân sự</p>
+                                </div>
+                                <div className="w-[15%] flex flex-col items-center">
+                                     <img src={`https://api.qrserver.com/v1/create-qr-code/?size=65x65&data=${encodeURIComponent(summaryCode)}`} alt="QR" className="w-12 h-12 border border-slate-100" />
+                                 </div>
+                                <div className="w-[50%] text-center header-text">
+                                    <p className="font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+                                    <p className="font-bold underline underline-offset-[4px] mt-1">Độc lập - Tự do - Hạnh phúc</p>
+                                    <p className="mt-3 italic text-right mr-10">Hà Nội, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
+                                </div>
+                            </div>
+
+                            {/* TITLE */}
+                            <h2 className="title-main uppercase">{printTitle}</h2>
+                            <p className="title-sub">(Kèm theo Tờ trình quyết toán chi phí mua sắm/tiêu dùng thực tế)</p>
+
+                            {/* KÍNH TRÌNH TỔNG GIÁM ĐỐC */}
+                            <div className="border border-black p-3 mb-4 bg-slate-50/50 header-text" style={{ fontSize: '9.5pt', lineHeight: '1.4' }}>
+                                <p className="font-bold uppercase mb-1">KÍNH TRÌNH TỔNG GIÁM ĐỐC:</p>
+                                <p>
+                                    Ban Hành chính Nhân sự kính trình Tổng Giám đốc xem xét phê duyệt quyết toán chi phí tiêu thụ {categoryLabel} thực tế kỳ <strong>{periodLabel}</strong> với tổng số tiền là <strong>{Number(deptReportDataVS.totalActual).toLocaleString('vi-VN')} đ</strong> (bằng chữ: <em>{numberToVietnameseWords(deptReportDataVS.totalActual)} đồng</em>). Số liệu tổng hợp nhanh và chi tiết theo phòng ban phát sinh chi tiết dưới đây:
+                                </p>
+                            </div>
+
+                            {/* TỔNG HỢP NHANH SỐ LIỆU */}
+                            <table className="print-table mb-4" style={{ fontSize: '8.5pt' }}>
+                                <thead>
+                                    <tr className="bg-slate-100 font-bold text-center text-[9pt]">
+                                        <th colSpan={4} style={{ padding: '4px', border: '1px solid #000' }}>TỔNG HỢP NHANH SỐ LIỆU TIÊU THỤ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td className="font-bold" style={{ width: '25%' }}>Kỳ tổng hợp:</td>
+                                        <td style={{ width: '25%' }}>{periodLabel}</td>
+                                        <td className="font-bold" style={{ width: '25%' }}>Phạm vi:</td>
+                                        <td style={{ width: '25%' }}>{selectedIds.length > 0 ? "Theo danh sách chọn" : "Toàn hệ thống (Bộ lọc)"}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="font-bold">Số phòng ban phát sinh:</td>
+                                        <td>{deptReportDataVS.departments.length} đơn vị</td>
+                                        <td className="font-bold">Tổng số lượt yêu cầu/cấp phát:</td>
+                                        <td>{deptReportDataVS.totalUniqueRequests} lượt</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="font-bold">Tổng số mặt hàng tiêu thụ:</td>
+                                        <td>{deptReportDataVS.totalUniqueItems} mặt hàng</td>
+                                        <td className="font-bold">Tổng giá trị tiêu thụ:</td>
+                                        <td className="font-bold text-indigo-700">{Number(deptReportDataVS.totalActual).toLocaleString('vi-VN')} đ</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="font-bold">Phòng ban tiêu thụ cao nhất:</td>
+                                        <td className="font-bold text-rose-700">{deptReportDataVS.highestDeptName}</td>
+                                        <td className="font-bold">Giá trị cao nhất:</td>
+                                        <td className="font-bold text-rose-700">{Number(deptReportDataVS.highestDeptValue).toLocaleString('vi-VN')} đ</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </>
+                    );
+                })()}
+
+                {/* MAIN TABLE */}
+                <table className="print-table">
+                    <thead>
+                        <tr className="bg-slate-100 font-bold text-[8pt] text-center">
+                            <th style={{width: '5%'}}>STT</th>
+                            <th style={{width: '39%'}}>PHÒNG BAN / ĐƠN VỊ</th>
+                            <th style={{width: '14%'}}>SỐ LƯỢT YÊU CẦU</th>
+                            <th style={{width: '14%'}}>SỐ MẶT HÀNG</th>
+                            <th style={{width: '16%'}}>GIÁ TRỊ TIÊU THỤ</th>
+                            <th style={{width: '12%'}}>TỶ TRỌNG</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {deptReportDataVS.departments.map((dept: any, idx: number) => (
+                            <tr key={dept.name} className="item-main-row text-[8.5pt]">
+                                <td className="text-center">{idx + 1}</td>
+                                <td className="font-bold">{dept.name}</td>
+                                <td className="text-center">{dept.requestCount} lượt</td>
+                                <td className="text-center">{dept.itemCount} mặt hàng</td>
+                                <td className="text-right font-bold">{Number(dept.actualTotal).toLocaleString('vi-VN')} đ</td>
+                                <td className="text-center font-bold">{dept.percentage.toFixed(2)}%</td>
+                            </tr>
+                        ))}
+                        
+                        {/* TOTAL ROW */}
+                        <tr className="item-main-row print-highlight-row font-bold text-[8.5pt]">
+                            <td className="text-center" colSpan={2}>TỔNG CỘNG</td>
+                            <td className="text-center">{deptReportDataVS.departments.reduce((sum: number, d: any) => sum + d.requestCount, 0)} lượt</td>
+                            <td className="text-center">{deptReportDataVS.totalUniqueItems} mặt hàng</td>
+                            <td className="text-right text-indigo-700">{Number(deptReportDataVS.totalActual).toLocaleString('vi-VN')} đ</td>
                             <td className="text-center">100.00%</td>
                         </tr>
                     </tbody>
@@ -2084,15 +2233,14 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
           )}
 
           {/* EXECUTIVE REPORT PAGE */}
-          {/* EXECUTIVE REPORT PAGE */}
-          {selectedPrintType !== 'DEPT_VPP' && selectedPrintType !== 'DEPT_VS' && (
+          {(selectedPrintType === 'VPP' || selectedPrintType === 'VE_SINH') && (
             <div className="print-sheet p-8 break-before-page flex flex-col justify-center min-h-[500px]">
                 <div className="max-w-2xl mx-auto w-full">
                     <div className="text-center mb-10">
                        <h2 className="text-[16pt] font-black uppercase text-slate-800 tracking-wider">{dashboardTitle}</h2>
                        <div className="w-16 h-1 bg-slate-800 mx-auto mt-4 mb-2"></div>
                     </div>
-    
+     
                     <table className="w-full border-collapse text-[11pt] mb-8">
                         <tbody>
                             <tr className="border-b border-slate-200">
@@ -2117,7 +2265,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                             </tr>
                         </tbody>
                     </table>
-    
+     
                     <div className="text-center italic text-slate-500 text-[10pt] px-12 mt-12">
                         Các phương án mua sắm đã được Hành chính rà soát và tối ưu chi phí trước khi trình phê duyệt.
                     </div>
