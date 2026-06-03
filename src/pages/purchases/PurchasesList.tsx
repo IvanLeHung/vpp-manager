@@ -1766,7 +1766,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               .total-label { font-weight: bold; min-width: 300px; text-align: right; }
               .total-value { font-weight: bold; min-width: 120px; text-align: right; }
               
-              .footer-sign { margin-top: 40px; display: flex; justify-content: space-around; text-align: center; font-size: 9pt; }
+              .footer-sign { margin-top: 15px; display: flex; justify-content: space-around; text-align: center; font-size: 9pt; page-break-inside: avoid; break-inside: avoid; }
               .sign-box { height: 80px; }
             }
           `}} />
@@ -1932,14 +1932,14 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                 <div className="footer-sign">
                    <div>
                       <p className="font-bold uppercase">Người lập phiếu</p>
-                      <div className="mt-16">
+                      <div className="mt-6">
                          <p className="font-bold">..........................</p>
                          <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
                       </div>
                    </div>
                    <div>
                       <p className="font-bold uppercase">Trưởng bộ phận</p>
-                      <div className="mt-16">
+                      <div className="mt-6">
                          <p className="font-bold">..........................</p>
                          <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
                       </div>
@@ -2081,7 +2081,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                    <div>
                       <p className="font-bold uppercase">Người lập báo cáo</p>
                       <p className="text-[7.5pt] italic text-slate-500">(Ký và ghi rõ họ tên)</p>
-                      <div className="mt-16">
+                      <div className="mt-6">
                          <p className="font-bold">..........................</p>
                          <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
                       </div>
@@ -2089,7 +2089,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                    <div>
                       <p className="font-bold uppercase">Trưởng bộ phận HCNS</p>
                       <p className="text-[7.5pt] italic text-slate-500">(Ký và duyệt)</p>
-                      <div className="mt-16">
+                      <div className="mt-6">
                          <p className="font-bold">..........................</p>
                          <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
                       </div>
@@ -2231,7 +2231,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                    <div>
                       <p className="font-bold uppercase">Người lập báo cáo</p>
                       <p className="text-[7.5pt] italic text-slate-500">(Ký và ghi rõ họ tên)</p>
-                      <div className="mt-16">
+                      <div className="mt-6">
                          <p className="font-bold">..........................</p>
                          <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
                       </div>
@@ -2239,7 +2239,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                    <div>
                       <p className="font-bold uppercase">Trưởng bộ phận HCNS</p>
                       <p className="text-[7.5pt] italic text-slate-500">(Ký và duyệt)</p>
-                      <div className="mt-16">
+                      <div className="mt-6">
                          <p className="font-bold">..........................</p>
                          <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
                       </div>
