@@ -124,12 +124,16 @@
     margin-top: 8px !important;
   }
 
-  .print-signatures:not(.grid-cols-3) {
+  .print-signatures:not(.grid-cols-3):not(.grid-cols-5) {
     grid-template-columns: 1fr 1fr !important;
   }
 
   .print-signatures.grid-cols-3 {
     grid-template-columns: 1fr 1fr 1fr !important;
+  }
+
+  .print-signatures.grid-cols-5 {
+    grid-template-columns: repeat(5, 1fr) !important;
   }
 
   thead {

@@ -196,13 +196,17 @@ const RequestPrint: React.FC = () => {
         }
         .print-signatures {
           display: grid;
-          grid-template-cols: repeat(5, 1fr);
-          gap: 10px;
-          margin-top: 20px;
+          grid-template-cols: repeat(5, 1fr) !important;
+          gap: 6px !important;
+          margin-top: 15px;
           page-break-inside: avoid;
         }
         .print-signature-block {
           text-align: center;
+          font-size: 9.5px !important;
+        }
+        .print-signature-block p {
+          margin-bottom: 2px !important;
         }
       `}</style>
 
@@ -329,7 +333,7 @@ const RequestPrint: React.FC = () => {
         </table>
 
         {/* Signatures */}
-        <div className="print-signatures">
+        <div className="print-signatures grid-cols-5">
           <div className="print-signature-block">
             <p className="mb-2 uppercase">Người đề xuất</p>
             <p className="text-[11px] font-normal italic mb-4">(Ký và ghi họ tên)</p>
