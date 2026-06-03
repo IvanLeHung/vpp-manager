@@ -196,8 +196,8 @@ const RequestPrint: React.FC = () => {
         }
         .print-signatures {
           display: grid;
-          grid-template-cols: 1fr 1fr 1fr;
-          gap: 15px;
+          grid-template-cols: repeat(5, 1fr);
+          gap: 10px;
           margin-top: 20px;
           page-break-inside: avoid;
         }
@@ -236,7 +236,7 @@ const RequestPrint: React.FC = () => {
             {(() => {
               if (selectedPrintType === 'VE_SINH') return 'PHIẾU ĐỀ XUẤT VỆ SINH';
               if (selectedPrintType === 'VPP') return 'PHIẾU ĐỀ XUẤT VĂN PHÒNG PHẨM';
-              return 'PHIẾU ĐỀ XUẤT TỔNG HỢP VĂN PHÒNG PHẨM VÀ ĐỒ VỆ SINH';
+              return 'PHIẾU ĐỀ XUẤT VĂN PHÒNG PHẨM VÀ ĐỒ VỆ SINH';
             })()}
           </h1>
         </div>
@@ -333,7 +333,7 @@ const RequestPrint: React.FC = () => {
           <div className="print-signature-block">
             <p className="mb-2 uppercase">Người đề xuất</p>
             <p className="text-[11px] font-normal italic mb-4">(Ký và ghi họ tên)</p>
-            <div className="mt-12 border-t border-dotted border-black w-[80%] mx-auto pt-2 relative">
+            <div className="mt-12 border-t border-dotted border-black w-[90%] mx-auto pt-2 relative">
               <p className="font-black text-xs uppercase">{data.requester?.fullName}</p>
               <p className="text-[9px] font-bold text-blue-600 mt-1">
                 {new Date(data.createdAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} (Đã ký số)
@@ -344,7 +344,7 @@ const RequestPrint: React.FC = () => {
           <div className="print-signature-block">
             <p className="mb-2 uppercase text-slate-600">Trưởng bộ phận</p>
             <p className="text-[11px] font-normal italic mb-4">(Ký xác nhận)</p>
-            <div className="mt-12 border-t border-dotted border-black w-[80%] mx-auto pt-2">
+            <div className="mt-12 border-t border-dotted border-black w-[90%] mx-auto pt-2">
               {(() => {
                 const h = data.approvalHistories?.slice().reverse().find((x:any) => 
                   (x.action.includes('APPROVE') || x.action === 'APPROVED') && 
@@ -368,7 +368,7 @@ const RequestPrint: React.FC = () => {
           <div className="print-signature-block">
             <p className="mb-2 uppercase">Người duyệt</p>
             <p className="text-[11px] font-normal italic mb-4">(Hành chính/Lãnh đạo)</p>
-            <div className="mt-12 border-t border-dotted border-black w-[80%] mx-auto pt-2">
+            <div className="mt-12 border-t border-dotted border-black w-[90%] mx-auto pt-2">
               {(() => {
                 const h = data.approvalHistories?.slice().reverse().find((x:any) => 
                   (x.action.includes('APPROVE') || x.action === 'APPROVED') && 
@@ -388,13 +388,11 @@ const RequestPrint: React.FC = () => {
               })()}
             </div>
           </div>
-        </div>
 
-        <div className="print-signatures" style={{ marginTop: '30px' }}>
           <div className="print-signature-block">
             <p className="mb-2 uppercase">Thủ kho / Xuất</p>
             <p className="text-[11px] font-normal italic mb-4">(Ký và ghi tên)</p>
-            <div className="mt-12 border-t border-dotted border-black w-[80%] mx-auto pt-2">
+            <div className="mt-12 border-t border-dotted border-black w-[90%] mx-auto pt-2">
               {(() => {
                 const h = data.approvalHistories?.slice().reverse().find((x:any) => x.action === 'ISSUE' || x.action === 'ISSUED');
                 return (
@@ -415,7 +413,7 @@ const RequestPrint: React.FC = () => {
           <div className="print-signature-block">
             <p className="mb-2 uppercase text-indigo-700">Người nhận</p>
             <p className="text-[11px] font-normal italic mb-4">(Ký nhận đủ hàng)</p>
-            <div className="mt-14 border-t border-dotted border-black w-[70%] mx-auto pt-2">
+            <div className="mt-12 border-t border-dotted border-black w-[90%] mx-auto pt-2">
               <p className="font-black text-xs uppercase">
                 {data.status === 'COMPLETED' ? data.requester?.fullName : '............................'}
               </p>
@@ -423,10 +421,6 @@ const RequestPrint: React.FC = () => {
                 <p className="text-[9px] font-normal text-slate-400 italic">Đã nhận đủ hàng</p>
               )}
             </div>
-          </div>
-          
-          <div className="print-signature-block">
-            {/* Blank placeholder to align grid */}
           </div>
         </div>
 
