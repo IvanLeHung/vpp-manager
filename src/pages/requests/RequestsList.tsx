@@ -39,6 +39,39 @@ function sortItemsForPrinting(items: any[]) {
   });
 }
 
+function getActionLabel(action: string) {
+  if (!action) return '—';
+  switch(action.toUpperCase()) {
+    case 'SUBMIT': return 'Gửi trình duyệt';
+    case 'TBP_APPROVE': return 'Trưởng bộ phận Duyệt';
+    case 'ADMIN_APPROVE': return 'Hành chính Duyệt';
+    case 'RETURN_FOR_REVISION': case 'RETURN_FOR_EDIT': return 'Trả lại chỉnh sửa';
+    case 'REJECT': return 'Từ chối toàn bộ';
+    case 'CANCEL': return 'Hủy phiếu';
+    case 'ISSUE': case 'ISSUED': return 'Xuất kho / Giao hàng';
+    case 'PARTIAL_DELIVERY_CONFIRMED': return 'Xác nhận Giao hàng Một phần';
+    case 'CONFIRM_RECEIPT': return 'Đã nhận hàng';
+    case 'APPROVE': return 'Duyệt (Approve)';
+    case 'TBP_REJECT': return 'Trưởng bộ phận Từ chối';
+    case 'ADMIN_REJECT': return 'Hành chính Từ chối';
+    case 'WITHDRAW': return 'Rút phiếu';
+    case 'URGE_DELIVERY': return 'Hối thúc giao hàng';
+    default: return action;
+  }
+}
+
+function sortLinesForPrinting(lines: any[]) {
+  return [...lines].sort((a, b) => {
+    const itemA = a.item || {};
+    const itemB = b.item || {};
+    const groupA = itemA.printSortGroup || getItemSortGroupName(itemA.name || '');
+    const groupB = itemB.printSortGroup || getItemSortGroupName(itemB.name || '');
+    if (groupA !== groupB) return groupA.localeCompare(groupB, "vi");
+    if (itemA.name !== itemB.name) return (itemA.name || '').localeCompare(itemB.name || '', "vi");
+    return (itemA.mvpp || '').localeCompare(itemB.mvpp || '', "vi");
+  });
+}
+
 export default function RequestsList({ requests, currentUser, setViewMode, setActiveRequest, setNavigationIds, refreshData, showToast }: Props) {
   const { items: masterItems } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
@@ -50,6 +83,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH'>('ALL');
+  const [printMode, setPrintMode] = useState<'SUMMARY' | 'INDIVIDUAL'>('SUMMARY');
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [isSubmittingBatch, setIsSubmittingBatch] = useState(false);
   const [previewReq, setPreviewReq] = useState<VPPRequest | null>(null);
@@ -387,6 +421,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   }, [requests, filteredRequests, selectedIds, masterItems]);
 
   const handlePrintSummary = (type: 'ALL' | 'VPP' | 'VE_SINH' = 'ALL') => {
+    setPrintMode('SUMMARY');
     setSelectedPrintType(type);
     setTimeout(() => {
       window.print();
@@ -631,8 +666,16 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                 <button onClick={handleExportExcel} className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white font-black rounded-lg text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition">
                   <FileSpreadsheet className="w-3.5 h-3.5"/> Xuất Excel
                 </button>
-                <button onClick={() => window.print()} className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white font-black rounded-lg text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition">
-                  <Printer className="w-3.5 h-3.5"/> In phiếu
+                <button 
+                  onClick={() => {
+                    setPrintMode('INDIVIDUAL');
+                    setTimeout(() => {
+                      window.print();
+                    }, 100);
+                  }} 
+                  className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white font-black rounded-lg text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition"
+                >
+                  <Printer className="w-3.5 h-3.5"/> In PDF Phiếu Đề xuất
                 </button>
                 <div className="h-4 w-[1px] bg-white/20 mx-1"></div>
                 <button onClick={toggleBulkMode} className="p-1.5 hover:bg-white/10 rounded-lg transition" title="Ẩn ô chọn">
@@ -891,144 +934,437 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
               break-inside: avoid;
               page-break-inside: avoid;
             }
+            .page-break {
+              page-break-before: always !important;
+              break-before: page !important;
+            }
+            .print-page {
+              font-family: "Times New Roman", Times, serif, sans-serif !important;
+              color: #000 !important;
+              background: #fff !important;
+            }
           }
         `}} />
-        {summaryGroups.groups
-          .filter(g => selectedPrintType === 'ALL' || g.type === selectedPrintType)
-          .map((group, gIdx) => (
-          <div key={group.type} className={`print-sheet text-black leading-tight p-4 bg-white ${gIdx > 0 ? 'page-break-before' : ''}`}>
-              <div className="flex justify-between items-start mb-6 w-full print-header">
-                  <div className="w-[40%] text-left">
-                      <p className="font-bold text-[11pt] uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
-                      <p className="text-[9pt] italic mt-1 font-bold">Báo cáo tổng hợp tồn đọng cấp phát</p>
-                      <p className="text-[8pt] text-black mt-1">Ban Hành chính Nhân sự</p>
-                  </div>
-                  <div className="w-[10%] flex flex-col items-center text-center">
-                       <img 
-                           src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent('https://vpp.danko.vn/requests')}`} 
-                           alt="QR Code" 
-                           className="w-10 h-10 border border-slate-100"
-                       />
-                   </div>
-                  <div className="w-[50%] text-center">
-                      <p className="text-[11pt] font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
-                      <p className="text-[10pt] font-bold underline decoration-[1px] underline-offset-[4px] mt-1">Độc lập - Tự do - Hạnh phúc</p>
-                      <p className="text-[9pt] mt-3 italic text-right mr-10">Hà Nội, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
-                  </div>
-              </div>
+        {printMode === 'SUMMARY' ? (
+          summaryGroups.groups
+            .filter(g => selectedPrintType === 'ALL' || g.type === selectedPrintType)
+            .map((group, gIdx) => (
+            <div key={group.type} className={`print-sheet text-black leading-tight p-4 bg-white ${gIdx > 0 ? 'page-break' : ''}`}>
+                <div className="flex justify-between items-start mb-6 w-full print-header">
+                    <div className="w-[40%] text-left">
+                        <p className="font-bold text-[11pt] uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
+                        <p className="text-[9pt] italic mt-1 font-bold">Báo cáo tổng hợp tồn đọng cấp phát</p>
+                        <p className="text-[8pt] text-black mt-1">Ban Hành chính Nhân sự</p>
+                    </div>
+                    <div className="w-[10%] flex flex-col items-center text-center">
+                         <img 
+                             src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent('https://vpp.danko.vn/requests')}`} 
+                             alt="QR Code" 
+                             className="w-10 h-10 border border-slate-100"
+                         />
+                     </div>
+                    <div className="w-[50%] text-center">
+                        <p className="text-[11pt] font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+                        <p className="text-[10pt] font-bold underline decoration-[1px] underline-offset-[4px] mt-1">Độc lập - Tự do - Hạnh phúc</p>
+                        <p className="text-[9pt] mt-3 italic text-right mr-10">Hà Nội, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
+                    </div>
+                </div>
 
-           <div className="text-center mb-8">
-               <h1 className="text-[13pt] font-bold uppercase tracking-wide">
-                   PHIẾU TỔNG HỢP ĐỒ {group.label}
-               </h1>
-               <p className="text-[9pt] italic mt-1 text-black">
-                 ({selectedIds.length > 0 
-                   ? `Tổng hợp từ ${selectedIds.length} phiếu đã chọn` 
-                   : `Tổng hợp từ ${filteredRequests.length} phiếu đang lọc`})
-               </p>
-           </div>
+             <div className="text-center mb-8">
+                 <h1 className="text-[13pt] font-bold uppercase tracking-wide">
+                     PHIẾU TỔNG HỢP ĐỒ {group.label}
+                 </h1>
+                 <p className="text-[9pt] italic mt-1 text-black">
+                   ({selectedIds.length > 0 
+                     ? `Tổng hợp từ ${selectedIds.length} phiếu đã chọn` 
+                     : `Tổng hợp từ ${filteredRequests.length} phiếu đang lọc`})
+                 </p>
+             </div>
 
-           <table className="print-table mb-8 bg-white">
-               <thead>
-                    <tr className="uppercase text-[7.8pt] font-bold text-center">
-                        <th className="col-stt text-center">STT</th>
-                        <th className="col-code text-center">Mã VT</th>
-                        <th className="col-name text-center">Tên vật tư</th>
-                        <th className="col-unit text-center">ĐVT</th>
-                        <th className="col-qty text-center">Cần xuất</th>
-                        <th className="col-price text-center">Đơn giá</th>
-                        <th className="col-total text-center">Thành tiền</th>
-                    </tr>
-               </thead>
-               {group.items.map((item, idx) => (
-                 <tbody key={item.mvpp} className="avoid-page-break">
-                    {/* Main Item Row */}
-                    <tr className="item-main-row">
-                        <td className="col-stt item-bold">{idx + 1}</td>
-                        <td className="col-code text-center item-bold">{item.mvpp}</td>
-                        <td className="text-left item-name">{item.name}</td>
-                        <td className="text-center item-regular">{item.unit}</td>
-                        <td className="text-center item-bold">{item.qtyRequested - item.qtyDelivered}</td>
-                        <td className="text-right item-regular">{Number(item.price).toLocaleString('vi-VN')}</td>
-                        <td className="text-right item-bold">{(Number(item.price) * (item.qtyRequested - item.qtyDelivered)).toLocaleString('vi-VN')}</td>
-                    </tr>
-                    {/* Department Sub-header */}
-                    <tr className="allocation-header-row">
-                        <td className="border-r-0"></td>
-                        <td colSpan={3} className="text-left border-l-0">Phòng ban đề xuất</td>
-                        <td className="text-center">Sl</td>
-                        <td colSpan={2} className="text-left">Ghi chú</td>
-                    </tr>
-                    {/* Department Sub-rows */}
-                    {item.deptEntries.map((de: any, i: number) => (
-                      <tr key={i} className="allocation-row">
+             <table className="print-table mb-8 bg-white">
+                 <thead>
+                      <tr className="uppercase text-[7.8pt] font-bold text-center">
+                          <th className="col-stt text-center">STT</th>
+                          <th className="col-code text-center">Mã VT</th>
+                          <th className="col-name text-center">Tên vật tư</th>
+                          <th className="col-unit text-center">ĐVT</th>
+                          <th className="col-qty text-center">Cần xuất</th>
+                          <th className="col-price text-center">Đơn giá</th>
+                          <th className="col-total text-center">Thành tiền</th>
+                      </tr>
+                 </thead>
+                 {group.items.map((item, idx) => (
+                   <tbody key={item.mvpp} className="avoid-page-break">
+                      {/* Main Item Row */}
+                      <tr className="item-main-row">
+                          <td className="col-stt item-bold">{idx + 1}</td>
+                          <td className="col-code text-center item-bold">{item.mvpp}</td>
+                          <td className="text-left item-name">{item.name}</td>
+                          <td className="text-center item-regular">{item.unit}</td>
+                          <td className="text-center item-bold">{item.qtyRequested - item.qtyDelivered}</td>
+                          <td className="text-right item-regular">{Number(item.price).toLocaleString('vi-VN')}</td>
+                          <td className="text-right item-bold">{(Number(item.price) * (item.qtyRequested - item.qtyDelivered)).toLocaleString('vi-VN')}</td>
+                      </tr>
+                      {/* Department Sub-header */}
+                      <tr className="allocation-header-row">
                           <td className="border-r-0"></td>
-                          <td colSpan={3} className="text-left border-l-0 pl-4 text-black">
-                            • {de.dept}
-                          </td>
-                          <td className="text-center font-bold">{de.qty}</td>
-                          <td colSpan={2} className="allocation-note">
-                            {de.note || '-'}
-                            {de.replacements && de.replacements.length > 0 && (
-                              <div className="mt-1 text-[7.2pt] border-t border-dotted border-black/30 pt-1 text-black">
-                                {de.replacements.map((r:any, ri:number) => (
-                                  <div key={ri} className="flex flex-col">
-                                    <p className="font-bold">↳ THAY CHO: {r.name} (SL cũ: {r.qty})</p>
-                                    <p className="font-normal text-[6.8pt] opacity-80 italic">Lý do: {r.reason} • {r.status === 'REPLACEMENT_PENDING_ADMIN' ? 'TRẠNG THÁI: CHỜ ADMIN DUYỆT' : 'TRẠNG THÁI: ĐÃ CHẤP THUẬN'}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                          <td colSpan={3} className="text-left border-l-0">Phòng ban đề xuất</td>
+                          <td className="text-center">Sl</td>
+                          <td colSpan={2} className="text-left">Ghi chú</td>
+                      </tr>
+                      {/* Department Sub-rows */}
+                      {item.deptEntries.map((de: any, i: number) => (
+                        <tr key={i} className="allocation-row">
+                            <td className="border-r-0"></td>
+                            <td colSpan={3} className="text-left border-l-0 pl-4 text-black">
+                              • {de.dept}
+                            </td>
+                            <td className="text-center font-bold">{de.qty}</td>
+                            <td colSpan={2} className="allocation-note">
+                              {de.note || '-'}
+                              {de.replacements && de.replacements.length > 0 && (
+                                <div className="mt-1 text-[7.2pt] border-t border-dotted border-black/30 pt-1 text-black">
+                                  {de.replacements.map((r:any, ri:number) => (
+                                    <div key={ri} className="flex flex-col">
+                                      <p className="font-bold">↳ THAY CHO: {r.name} (SL cũ: {r.qty})</p>
+                                      <p className="font-normal text-[6.8pt] opacity-80 italic">Lý do: {r.reason} • {r.status === 'REPLACEMENT_PENDING_ADMIN' ? 'TRẠNG THÁI: CHỜ ADMIN DUYỆT' : 'TRẠNG THÁI: ĐÃ CHẤP THUẬN'}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </td>
+                        </tr>
+                      ))}
+                   </tbody>
+                 ))}
+                 <tbody>
+                      <tr className="font-bold text-[9pt]">
+                          <td colSpan={4} className="p-1 text-right border border-black">Tổng cộng ({group.items.length} mặt hàng):</td>
+                          <td className="p-1 text-center text-[11pt] border border-black">{group.items.reduce((s, i) => s + (i.qtyRequested - i.qtyDelivered), 0)}</td>
+                          <td className="p-1 border border-black"></td>
+                          <td className="p-1 text-right text-[11pt] border border-black">
+                            {group.items.reduce((s, i) => s + (i.price * (i.qtyRequested - i.qtyDelivered)), 0).toLocaleString('vi-VN')} đ
                           </td>
                       </tr>
-                    ))}
+                      <tr className="font-bold text-[8pt] text-slate-600 bg-slate-50">
+                          <td colSpan={6} className="p-1 text-right border border-black">Tổng giá trị đề xuất ban đầu đã duyệt:</td>
+                          <td className="p-1 text-right border border-black">
+                            {group.items.reduce((s, i) => s + i.originalTotal, 0).toLocaleString('vi-VN')} đ
+                          </td>
+                      </tr>
                  </tbody>
-               ))}
-               <tbody>
-                    <tr className="font-bold text-[9pt]">
-                        <td colSpan={4} className="p-1 text-right border border-black">Tổng cộng ({group.items.length} mặt hàng):</td>
-                        <td className="p-1 text-center text-[11pt] border border-black">{group.items.reduce((s, i) => s + (i.qtyRequested - i.qtyDelivered), 0)}</td>
-                        <td className="p-1 border border-black"></td>
-                        <td className="p-1 text-right text-[11pt] border border-black">
-                          {group.items.reduce((s, i) => s + (i.price * (i.qtyRequested - i.qtyDelivered)), 0).toLocaleString('vi-VN')} đ
-                        </td>
-                    </tr>
-                    <tr className="font-bold text-[8pt] text-slate-600 bg-slate-50">
-                        <td colSpan={6} className="p-1 text-right border border-black">Tổng giá trị đề xuất ban đầu đã duyệt:</td>
-                        <td className="p-1 text-right border border-black">
-                          {group.items.reduce((s, i) => s + i.originalTotal, 0).toLocaleString('vi-VN')} đ
-                        </td>
-                    </tr>
-               </tbody>
-           </table>
+             </table>
 
-          {/* SIGNATURE SECTION */}
-          <div className="mt-8 print-signatures avoid-page-break">
-              <div className="grid grid-cols-2 gap-8 text-center text-[10pt] font-bold">
-                  <div className="flex flex-col items-center">
-                      <p className="uppercase mb-1 whitespace-nowrap">Người lập biểu</p>
-                      <p className="text-[9pt] font-normal italic mb-4">(Ký và ghi họ tên)</p>
-                      <div className="mt-16 border-t border-dotted border-black w-[70%] pt-2">
-                         <p className="font-bold uppercase">{currentUser.name || '............................'}</p>
-                         <p className="text-[8pt] font-normal text-black italic">Trích xuất: {new Date().toLocaleTimeString('vi-VN')}</p>
-                      </div>
-                  </div>
-                  <div className="flex flex-col items-center">
-                      <p className="uppercase mb-1 whitespace-nowrap">Phụ trách HC/KHO</p>
-                      <p className="text-[9pt] font-normal italic mb-4">(Ký xác nhận)</p>
-                      <div className="mt-16 border-t border-dotted border-black w-[70%] pt-2">
-                         <p className="font-bold uppercase">............................</p>
-                      </div>
-                  </div>
-              </div>
+            {/* SIGNATURE SECTION */}
+            <div className="mt-8 print-signatures avoid-page-break">
+                <div className="grid grid-cols-2 gap-8 text-center text-[10pt] font-bold">
+                    <div className="flex flex-col items-center">
+                        <p className="uppercase mb-1 whitespace-nowrap">Người lập biểu</p>
+                        <p className="text-[9pt] font-normal italic mb-4">(Ký và ghi họ tên)</p>
+                        <div className="mt-16 border-t border-dotted border-black w-[70%] pt-2">
+                           <p className="font-bold uppercase">{currentUser.name || '............................'}</p>
+                           <p className="text-[8pt] font-normal text-black italic">Trích xuất: {new Date().toLocaleTimeString('vi-VN')}</p>
+                        </div>
+                    </div>
+                    <div className="flex flex-col items-center">
+                        <p className="uppercase mb-1 whitespace-nowrap">Phụ trách HC/KHO</p>
+                        <p className="text-[9pt] font-normal italic mb-4">(Ký xác nhận)</p>
+                        <div className="mt-16 border-t border-dotted border-black w-[70%] pt-2">
+                           <p className="font-bold uppercase">............................</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div className="mt-auto pt-4 border-t border-black text-[8pt] text-black flex justify-between print-info">
+                <p>Ngày in: {new Date().toLocaleString('vi-VN')} • VPP-Manager Dashboard</p>
+                <p>Trang <span className="sheet-page-number"></span></p>
+            </div>
           </div>
-          
-          <div className="mt-auto pt-4 border-t border-black text-[8pt] text-black flex justify-between print-info">
-              <p>Ngày in: {new Date().toLocaleString('vi-VN')} • VPP-Manager Dashboard</p>
-              <p>Trang <span className="sheet-page-number"></span></p>
-          </div>
-        </div>
-        ))}
+          ))
+        ) : (
+          requests
+            .filter(r => selectedIds.includes(r.id))
+            .map((req, rIdx) => {
+              const filteredLines = sortLinesForPrinting(req.lines || []);
+              return (
+                <div key={req.id} className={`print-page text-black leading-tight bg-white ${rIdx > 0 ? 'page-break' : ''}`} style={{ width: '210mm', minHeight: '297mm', padding: '10mm 15mm', boxSizing: 'border-box', margin: '0 auto', fontFamily: '"Times New Roman", Times, serif' }}>
+                  {/* Header */}
+                  <div className="print-header flex justify-between border-b-2 border-black pb-2 mb-5">
+                    <div className="w-[35%] text-left">
+                      <p className="font-bold text-[13px] uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
+                      <p className="text-[10px] italic mt-1 font-bold">Số phiếu: {req.id}</p>
+                      <p className="text-[9px] text-slate-500 mt-1">Ban Hành chính Nhân sự</p>
+                    </div>
+                    <div className="w-[20%] flex flex-col items-center text-center">
+                      <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(req.id)}`} 
+                        alt="QR Code" 
+                        className="w-16 h-16 border border-slate-100"
+                      />
+                      <p className="text-[8px] font-bold mt-1 uppercase text-slate-400">Scan to Verify</p>
+                    </div>
+                    <div className="w-[45%] text-center">
+                      <p className="text-[14px] font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+                      <p className="text-[13px] font-bold underline decoration-[1.5px] underline-offset-[5px] mt-1">Độc lập - Tự do - Hạnh phúc</p>
+                      <p className="text-[11px] mt-3 text-slate-600 italic">Hà Nội, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
+                    </div>
+                  </div>
+
+                  {/* Title */}
+                  <div className="text-center mb-6">
+                    <h1 className="text-[20px] font-black uppercase tracking-widest break-words leading-tight underline underline-offset-8 decoration-slate-300">
+                      PHIẾU ĐỀ XUẤT VĂN PHÒNG PHẨM VÀ ĐỒ VỆ SINH
+                    </h1>
+                  </div>
+
+                  {/* Metadata */}
+                  <div className="grid grid-cols-2 gap-y-2 gap-x-12 mb-6 text-sm">
+                    <div className="flex items-end"><span className="w-40 font-bold shrink-0">Người đề xuất:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{req.requester?.fullName}</span></div>
+                    <div className="flex items-end"><span className="w-40 font-bold shrink-0">Phòng ban:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{req.department}</span></div>
+                    <div className="flex items-end"><span className="w-40 font-bold shrink-0">Ngày lập phiếu:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{new Date(req.createdAt).toLocaleDateString('vi-VN')}</span></div>
+                    <div className="flex items-end"><span className="w-40 font-bold shrink-0">Loại yêu cầu:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5">{req.requestType}</span></div>
+                    <div className="col-span-2 flex items-end"><span className="w-40 font-bold shrink-0">Lý do / Mục đích:</span> <span className="flex-1 border-b border-dotted border-black pb-0.5 italic">"{req.purpose || 'Không có ghi chú'}"</span></div>
+                  </div>
+
+                  {/* Main Table */}
+                  <table className="print-table w-full border-collapse mt-4 mb-6">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th style={{ width: '6%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>STT</th>
+                        <th style={{ width: '12%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>Mã VT</th>
+                        <th style={{ width: '32%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>Tên Văn Phòng Phẩm / Đồ vệ sinh</th>
+                        <th style={{ width: '7%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>ĐVT</th>
+                        <th style={{ width: '7%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>SL</th>
+                        <th style={{ width: '13%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>Đơn giá</th>
+                        <th style={{ width: '13%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>Thành tiền</th>
+                        <th style={{ width: '10%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>Ghi chú</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredLines.map((l: any, idx: number) => {
+                        const displayItem = l.replacementItem || l.item;
+                        const isReplaced = !!l.replacementItemId;
+                        const displayQtyRequested = l.qtyRequested;
+                        const displayQtyApproved = l.replacementQty ?? l.qtyApproved;
+
+                        return (
+                          <tr key={l.id} className="h-10">
+                            <td className="text-center font-medium" style={{ border: '1px solid #000', padding: '6px 8px', fontSize: '11px' }}>{idx + 1}</td>
+                            <td className="text-center font-bold" style={{ border: '1px solid #000', padding: '6px 8px', fontSize: '11px' }}>{displayItem?.mvpp}</td>
+                            <td className="font-medium" style={{ border: '1px solid #000', padding: '6px 8px', fontSize: '11px' }}>
+                              <div className="flex flex-col">
+                                <span>{displayItem?.name}</span>
+                                {isReplaced && (
+                                  <span className="text-[10px] text-slate-500 italic mt-0.5">
+                                    (Thay cho: {l.item?.name})
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="text-center" style={{ border: '1px solid #000', padding: '6px 8px', fontSize: '11px' }}>{displayItem?.unit}</td>
+                            <td className="text-center font-black text-base" style={{ border: '1px solid #000', padding: '6px 8px', fontSize: '11px' }}>
+                              {displayQtyApproved !== null && (displayQtyApproved !== displayQtyRequested || l.qtyManagerApproved !== displayQtyRequested) ? (
+                                <div className="flex flex-col items-center leading-none">
+                                  <span className="text-[9px] text-slate-400 line-through mb-1">{displayQtyRequested}</span>
+                                  <span>{displayQtyApproved}</span>
+                                  {l.qtyManagerApproved !== null && l.qtyManagerApproved !== displayQtyApproved && !isReplaced && (
+                                    <span className="text-[8px] font-bold text-slate-400 mt-1 italic">
+                                      (TBP: {l.qtyManagerApproved})
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                displayQtyApproved ?? displayQtyRequested
+                              )}
+                            </td>
+                            <td className="text-right font-medium" style={{ border: '1px solid #000', padding: '6px 8px', fontSize: '11px' }}>
+                              {(displayItem?.price || 0).toLocaleString('vi-VN')}
+                            </td>
+                            <td className="text-right font-bold" style={{ border: '1px solid #000', padding: '6px 8px', fontSize: '11px' }}>
+                              {((displayItem?.price || 0) * (displayQtyApproved ?? displayQtyRequested)).toLocaleString('vi-VN')}
+                            </td>
+                            <td className="italic text-[10px] leading-tight" style={{ border: '1px solid #000', padding: '6px 8px', fontSize: '11px' }}>{l.note || '—'}</td>
+                          </tr>
+                        );
+                      })}
+                      <tr className="bg-gray-50 h-10 font-black">
+                        <td colSpan={4} className="text-right uppercase text-xs font-bold" style={{ border: '1px solid #000', padding: '6px 8px' }}>Tổng cộng:</td>
+                        <td className="text-center text-lg font-black" style={{ border: '1px solid #000', padding: '6px 8px' }}>
+                          {filteredLines.reduce((sum: number, line: any) => sum + (line.replacementQty ?? line.qtyApproved ?? line.qtyRequested), 0)}
+                        </td>
+                        <td className="text-right font-black" colSpan={2} style={{ border: '1px solid #000', padding: '6px 8px' }}>
+                          {filteredLines.reduce((sum: number, line: any) => {
+                            const item = line.replacementItem || line.item;
+                            const qty = line.replacementQty ?? line.qtyApproved ?? line.qtyRequested;
+                            return sum + ((item?.price || 0) * qty);
+                          }, 0).toLocaleString('vi-VN')} VNĐ
+                        </td>
+                        <td style={{ border: '1px solid #000', padding: '6px 8px' }}></td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  {/* Signatures */}
+                  <div className="print-signatures grid grid-cols-5 gap-1 mt-4" style={{ display: 'grid', gridTemplateCols: 'repeat(5, 1fr)', pageBreakInside: 'avoid' }}>
+                    <div className="text-center text-[9.5px]">
+                      <p className="mb-1 uppercase font-bold text-black">Người đề xuất</p>
+                      <p className="text-[9px] font-normal italic mb-4 text-black">(Ký và ghi họ tên)</p>
+                      <div className="mt-12 border-t border-dotted border-black w-[90%] mx-auto pt-2 relative">
+                        <p className="font-black text-xs uppercase text-black">{req.requester?.fullName}</p>
+                        <p className="text-[8px] font-bold text-blue-600 mt-1">
+                          {new Date(req.createdAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} (Đã ký số)
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="text-center text-[9.5px]">
+                      <p className="mb-1 uppercase font-bold text-slate-600">Trưởng bộ phận</p>
+                      <p className="text-[9px] font-normal italic mb-4 text-black">(Ký xác nhận)</p>
+                      <div className="mt-12 border-t border-dotted border-black w-[90%] mx-auto pt-2">
+                        {(() => {
+                          const h = req.approvalHistories?.slice().reverse().find((x:any) => 
+                            (x.action.includes('APPROVE') || x.action === 'APPROVED') && 
+                            (x.approver?.role === 'MANAGER' || x.action.includes('TBP') || x.reason?.toLowerCase().includes('quản lý'))
+                          );
+                          return (
+                            <>
+                              {h && <p className="text-[9px] font-bold text-blue-600 mb-0.5">(Đã ký số)</p>}
+                              <p className="font-black text-xs uppercase text-black">{h?.approver?.fullName || '............................'}</p>
+                              {h && (
+                                <p className="text-[8px] font-normal text-slate-500 mt-0.5">
+                                  {new Date(h.createdAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    <div className="text-center text-[9.5px]">
+                      <p className="mb-1 uppercase font-bold text-black">Người duyệt</p>
+                      <p className="text-[9px] font-normal italic mb-4 text-black">(HC/Lãnh đạo)</p>
+                      <div className="mt-12 border-t border-dotted border-black w-[90%] mx-auto pt-2">
+                        {(() => {
+                          const h = req.approvalHistories?.slice().reverse().find((x:any) => 
+                            (x.action.includes('APPROVE') || x.action === 'APPROVED') && 
+                            (x.approver?.role === 'ADMIN' || x.action.includes('ADMIN') || x.reason?.toLowerCase().includes('hành chính'))
+                          );
+                          return (
+                            <>
+                              {h && <p className="text-[9px] font-bold text-blue-600 mb-0.5">(Đã ký số)</p>}
+                              <p className="font-black text-xs uppercase text-black">{h?.approver?.fullName || '............................'}</p>
+                              {h && (
+                                <p className="text-[8px] font-normal text-slate-500 mt-0.5">
+                                  {new Date(h.createdAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    <div className="text-center text-[9.5px]">
+                      <p className="mb-1 uppercase font-bold text-black">Thủ kho / Xuất</p>
+                      <p className="text-[9px] font-normal italic mb-4 text-black">(Ký và ghi tên)</p>
+                      <div className="mt-12 border-t border-dotted border-black w-[90%] mx-auto pt-2">
+                        {(() => {
+                          const h = req.approvalHistories?.slice().reverse().find((x:any) => x.action === 'ISSUE' || x.action === 'ISSUED');
+                          return (
+                            <>
+                              {h && <p className="text-[9px] font-bold text-blue-600 mb-0.5">(Đã ký số)</p>}
+                              <p className="font-black text-xs uppercase text-black">{h?.approver?.fullName || '............................'}</p>
+                              {h && (
+                                <p className="text-[8px] font-normal text-slate-500 mt-0.5">
+                                  {new Date(h.createdAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    <div className="text-center text-[9.5px]">
+                      <p className="mb-1 uppercase font-bold text-indigo-700">Người nhận</p>
+                      <p className="text-[9px] font-normal italic mb-4 text-black">(Ký nhận đủ hàng)</p>
+                      <div className="mt-12 border-t border-dotted border-black w-[90%] mx-auto pt-2">
+                        <p className="font-black text-xs uppercase text-black">
+                          {req.status === 'COMPLETED' ? req.requester?.fullName : '............................'}
+                        </p>
+                        {req.status === 'COMPLETED' && (
+                          <p className="text-[8px] font-normal text-slate-400 italic">Đã nhận đủ hàng</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Audit Trail Section for Print */}
+                  <div className="mt-8 border-t border-slate-300 pt-4" style={{ pageBreakInside: 'avoid' }}>
+                    <h3 className="text-[10px] font-black uppercase mb-2 text-slate-800 tracking-wider flex items-center">
+                      <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full mr-2"></span>
+                      Lịch sử Xử lý (Audit Trail)
+                    </h3>
+                    <table className="w-full border-collapse text-[9px] print-table">
+                      <thead>
+                        <tr className="bg-slate-50">
+                          <th style={{ border: '0.7px solid #000', padding: '3px 4px', textAlign: 'left', fontWeight: 'bold', fontSize: '9px' }}>Thời gian</th>
+                          <th style={{ border: '0.7px solid #000', padding: '3px 4px', textAlign: 'left', fontWeight: 'bold', fontSize: '9px' }}>Người thực hiện</th>
+                          <th style={{ border: '0.7px solid #000', padding: '3px 4px', textAlign: 'left', fontWeight: 'bold', fontSize: '9px' }}>Hành động</th>
+                          <th style={{ border: '0.7px solid #000', padding: '3px 4px', textAlign: 'left', fontWeight: 'bold', fontSize: '9px' }}>Ghi chú / Nội dung</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td style={{ border: '0.7px solid #000', padding: '3px 4px', fontSize: '9px' }}>
+                            {new Date(req.createdAt).toLocaleString('vi-VN', { 
+                              day: '2-digit', month: '2-digit', year: 'numeric',
+                              hour: '2-digit', minute: '2-digit'
+                            })}
+                          </td>
+                          <td style={{ border: '0.7px solid #000', padding: '3px 4px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '9px' }}>
+                            {req.requester?.fullName}
+                          </td>
+                          <td style={{ border: '0.7px solid #000', padding: '3px 4px', fontSize: '9px' }}>
+                            <span className="font-bold">Tạo phiếu</span>
+                          </td>
+                          <td style={{ border: '0.7px solid #000', padding: '3px 4px', fontStyle: 'italic', fontSize: '9px' }}>
+                            Khởi tạo yêu cầu
+                          </td>
+                        </tr>
+                        {req.approvalHistories?.map((h: any, idx: number) => (
+                          <tr key={idx}>
+                            <td style={{ border: '0.7px solid #000', padding: '3px 4px', fontSize: '9px' }}>
+                              {new Date(h.createdAt).toLocaleString('vi-VN', { 
+                                day: '2-digit', month: '2-digit', year: 'numeric',
+                                hour: '2-digit', minute: '2-digit'
+                              })}
+                            </td>
+                            <td style={{ border: '0.7px solid #000', padding: '3px 4px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '9px' }}>
+                              {h.approver?.fullName} {h.approver?.role === 'ADMIN' ? '(ADM)' : ''}
+                            </td>
+                            <td style={{ border: '0.7px solid #000', padding: '3px 4px', fontSize: '9px' }}>
+                              <span className="font-bold">{getActionLabel(h.action)}</span>
+                            </td>
+                            <td style={{ border: '0.7px solid #000', padding: '3px 4px', fontStyle: 'italic', fontSize: '9px' }}>
+                              {h.reason || '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="mt-8 pt-4 border-t border-slate-200 text-[10px] text-[#555] flex justify-between print-info" style={{ pageBreakInside: 'avoid' }}>
+                    <p>Ngày in: {new Date().toLocaleString('vi-VN')} • Mã tra cứu: {req.id}</p>
+                    <p>Hệ thống Quản lý VPP - {req.id} • Trang 1/1</p>
+                  </div>
+                </div>
+              );
+            })
+        )}
       </div>
     </div>
   );
