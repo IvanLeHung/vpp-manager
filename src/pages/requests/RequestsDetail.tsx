@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { XCircle, Printer, CheckCircle, RefreshCw, ArrowLeft, Archive, CheckSquare, Trash2, StopCircle, AlertTriangle, ShoppingCart, Minus, Plus, Check, FileSpreadsheet, ChevronLeft, ChevronRight, Shield, Search, Filter, Package, History as HistoryIcon, Layers, FileText } from 'lucide-react';
+import { XCircle, Printer, CheckCircle, RefreshCw, ArrowLeft, Archive, CheckSquare, Trash2, StopCircle, AlertTriangle, ShoppingCart, Minus, Plus, Check, FileSpreadsheet, ChevronLeft, ChevronRight, Search, Filter, Package, History as HistoryIcon, Layers, FileText } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../../lib/api';
 import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
@@ -8,8 +8,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import DocumentChainMap from '../../components/DocumentChainMap';
 import type { User } from '../../context/AppContext';
 import type { ViewMode } from '../Requests';
-import { Layout, Card, Table, Dropdown, Tooltip, Space, Button } from 'antd';
-import { PrinterOutlined, DownOutlined } from '@ant-design/icons';
+import { Layout, Card, Table, Tooltip, Avatar } from 'antd';
 
 
 interface Props {
@@ -148,7 +147,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
   const [showFullHistory, setShowFullHistory] = useState(false);
   
   // Custom approvals
-  const [approvals, setApprovals] = useState<{lineId: string, qtyApproved: number, selected: boolean, note: string, replacementItemId?: string | null, replacementItemName?: string | null}[]>([]);
+  const [approvals, setApprovals] = useState<{lineId: string, qtyApproved: number, selected: boolean, note: string, replacementItemId?: string | null, replacementItemName?: string | null, replacementItem?: any | null}[]>([]);
   const [approvalSwapMode, setApprovalSwapMode] = useState<boolean>(false);
   // Custom issues
   const [issues, setIssues] = useState<{
@@ -237,7 +236,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       }));
       setSelectedWarehouse(res.data.warehouseCode || 'MAIN');
       // Load comparison for Admin Level 2
-      if (currentUser.role === 'ADMIN' && res.data.status === 'PENDING_ADMIN') {
+      if (currentUser?.role === 'ADMIN' && res.data.status === 'PENDING_ADMIN') {
         try {
           setLoadingComparison(true);
           const compRes = await api.get(`/requests/${requestId}/comparison`);
@@ -488,23 +487,23 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
     }
   };
 
-  if (loading || !data) {
+  if (loading || !data || !currentUser) {
     return (
       <div className="flex flex-col h-full bg-slate-50 relative items-center justify-center">
          <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin mb-4" />
-         <p className="font-bold text-slate-500">Đang tải dữ liệu phiếu...</p>
+         <p className="font-bold text-slate-500">Đang tải dữ liệu...</p>
       </div>
     );
   }
 
-  const currentUid = currentUser.userId || currentUser.id;
-  const isApprover = data.currentApproverId === currentUid || (currentUser.role === 'ADMIN' && (data.status === 'PENDING_ADMIN' || data.status === 'PENDING_MANAGER'));
-  const isWarehouse = (currentUser.role === 'WAREHOUSE' || currentUser.role === 'ADMIN') && ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED', 'PARTIAL_ADMIN_APPROVED', 'BACKORDER'].includes(data.status);
+  const currentUid = currentUser?.userId || currentUser?.id;
+  const isApprover = data.currentApproverId === currentUid || (currentUser?.role === 'ADMIN' && (data.status === 'PENDING_ADMIN' || data.status === 'PENDING_MANAGER'));
+  const isWarehouse = (currentUser?.role === 'WAREHOUSE' || currentUser?.role === 'ADMIN') && ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED', 'PARTIAL_ADMIN_APPROVED', 'BACKORDER'].includes(data.status);
   const isOwnerDraft = currentUid === data.requesterId && (data.status === 'DRAFT' || data.status === 'RETURNED' || data.status === 'NEED_REVISION');
   const isOwnerPending = currentUid === data.requesterId && (data.status === 'PENDING_MANAGER' || data.status === 'PENDING_ADMIN');
-  const canCancel = ['DRAFT', 'PENDING_MANAGER', 'PENDING_ADMIN', 'RETURNED', 'NEED_REVISION', 'APPROVED', 'READY_TO_ISSUE'].includes(data.status) && (currentUser.role !== 'EMPLOYEE' || currentUid === data.requesterId);
-  const isHandover = (currentUid === data.requesterId || currentUser.role === 'ADMIN') && data.status === 'WAITING_HANDOVER';
-  const isFutureApprover = currentUser.role === 'MANAGER' && data.approvalSteps?.some((s: any) => s.approverId === currentUid) && data.status === 'PENDING_MANAGER' && data.currentApproverId !== currentUid;
+  const canCancel = ['DRAFT', 'PENDING_MANAGER', 'PENDING_ADMIN', 'RETURNED', 'NEED_REVISION', 'APPROVED', 'READY_TO_ISSUE'].includes(data.status) && (currentUser?.role !== 'EMPLOYEE' || currentUid === data.requesterId);
+  const isHandover = (currentUid === data.requesterId || currentUser?.role === 'ADMIN') && data.status === 'WAITING_HANDOVER';
+  const isFutureApprover = currentUser?.role === 'MANAGER' && data.approvalSteps?.some((s: any) => s.approverId === currentUid) && data.status === 'PENDING_MANAGER' && data.currentApproverId !== currentUid;
 
   const handleBack = () => {
     if (from && ref) {
@@ -853,7 +852,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
           )}
 
                {/* Decision Support Panel for Admin */}
-               {currentUser.role === 'ADMIN' && data.status === 'PENDING_ADMIN' && (
+               {currentUser?.role === 'ADMIN' && data.status === 'PENDING_ADMIN' && (
                    <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
                        {!comparison ? (
                            loadingComparison ? (
@@ -1192,14 +1191,14 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                       {/* Tiêu đề & Avatar cá nhân */}
                       <div className="flex items-center gap-3 mb-5 relative z-10 border-b border-slate-100 pb-3">
                           <Avatar size={40} className="bg-indigo-600 text-white font-bold border border-indigo-200 flex-shrink-0 flex items-center justify-center">
-                              {currentUser.fullName?.charAt(0).toUpperCase() || currentUser.username?.charAt(0).toUpperCase() || 'U'}
+                              {currentUser?.fullName?.charAt(0).toUpperCase() || currentUser?.username?.charAt(0).toUpperCase() || 'U'}
                           </Avatar>
                           <div className="flex flex-col min-w-0">
                               <h3 className="text-xs font-black text-slate-800 uppercase tracking-tight flex items-center gap-1.5 leading-none">
                                   TRUNG TÂM LỆNH
                               </h3>
                               <span className="self-start text-[8px] font-black text-indigo-600 uppercase tracking-wider bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded mt-1.5 leading-none">
-                                  Role: {currentUser.role}
+                                  Role: {currentUser?.role}
                               </span>
                           </div>
                       </div>
@@ -1220,7 +1219,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                       {/* --- THAO TÁC CỦA QUẢN LÝ --- */}
                       {isApprover && (
                           <>
-                             <button onClick={() => setShowApproveModal(true)} className="w-full py-3.5 bg-emerald-500 text-white rounded-xl font-black hover:bg-emerald-600 transition shadow-lg shadow-emerald-500/20 flex items-center justify-center transform hover:scale-[1.02]"><CheckSquare className="w-5 h-5 mr-2"/> {(currentUser.role === 'MANAGER' && data.status === 'PENDING_MANAGER') ? 'DUYỆT CẤP 1 (TRƯỞNG BP)' : 'PHÊ DUYỆT CẤP 2 (Admin)' }</button>
+                             <button onClick={() => setShowApproveModal(true)} className="w-full py-3.5 bg-emerald-500 text-white rounded-xl font-black hover:bg-emerald-600 transition shadow-lg shadow-emerald-500/20 flex items-center justify-center transform hover:scale-[1.02]"><CheckSquare className="w-5 h-5 mr-2"/> {(currentUser?.role === 'MANAGER' && data.status === 'PENDING_MANAGER') ? 'DUYỆT CẤP 1 (TRƯỞNG BP)' : 'PHÊ DUYỆT CẤP 2 (Admin)' }</button>
                              <div className="flex gap-3">
                                 <button onClick={() => setShowRejectModal(true)} className="flex-1 py-2.5 bg-white text-rose-600 hover:bg-rose-50 border border-rose-200 hover:border-rose-300 rounded-xl font-bold transition">Từ Chối</button>
                                 <button onClick={() => handleAction('/return', {reason: prompt('Lý do yêu cầu làm lại?')}, 'Đã trả lại')} className="flex-1 py-2.5 bg-white text-amber-600 hover:bg-amber-50 border border-amber-200 hover:border-amber-300 rounded-xl font-bold transition">Trả Lại Sửa</button>
@@ -1229,13 +1228,13 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                       )}
 
                       {/* --- THAO TÁC CỦA KHO --- */}
-                      {(isWarehouse || currentUser.role === 'ADMIN' || currentUser.role === 'WAREHOUSE') && ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED', 'PARTIAL_ADMIN_APPROVED', 'BACKORDER', 'PARTIALLY_DELIVERED', 'PENDING_REMAINING_DELIVERY'].includes(data.status) && (
+                      {(isWarehouse || currentUser?.role === 'ADMIN' || currentUser?.role === 'WAREHOUSE') && ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED', 'PARTIAL_ADMIN_APPROVED', 'BACKORDER', 'PARTIALLY_DELIVERED', 'PENDING_REMAINING_DELIVERY'].includes(data.status) && (
                            <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3 flex flex-col gap-2.5">
                                <p className="text-[8px] font-black text-slate-450 uppercase tracking-widest leading-none mb-0.5">Các chức năng chính</p>
                                
                                <button onClick={() => openIssueModal()} className="w-full py-2.5 bg-emerald-600 text-white rounded-lg font-black hover:bg-emerald-700 transition shadow-sm flex items-center justify-center transform hover:scale-[1.01] border border-emerald-600 text-xs"><Archive className="w-4 h-4 mr-2"/> CẤP PHÁT CHO NHÂN SỰ</button>
                                
-                               {(currentUser.role === 'ADMIN' || currentUser.role === 'WAREHOUSE') && ['PARTIALLY_ISSUED', 'PARTIALLY_DELIVERED', 'WAITING_HANDOVER', 'READY_TO_ISSUE', 'APPROVED', 'BACKORDER'].includes(data.status) && (
+                               {(currentUser?.role === 'ADMIN' || currentUser?.role === 'WAREHOUSE') && ['PARTIALLY_ISSUED', 'PARTIALLY_DELIVERED', 'WAITING_HANDOVER', 'READY_TO_ISSUE', 'APPROVED', 'BACKORDER'].includes(data.status) && (
                                    <button 
                                      onClick={() => {
                                        const reason = prompt('Nhập lý do không giao nữa / đóng phiếu:');
@@ -1250,7 +1249,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                )}
                            </div>
                       )}
-                      {currentUser.role === 'ADMIN' && 
+                      {currentUser?.role === 'ADMIN' && 
                        ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED'].includes(data.status) &&
                        data.lines.some((l:any) => l.qtyRequested > (l.qtyApproved ?? 0)) &&
                        (!data.revisionReason?.includes('Đã tạo PO')) && (
@@ -1511,7 +1510,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                                  <span className="text-[9px] font-extrabold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
                                                    {approval.replacementItemId && approval.replacementItem ? approval.replacementItem.mvpp : l.item.mvpp}
                                                  </span>
-                                                {currentUser.role === 'ADMIN' && approval.selected && (
+                                                {currentUser?.role === 'ADMIN' && approval.selected && (
                                                   <button 
                                                     type="button"
                                                     onClick={() => {
@@ -1627,7 +1626,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                 className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-400 h-20 resize-none"
                                 placeholder="Nhập ghi chú tổng thể cho toàn bộ phiếu..."
                              />
-                             {currentUser.role === 'ADMIN' && data.status === 'PENDING_ADMIN' && (
+                             {currentUser?.role === 'ADMIN' && data.status === 'PENDING_ADMIN' && (
                                <div className="mt-3 flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
                                  <input 
                                    type="checkbox" 
