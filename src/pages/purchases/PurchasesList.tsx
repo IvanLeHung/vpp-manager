@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../../lib/api';
 import { 
-  Search, Plus, DollarSign,
+  Plus, DollarSign,
   ShoppingCart, Package, Clock, ChevronRight, Truck, User as UserIcon,
-  Printer, CheckSquare, ChevronDown, FileText, AlertTriangle, X, CheckCircle, Download, Eye,
-  Archive
+  Printer, CheckSquare, ChevronDown, AlertTriangle, X, CheckCircle, Download, Eye
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import * as docx from 'docx';
@@ -38,7 +37,7 @@ const formatDigitalSignatureDate = (date?: string | Date) => {
     return `${day}/${month}/${year} ${hours}:${minutes}`;
 };
 
-function numberToVietnameseWords(num: number): string {
+export function numberToVietnameseWords(num: number): string {
     if (num === 0) return 'không';
     
     const units = ['', 'nghìn', 'triệu', 'tỷ', 'nghìn tỷ', 'triệu tỷ'];
@@ -124,21 +123,58 @@ function getItemCategoryType(item: any): 'VPP' | 'VE_SINH' | 'OTHER' {
   return 'OTHER';
 }
 
+function hasPermission(role: string, permission: string): boolean {
+  if (role === 'ADMIN') return true;
+  
+  const permissionsMap: Record<string, string[]> = {
+    ADMIN: [
+      'REPORT_PRINT', 'REPORT_EXPORT_PDF', 'REPORT_EXPORT_WORD', 'REPORT_EXPORT_EXCEL',
+      'PURCHASE_REPORT_VIEW', 'CONSUMPTION_REPORT_VIEW'
+    ],
+    WAREHOUSE: [
+      'REPORT_PRINT', 'REPORT_EXPORT_PDF', 'REPORT_EXPORT_WORD', 'REPORT_EXPORT_EXCEL',
+      'PURCHASE_REPORT_VIEW', 'CONSUMPTION_REPORT_VIEW'
+    ],
+    MANAGER: [
+      'REPORT_PRINT', 'REPORT_EXPORT_PDF', 'REPORT_EXPORT_EXCEL',
+      'PURCHASE_REPORT_VIEW', 'CONSUMPTION_REPORT_VIEW'
+    ],
+    EMPLOYEE: []
+  };
+
+  return (permissionsMap[role] || []).includes(permission);
+}
+
 const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail }) => {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('ALL');
   
   // Bulk Selection & Printing states
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkMode, setIsBulkMode] = useState(false);
-  const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH' | 'DEPT_VPP' | 'DEPT_VS'>('ALL');
+  const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH' | 'DEPT_VPP' | 'DEPT_VS' | 'REQ_DEPT_VPP' | 'REQ_DEPT_VS'>('ALL');
+  const [selectedPrintDetailMode, setSelectedPrintDetailMode] = useState<'SUMMARY' | 'DETAIL'>('SUMMARY');
   const [showPrintMenu, setShowPrintMenu] = useState(false);
-  const [showExportMenu, setShowExportMenu] = useState(false);
+  // const [showExportMenu, setShowExportMenu] = useState(false);
   const [showPrintConfirm, setShowPrintConfirm] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [previewPO, setPreviewPO] = useState<any | null>(null);
+
+  // New report setup states
+  const [showReportSetupModal, setShowReportSetupModal] = useState(false);
+  const [setupReportType, setSetupReportType] = useState<'PURCHASE_SUMMARY' | 'CONSUMPTION_BY_DEPARTMENT' | 'REQUEST_DEPARTMENT_SUMMARY'>('PURCHASE_SUMMARY');
+  const [setupCategoryType, setSetupCategoryType] = useState<'VPP' | 'VE_SINH'>('VPP');
+  const [setupFormat, setSetupFormat] = useState<'PDF' | 'DOCX' | 'XLSX'>('PDF');
+  const [setupDetailMode, setSetupDetailMode] = useState<'SUMMARY' | 'DETAIL'>('SUMMARY');
+  const [exportLoading, setExportLoading] = useState(false);
+
+  const currentUser = useMemo(() => {
+    const saved = localStorage.getItem('vpp_user');
+    return saved ? JSON.parse(saved) : null;
+  }, []);
+  const userRole = currentUser?.role || 'EMPLOYEE';
 
   useEffect(() => {
     fetchData();
@@ -666,7 +702,117 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   const deptReportDataVPP = useMemo(() => getDeptReportData('DEPT_VPP'), [data, filteredData, selectedIds]);
   const deptReportDataVS = useMemo(() => getDeptReportData('DEPT_VS'), [data, filteredData, selectedIds]);
 
-  const handlePrintSummary = (type: 'ALL' | 'VPP' | 'VE_SINH' | 'DEPT_VPP' | 'DEPT_VS' = 'ALL') => {
+  const getReqDeptReportData = (categoryType: 'VPP' | 'VE_SINH') => {
+    const targetData = selectedIds.length > 0 
+      ? data.filter(d => selectedIds.includes(d.id))
+      : filteredData;
+
+    const map = new Map<string, {
+      name: string;
+      requestCodes: Set<string>;
+      items: Set<string>;
+      qtyRequested: number;
+      qtyApproved: number;
+      qtyPurchased: number;
+      estimatedValue: number;
+      notes: Set<string>;
+      detailLines: any[];
+    }>();
+
+    targetData.forEach(po => {
+      po.lines?.forEach((line: any) => {
+        if (!line.item) return;
+
+        const isReplaced = !!line.requestLine?.replacementItemId;
+        const effectiveItem = isReplaced ? line.requestLine.replacementItem : line.item;
+        if (!effectiveItem) return;
+
+        const category = getItemCategoryType(effectiveItem);
+        if (category !== categoryType) return;
+
+        const originalRequest = line.requestLine?.request;
+        const deptName = line.originalDept || 
+                         originalRequest?.department || 
+                         originalRequest?.requester?.department?.name ||
+                         po.department || 
+                         'Khác';
+
+        const requestCode = line.fuzzyRequestCode || originalRequest?.id || po.id;
+        
+        const qtyRequested = Number(line.requestLine?.qtyRequested || line.qtyRequested || 0);
+        const qtyApproved = Number(
+          line.requestLine?.qtyAdminApproved ?? 
+          line.requestLine?.qtyManagerApproved ?? 
+          line.requestLine?.qtyApproved ?? 
+          line.requestLine?.qtyRequested ?? 
+          line.qtyApproved ?? 
+          0
+        );
+        const qtyPurchased = Number(line.qtyOrdered || line.qtyApproved || line.qtyRequested || 0);
+        const price = Number(isReplaced ? (line.requestLine?.replacementPrice || line.unitPrice || line.item?.price || 0) : (line.unitPrice || line.item?.price || 0));
+        const actualValue = qtyPurchased * price;
+
+        const specificNote = line.originalNote || line.requestLine?.note || '';
+
+        if (!map.has(deptName)) {
+          map.set(deptName, {
+            name: deptName,
+            requestCodes: new Set(),
+            items: new Set(),
+            qtyRequested: 0,
+            qtyApproved: 0,
+            qtyPurchased: 0,
+            estimatedValue: 0,
+            notes: new Set(),
+            detailLines: []
+          });
+        }
+
+        const current = map.get(deptName)!;
+        current.requestCodes.add(requestCode);
+        current.items.add(effectiveItem.mvpp);
+        current.qtyRequested += qtyRequested;
+        current.qtyApproved += qtyApproved;
+        current.qtyPurchased += qtyPurchased;
+        current.estimatedValue += actualValue;
+        if (specificNote && specificNote.trim()) {
+          current.notes.add(specificNote.trim());
+        }
+
+        current.detailLines.push({
+          requestCode,
+          itemName: effectiveItem.name,
+          qtyApproved,
+          qtyPurchased,
+          note: specificNote
+        });
+      });
+    });
+
+    const list = Array.from(map.values()).map(dept => {
+      return {
+        ...dept,
+        requestCodesStr: Array.from(dept.requestCodes).join(', '),
+        requestCount: dept.requestCodes.size,
+        itemCount: dept.items.size,
+        notesStr: Array.from(dept.notes).slice(0, 3).join('; ')
+      };
+    });
+
+    list.sort((a, b) => b.estimatedValue - a.estimatedValue);
+    const totalActual = list.reduce((sum, d) => sum + d.estimatedValue, 0);
+
+    return {
+      departments: list,
+      totalActual,
+      totalCount: list.length
+    };
+  };
+
+  const reqDeptReportDataVPP = useMemo(() => getReqDeptReportData('VPP'), [data, filteredData, selectedIds]);
+  const reqDeptReportDataVS = useMemo(() => getReqDeptReportData('VE_SINH'), [data, filteredData, selectedIds]);
+
+  const handlePrintSummary = (type: 'ALL' | 'VPP' | 'VE_SINH' | 'DEPT_VPP' | 'DEPT_VS' | 'REQ_DEPT_VPP' | 'REQ_DEPT_VS' = 'ALL') => {
       setSelectedPrintType(type);
       setShowPrintMenu(false);
       setShowPrintConfirm(false);
@@ -1220,182 +1366,143 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                             className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/5 shadow-sm transition"
                             title="Lọc theo tháng báo cáo"
                         />
-                        <div className="relative flex-1 md:w-72">
-                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                            <input 
-                              type="text" placeholder="Tìm theo mã, NCC, vật tư, phòng ban, kho..." 
-                              value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}
-                              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/5 transition shadow-sm"
-                            />
-                        </div>
-                        <div className="flex gap-2">
-                           {/* DROPDOWN PRINT BUTTON */}
+                                 {/* UNIFIED REPORT PRINT & EXPORT BUTTON */}
                            <div className="relative">
                               <button 
                                 onClick={() => setShowPrintMenu(!showPrintMenu)}
                                 className={`flex items-center px-4 py-2.5 rounded-xl border transition-all font-black text-[10px] uppercase shadow-sm ${showPrintMenu ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-500/30' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
                               >
-                                 <Printer className={`w-4 h-4 mr-2 ${showPrintMenu ? 'text-white' : 'text-indigo-500'}`}/> In phiếu mua sắm <ChevronDown className={`w-3.5 h-3.5 ml-2 transition-transform ${showPrintMenu ? 'rotate-180' : ''}`}/>
+                                 <Printer className={`w-4 h-4 mr-2 ${showPrintMenu ? 'text-white' : 'text-indigo-500'}`}/> In / Xuất báo cáo <ChevronDown className={`w-3.5 h-3.5 ml-2 transition-transform ${showPrintMenu ? 'rotate-180' : ''}`}/>
                               </button>
 
                               {showPrintMenu && (
                                 <>
                                   <div className="fixed inset-0 z-40" onClick={() => setShowPrintMenu(false)}></div>
-                                  <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 py-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 py-3 animate-in fade-in slide-in-from-top-2 duration-200">
                                      <div className="px-4 pb-2 mb-2 border-b border-slate-100">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">TỜ CHỌN IN TỔNG HỢP</p>
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">CHỌN MẪU BÁO CÁO</p>
                                      </div>
-                                     <button 
-                                       disabled={printStats.vppCount === 0}
-                                       onClick={() => handlePrintSummary('VPP')}
-                                       className={`w-full px-4 py-2.5 text-left flex items-center justify-between transition ${printStats.vppCount === 0 ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-indigo-50'}`}
-                                     >
-                                        <div className="flex items-center gap-3">
-                                           <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg"><FileText className="w-3.5 h-3.5"/></div>
-                                           <span className="text-xs font-bold text-slate-700">Phiếu tổng hợp mua sắm VPP</span>
-                                        </div>
-                                        <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{printStats.vppCount}</span>
-                                     </button>
                                      
-                                     <button 
-                                       disabled={printStats.vsCount === 0}
-                                       onClick={() => handlePrintSummary('VE_SINH')}
-                                       className={`w-full px-4 py-2.5 text-left flex items-center justify-between transition ${printStats.vsCount === 0 ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-cyan-50'}`}
-                                     >
-                                        <div className="flex items-center gap-3">
-                                           <div className="p-1.5 bg-cyan-50 text-cyan-600 rounded-lg"><FileText className="w-3.5 h-3.5"/></div>
-                                           <span className="text-xs font-bold text-slate-700">Phiếu tổng hợp mua sắm Vệ sinh</span>
-                                        </div>
-                                        <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{printStats.vsCount}</span>
-                                     </button>
-
-                                     <button 
-                                       disabled={deptReportDataVPP.departments.length === 0}
-                                       onClick={() => handlePrintSummary('DEPT_VPP')}
-                                       className={`w-full px-4 py-2.5 text-left flex items-center justify-between transition ${deptReportDataVPP.departments.length === 0 ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-violet-50 group'}`}
-                                     >
-                                        <div className="flex items-center gap-3">
-                                           <div className="p-1.5 bg-violet-50 text-violet-600 rounded-lg group-hover:bg-violet-600 group-hover:text-white transition-colors"><FileText className="w-3.5 h-3.5"/></div>
-                                           <span className="text-xs font-bold text-slate-700">Tổng hợp tiêu thụ VPP theo phòng ban</span>
-                                        </div>
-                                     </button>
-
-                                     <button 
-                                       disabled={deptReportDataVS.departments.length === 0}
-                                       onClick={() => handlePrintSummary('DEPT_VS')}
-                                       className={`w-full px-4 py-2.5 text-left flex items-center justify-between transition ${deptReportDataVS.departments.length === 0 ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-violet-50 group'}`}
-                                     >
-                                        <div className="flex items-center gap-3">
-                                           <div className="p-1.5 bg-violet-50 text-violet-600 rounded-lg group-hover:bg-violet-600 group-hover:text-white transition-colors"><FileText className="w-3.5 h-3.5"/></div>
-                                           <span className="text-xs font-bold text-slate-700">Tổng hợp tiêu thụ Vệ sinh theo phòng ban</span>
-                                        </div>
-                                     </button>
-
-                                     <div className="mx-3 my-2 border-t border-slate-100"></div>
-
-                                     <button 
-                                       disabled={printStats.total === 0}
-                                       onClick={() => setShowPrintConfirm(true)}
-                                       className={`w-full px-4 py-2.5 text-left flex items-center justify-between transition ${printStats.total === 0 ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-violet-50 group'}`}
-                                     >
-                                        <div className="flex items-center gap-3">
-                                           <div className="p-1.5 bg-violet-50 text-violet-600 rounded-lg group-hover:bg-violet-600 group-hover:text-white transition-colors"><Printer className="w-3.5 h-3.5"/></div>
-                                           <span className="text-xs font-black text-slate-800">In tất cả, tách theo loại hàng</span>
-                                        </div>
-                                        <span className="text-[10px] font-black text-violet-500 bg-violet-50 px-2 py-0.5 rounded-full">{printStats.total}</span>
-                                     </button>
-
-                                     <div className="mx-3 my-2 border-t border-slate-100"></div>
-                                     <div className="px-4 pb-1 mb-1">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Xuất Excel (Mẫu in)</p>
-                                     </div>
+                                     {/* Group 1 */}
+                                     <div className="px-4 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-wider">Mua sắm theo mặt hàng</div>
                                      <button 
                                        onClick={() => {
-                                         handleExportExcelTemplate();
+                                         setSetupReportType('PURCHASE_SUMMARY');
+                                         setSetupCategoryType('VPP');
+                                         setShowReportSetupModal(true);
                                          setShowPrintMenu(false);
                                        }}
-                                       className="w-full px-4 py-2.5 text-left flex items-center justify-between hover:bg-emerald-50 transition group"
+                                       className="w-full px-4 py-2 text-left flex items-center justify-between hover:bg-indigo-55 transition"
                                      >
-                                        <div className="flex items-center gap-3">
-                                           <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors"><Download className="w-3.5 h-3.5"/></div>
-                                           <span className="text-xs font-bold text-slate-700">Tải Excel theo Mẫu In</span>
-                                        </div>
+                                        <span className="text-xs font-bold text-slate-700">Phiếu tổng hợp mua sắm VPP</span>
+                                        <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{printStats.vppCount}</span>
+                                     </button>
+                                     <button 
+                                       onClick={() => {
+                                         setSetupReportType('PURCHASE_SUMMARY');
+                                         setSetupCategoryType('VE_SINH');
+                                         setShowReportSetupModal(true);
+                                         setShowPrintMenu(false);
+                                       }}
+                                       className="w-full px-4 py-2 text-left flex items-center justify-between hover:bg-indigo-55 transition"
+                                     >
+                                        <span className="text-xs font-bold text-slate-700">Phiếu tổng hợp mua sắm Vệ sinh</span>
+                                        <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{printStats.vsCount}</span>
+                                     </button>
+
+                                     {/* Group 2 */}
+                                     <div className="px-4 py-1.5 mt-2 text-[9px] font-black text-slate-400 uppercase tracking-wider border-t border-slate-100 pt-2">Tiêu thụ theo phòng ban</div>
+                                     <button 
+                                       disabled={deptReportDataVPP.departments.length === 0}
+                                       onClick={() => {
+                                         setSetupReportType('CONSUMPTION_BY_DEPARTMENT');
+                                         setSetupCategoryType('VPP');
+                                         setShowReportSetupModal(true);
+                                         setShowPrintMenu(false);
+                                       }}
+                                       className={`w-full px-4 py-2 text-left flex items-center justify-between transition ${deptReportDataVPP.departments.length === 0 ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-indigo-55'}`}
+                                     >
+                                        <span className="text-xs font-bold text-slate-700">Tổng hợp tiêu thụ VPP theo phòng ban</span>
+                                     </button>
+                                     <button 
+                                       disabled={deptReportDataVS.departments.length === 0}
+                                       onClick={() => {
+                                         setSetupReportType('CONSUMPTION_BY_DEPARTMENT');
+                                         setSetupCategoryType('VE_SINH');
+                                         setShowReportSetupModal(true);
+                                         setShowPrintMenu(false);
+                                       }}
+                                       className={`w-full px-4 py-2 text-left flex items-center justify-between transition ${deptReportDataVS.departments.length === 0 ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-indigo-55'}`}
+                                     >
+                                        <span className="text-xs font-bold text-slate-700">Tổng hợp tiêu thụ Vệ sinh theo phòng ban</span>
+                                     </button>
+
+                                     {/* Group 3 */}
+                                     <div className="px-4 py-1.5 mt-2 text-[9px] font-black text-slate-400 uppercase tracking-wider border-t border-slate-100 pt-2">Theo phòng ban của đề xuất</div>
+                                     <button 
+                                       onClick={() => {
+                                         if (selectedIds.length === 0) {
+                                           alert("Báo cáo này chỉ xuất theo các phiếu được chọn. Vui lòng chọn ít nhất một phiếu trước khi in.");
+                                           return;
+                                         }
+                                         setSetupReportType('REQUEST_DEPARTMENT_SUMMARY');
+                                         setSetupCategoryType('VPP');
+                                         setShowReportSetupModal(true);
+                                         setShowPrintMenu(false);
+                                       }}
+                                       className={`w-full px-4 py-2 text-left flex items-center justify-between transition ${selectedIds.length === 0 ? 'opacity-45 hover:bg-slate-50' : 'hover:bg-indigo-55'}`}
+                                     >
+                                        <span className="text-xs font-bold text-slate-700">Tổng hợp VPP theo phòng ban của đề xuất</span>
+                                     </button>
+                                     <button 
+                                       onClick={() => {
+                                         if (selectedIds.length === 0) {
+                                           alert("Báo cáo này chỉ xuất theo các phiếu được chọn. Vui lòng chọn ít nhất một phiếu trước khi in.");
+                                           return;
+                                         }
+                                         setSetupReportType('REQUEST_DEPARTMENT_SUMMARY');
+                                         setSetupCategoryType('VE_SINH');
+                                         setShowReportSetupModal(true);
+                                         setShowPrintMenu(false);
+                                       }}
+                                       className={`w-full px-4 py-2 text-left flex items-center justify-between transition ${selectedIds.length === 0 ? 'opacity-45 hover:bg-slate-50' : 'hover:bg-indigo-55'}`}
+                                     >
+                                        <span className="text-xs font-bold text-slate-700">Tổng hợp Vệ sinh theo phòng ban của đề xuất</span>
+                                     </button>
+
+                                     {/* Group 4 */}
+                                     <div className="px-4 py-1.5 mt-2 text-[9px] font-black text-slate-400 uppercase tracking-wider border-t border-slate-100 pt-2">Xuất dữ liệu</div>
+                                     <button 
+                                       onClick={() => { handleExportExcelTemplate(); setShowPrintMenu(false); }}
+                                       className="w-full px-4 py-2 text-left flex items-center hover:bg-emerald-50 transition text-emerald-700 font-bold"
+                                     >
+                                        <Download className="w-3.5 h-3.5 mr-2 text-emerald-500"/>
+                                        <span className="text-xs">Xuất Excel theo mẫu in</span>
+                                     </button>
+                                     <button 
+                                       disabled={printStats.vppCount === 0 && printStats.vsCount === 0}
+                                       onClick={() => { handleExportWordTemplate('VPP'); setShowPrintMenu(false); }}
+                                       className="w-full px-4 py-2 text-left flex items-center hover:bg-blue-50 transition text-blue-700 font-bold"
+                                     >
+                                        <Download className="w-3.5 h-3.5 mr-2 text-blue-500"/>
+                                        <span className="text-xs">Xuất Word theo mẫu in</span>
+                                     </button>
+                                     <button 
+                                       onClick={() => { handleExportExcel(); setShowPrintMenu(false); }}
+                                       className="w-full px-4 py-2 text-left flex items-center hover:bg-slate-100 transition text-slate-700 font-bold"
+                                     >
+                                        <Download className="w-3.5 h-3.5 mr-2 text-slate-500"/>
+                                        <span className="text-xs">Xuất toàn bộ dữ liệu thô Excel</span>
                                      </button>
 
                                      {printStats.otherCount > 0 && (
-                                       <div className="px-4 mt-2 py-2.5 bg-amber-50 rounded-xl mx-3 border border-amber-100 flex items-start gap-2">
+                                       <div className="px-4 mt-2 py-2 bg-amber-50 rounded-xl mx-3 border border-amber-100 flex items-start gap-2">
                                           <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5"/>
                                           <p className="text-[10px] font-bold text-amber-800 leading-normal">
                                              Có {printStats.otherCount} hàng hóa chưa phân loại VPP/Vệ sinh. Vui lòng cập nhật danh mục hàng hóa để in báo cáo chính xác.
                                           </p>
                                        </div>
                                      )}
-                                  </div>
-                                </>
-                              )}
-                           </div>
-
-                           <div className="relative">
-                              <button 
-                                onClick={() => setShowExportMenu(!showExportMenu)}
-                                className={`flex items-center px-4 py-2.5 rounded-xl border transition-all font-black text-[10px] uppercase shadow-sm ${showExportMenu ? 'bg-emerald-600 text-white border-emerald-600 shadow-emerald-500/30' : 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'}`}
-                              >
-                                 <Download className={`w-4 h-4 mr-2 ${showExportMenu ? 'text-white' : 'text-emerald-500'}`}/> Tải Mẫu in <ChevronDown className={`w-3.5 h-3.5 ml-2 transition-transform ${showExportMenu ? 'rotate-180' : ''}`}/>
-                              </button>
-
-                              {showExportMenu && (
-                                <>
-                                  <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)}></div>
-                                  <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 py-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                                     <div className="px-4 pb-2 mb-2 border-b border-slate-100">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Định dạng Excel</p>
-                                     </div>
-                                     <button 
-                                       onClick={() => { handleExportExcelTemplate(); setShowExportMenu(false); }}
-                                       className="w-full px-4 py-2.5 text-left flex items-center justify-between hover:bg-emerald-50 transition group"
-                                     >
-                                        <div className="flex items-center gap-3">
-                                           <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors"><FileText className="w-3.5 h-3.5"/></div>
-                                           <span className="text-xs font-bold text-slate-700">Tải Excel (Mẫu in tổng hợp)</span>
-                                        </div>
-                                     </button>
-
-                                     <div className="mx-3 my-2 border-t border-slate-100"></div>
-                                     <div className="px-4 pb-2 mb-1">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Định dạng Word (.docx)</p>
-                                     </div>
-                                     <button 
-                                       disabled={printStats.vppCount === 0}
-                                       onClick={() => { handleExportWordTemplate('VPP'); setShowExportMenu(false); }}
-                                       className={`w-full px-4 py-2.5 text-left flex items-center justify-between transition ${printStats.vppCount === 0 ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-blue-50 group'}`}
-                                     >
-                                        <div className="flex items-center gap-3">
-                                           <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors"><FileText className="w-3.5 h-3.5"/></div>
-                                           <span className="text-xs font-bold text-slate-700">Tải Word (Mẫu in) - VPP</span>
-                                        </div>
-                                     </button>
-                                     
-                                     <button 
-                                       disabled={printStats.vsCount === 0}
-                                       onClick={() => { handleExportWordTemplate('VE_SINH'); setShowExportMenu(false); }}
-                                       className={`w-full px-4 py-2.5 text-left flex items-center justify-between transition ${printStats.vsCount === 0 ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-blue-50 group'}`}
-                                     >
-                                        <div className="flex items-center gap-3">
-                                           <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors"><FileText className="w-3.5 h-3.5"/></div>
-                                           <span className="text-xs font-bold text-slate-700">Tải Word (Mẫu in) - Vệ sinh</span>
-                                        </div>
-                                     </button>
-
-                                     <div className="mx-3 my-2 border-t border-slate-100"></div>
-                                     <button 
-                                       onClick={() => { handleExportExcel(); setShowExportMenu(false); }}
-                                       className="w-full px-4 py-2.5 text-left flex items-center justify-between hover:bg-slate-50 transition group"
-                                     >
-                                        <div className="flex items-center gap-3">
-                                           <div className="p-1.5 bg-slate-50 text-slate-500 rounded-lg group-hover:bg-slate-500 group-hover:text-white transition-colors"><Download className="w-3.5 h-3.5"/></div>
-                                           <span className="text-xs font-bold text-slate-500">Tải Excel (Dữ liệu thô)</span>
-                                        </div>
-                                     </button>
                                   </div>
                                 </>
                               )}
@@ -1409,7 +1516,6 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                            </button>
                         </div>
                     </div>
-                </div>
 
                 {/* TABLE */}
                 <div className="flex-1 overflow-auto rounded-b-3xl relative custom-scrollbar">
@@ -1672,8 +1778,169 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
         </div>
 
-        {/* PRINT CONFIRM MODAL */}
-        {showPrintConfirm && (
+         {/* REPORT SETUP MODAL */}
+         {showReportSetupModal && (
+           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 no-print">
+             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100">
+               {/* Header */}
+               <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-50/20">
+                 <div className="flex items-center gap-3">
+                   <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-500/30">
+                     <Printer className="w-5 h-5"/>
+                   </div>
+                   <div>
+                     <h3 className="text-base font-black text-slate-800">Tùy chọn xuất báo cáo</h3>
+                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cấu hình định dạng và chế độ in</p>
+                   </div>
+                 </div>
+                 <button onClick={() => setShowReportSetupModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                   <X className="w-5 h-5 text-slate-400"/>
+                 </button>
+               </div>
+
+               {/* Body */}
+               <div className="p-6 space-y-4">
+                 {/* Title and Category */}
+                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Mẫu báo cáo</p>
+                   <p className="text-sm font-black text-slate-800">
+                     {setupReportType === 'PURCHASE_SUMMARY' && `Phiếu tổng hợp mua sắm ${setupCategoryType}`}
+                     {setupReportType === 'CONSUMPTION_BY_DEPARTMENT' && `Tổng hợp tiêu thụ ${setupCategoryType} theo phòng ban`}
+                     {setupReportType === 'REQUEST_DEPARTMENT_SUMMARY' && `Tổng hợp ${setupCategoryType} theo phòng ban của đề xuất`}
+                   </p>
+                   
+                   <div className="mt-3 grid grid-cols-2 gap-4 border-t border-slate-200/60 pt-3 text-[11px] font-bold text-slate-500">
+                     <div>
+                       <span className="block text-[9px] text-slate-400 uppercase font-black">Loại hàng</span>
+                       <span className="text-xs font-black text-indigo-600">{setupCategoryType === 'VPP' ? 'Văn Phòng Phẩm' : 'Vật Tư Vệ Sinh'}</span>
+                     </div>
+                     <div>
+                       <span className="block text-[9px] text-slate-400 uppercase font-black">Phiếu đã chọn</span>
+                       <span className="text-xs font-black text-slate-700">{selectedIds.length > 0 ? `${selectedIds.length} phiếu` : 'Tất cả (theo bộ lọc)'}</span>
+                     </div>
+                   </div>
+                 </div>
+
+                 {/* Format selection */}
+                 <div>
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Định dạng đầu ra (Format)</p>
+                   <div className="grid grid-cols-3 gap-2">
+                     {[
+                       { value: 'PDF', label: 'In PDF', permission: 'REPORT_EXPORT_PDF' },
+                       { value: 'DOCX', label: 'Xuất Word', permission: 'REPORT_EXPORT_WORD' },
+                       { value: 'XLSX', label: 'Xuất Excel', permission: 'REPORT_EXPORT_EXCEL' }
+                     ].map(fmt => {
+                       const allowed = hasPermission(userRole, fmt.permission);
+                       if (!allowed) return null;
+                       return (
+                         <button
+                           key={fmt.value}
+                           onClick={() => setSetupFormat(fmt.value as any)}
+                           className={`py-3.5 px-2 rounded-xl text-xs font-black transition-all flex flex-col items-center justify-center border gap-1 ${
+                             setupFormat === fmt.value 
+                               ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-600/20 scale-102' 
+                               : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                           }`}
+                         >
+                           <span className="text-xs uppercase">{fmt.value}</span>
+                           <span className="text-[9px] font-bold opacity-80">{fmt.label}</span>
+                         </button>
+                       );
+                     })}
+                   </div>
+                 </div>
+
+                 {/* Detail mode (Only for REQUEST_DEPARTMENT_SUMMARY) */}
+                 {setupReportType === 'REQUEST_DEPARTMENT_SUMMARY' && (
+                   <div>
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Tùy chọn hiển thị</p>
+                     <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
+                       <button
+                         onClick={() => setSetupDetailMode('SUMMARY')}
+                         className={`py-2 rounded-lg text-xs font-black transition-all ${
+                           setupDetailMode === 'SUMMARY'
+                             ? 'bg-white text-indigo-600 shadow-sm'
+                             : 'text-slate-500 hover:text-slate-700'
+                         }`}
+                       >
+                         In gọn (Tổng hợp)
+                       </button>
+                       <button
+                         onClick={() => setSetupDetailMode('DETAIL')}
+                         className={`py-2 rounded-lg text-xs font-black transition-all ${
+                           setupDetailMode === 'DETAIL'
+                             ? 'bg-white text-indigo-600 shadow-sm'
+                             : 'text-slate-500 hover:text-slate-700'
+                         }`}
+                       >
+                         In chi tiết (Dòng phiếu con)
+                       </button>
+                     </div>
+                   </div>
+                 )}
+               </div>
+
+               {/* Footer */}
+               <div className="p-6 bg-slate-50 flex gap-3 border-t border-slate-100">
+                 <button
+                   onClick={() => setShowReportSetupModal(false)}
+                   className="flex-1 py-3 bg-white border border-slate-200 text-slate-500 font-black rounded-xl text-xs uppercase tracking-widest hover:bg-slate-100 transition active:scale-95 shadow-sm"
+                 >
+                   Hủy bỏ
+                 </button>
+                 <button
+                   onClick={async () => {
+                     if (setupFormat === 'PDF') {
+                       // Trigger client browser printing
+                       setSelectedPrintType(
+                         setupReportType === 'PURCHASE_SUMMARY' ? setupCategoryType :
+                         setupReportType === 'CONSUMPTION_BY_DEPARTMENT' ? (setupCategoryType === 'VPP' ? 'DEPT_VPP' : 'DEPT_VS') :
+                         (setupCategoryType === 'VPP' ? 'REQ_DEPT_VPP' : 'REQ_DEPT_VS') as any
+                       );
+                       setSelectedPrintDetailMode(setupDetailMode);
+                       setShowReportSetupModal(false);
+                       setTimeout(() => {
+                         window.print();
+                       }, 250);
+                     } else {
+                       // Trigger API call for DOCX/XLSX
+                       try {
+                         setExportLoading(true);
+                         const res = await api.post('/reports/generate', {
+                           reportType: setupReportType,
+                           itemCategoryType: setupCategoryType,
+                           selectedIds,
+                           selectedType: 'PO',
+                           outputFormat: setupFormat,
+                           detailMode: setupDetailMode,
+                           fromDate: selectedMonth ? `${selectedMonth}-01` : undefined,
+                           toDate: selectedMonth ? undefined : undefined
+                         });
+                         if (res.data.fileUrl) {
+                           window.open(res.data.fileUrl, '_blank');
+                         } else {
+                           alert('Không thể tạo file báo cáo. Vui lòng kiểm tra lại.');
+                         }
+                       } catch (err: any) {
+                         alert(err.response?.data?.error || 'Thao tác xuất thất bại');
+                       } finally {
+                         setExportLoading(false);
+                         setShowReportSetupModal(false);
+                       }
+                     }
+                   }}
+                   disabled={exportLoading}
+                   className="flex-2 flex-[2] py-3 bg-indigo-600 text-white font-black rounded-xl text-xs uppercase tracking-widest hover:bg-indigo-700 shadow-xl shadow-indigo-500/30 transition active:scale-95 flex items-center justify-center"
+                 >
+                   {exportLoading ? 'Đang xuất...' : (setupFormat === 'PDF' ? 'Xem trước & In' : 'Tải file')}
+                 </button>
+               </div>
+             </div>
+           </div>
+         )}
+         
+         {/* PRINT CONFIRM MODAL */}
+         {showPrintConfirm && (
            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 no-print">
               <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
                  <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-50/30">
@@ -1975,8 +2242,8 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
                     const categoryCodeShort = 'VPP';
                     const summaryCode = `THMS-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-PB-${categoryCodeShort}`;
-                    const printTitle = 'TỔNG HỢP TIÊU THỤ ĐỒ VĂN PHÒNG PHẨM THEO PHÒNG BAN';
-                    const categoryLabel = 'đồ Văn phòng phẩm';
+                    // const printTitle = 'TỔNG HỢP TIÊU THỤ ĐỒ VĂN PHÒNG PHẨM THEO PHÒNG BAN';
+                    // const categoryLabel = 'đồ Văn phòng phẩm';
 
                     return (
                         <>
@@ -2125,8 +2392,8 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
                     const categoryCodeShort = 'VS';
                     const summaryCode = `THMS-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-PB-${categoryCodeShort}`;
-                    const printTitle = 'TỔNG HỢP TIÊU THỤ ĐỒ VỆ SINH THEO PHÒNG BAN';
-                    const categoryLabel = 'đồ vệ sinh';
+                    // const printTitle = 'TỔNG HỢP TIÊU THỤ ĐỒ VỆ SINH THEO PHÒNG BAN';
+                    // const categoryLabel = 'đồ vệ sinh';
 
                     return (
                         <>
@@ -2248,7 +2515,340 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
             </div>
           )}
 
-          {/* EXECUTIVE REPORT PAGE */}
+          
+          {/* REQ_DEPT_VPP Print Sheet */}
+          {(selectedPrintType === 'REQ_DEPT_VPP' || selectedPrintType === 'ALL') && reqDeptReportDataVPP.totalActual > 0 && (
+            <div className="print-sheet p-4">
+                {(() => {
+                    const targetData = selectedIds.length > 0 
+                      ? data.filter(d => selectedIds.includes(d.id))
+                      : filteredData;
+                    
+                    let periodLabel = "Tất cả các kỳ";
+                    if (selectedMonth) {
+                        const [year, month] = selectedMonth.split('-');
+                        periodLabel = `Tháng ${month}/${year}`;
+                    } else {
+                        const dates = targetData.map(d => new Date(d.createdAt || d.orderDate).getTime()).filter(Boolean);
+                        if (dates.length > 0) {
+                            const minDate = new Date(Math.min(...dates));
+                            const maxDate = new Date(Math.max(...dates));
+                            if (minDate.toDateString() === maxDate.toDateString()) {
+                                periodLabel = minDate.toLocaleDateString('vi-VN');
+                            } else {
+                                periodLabel = `Từ ${minDate.toLocaleDateString('vi-VN')} đến ${maxDate.toLocaleDateString('vi-VN')}`;
+                            }
+                        }
+                    }
+
+                    const categoryCodeShort = 'VPP';
+                    const summaryCode = `THMS-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-PBDX-${categoryCodeShort}`;
+                    const titleText = 'TỔNG HỢP VPP THEO PHÒNG BAN CỦA ĐỀ XUẤT';
+
+                    return (
+                        <>
+                            <div className="flex justify-between items-start w-full border-b pb-4 mb-4">
+                                <div className="w-[45%] text-left header-text">
+                                    <p className="font-bold uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
+                                    <p className="font-bold italic">Báo cáo tổng hợp đơn mua sắm</p>
+                                    <p>Ban Hành chính Nhân sự</p>
+                                </div>
+                                <div className="w-[10%] flex flex-col items-center">
+                                     <img src={`https://api.qrserver.com/v1/create-qr-code/?size=65x65&data=${encodeURIComponent(summaryCode)}`} alt="QR" className="w-12 h-12 border border-slate-100" />
+                                 </div>
+                                <div className="w-[45%] text-center header-text">
+                                    <p className="font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+                                    <p className="font-bold underline underline-offset-[4px] mt-1">Độc lập - Tự do - Hạnh phúc</p>
+                                    <p className="mt-3 italic text-right mr-10">Hà Nội, ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}</p>
+                                </div>
+                            </div>
+
+                            <h2 className="title-main uppercase text-center">{titleText}</h2>
+                            <p className="title-sub">(Tổng hợp từ ${targetData.length} phiếu mua sắm / đề nghị đang lọc)</p>
+
+                            <table className="print-table mb-4" style={{ fontSize: '8.5pt' }}>
+                                <thead>
+                                    <tr className="bg-slate-100 font-bold text-center text-[9pt]">
+                                        <th colSpan={4} style={{ padding: '4px', border: '1px solid #000' }}>TỔNG HỢP NHANH SỐ LIỆU THEO ĐỀ XUẤT</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td className="font-bold" style={{ width: '25%' }}>Kỳ tổng hợp:</td>
+                                        <td style={{ width: '25%' }}>{periodLabel}</td>
+                                        <td className="font-bold" style={{ width: '25%' }}>Phạm vi:</td>
+                                        <td style={{ width: '25%' }}>{selectedIds.length > 0 ? "Theo danh sách chọn" : "Toàn hệ thống (Bộ lọc)"}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="font-bold">Số phòng ban đề xuất:</td>
+                                        <td>{reqDeptReportDataVPP.totalCount} đơn vị</td>
+                                        <td className="font-bold">Tổng số phiếu đề xuất:</td>
+                                        <td>{reqDeptReportDataVPP.departments.reduce((sum, d) => sum + d.requestCount, 0)} phiếu</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="font-bold">Tổng giá trị mua thực tế:</td>
+                                        <td className="font-bold text-indigo-700" colSpan={3}>{Number(reqDeptReportDataVPP.totalActual).toLocaleString('vi-VN')} đ</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </>
+                    );
+                })()}
+
+                <table className="print-table">
+                    <thead>
+                        <tr className="bg-slate-100 font-bold text-[8pt] text-center">
+                            <th style={{width: '4%'}}>STT</th>
+                            <th style={{width: '20%'}}>PHÒNG BAN / ĐƠN VỊ</th>
+                            <th style={{width: '18%'}}>SỐ PHIẾU ĐỀ XUẤT</th>
+                            <th style={{width: '8%'}}>SỐ MẶT HÀNG</th>
+                            <th style={{width: '10%'}}>SL YÊU CẦU</th>
+                            <th style={{width: '10%'}}>SL DUYỆT</th>
+                            <th style={{width: '10%'}}>SL MUA</th>
+                            <th style={{width: '12%'}}>GIÁ TRỊ TẠM TÍNH</th>
+                            <th style={{width: '8%'}}>TỶ TRỌNG</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {reqDeptReportDataVPP.departments.map((dept, idx) => {
+                            const pct = reqDeptReportDataVPP.totalActual > 0 ? (dept.estimatedValue / reqDeptReportDataVPP.totalActual) * 100 : 0;
+                            return (
+                                <React.Fragment key={dept.name}>
+                                    <tr className="item-main-row text-[8.5pt] print-highlight-row">
+                                        <td className="text-center">{idx + 1}</td>
+                                        <td className="font-bold">{dept.name}</td>
+                                        <td className="text-center text-[7.5pt]">{dept.requestCodesStr}</td>
+                                        <td className="text-center">{dept.itemCount}</td>
+                                        <td className="text-center">{dept.qtyRequested}</td>
+                                        <td className="text-center">{dept.qtyApproved}</td>
+                                        <td className="text-center font-bold">{dept.qtyPurchased}</td>
+                                        <td className="text-right font-bold">{Number(dept.estimatedValue).toLocaleString('vi-VN')}</td>
+                                        <td className="text-center font-bold">{pct.toFixed(2)}%</td>
+                                    </tr>
+                                    {selectedPrintDetailMode === 'DETAIL' && dept.detailLines && dept.detailLines.map((dl, dlIdx) => (
+                                        <tr key={`dl-${dlIdx}`} className="allocation-row">
+                                            <td style={{borderTop: 'none', borderBottom: 'none'}}></td>
+                                            <td colSpan={8} style={{borderTop: 'none', borderBottom: 'none'}}>
+                                                <div className="grid grid-cols-12 gap-2 px-2 py-0.5">
+                                                    <div className="col-span-5 flex flex-col">
+                                                        <span className="font-bold text-slate-700">- {dl.itemName}</span>
+                                                        <span className="text-[6.5pt] text-slate-400 ml-2">Phiếu: {dl.requestCode}</span>
+                                                    </div>
+                                                    <div className="col-span-3 text-left">
+                                                        <span className="text-slate-600">Duyệt: {dl.qtyApproved} | Mua: {dl.qtyPurchased}</span>
+                                                    </div>
+                                                    <div className="col-span-4">
+                                                        <span className="text-slate-500 italic">{dl.note ? `Ghi chú: ${dl.note}` : ''}</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </React.Fragment>
+                            );
+                        })}
+                        
+                        <tr className="item-main-row print-highlight-row font-bold text-[8.5pt]">
+                            <td className="text-center" colSpan={2}>TỔNG CỘNG</td>
+                            <td className="text-center">{reqDeptReportDataVPP.departments.reduce((sum, d) => sum + d.requestCount, 0)} phiếu</td>
+                            <td className="text-center">{reqDeptReportDataVPP.departments.reduce((sum, d) => sum + d.itemCount, 0)}</td>
+                            <td className="text-center">{reqDeptReportDataVPP.departments.reduce((sum, d) => sum + d.qtyRequested, 0)}</td>
+                            <td className="text-center">{reqDeptReportDataVPP.departments.reduce((sum, d) => sum + d.qtyApproved, 0)}</td>
+                            <td className="text-center">{reqDeptReportDataVPP.departments.reduce((sum, d) => sum + d.qtyPurchased, 0)}</td>
+                            <td className="text-right text-indigo-700">{Number(reqDeptReportDataVPP.totalActual).toLocaleString('vi-VN')} đ</td>
+                            <td className="text-center">100.00%</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div className="footer-sign">
+                   <div>
+                      <p className="font-bold uppercase">Người lập báo cáo</p>
+                      <p className="text-[7.5pt] italic text-slate-500">(Ký và ghi rõ họ tên)</p>
+                      <div className="mt-6">
+                         <p className="font-bold">..........................</p>
+                         <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
+                      </div>
+                   </div>
+                   <div>
+                      <p className="font-bold uppercase">Trưởng bộ phận HCNS</p>
+                      <p className="text-[7.5pt] italic text-slate-500">(Ký và duyệt)</p>
+                      <div className="mt-6">
+                         <p className="font-bold">..........................</p>
+                         <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
+                      </div>
+                   </div>
+                </div>
+            </div>
+          )}
+
+          {/* REQ_DEPT_VS Print Sheet */}
+          {(selectedPrintType === 'REQ_DEPT_VS' || selectedPrintType === 'ALL') && reqDeptReportDataVS.totalActual > 0 && (
+            <div className="print-sheet p-4">
+                {(() => {
+                    const targetData = selectedIds.length > 0 
+                      ? data.filter(d => selectedIds.includes(d.id))
+                      : filteredData;
+                    
+                    let periodLabel = "Tất cả các kỳ";
+                    if (selectedMonth) {
+                        const [year, month] = selectedMonth.split('-');
+                        periodLabel = `Tháng ${month}/${year}`;
+                    } else {
+                        const dates = targetData.map(d => new Date(d.createdAt || d.orderDate).getTime()).filter(Boolean);
+                        if (dates.length > 0) {
+                            const minDate = new Date(Math.min(...dates));
+                            const maxDate = new Date(Math.max(...dates));
+                            if (minDate.toDateString() === maxDate.toDateString()) {
+                                periodLabel = minDate.toLocaleDateString('vi-VN');
+                            } else {
+                                periodLabel = `Từ ${minDate.toLocaleDateString('vi-VN')} đến ${maxDate.toLocaleDateString('vi-VN')}`;
+                            }
+                        }
+                    }
+
+                    const categoryCodeShort = 'VS';
+                    const summaryCode = `THMS-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-PBDX-${categoryCodeShort}`;
+                    const titleText = 'TỔNG HỢP VỆ SINH THEO PHÒNG BAN CỦA ĐỀ XUẤT';
+
+                    return (
+                        <>
+                            <div className="flex justify-between items-start w-full border-b pb-4 mb-4">
+                                <div className="w-[45%] text-left header-text">
+                                    <p className="font-bold uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
+                                    <p className="font-bold italic">Báo cáo tổng hợp đơn mua sắm</p>
+                                    <p>Ban Hành chính Nhân sự</p>
+                                </div>
+                                <div className="w-[10%] flex flex-col items-center">
+                                     <img src={`https://api.qrserver.com/v1/create-qr-code/?size=65x65&data=${encodeURIComponent(summaryCode)}`} alt="QR" className="w-12 h-12 border border-slate-100" />
+                                 </div>
+                                <div className="w-[45%] text-center header-text">
+                                    <p className="font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+                                    <p className="font-bold underline underline-offset-[4px] mt-1">Độc lập - Tự do - Hạnh phúc</p>
+                                    <p className="mt-3 italic text-right mr-10">Hà Nội, ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}</p>
+                                </div>
+                            </div>
+
+                            <h2 className="title-main uppercase text-center">{titleText}</h2>
+                            <p className="title-sub">(Tổng hợp từ ${targetData.length} phiếu mua sắm / đề nghị đang lọc)</p>
+
+                            <table className="print-table mb-4" style={{ fontSize: '8.5pt' }}>
+                                <thead>
+                                    <tr className="bg-slate-100 font-bold text-center text-[9pt]">
+                                        <th colSpan={4} style={{ padding: '4px', border: '1px solid #000' }}>TỔNG HỢP NHANH SỐ LIỆU THEO ĐỀ XUẤT</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td className="font-bold" style={{ width: '25%' }}>Kỳ tổng hợp:</td>
+                                        <td style={{ width: '25%' }}>{periodLabel}</td>
+                                        <td className="font-bold" style={{ width: '25%' }}>Phạm vi:</td>
+                                        <td style={{ width: '25%' }}>{selectedIds.length > 0 ? "Theo danh sách chọn" : "Toàn hệ thống (Bộ lọc)"}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="font-bold">Số phòng ban đề xuất:</td>
+                                        <td>{reqDeptReportDataVS.totalCount} đơn vị</td>
+                                        <td className="font-bold">Tổng số phiếu đề xuất:</td>
+                                        <td>{reqDeptReportDataVS.departments.reduce((sum, d) => sum + d.requestCount, 0)} phiếu</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="font-bold">Tổng giá trị mua thực tế:</td>
+                                        <td className="font-bold text-indigo-700" colSpan={3}>{Number(reqDeptReportDataVS.totalActual).toLocaleString('vi-VN')} đ</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </>
+                    );
+                })()}
+
+                <table className="print-table">
+                    <thead>
+                        <tr className="bg-slate-100 font-bold text-[8pt] text-center">
+                            <th style={{width: '4%'}}>STT</th>
+                            <th style={{width: '20%'}}>PHÒNG BAN / ĐƠN VỊ</th>
+                            <th style={{width: '18%'}}>SỐ PHIẾU ĐỀ XUẤT</th>
+                            <th style={{width: '8%'}}>SỐ MẶT HÀNG</th>
+                            <th style={{width: '10%'}}>SL YÊU CẦU</th>
+                            <th style={{width: '10%'}}>SL DUYỆT</th>
+                            <th style={{width: '10%'}}>SL MUA</th>
+                            <th style={{width: '12%'}}>GIÁ TRỊ TẠM TÍNH</th>
+                            <th style={{width: '8%'}}>TỶ TRỌNG</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {reqDeptReportDataVS.departments.map((dept, idx) => {
+                            const pct = reqDeptReportDataVS.totalActual > 0 ? (dept.estimatedValue / reqDeptReportDataVS.totalActual) * 100 : 0;
+                            return (
+                                <React.Fragment key={dept.name}>
+                                    <tr className="item-main-row text-[8.5pt] print-highlight-row">
+                                        <td className="text-center">{idx + 1}</td>
+                                        <td className="font-bold">{dept.name}</td>
+                                        <td className="text-center text-[7.5pt]">{dept.requestCodesStr}</td>
+                                        <td className="text-center">{dept.itemCount}</td>
+                                        <td className="text-center">{dept.qtyRequested}</td>
+                                        <td className="text-center">{dept.qtyApproved}</td>
+                                        <td className="text-center font-bold">{dept.qtyPurchased}</td>
+                                        <td className="text-right font-bold">{Number(dept.estimatedValue).toLocaleString('vi-VN')}</td>
+                                        <td className="text-center font-bold">{pct.toFixed(2)}%</td>
+                                    </tr>
+                                    {selectedPrintDetailMode === 'DETAIL' && dept.detailLines && dept.detailLines.map((dl, dlIdx) => (
+                                        <tr key={`dl-${dlIdx}`} className="allocation-row">
+                                            <td style={{borderTop: 'none', borderBottom: 'none'}}></td>
+                                            <td colSpan={8} style={{borderTop: 'none', borderBottom: 'none'}}>
+                                                <div className="grid grid-cols-12 gap-2 px-2 py-0.5">
+                                                    <div className="col-span-5 flex flex-col">
+                                                        <span className="font-bold text-slate-700">- {dl.itemName}</span>
+                                                        <span className="text-[6.5pt] text-slate-400 ml-2">Phiếu: {dl.requestCode}</span>
+                                                    </div>
+                                                    <div className="col-span-3 text-left">
+                                                        <span className="text-slate-600">Duyệt: {dl.qtyApproved} | Mua: {dl.qtyPurchased}</span>
+                                                    </div>
+                                                    <div className="col-span-4">
+                                                        <span className="text-slate-500 italic">{dl.note ? `Ghi chú: ${dl.note}` : ''}</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </React.Fragment>
+                            );
+                        })}
+                        
+                        <tr className="item-main-row print-highlight-row font-bold text-[8.5pt]">
+                            <td className="text-center" colSpan={2}>TỔNG CỘNG</td>
+                            <td className="text-center">{reqDeptReportDataVS.departments.reduce((sum, d) => sum + d.requestCount, 0)} phiếu</td>
+                            <td className="text-center">{reqDeptReportDataVS.departments.reduce((sum, d) => sum + d.itemCount, 0)}</td>
+                            <td className="text-center">{reqDeptReportDataVS.departments.reduce((sum, d) => sum + d.qtyRequested, 0)}</td>
+                            <td className="text-center">{reqDeptReportDataVS.departments.reduce((sum, d) => sum + d.qtyApproved, 0)}</td>
+                            <td className="text-center">{reqDeptReportDataVS.departments.reduce((sum, d) => sum + d.qtyPurchased, 0)}</td>
+                            <td className="text-right text-indigo-700">{Number(reqDeptReportDataVS.totalActual).toLocaleString('vi-VN')} đ</td>
+                            <td className="text-center">100.00%</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div className="footer-sign">
+                   <div>
+                      <p className="font-bold uppercase">Người lập báo cáo</p>
+                      <p className="text-[7.5pt] italic text-slate-500">(Ký và ghi rõ họ tên)</p>
+                      <div className="mt-6">
+                         <p className="font-bold">..........................</p>
+                         <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
+                      </div>
+                   </div>
+                   <div>
+                      <p className="font-bold uppercase">Trưởng bộ phận HCNS</p>
+                      <p className="text-[7.5pt] italic text-slate-500">(Ký và duyệt)</p>
+                      <div className="mt-6">
+                         <p className="font-bold">..........................</p>
+                         <p className="text-[9pt] font-black text-blue-600 mt-1">{formatDigitalSignatureDate()} (Đã ký số)</p>
+                      </div>
+                   </div>
+                </div>
+            </div>
+          )}
+
+{/* EXECUTIVE REPORT PAGE */}
           {(selectedPrintType === 'VPP' || selectedPrintType === 'VE_SINH') && (
             <div className="print-sheet p-8 break-before-page flex flex-col justify-center min-h-[500px]">
                 <div className="max-w-2xl mx-auto w-full">
