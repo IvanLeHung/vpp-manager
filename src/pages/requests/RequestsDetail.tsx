@@ -1186,15 +1186,25 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
           {/* RIGHT COLUMN: Actions & History */}
           <Layout.Sider width={260} theme="light" className="no-print border-l border-slate-200 sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto">
               <div className="p-6 flex flex-col gap-6">
-                  <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 relative overflow-hidden text-slate-800">
+                  <div className="bg-white rounded-2xl shadow-sm p-5 border border-slate-200 relative overflow-hidden text-slate-800">
                       <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500 rounded-full blur-[80px] opacity-10 transform translate-x-1/2 -translate-y-1/2"></div>
-                  <div className="flex items-center justify-between mb-6 relative z-10">
-                      <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-                          <Shield className="w-5 h-5 text-indigo-500"/> TRUNG TÂM LỆNH
-                      </h3>
-                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] bg-slate-50 px-2 py-1 rounded border border-slate-200">ROLE: {currentUser.role}</span>
-                  </div>
-                  <div className="flex flex-col gap-3 relative z-10">
+                      
+                      {/* Tiêu đề & Avatar cá nhân */}
+                      <div className="flex items-center gap-3 mb-5 relative z-10 border-b border-slate-100 pb-3">
+                          <Avatar size={40} className="bg-indigo-600 text-white font-bold border border-indigo-200 flex-shrink-0 flex items-center justify-center">
+                              {currentUser.fullName?.charAt(0).toUpperCase() || currentUser.username?.charAt(0).toUpperCase() || 'U'}
+                          </Avatar>
+                          <div className="flex flex-col min-w-0">
+                              <h3 className="text-xs font-black text-slate-800 uppercase tracking-tight flex items-center gap-1.5 leading-none">
+                                  TRUNG TÂM LỆNH
+                              </h3>
+                              <span className="self-start text-[8px] font-black text-indigo-600 uppercase tracking-wider bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded mt-1.5 leading-none">
+                                  Role: {currentUser.role}
+                              </span>
+                          </div>
+                      </div>
+
+                      <div className="flex flex-col gap-4 relative z-10">
                       
                       {/* --- THAO TÁC CỦA NGƯỜI LẬP --- */}
                       {isOwnerDraft && (
@@ -1220,23 +1230,25 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
                       {/* --- THAO TÁC CỦA KHO --- */}
                       {(isWarehouse || currentUser.role === 'ADMIN' || currentUser.role === 'WAREHOUSE') && ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED', 'PARTIAL_ADMIN_APPROVED', 'BACKORDER', 'PARTIALLY_DELIVERED', 'PENDING_REMAINING_DELIVERY'].includes(data.status) && (
-                           <>
-                             <button onClick={() => openIssueModal()} className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/20 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-emerald-500"><Archive className="w-6 h-6 mr-2"/> CẤP PHÁT CHO NHÂN SỰ</button>
-                             
-                             {(currentUser.role === 'ADMIN' || currentUser.role === 'WAREHOUSE') && ['PARTIALLY_ISSUED', 'PARTIALLY_DELIVERED', 'WAITING_HANDOVER', 'READY_TO_ISSUE', 'APPROVED', 'BACKORDER'].includes(data.status) && (
-                               <button 
-                                 onClick={() => {
-                                   const reason = prompt('Nhập lý do không giao nữa / đóng phiếu:');
-                                   if (reason !== null) {
-                                     handleAction('/close-remaining', { reason }, 'Đóng phiếu thành công (không giao nữa)!');
-                                   }
-                                 }} 
-                                 className="w-full py-3.5 bg-rose-500 text-white rounded-xl font-black hover:bg-rose-600 transition shadow-lg shadow-rose-500/20 flex items-center justify-center transform hover:scale-[1.02] mt-2 border border-rose-500"
-                               >
-                                 <StopCircle className="w-5 h-5 mr-2"/> KHÔNG GIAO NỮA (ĐÓNG PHIẾU)
-                               </button>
-                             )}
-                           </>
+                           <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3 flex flex-col gap-2.5">
+                               <p className="text-[8px] font-black text-slate-450 uppercase tracking-widest leading-none mb-0.5">Các chức năng chính</p>
+                               
+                               <button onClick={() => openIssueModal()} className="w-full py-2.5 bg-emerald-600 text-white rounded-lg font-black hover:bg-emerald-700 transition shadow-sm flex items-center justify-center transform hover:scale-[1.01] border border-emerald-600 text-xs"><Archive className="w-4 h-4 mr-2"/> CẤP PHÁT CHO NHÂN SỰ</button>
+                               
+                               {(currentUser.role === 'ADMIN' || currentUser.role === 'WAREHOUSE') && ['PARTIALLY_ISSUED', 'PARTIALLY_DELIVERED', 'WAITING_HANDOVER', 'READY_TO_ISSUE', 'APPROVED', 'BACKORDER'].includes(data.status) && (
+                                   <button 
+                                     onClick={() => {
+                                       const reason = prompt('Nhập lý do không giao nữa / đóng phiếu:');
+                                       if (reason !== null) {
+                                         handleAction('/close-remaining', { reason }, 'Đóng phiếu thành công (không giao nữa)!');
+                                       }
+                                     }} 
+                                     className="w-full py-2 bg-transparent hover:bg-rose-50 text-rose-600 rounded-lg font-bold text-[11px] transition flex items-center justify-center gap-1.5 border border-dashed border-rose-200/40"
+                                   >
+                                     <StopCircle className="w-4 h-4"/> Không giao nữa (Đóng phiếu)
+                                   </button>
+                               )}
+                           </div>
                       )}
                       {currentUser.role === 'ADMIN' && 
                        ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED'].includes(data.status) &&
@@ -1269,64 +1281,52 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                       
                       {canCancel && <button onClick={() => handleAction('/cancel', {reason: prompt('Nhập lý do hủy phiếu:')}, 'Đã Hủy phiếu')} className="w-full py-2.5 bg-transparent text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center rounded-xl font-bold transition"><Trash2 className="w-4 h-4 mr-2"/> Hủy Bỏ Phiếu Này</button>}
                       
-                      {/* PRINT OPTIONS GROUP */}
-                      <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-slate-100">
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1 text-center">Tùy chọn in đề xuất</p>
-                          
-                          {(() => {
-                            const hasPendingReplacement = data.lines.some((l: any) => l.status === 'REPLACEMENT_PENDING_ADMIN');
-                            const printMenu = {
-                              items: [
-                                {
-                                  key: 'VPP',
-                                  label: 'In Đề Xuất Văn Phòng Phẩm',
-                                  icon: <PrinterOutlined />,
-                                },
-                                {
-                                  key: 'VE_SINH',
-                                  label: 'In Đề Xuất Vệ Sinh',
-                                  icon: <PrinterOutlined />,
-                                },
-                              ],
-                              onClick: (info: any) => {
-                                printDocument(info.key as 'VPP' | 'VE_SINH');
-                              }
-                            };
-                            return (
-                              <div className="w-full flex justify-center [&>div]:w-full">
-                                <Space.Compact className="w-full flex">
-                                  <Button
-                                    type="primary"
-                                    onClick={() => printDocument('ALL')}
-                                    disabled={hasPendingReplacement}
-                                    className="flex-1 font-bold h-11 flex items-center justify-center gap-2"
-                                  >
-                                    <PrinterOutlined /> IN CẢ PHIẾU (A4 FULL)
-                                  </Button>
-                                  <Dropdown
-                                    menu={printMenu}
-                                    disabled={hasPendingReplacement}
-                                    trigger={['click']}
-                                    placement="bottomRight"
-                                  >
-                                    <Button
-                                      type="primary"
-                                      icon={<DownOutlined />}
-                                      className="h-11 flex items-center justify-center"
-                                    />
-                                  </Dropdown>
-                                </Space.Compact>
-                              </div>
-                            );
-                          })()}
-                      </div>
+                      {/* TÙY CHỌN IN VÀ XUẤT */}
+                      {(() => {
+                        const hasPendingReplacement = data.lines.some((l: any) => l.status === 'REPLACEMENT_PENDING_ADMIN');
+                        return (
+                          <div className="flex flex-col gap-2 mt-2 pt-4 border-t border-dashed border-slate-200">
+                              <p className="text-[9px] font-black text-slate-450 uppercase tracking-widest mb-1.5 text-center">Tùy chọn in & xuất</p>
+                              
+                              <div className="flex flex-col gap-2">
+                                  {/* In lẻ VPP / Vệ sinh */}
+                                  <div className="flex gap-2">
+                                      <button
+                                          disabled={hasPendingReplacement}
+                                          onClick={() => printDocument('VPP')}
+                                          className="flex-1 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1 border border-blue-100 disabled:opacity-50"
+                                      >
+                                          <Printer className="w-3.5 h-3.5"/> In VPP
+                                      </button>
+                                      <button
+                                          disabled={hasPendingReplacement}
+                                          onClick={() => printDocument('VE_SINH')}
+                                          className="flex-1 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1 border border-blue-100 disabled:opacity-50"
+                                      >
+                                          <Printer className="w-3.5 h-3.5"/> In Vệ sinh
+                                      </button>
+                                  </div>
 
-                      <button 
-                        onClick={handleExportExcel}
-                        className="w-full py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center justify-center rounded-xl font-bold transition shadow-sm mt-4"
-                      >
-                        <FileSpreadsheet className="w-4 h-4 mr-2 text-emerald-500"/> Xuất File Excel
-                      </button>
+                                  {/* In cả phiếu */}
+                                  <button
+                                      disabled={hasPendingReplacement}
+                                      onClick={() => printDocument('ALL')}
+                                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 disabled:opacity-50 shadow-sm shadow-blue-500/10"
+                                  >
+                                      <Printer className="w-4 h-4"/> In cả phiếu (A4 Full)
+                                  </button>
+
+                                  {/* Xuất file Excel (Đồng màu xanh dương) */}
+                                  <button 
+                                    onClick={handleExportExcel}
+                                    className="w-full py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-100 flex items-center justify-center rounded-lg font-bold transition text-xs"
+                                  >
+                                    <FileSpreadsheet className="w-4 h-4 mr-1.5 text-blue-500"/> Xuất File Excel
+                                  </button>
+                              </div>
+                          </div>
+                        );
+                      })()}
 
                       <div className="mt-4 pt-4 border-t border-slate-100">
                           <div className="flex justify-between items-center mb-2">

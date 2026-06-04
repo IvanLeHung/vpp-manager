@@ -104,9 +104,23 @@ const RequestPrint: React.FC = () => {
     );
   }
 
+  const getItemCategoryType = (item: any): 'VPP' | 'VE_SINH' => {
+    if (!item) return 'VPP';
+    const itemType = String(item.itemType || '').toUpperCase();
+    const category = String(item.category || '').toUpperCase();
+    const mvpp = String(item.mvpp || '').toUpperCase();
+    
+    if (itemType.includes('VE_SINH') || itemType.includes('VỆ SINH') || 
+        category.includes('VE_SINH') || category.includes('VỆ SINH') || category.includes('TẠP HÓA') ||
+        mvpp.startsWith('VS')) {
+      return 'VE_SINH';
+    }
+    return 'VPP';
+  };
+
   const filteredLines = sortLinesForPrinting(data.lines || []).filter((l: any) => {
     if (selectedPrintType === 'ALL') return true;
-    const type = l.item?.itemType || (l.item?.mvpp?.startsWith('VPP') ? 'VPP' : 'VE_SINH');
+    const type = getItemCategoryType(l.item);
     return type === selectedPrintType;
   });
 
