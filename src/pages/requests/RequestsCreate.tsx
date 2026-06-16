@@ -277,13 +277,33 @@ export default function RequestsCreate({
     }
 
     setIsSubmitting(true);
-
     try {
+      // Determine warehouseCode dynamically based on item category
+      let calculatedWarehouseCode = 'MAIN';
+      const hasVeSinhItem = targetItems.some((t) => {
+        const item = t.item;
+        if (!item) return false;
+        const type = (item.itemType || '').toString().toUpperCase();
+        const cat = (item.category || '').toString().toUpperCase();
+        const mvpp = (item.mvpp || '').toString().toUpperCase();
+        return (
+          type === 'VE_SINH' ||
+          type.includes('VỆ SINH') ||
+          cat.includes('VE_SINH') ||
+          cat.includes('VỆ SINH') ||
+          cat.includes('TẠP HÓA') ||
+          mvpp.startsWith('VS')
+        );
+      });
+      if (hasVeSinhItem) {
+        calculatedWarehouseCode = 'VE_SINH';
+      }
+
       const payload = {
         requestType: reqType,
         priority,
         purpose,
-        warehouseCode: 'MAIN',
+        warehouseCode: calculatedWarehouseCode,
         neededByDate: neededByDate
           ? new Date(neededByDate).toISOString()
           : undefined,
