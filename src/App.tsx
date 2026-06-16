@@ -8,6 +8,7 @@ import InventoryReport from './pages/InventoryReport';
 import Analytics from './pages/Analytics';
 import Purchases from './pages/purchases/Purchases';
 import Receipts from './pages/purchases/Receipts';
+import ProcurementBatches from './pages/purchases/ProcurementBatches';
 import ReceiptPrint from './pages/purchases/ReceiptPrint';
 import RequestPrint from './pages/requests/RequestPrint';
 import PurchasePrint from './pages/purchases/PurchasePrint';
@@ -277,6 +278,7 @@ function App() {
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/purchase-orders" element={<Purchases />} />
             <Route path="/purchase-orders/:id" element={<Purchases />} />
+            <Route path="/procurement-batches" element={<ProcurementBatches />} />
             <Route path="/receipts" element={<Receipts />} />
             <Route path="/receipts/:id" element={<Receipts />} />
             <Route path="/users" element={<Users />} /> 

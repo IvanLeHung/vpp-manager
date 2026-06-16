@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Package, LayoutDashboard, LogOut, FileText, ClipboardList, ShieldAlert, ShoppingCart, Users as UsersIcon, Database, ClipboardCheck, Droplets, TrendingDown, ChevronDown, User, Key, Activity, PlusCircle, CheckSquare, BarChart3 } from 'lucide-react';
+import { Package, LayoutDashboard, LogOut, FileText, ClipboardList, ShieldAlert, ShoppingCart, Users as UsersIcon, Database, ClipboardCheck, Droplets, TrendingDown, ChevronDown, User, Key, Activity, PlusCircle, CheckSquare, BarChart3, Folder } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import ProfileDialog from '../components/ProfileDialog';
 import NotificationBell from '../components/NotificationBell';
@@ -65,6 +65,9 @@ export default function MainLayout() {
               )}
               <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/requests')}`} onClick={() => navigate('/requests')}>
                 <ClipboardList className="w-5 h-5 mr-3" /> Yêu Cầu Cấp Phát
+              </button>
+              <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/procurement-batches')}`} onClick={() => navigate('/procurement-batches')}>
+                <Folder className="w-5 h-5 mr-3" /> Batch Hồ Sơ
               </button>
               {currentUser?.role === 'ADMIN' && (
                 <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/inventory-report')}`} onClick={() => navigate('/inventory-report')}>
@@ -140,6 +143,9 @@ export default function MainLayout() {
               <div className="pt-6 pb-2 px-2 text-[11px] font-black text-indigo-500 uppercase tracking-wider">Báo cáo</div>
               <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/analytics')}`} onClick={() => navigate('/analytics')}>
                 <BarChart3 className="w-5 h-5 mr-3" /> Báo cáo bộ phận
+              </button>
+              <button className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all cursor-pointer ${getActiveClass('/procurement-batches')}`} onClick={() => navigate('/procurement-batches')}>
+                <Folder className="w-5 h-5 mr-3" /> Batch Hồ Sơ
               </button>
 
               <div className="pt-6 pb-2 px-2 text-[11px] font-black text-slate-400 uppercase tracking-wider">Hỗ trợ</div>
