@@ -3,8 +3,9 @@ import { useParams } from 'react-router-dom';
 import PurchasesList from './PurchasesList';
 import PurchasesCreate from './PurchasesCreate';
 import PurchasesDetail from './PurchasesDetail';
+import PurchaseReportHistory from './PurchaseReportHistory';
 
-export type ViewMode = 'LIST' | 'CREATE' | 'DETAIL';
+export type ViewMode = 'LIST' | 'CREATE' | 'DETAIL' | 'REPORT_HISTORY';
 
 const Purchases: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -12,6 +13,7 @@ const Purchases: React.FC = () => {
   const [selectedPoId, setSelectedPoId] = useState<string | null>(null);
   const [navigationIds, setNavigationIds] = useState<string[]>([]);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'warning'} | null>(null);
+  const [recreateConfig, setRecreateConfig] = useState<any | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -36,6 +38,11 @@ const Purchases: React.FC = () => {
     setViewMode('DETAIL');
   };
 
+  const handleRecreateReport = (config: any) => {
+    setRecreateConfig(config);
+    setViewMode('LIST');
+  };
+
   return (
     <div className="h-full bg-slate-50 relative">
       {toast && (
@@ -52,6 +59,9 @@ const Purchases: React.FC = () => {
         <PurchasesList 
           onCreateNew={handleCreateNew} 
           onViewDetail={handleViewDetail}
+          onShowHistory={() => setViewMode('REPORT_HISTORY')}
+          recreateConfig={recreateConfig}
+          clearRecreateConfig={() => setRecreateConfig(null)}
         />
       )}
       
@@ -70,6 +80,13 @@ const Purchases: React.FC = () => {
           onNavigate={setSelectedPoId}
           onBack={() => setViewMode('LIST')}
           showToast={showToast}
+        />
+      )}
+
+      {viewMode === 'REPORT_HISTORY' && (
+        <PurchaseReportHistory 
+          onBack={() => setViewMode('LIST')}
+          onRecreate={handleRecreateReport}
         />
       )}
     </div>

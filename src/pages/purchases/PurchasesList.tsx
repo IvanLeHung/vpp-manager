@@ -3,16 +3,21 @@ import api from '../../lib/api';
 import { 
   Plus, DollarSign,
   ShoppingCart, Package, Clock, ChevronRight, Truck, User as UserIcon,
-  Printer, CheckSquare, ChevronDown, AlertTriangle, X, CheckCircle, Download, Eye
+  Printer, CheckSquare, ChevronDown, AlertTriangle, X, CheckCircle, Download, Eye,
+  FileText, ArrowLeft, RefreshCw, Layers
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import * as docx from 'docx';
 import { saveAs } from 'file-saver';
 import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
+import { toast } from 'react-toastify';
 
 interface PurchasesListProps {
   onCreateNew: () => void;
   onViewDetail: (id: string, ids?: string[]) => void;
+  onShowHistory: () => void;
+  recreateConfig: any | null;
+  clearRecreateConfig: () => void;
 }
 
 function getItemSortGroupName(itemName: string) {
@@ -145,7 +150,7 @@ function hasPermission(role: string, permission: string): boolean {
   return (permissionsMap[role] || []).includes(permission);
 }
 
-const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail }) => {
+const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail, onShowHistory, recreateConfig, clearRecreateConfig }) => {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm] = useState('');
@@ -170,11 +175,132 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   const [setupDetailMode, setSetupDetailMode] = useState<'SUMMARY' | 'DETAIL'>('SUMMARY');
   const [exportLoading, setExportLoading] = useState(false);
 
+  // Export module states (Task 1, 2, 3)
+  const [showExportConfigModal, setShowExportConfigModal] = useState(false);
+  const [exportConfig, setExportConfig] = useState({
+    report_type: 'SUMMARY',
+    group_by: ['MONTH', 'DEPARTMENT', 'CATEGORY'],
+    format: 'PDF',
+    include_items: true,
+    include_signature_block: true
+  });
+
+  const [showExportPreviewModal, setShowExportPreviewModal] = useState(false);
+  const [previewActiveTab, setPreviewActiveTab] = useState<'SUMMARY' | 'DETAIL' | 'ITEMS' | 'CLASSIFICATION'>('SUMMARY');
+  const [itemsClassification, setItemsClassification] = useState<any[]>([]);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
   const currentUser = useMemo(() => {
     const saved = localStorage.getItem('vpp_user');
     return saved ? JSON.parse(saved) : null;
   }, []);
   const userRole = currentUser?.role || 'EMPLOYEE';
+
+  const selectedTotal = useMemo(() => {
+    return data
+      .filter(d => selectedIds.includes(d.id))
+      .reduce((sum, d) => sum + Number(d.actualTotal || d.totalAmount || 0), 0);
+  }, [data, selectedIds]);
+
+  const checkPOAccess = (po: any) => {
+    if (!currentUser) return false;
+    const userId = currentUser.userId || currentUser.id;
+    if (currentUser.role === 'ADMIN') return true;
+    if (po.assignedToId === userId) return true;
+    if (currentUser.role === 'MANAGER' && currentUser.departmentId) {
+      if (po.requester?.departmentId === currentUser.departmentId) return true;
+    }
+    if (po.requesterId === userId) return true;
+    return false;
+  };
+
+  const getFilteredPOsOnFrontend = (pos: any[], user: any) => {
+    const valid: any[] = [];
+    const excluded: any[] = [];
+    pos.forEach(po => {
+      if (checkPOAccess(po)) {
+        valid.push(po);
+      } else {
+        excluded.push(po);
+      }
+    });
+    return { valid, excluded };
+  };
+
+  const getSelectedItemsFullSnapshot = (selectedPOs: any[]) => {
+    const itemMap = new Map<string, any>();
+    selectedPOs.forEach(po => {
+      if (!po.lines) return;
+      po.lines.forEach((line: any) => {
+        const item = line.item;
+        if (!item) return;
+        if (!itemMap.has(item.id)) {
+          const nameLower = item.name.toLowerCase();
+          const vppKeywords = ['giấy', 'giấy in', 'bút', 'file', 'kẹp', 'ghim', 'sổ', 'bìa', 'hồ sơ', 'văn phòng phẩm', 'giấy note', 'mực in'];
+          const vsKeywords = ['nước rửa tay', 'nước lau sàn', 'giấy vệ sinh', 'túi rác', 'chổi', 'cây lau', 'xà phòng', 'dung dịch tẩy rửa', 'khăn lau', 'nước tẩy'];
+          let system_classification = 'Khác';
+          if (vppKeywords.some(kw => nameLower.includes(kw))) system_classification = 'VPP';
+          else if (vsKeywords.some(kw => nameLower.includes(kw))) system_classification = 'Đồ vệ sinh';
+          itemMap.set(item.id, {
+            item_id: item.id,
+            item_name: item.name,
+            system_classification,
+            final_classification: system_classification,
+            changed_by_user: false
+          });
+        }
+      });
+    });
+    return Array.from(itemMap.values());
+  };
+
+  const getSelectedItemsFullSnapshotWithRecreate = (selectedPOs: any[], recreateSnapshot: any[]) => {
+    const snapshot = getSelectedItemsFullSnapshot(selectedPOs);
+    if (!recreateSnapshot || !Array.isArray(recreateSnapshot)) return snapshot;
+    const recreateMap = new Map<string, any>();
+    recreateSnapshot.forEach(item => {
+      recreateMap.set(item.item_id, item);
+    });
+    return snapshot.map(item => {
+      if (recreateMap.has(item.item_id)) {
+        const rec = recreateMap.get(item.item_id);
+        return {
+          ...item,
+          final_classification: rec.final_classification || item.final_classification,
+          changed_by_user: rec.changed_by_user || false
+        };
+      }
+      return item;
+    });
+  };
+
+  useEffect(() => {
+    if (recreateConfig && data.length > 0) {
+      const poIds = recreateConfig.selectedPoIds || [];
+      setSelectedIds(poIds);
+      setIsBulkMode(true);
+      
+      const config = recreateConfig.configJson || {};
+      setExportConfig({
+        report_type: config.report_type || 'SUMMARY',
+        group_by: config.group_by || ['MONTH', 'DEPARTMENT', 'CATEGORY'],
+        format: recreateConfig.format || 'PDF',
+        include_items: config.include_items !== undefined ? config.include_items : true,
+        include_signature_block: config.include_signature_block !== undefined ? config.include_signature_block : true
+      });
+      
+      const overrides = recreateConfig.classificationOverrideJson || [];
+      const selectedPOs = data.filter(d => poIds.includes(d.id));
+      const snapshot = getSelectedItemsFullSnapshotWithRecreate(selectedPOs, overrides);
+      setItemsClassification(snapshot);
+      
+      setShowExportConfigModal(true);
+      clearRecreateConfig();
+    }
+  }, [recreateConfig, data]);
+
+
 
   useEffect(() => {
     fetchData();
@@ -1511,9 +1637,12 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                            <button onClick={() => setIsBulkMode(!isBulkMode)} className={`p-2.5 rounded-xl border transition flex items-center gap-1.5 text-[10px] font-black uppercase ${isBulkMode ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-slate-200 text-slate-500'}`}>
                               <CheckSquare className="w-4 h-4"/> {isBulkMode ? 'Ẩn ô chọn' : 'Chọn nhiều'}
                            </button>
-                           <button onClick={onCreateNew} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-[10px] font-black transition-all flex items-center shadow-lg shadow-indigo-500/30 whitespace-nowrap active:scale-95 uppercase">
-                               <Plus className="w-4 h-4 mr-1.5" /> Tạo Đề Nghị
-                           </button>
+                                                       <button onClick={onShowHistory} className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl text-[10px] font-black transition-all flex items-center shadow-sm whitespace-nowrap active:scale-95 uppercase gap-1.5 cursor-pointer">
+                                <FileText className="w-4 h-4 text-indigo-600" /> Lịch sử báo cáo
+                            </button>
+                            <button onClick={onCreateNew} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-[10px] font-black transition-all flex items-center shadow-lg shadow-indigo-500/30 whitespace-nowrap active:scale-95 uppercase cursor-pointer">
+                                <Plus className="w-4 h-4 mr-1.5" /> Tạo Đề Nghị
+                            </button>
                         </div>
                     </div>
 
