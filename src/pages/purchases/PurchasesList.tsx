@@ -197,6 +197,42 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   }, []);
   const userRole = currentUser?.role || 'EMPLOYEE';
 
+  const checkHasMatchingItem = (category: 'VPP' | 'VE_SINH'): boolean => {
+    const selectedPOs = data.filter(po => selectedIds.includes(po.id));
+    return selectedPOs.some(po => {
+      if (!po.lines) return false;
+      return po.lines.some((line: any) => {
+        const isReplaced = !!line.requestLine?.replacementItemId;
+        const effectiveItem = isReplaced ? line.requestLine.replacementItem : line.item;
+        if (!effectiveItem) return false;
+        
+        const override = itemsClassification?.find((c: any) => c.item_id === effectiveItem.id);
+        const classification = override ? override.final_classification : getItemCategoryType(effectiveItem);
+        
+        const normalizedClass = (classification || '').toString().toUpperCase();
+        const normalizedCategory = category.toUpperCase();
+        
+        if (normalizedCategory === 'VPP') {
+          return normalizedClass === 'VPP';
+        } else if (normalizedCategory === 'VE_SINH') {
+          return normalizedClass === 'VE_SINH' || normalizedClass === 'DO_VE_SINH' || normalizedClass.includes('VỆ SINH');
+        }
+        return false;
+      });
+    });
+  };
+
+  const getPeriodLabel = (poIds: string[]): string => {
+    if (!poIds || poIds.length === 0) return '';
+    const selectedPOs = data.filter(po => poIds.includes(po.id));
+    const months = selectedPOs.map(po => {
+      const date = new Date(po.createdAt);
+      return `${String(date.getMonth() + 1).padStart(2, '0')}${date.getFullYear()}`;
+    });
+    const uniqueMonths = Array.from(new Set(months));
+    return uniqueMonths.length === 1 ? `_Selected_${uniqueMonths[0]}` : '_Selected_MultiMonth';
+  };
+
   const selectedTotal = useMemo(() => {
     return data
       .filter(d => selectedIds.includes(d.id))
@@ -1021,9 +1057,39 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   };
 
   const handleExportExcelTemplate = () => {
-    if (summaryGroups.length === 0) {
-        return;
-    }
+
+
+      if (summaryGroups.length === 0) {
+
+
+          return;
+
+
+      }
+
+
+      if (selectedIds.length > 0) {
+
+
+        const hasVPP = checkHasMatchingItem('VPP');
+
+
+        const hasVS = checkHasMatchingItem('VE_SINH');
+
+
+        if (!hasVPP && !hasVS) {
+
+
+          toast.error("Các phiếu đã chọn không có dữ liệu phù hợp với mẫu báo cáo này.");
+
+
+          return;
+
+
+        }
+
+
+      }
     
     const wb = XLSX.utils.book_new();
     
@@ -1111,11 +1177,38 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
         XLSX.utils.book_append_sheet(wb, ws, group.label.slice(0, 31));
     });
     
-    XLSX.writeFile(wb, `Phieu_Tong_Hop_Mua_Sam_Mau_In_${new Date().toISOString().slice(0,10)}.xlsx`);
+    const suffix = getPeriodLabel(selectedIds);
+    const fileName = selectedIds.length > 0 
+      ? `PhieuTongHopMuaSam${suffix}.xlsx`
+      : `Phieu_Tong_Hop_Mua_Sam_Mau_In_${new Date().toISOString().slice(0,10)}.xlsx`;
+    XLSX.writeFile(wb, fileName);
   };
 
   const handleExportWordTemplate = async (type: 'VPP' | 'VE_SINH') => {
-    const group = summaryGroups.find(g => g.type === type);
+
+
+      if (selectedIds.length > 0) {
+
+
+        const hasMatch = checkHasMatchingItem(type);
+
+
+        if (!hasMatch) {
+
+
+          toast.error("Các phiếu đã chọn không có dữ liệu phù hợp với mẫu báo cáo này.");
+
+
+          return;
+
+
+        }
+
+
+      }
+
+
+      const group = summaryGroups.find(g => g.type === type);
     if (!group) return;
 
     const groupCodeShort = group.type === 'VE_SINH' ? 'VS' : group.type;
@@ -1364,7 +1457,12 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
     });
 
     const blob = await docx.Packer.toBlob(doc);
-    saveAs(blob, `Phieu_Tong_Hop_Mua_Sam_${group.type}_${new Date().toISOString().slice(0,10)}.docx`);
+    const suffix = getPeriodLabel(selectedIds);
+    const categoryLabel = group.type === 'VE_SINH' ? 'VeSinh' : group.type;
+    const fileName = selectedIds.length > 0 
+      ? `PhieuTongHopMuaSam${categoryLabel}${suffix}.docx`
+      : `Phieu_Tong_Hop_Mua_Sam_${group.type}_${new Date().toISOString().slice(0,10)}.docx`;
+    saveAs(blob, fileName);
   };
 
   const toggleSelect = (id: string) => {
@@ -1505,8 +1603,31 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                 <>
                                   <div className="fixed inset-0 z-40" onClick={() => setShowPrintMenu(false)}></div>
                                   <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 py-3 animate-in fade-in slide-in-from-top-2 duration-200">
+
+                                     {selectedIds.length > 0 && (
+
+                                        <div className="px-4 py-2.5 mb-2 bg-indigo-50/50 border-b border-indigo-100/60 text-left">
+
+                                           <p className="text-[11px] font-black text-indigo-700 flex items-center gap-1.5 uppercase tracking-wide">
+
+                                              📋 Đang chọn: {selectedIds.length} phiếu
+
+                                           </p>
+
+                                           <p className="text-[9px] font-bold text-slate-500 mt-0.5">
+
+                                              Báo cáo sẽ xuất theo phiếu đã chọn.
+
+                                           </p>
+
+                                        </div>
+
+                                     )}
+
                                      <div className="px-4 pb-2 mb-2 border-b border-slate-100">
+
                                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">CHỌN MẪU BÁO CÁO</p>
+
                                      </div>
                                      
                                      {/* Group 1 */}
@@ -2019,7 +2140,23 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                  </button>
                  <button
                    onClick={async () => {
+                     if (selectedIds.length > 0) {
+
+                       const hasMatch = checkHasMatchingItem(setupCategoryType);
+
+                       if (!hasMatch) {
+
+                         toast.error("Các phiếu đã chọn không có dữ liệu phù hợp với mẫu báo cáo này.");
+
+                         return;
+
+                       }
+
+                     }
+
+
                      if (setupFormat === 'PDF') {
+
                        // Trigger client browser printing
                        setSelectedPrintType(
                          setupReportType === 'PURCHASE_SUMMARY' ? setupCategoryType :
@@ -2036,15 +2173,15 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                        try {
                          setExportLoading(true);
                          const res = await api.post('/reports/generate', {
-                           reportType: setupReportType,
-                           itemCategoryType: setupCategoryType,
-                           selectedIds,
-                           selectedType: 'PO',
-                           outputFormat: setupFormat,
-                           detailMode: setupDetailMode,
-                           fromDate: selectedMonth ? `${selectedMonth}-01` : undefined,
-                           toDate: selectedMonth ? undefined : undefined
-                         });
+                            reportType: setupReportType,
+                            itemCategoryType: setupCategoryType,
+                            ...(selectedIds.length > 0 ? { po_ids: selectedIds } : {}),
+                            selectedType: 'PO',
+                            outputFormat: setupFormat,
+                            detailMode: setupDetailMode,
+                            fromDate: selectedMonth && selectedIds.length === 0 ? `${selectedMonth}-01` : undefined,
+                            toDate: undefined
+                          });
                          if (res.data.fileUrl) {
                            window.open(res.data.fileUrl, '_blank');
                          } else {
@@ -2202,7 +2339,16 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
                             {/* TITLE */}
                             <h2 className="title-main">{printTitle}</h2>
-                            <p className="title-sub">(Tổng hợp từ {group.poCount} phiếu mua sắm / đề nghị đang lọc)</p>
+
+                            <p className="title-sub">
+
+                              {selectedIds.length > 0
+
+                                ? `Phạm vi: Theo phiếu đã chọn (${group.poCount} phiếu)`
+
+                                : `(Tổng hợp từ ${group.poCount} phiếu mua sắm / đề nghị đang lọc)`}
+
+                            </p>
 
                             {/* OVERVIEW INFO BLOCK */}
                             <div className="info-grid">
@@ -2411,7 +2557,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                         <td className="font-bold" style={{ width: '25%' }}>Kỳ tổng hợp:</td>
                                         <td style={{ width: '25%' }}>{periodLabel}</td>
                                         <td className="font-bold" style={{ width: '25%' }}>Phạm vi:</td>
-                                        <td style={{ width: '25%' }}>{selectedIds.length > 0 ? "Theo danh sách chọn" : "Toàn hệ thống (Bộ lọc)"}</td>
+                                        <td style={{ width: '25%' }}>{selectedIds.length > 0 ? `Theo phiếu đã chọn (${deptReportDataVPP.poCount} phiếu)` : "Toàn hệ thống (Bộ lọc)"}</td>
                                     </tr>
                                     <tr>
                                         <td className="font-bold">Số phòng ban phát sinh:</td>
@@ -2561,7 +2707,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                         <td className="font-bold" style={{ width: '25%' }}>Kỳ tổng hợp:</td>
                                         <td style={{ width: '25%' }}>{periodLabel}</td>
                                         <td className="font-bold" style={{ width: '25%' }}>Phạm vi:</td>
-                                        <td style={{ width: '25%' }}>{selectedIds.length > 0 ? "Theo danh sách chọn" : "Toàn hệ thống (Bộ lọc)"}</td>
+                                        <td style={{ width: '25%' }}>{selectedIds.length > 0 ? `Theo phiếu đã chọn (${deptReportDataVS.poCount} phiếu)` : "Toàn hệ thống (Bộ lọc)"}</td>
                                     </tr>
                                     <tr>
                                         <td className="font-bold">Số phòng ban phát sinh:</td>
@@ -2693,7 +2839,15 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                             </div>
 
                             <h2 className="title-main uppercase text-center">{titleText}</h2>
-                            <p className="title-sub">(Tổng hợp từ ${targetData.length} phiếu mua sắm / đề nghị đang lọc)</p>
+                            <p className="title-sub">
+
+                              {selectedIds.length > 0
+
+                                ? `Phạm vi: Theo phiếu đã chọn (${targetData.length} phiếu)`
+
+                                : `(Tổng hợp từ ${targetData.length} phiếu mua sắm / đề nghị đang lọc)`}
+
+                            </p>
 
                             <table className="print-table mb-4" style={{ fontSize: '8.5pt' }}>
                                 <thead>
@@ -2706,7 +2860,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                         <td className="font-bold" style={{ width: '25%' }}>Kỳ tổng hợp:</td>
                                         <td style={{ width: '25%' }}>{periodLabel}</td>
                                         <td className="font-bold" style={{ width: '25%' }}>Phạm vi:</td>
-                                        <td style={{ width: '25%' }}>{selectedIds.length > 0 ? "Theo danh sách chọn" : "Toàn hệ thống (Bộ lọc)"}</td>
+                                        <td style={{ width: '25%' }}>{selectedIds.length > 0 ? `Theo phiếu đã chọn (${targetData.length} phiếu)` : "Toàn hệ thống (Bộ lọc)"}</td>
                                     </tr>
                                     <tr>
                                         <td className="font-bold">Số phòng ban đề xuất:</td>
@@ -2859,7 +3013,15 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                             </div>
 
                             <h2 className="title-main uppercase text-center">{titleText}</h2>
-                            <p className="title-sub">(Tổng hợp từ ${targetData.length} phiếu mua sắm / đề nghị đang lọc)</p>
+                            <p className="title-sub">
+
+                              {selectedIds.length > 0
+
+                                ? `Phạm vi: Theo phiếu đã chọn (${targetData.length} phiếu)`
+
+                                : `(Tổng hợp từ ${targetData.length} phiếu mua sắm / đề nghị đang lọc)`}
+
+                            </p>
 
                             <table className="print-table mb-4" style={{ fontSize: '8.5pt' }}>
                                 <thead>
@@ -2872,7 +3034,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                         <td className="font-bold" style={{ width: '25%' }}>Kỳ tổng hợp:</td>
                                         <td style={{ width: '25%' }}>{periodLabel}</td>
                                         <td className="font-bold" style={{ width: '25%' }}>Phạm vi:</td>
-                                        <td style={{ width: '25%' }}>{selectedIds.length > 0 ? "Theo danh sách chọn" : "Toàn hệ thống (Bộ lọc)"}</td>
+                                        <td style={{ width: '25%' }}>{selectedIds.length > 0 ? `Theo phiếu đã chọn (${targetData.length} phiếu)` : "Toàn hệ thống (Bộ lọc)"}</td>
                                     </tr>
                                     <tr>
                                         <td className="font-bold">Số phòng ban đề xuất:</td>
