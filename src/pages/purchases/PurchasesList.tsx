@@ -432,16 +432,6 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
               const type = getItemCategoryType(effectiveItem);
 
-              // Console warning for mismatch
-              const reqWarehouse = line.requestLine?.request?.warehouseCode;
-              if (reqWarehouse) {
-                  if (type === 'VE_SINH' && reqWarehouse === 'MAIN') {
-                      console.warn(`Mismatch: Item ${effectiveItem.mvpp} (${effectiveItem.name}) is classified as VE_SINH but requested for MAIN warehouse.`);
-                  } else if (type === 'VPP' && reqWarehouse === 'VE_SINH') {
-                      console.warn(`Mismatch: Item ${effectiveItem.mvpp} (${effectiveItem.name}) is classified as VPP but requested for VE_SINH warehouse.`);
-                  }
-              }
-
               if (!groups.has(type)) groups.set(type, new Map());
               const typeMap = groups.get(type)!;
               
