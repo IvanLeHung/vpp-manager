@@ -745,8 +745,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                         }))
                         .sort((a: any, b: any) => b.qty - a.qty)
                   };
-              })
-              .filter(item => getItemCategoryType(item) === type));
+              }));
           
           const groupApprovedTotal = items.reduce((s, i) => s + i.originalTotal, 0);
           const groupActualTotal = items.reduce((s, i) => s + i.actualTotal, 0);
