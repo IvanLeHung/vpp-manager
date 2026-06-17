@@ -285,6 +285,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
   const canConfirmDelivery = (isManager || isAdmin) && isORDERED;
   const canCancel = isAdmin && !isCOMPLETED && !isCANCELLED;
   const canEdit = (currentUid === data.requesterId || isAdmin) && (isDRAFT || isRETURNED);
+  const canComplete = (isManager || isAdmin) && !isCOMPLETED && !isCANCELLED && !isDRAFT && !isPENDING && !isRETURNED;
 
   const addApprovalLine = (item: any) => {
     if (approvals.find((a: any) => a.itemId === item.id && !a.isDeleted)) {
@@ -1066,6 +1067,14 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                           </button>
                       )}
 
+                      {/* Manual Complete */}
+                      {canComplete && (
+                          <button onClick={() => { if(window.confirm('Xác nhận hoàn tất phiếu mua sắm này?')) handleAction('/complete', {}, 'Đã hoàn tất phiếu mua sắm thành công!') }} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-black hover:bg-emerald-700 transition shadow-lg shadow-emerald-600/30 flex flex-col items-center gap-0.5 group-active:scale-95 transform">
+                             <span className="flex items-center gap-1.5 text-xs uppercase tracking-wider"><CheckCircle2 className="w-4 h-4"/> Hoàn Tất Phiếu</span>
+                             <span className="text-[8px] font-bold text-emerald-100 opacity-60 uppercase tracking-widest">Đóng phiếu & ghi nhận hoàn thành</span>
+                          </button>
+                      )}
+
                       {/* PRINT OPTIONS GROUP */}
                       <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-slate-700">
                           <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1 text-center">Tùy chọn in mua sắm</p>
@@ -1112,7 +1121,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                       )}
 
                       {/* Placeholder for no actions */}
-                      {!canSubmit && !canApprove && !canOrder && !canConfirmDelivery && !canCancel && !canEdit && (
+                      {!canSubmit && !canApprove && !canOrder && !canConfirmDelivery && !canCancel && !canEdit && !canComplete && (
                         <div className="py-6 flex flex-col items-center justify-center opacity-40">
                            <AlertTriangle className="w-8 h-8 text-slate-300 mb-2"/>
                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center leading-tight">Không có <br/> Thao tác</p>
