@@ -2337,8 +2337,25 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                 ? `Phạm vi: Theo phiếu đã chọn (${group.poCount} phiếu)`
 
                                 : `(Tổng hợp từ ${group.poCount} phiếu mua sắm / đề nghị đang lọc)`}
-
-                            </p>
+  <br />
+  <span style={{ fontSize: '0.9em', fontStyle: 'italic' }}>
+    {(() => {
+       let pos = targetData || [];
+       if (!pos || pos.length === 0) return '';
+       let minD = new Date(pos[0].createdAt);
+       let maxD = new Date(pos[0].createdAt);
+       pos.forEach((p:any) => {
+         const d = new Date(p.createdAt);
+         if(d < minD) minD = d;
+         if(d > maxD) maxD = d;
+       });
+       if (minD.toDateString() === maxD.toDateString()) {
+          return `Ngày ${minD.getDate()} tháng ${minD.getMonth()+1} năm ${minD.getFullYear()}`;
+       }
+       return `Từ ngày ${minD.getDate()}/${minD.getMonth()+1}/${minD.getFullYear()} đến ngày ${maxD.getDate()}/${maxD.getMonth()+1}/${maxD.getFullYear()}`;
+    })()}
+  </span>
+</p>
 
                             {/* OVERVIEW INFO BLOCK */}
                             <div className="info-grid">
@@ -2836,8 +2853,25 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                 ? `Phạm vi: Theo phiếu đã chọn (${targetData.length} phiếu)`
 
                                 : `(Tổng hợp từ ${targetData.length} phiếu mua sắm / đề nghị đang lọc)`}
-
-                            </p>
+  <br />
+  <span style={{ fontSize: '0.9em', fontStyle: 'italic' }}>
+    {(() => {
+       let pos = targetData || [];
+       if (!pos || pos.length === 0) return '';
+       let minD = new Date(pos[0].createdAt);
+       let maxD = new Date(pos[0].createdAt);
+       pos.forEach((p:any) => {
+         const d = new Date(p.createdAt);
+         if(d < minD) minD = d;
+         if(d > maxD) maxD = d;
+       });
+       if (minD.toDateString() === maxD.toDateString()) {
+          return `Ngày ${minD.getDate()} tháng ${minD.getMonth()+1} năm ${minD.getFullYear()}`;
+       }
+       return `Từ ngày ${minD.getDate()}/${minD.getMonth()+1}/${minD.getFullYear()} đến ngày ${maxD.getDate()}/${maxD.getMonth()+1}/${maxD.getFullYear()}`;
+    })()}
+  </span>
+</p>
 
                             <table className="print-table mb-4" style={{ fontSize: '8.5pt' }}>
                                 <thead>
@@ -3010,8 +3044,25 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                 ? `Phạm vi: Theo phiếu đã chọn (${targetData.length} phiếu)`
 
                                 : `(Tổng hợp từ ${targetData.length} phiếu mua sắm / đề nghị đang lọc)`}
-
-                            </p>
+  <br />
+  <span style={{ fontSize: '0.9em', fontStyle: 'italic' }}>
+    {(() => {
+       let pos = targetData || [];
+       if (!pos || pos.length === 0) return '';
+       let minD = new Date(pos[0].createdAt);
+       let maxD = new Date(pos[0].createdAt);
+       pos.forEach((p:any) => {
+         const d = new Date(p.createdAt);
+         if(d < minD) minD = d;
+         if(d > maxD) maxD = d;
+       });
+       if (minD.toDateString() === maxD.toDateString()) {
+          return `Ngày ${minD.getDate()} tháng ${minD.getMonth()+1} năm ${minD.getFullYear()}`;
+       }
+       return `Từ ngày ${minD.getDate()}/${minD.getMonth()+1}/${minD.getFullYear()} đến ngày ${maxD.getDate()}/${maxD.getMonth()+1}/${maxD.getFullYear()}`;
+    })()}
+  </span>
+</p>
 
                             <table className="print-table mb-4" style={{ fontSize: '8.5pt' }}>
                                 <thead>
