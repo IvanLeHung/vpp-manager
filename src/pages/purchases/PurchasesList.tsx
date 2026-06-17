@@ -1218,6 +1218,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   };
 
   const handleExportExcelTemplate = () => {
+    try {
 
 
       if (summaryGroups.length === 0) {
@@ -1343,9 +1344,14 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       ? `PhieuTongHopMuaSam${suffix}.xlsx`
       : `Phieu_Tong_Hop_Mua_Sam_Mau_In_${new Date().toISOString().slice(0,10)}.xlsx`;
     XLSX.writeFile(wb, fileName);
+    } catch (error) {
+      console.error('Export Excel template failed', error);
+      toast.error('Không thể xuất Excel. Vui lòng thử lại.');
+    }
   };
 
   const handleExportWordTemplate = async (type: 'VPP' | 'VE_SINH') => {
+    try {
 
 
       if (selectedIds.length > 0) {
@@ -1370,27 +1376,16 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
 
       const group = summaryGroups.find(g => g.type === type);
-    if (!group) return;
+    if (!group) {
+      toast.error("Không có dữ liệu phù hợp để xuất Word.");
+      return;
+    }
 
     const groupCodeShort = group.type === 'VE_SINH' ? 'VS' : group.type;
     const summaryCode = `THMS-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${groupCodeShort}`;
     const printTitle = group.type === 'VPP' 
         ? 'PHIẾU TỔNG HỢP MUA SẮM VĂN PHÒNG PHẨM' 
         : 'PHIẾU TỔNG HỢP MUA SẮM VẬT TƯ VỆ SINH';
-
-    // Fetch QR code
-    let qrImage;
-    try {
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(summaryCode)}`;
-        const resp = await fetch(qrUrl);
-        const buffer = await resp.arrayBuffer();
-        qrImage = new docx.ImageRun({
-            data: buffer,
-            transformation: { width: 60, height: 60 },
-        } as any);
-    } catch (e) {
-        console.error("Could not load QR code", e);
-    }
 
     const doc = new docx.Document({
         styles: {
@@ -1425,7 +1420,9 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                 new docx.TableCell({
                                     width: { size: 15, type: docx.WidthType.PERCENTAGE },
                                     verticalAlign: docx.VerticalAlign.CENTER,
-                                    children: qrImage ? [new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [qrImage] })] : []
+                                    children: [
+                                      new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: summaryCode, size: 14, bold: true })] })
+                                    ]
                                 }),
                                 new docx.TableCell({
                                     width: { size: 50, type: docx.WidthType.PERCENTAGE },
@@ -1624,6 +1621,10 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       ? `PhieuTongHopMuaSam${categoryLabel}${suffix}.docx`
       : `Phieu_Tong_Hop_Mua_Sam_${group.type}_${new Date().toISOString().slice(0,10)}.docx`;
     saveAs(blob, fileName);
+    } catch (error) {
+      console.error('Export Word template failed', error);
+      toast.error('Không thể xuất Word. Vui lòng thử lại.');
+    }
   };
 
   const toggleSelect = (id: string) => {
@@ -1887,11 +1888,11 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                         <Download className="w-3.5 h-3.5 mr-2 text-emerald-500"/>
                                         <span className="text-xs">Xuất Excel theo mẫu in</span>
                                      </button>
-                                     <button 
-                                       disabled={printStats.vppCount === 0 && printStats.vsCount === 0}
-                                       onClick={() => { handleExportWordTemplate('VPP'); setShowPrintMenu(false); }}
-                                       className="w-full px-4 py-2 text-left flex items-center hover:bg-blue-50 transition text-blue-700 font-bold"
-                                     >
+                                      <button 
+                                        disabled={printStats.vppCount === 0 && printStats.vsCount === 0}
+                                        onClick={() => { handleExportWordTemplate(printStats.vppCount > 0 ? 'VPP' : 'VE_SINH'); setShowPrintMenu(false); }}
+                                        className="w-full px-4 py-2 text-left flex items-center hover:bg-blue-50 transition text-blue-700 font-bold"
+                                      >
                                         <Download className="w-3.5 h-3.5 mr-2 text-blue-500"/>
                                         <span className="text-xs">Xuất Word theo mẫu in</span>
                                      </button>
