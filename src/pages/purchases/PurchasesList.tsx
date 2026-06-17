@@ -219,14 +219,74 @@ function getItemCategoryType(item: any): 'VPP' | 'VE_SINH' | 'OTHER' {
   return 'OTHER';
 }
 
+function firstNumber(...values: any[]): number {
+  for (const value of values) {
+    if (value !== null && value !== undefined && value !== '') {
+      const numberValue = Number(value);
+      if (!Number.isNaN(numberValue)) return numberValue;
+    }
+  }
+  return 0;
+}
+
+function getEffectiveLineItem(line: any): any {
+  if (!line) return null;
+  const hasReplacement = !!line.requestLine?.replacementItemId;
+  if (hasReplacement && line.requestLine?.replacementItem) return line.requestLine.replacementItem;
+  return line.item || line.requestLine?.replacementItem || line.requestLine?.item || line.replacementItem || null;
+}
+
+function getLinePrintQty(line: any): number {
+  const hasReplacement = !!line?.requestLine?.replacementItemId;
+  return hasReplacement
+    ? firstNumber(
+        line.effectiveQty,
+        line.requestLine?.replacementQty,
+        line.qtyDelivered,
+        line.qtyOrdered,
+        line.qtyApproved,
+        line.qtyRequested,
+        line.requestLine?.qtyApproved,
+        line.requestLine?.qtyRequested
+      )
+    : firstNumber(
+        line.effectiveQty,
+        line.qtyDelivered,
+        line.qtyOrdered,
+        line.qtyApproved,
+        line.qtyRequested,
+        line.requestLine?.qtyApproved,
+        line.requestLine?.qtyRequested
+      );
+}
+
+function getLinePrintPrice(line: any, effectiveItem?: any): number {
+  const hasReplacement = !!line?.requestLine?.replacementItemId;
+  return hasReplacement
+    ? firstNumber(
+        line.effectivePrice,
+        line.requestLine?.replacementPrice,
+        line.unitPrice,
+        effectiveItem?.price,
+        line.item?.price,
+        line.requestLine?.item?.price
+      )
+    : firstNumber(
+        line.effectivePrice,
+        line.unitPrice,
+        effectiveItem?.price,
+        line.item?.price,
+        line.requestLine?.item?.price
+      );
+}
+
 function getEligibleRequestCount(templateKey: 'VPP' | 'VE_SINH', selectedRequests: any[]): number {
   if (!selectedRequests || selectedRequests.length === 0) return 0;
   
   const eligibleRequests = selectedRequests.filter(po => {
     if (!po.lines) return false;
     return po.lines.some((line: any) => {
-      const isReplaced = !!line.requestLine?.replacementItemId;
-      const effectiveItem = isReplaced ? line.requestLine.replacementItem : line.item;
+      const effectiveItem = getEffectiveLineItem(line);
       if (!effectiveItem) return false;
       return getItemCategoryType(effectiveItem) === templateKey;
     });
@@ -309,8 +369,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
     return selectedPOs.some(po => {
       if (!po.lines) return false;
       return po.lines.some((line: any) => {
-        const isReplaced = !!line.requestLine?.replacementItemId;
-        const effectiveItem = isReplaced ? line.requestLine.replacementItem : line.item;
+        const effectiveItem = getEffectiveLineItem(line);
         if (!effectiveItem) return false;
         
         const override = itemsClassification?.find((c: any) => c.item_id === effectiveItem.id);
@@ -376,7 +435,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
     selectedPOs.forEach(po => {
       if (!po.lines) return;
       po.lines.forEach((line: any) => {
-        const item = line.item;
+        const item = getEffectiveLineItem(line);
         if (!item) return;
         if (!itemMap.has(item.id)) {
           const nameLower = item.name.toLowerCase();
@@ -528,13 +587,11 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
         : filteredData;
 
       targetData.forEach(po => {
-          if (['CANCELLED', 'REJECTED', 'COMPLETED'].includes(po.status)) return;
+          if (['CANCELLED', 'REJECTED'].includes(po.status)) return;
           
           po.lines?.forEach((line: any) => {
-              if (!line.item) return;
-              
               const isReplaced = !!line.requestLine?.replacementItemId;
-              const effectiveItem = isReplaced ? line.requestLine.replacementItem : line.item;
+              const effectiveItem = getEffectiveLineItem(line);
               if (!effectiveItem) return;
 
               const type = getItemCategoryType(effectiveItem);
@@ -542,19 +599,19 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               if (!groups.has(type)) groups.set(type, new Map());
               const typeMap = groups.get(type)!;
               
-              const key = effectiveItem.mvpp;
-              const effectiveQty = Number(line.qtyOrdered || line.qtyApproved || line.qtyRequested || 0);
-              const effectivePrice = Number(isReplaced ? (line.requestLine?.replacementPrice || line.unitPrice || line.item?.price || 0) : (line.unitPrice || line.item?.price || 0));
+              const key = effectiveItem.mvpp || effectiveItem.id;
+              const effectiveQty = getLinePrintQty(line);
+              const effectivePrice = getLinePrintPrice(line, effectiveItem);
               const effectiveItemName = effectiveItem.name || line.item?.name || '';
 
               // For Totals comparison
-              const originalQty = Number(line.qtyRequested || 0);
-              const originalPrice = Number(line.requestLine?.unitPrice || line.requestLine?.item?.price || line.unitPrice || line.item?.price || 0);
+              const originalQty = firstNumber(line.requestLine?.qtyRequested, line.qtyRequested, line.qtyApproved, line.qtyOrdered, line.qtyDelivered);
+              const originalPrice = firstNumber(line.requestLine?.unitPrice, line.requestLine?.item?.price, line.unitPrice, line.item?.price, effectiveItem.price);
 
               const current = typeMap.get(key) || {
-                  mvpp: effectiveItem.mvpp,
+                  mvpp: effectiveItem.mvpp || effectiveItem.id,
                   name: effectiveItemName,
-                  unit: effectiveItem.unit || line.item.unit,
+                  unit: effectiveItem.unit || line.item?.unit || line.requestLine?.item?.unit || '',
                   price: effectivePrice || 0,
                   qty: 0,
                   originalTotal: 0,
@@ -589,26 +646,24 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               if (!specificNote) specificNote = line.note || '';
 
               const originalUnit = originalRequestLine?.item?.unit || line.item?.unit || effectiveItem.unit;
-               const allocationQty = Number(
-                 isReplaced
-                   ? (
-                       originalRequestLine?.replacementQty ??
-                       originalRequestLine?.qtyApproved ??
-                       originalRequestLine?.qtyRequested ??
-                       line.qtyRequested ??
-                       line.qtyApproved ??
-                       line.qtyOrdered ??
-                       0
-                     )
-                   : (
-                       originalRequestLine?.qtyApproved ??
-                       originalRequestLine?.qtyRequested ??
-                       line.qtyRequested ??
-                       line.qtyApproved ??
-                       line.qtyOrdered ??
-                       0
-                     )
-               );
+              const allocationQty = isReplaced
+                ? firstNumber(
+                    originalRequestLine?.replacementQty,
+                    originalRequestLine?.qtyApproved,
+                    originalRequestLine?.qtyRequested,
+                    line.qtyDelivered,
+                    line.qtyRequested,
+                    line.qtyApproved,
+                    line.qtyOrdered
+                  )
+                : firstNumber(
+                    originalRequestLine?.qtyApproved,
+                    originalRequestLine?.qtyRequested,
+                    line.qtyDelivered,
+                    line.qtyRequested,
+                    line.qtyApproved,
+                    line.qtyOrdered
+                  );
 
               const allocationKey = `${deptName || 'UNLINKED'}-${requestCode}-${specificNote}`;
               const existingDept = current.deptBreakdown.get(allocationKey) || { 
@@ -628,7 +683,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               // De-duplicate originalTotal calculation across all PO lines in the summary
               if (line.requestLineId && !processedReqLineIds.has(line.requestLineId)) {
                   processedReqLineIds.add(line.requestLineId);
-                  const fullOriginalQty = Number(line.requestLine?.qtyRequested || line.qtyRequested || 0);
+                  const fullOriginalQty = firstNumber(line.requestLine?.qtyRequested, line.qtyRequested, line.qtyApproved, line.qtyOrdered, line.qtyDelivered);
                   current.originalTotal += (fullOriginalQty * originalPrice);
               } else if (!line.requestLineId) {
                   current.originalTotal += (originalQty * originalPrice);
@@ -643,7 +698,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               current.deptBreakdown.set(allocationKey, existingDept);
 
               if (isReplaced) {
-                const repKey = `${line.item.mvpp}-${line.requestLine.replacementReason}`;
+                const repKey = `${line.item?.mvpp || line.requestLine?.item?.mvpp || effectiveItem.mvpp || effectiveItem.id}-${line.requestLine.replacementReason}`;
                 if (!current.replacements.some((r: any) => r.key === repKey)) {
                   current.replacements.push({
                     key: repKey,
@@ -769,14 +824,15 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
         po.lines.forEach((line: any) => {
             const reqLine = line.requestLine;
+            const effectiveItem = getEffectiveLineItem(line);
             
-            const originalPrice = Number(reqLine?.unitPrice || reqLine?.item?.price || line.unitPrice || line.item?.price || 0);
-            const originalQty = Number(reqLine?.qtyRequested || line.qtyRequested || 0); // Use the original request quantity as baseline
+            const originalPrice = firstNumber(reqLine?.unitPrice, reqLine?.item?.price, line.unitPrice, line.item?.price, effectiveItem?.price);
+            const originalQty = firstNumber(reqLine?.qtyRequested, line.qtyRequested, line.qtyApproved, line.qtyOrdered, line.qtyDelivered);
             const lineProposed = originalPrice * originalQty;
 
             const isReplaced = !!reqLine?.replacementItemId;
-            const actualPrice = isReplaced ? Number(reqLine?.replacementPrice || 0) : Number(line.unitPrice || 0);
-            const actualQty = isReplaced ? Number(reqLine?.replacementQty || 0) : Number(line.qtyOrdered || line.qtyApproved || line.qtyRequested || 0);
+            const actualPrice = getLinePrintPrice(line, effectiveItem);
+            const actualQty = getLinePrintQty(line);
             const lineActual = actualPrice * actualQty;
 
             poProposed += lineProposed;
@@ -853,10 +909,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
       targetData.forEach(po => {
           po.lines?.forEach((line: any) => {
-              if (!line.item) return;
-
-              const isReplaced = !!line.requestLine?.replacementItemId;
-              const effectiveItem = isReplaced ? line.requestLine.replacementItem : line.item;
+              const effectiveItem = getEffectiveLineItem(line);
               if (!effectiveItem) return;
 
               const categoryType = getItemCategoryType(effectiveItem);
@@ -875,8 +928,8 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
               const requestCode = line.fuzzyRequestCode || originalRequest?.id || po.id;
 
-              const effectiveQty = Number(line.qtyOrdered || line.qtyApproved || line.qtyRequested || 0);
-              const effectivePrice = Number(isReplaced ? (line.requestLine?.replacementPrice || line.unitPrice || line.item?.price || 0) : (line.unitPrice || line.item?.price || 0));
+              const effectiveQty = getLinePrintQty(line);
+              const effectivePrice = getLinePrintPrice(line, effectiveItem);
               const lineActualTotal = effectiveQty * effectivePrice;
 
               let specificNote = line.originalNote || 
@@ -926,9 +979,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       const globalUniqueRequests = new Set<string>();
       targetData.forEach(po => {
           po.lines?.forEach((line: any) => {
-              if (!line.item) return;
-              const isReplaced = !!line.requestLine?.replacementItemId;
-              const effectiveItem = isReplaced ? line.requestLine.replacementItem : line.item;
+              const effectiveItem = getEffectiveLineItem(line);
               if (!effectiveItem) return;
 
               const categoryType = getItemCategoryType(effectiveItem);
@@ -985,10 +1036,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
     targetData.forEach(po => {
       po.lines?.forEach((line: any) => {
-        if (!line.item) return;
-
-        const isReplaced = !!line.requestLine?.replacementItemId;
-        const effectiveItem = isReplaced ? line.requestLine.replacementItem : line.item;
+        const effectiveItem = getEffectiveLineItem(line);
         if (!effectiveItem) return;
 
         const category = getItemCategoryType(effectiveItem);
@@ -1003,17 +1051,19 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
         const requestCode = line.fuzzyRequestCode || originalRequest?.id || po.id;
         
-        const qtyRequested = Number(line.requestLine?.qtyRequested || line.qtyRequested || 0);
-        const qtyApproved = Number(
-          line.requestLine?.qtyAdminApproved ?? 
-          line.requestLine?.qtyManagerApproved ?? 
-          line.requestLine?.qtyApproved ?? 
-          line.requestLine?.qtyRequested ?? 
-          line.qtyApproved ?? 
-          0
+        const qtyRequested = firstNumber(line.requestLine?.qtyRequested, line.qtyRequested, line.qtyApproved, line.qtyOrdered, line.qtyDelivered);
+        const qtyApproved = firstNumber(
+          line.requestLine?.qtyAdminApproved,
+          line.requestLine?.qtyManagerApproved,
+          line.requestLine?.qtyApproved,
+          line.requestLine?.qtyRequested,
+          line.qtyApproved,
+          line.qtyRequested,
+          line.qtyOrdered,
+          line.qtyDelivered
         );
-        const qtyPurchased = Number(line.qtyOrdered || line.qtyApproved || line.qtyRequested || 0);
-        const price = Number(isReplaced ? (line.requestLine?.replacementPrice || line.unitPrice || line.item?.price || 0) : (line.unitPrice || line.item?.price || 0));
+        const qtyPurchased = getLinePrintQty(line);
+        const price = getLinePrintPrice(line, effectiveItem);
         const actualValue = qtyPurchased * price;
 
         const specificNote = line.originalNote || line.requestLine?.note || '';
@@ -1034,7 +1084,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
         const current = map.get(deptName)!;
         current.requestCodes.add(requestCode);
-        current.items.add(effectiveItem.mvpp);
+        current.items.add(effectiveItem.mvpp || effectiveItem.id);
         current.qtyRequested += qtyRequested;
         current.qtyApproved += qtyApproved;
         current.qtyPurchased += qtyPurchased;
@@ -2075,36 +2125,42 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                        {(previewPO.lines || []).map((line: any, idx: number) => (
+                        {(previewPO.lines || []).map((line: any, idx: number) => {
+                          const effectiveItem = getEffectiveLineItem(line);
+                          const qty = getLinePrintQty(line);
+                          const price = getLinePrintPrice(line, effectiveItem);
+
+                          return (
                           <tr key={idx} className="hover:bg-slate-50/30 transition-colors">
                             <td className="px-5 py-4 text-center text-[10px] font-black text-slate-300 italic">{idx + 1}</td>
                             <td className="px-5 py-4">
-                              {line.item ? (
+                              {effectiveItem ? (
                                 <GoodsNameWithPreview 
-                                  itemId={line.item.id}
-                                  itemCode={line.item.mvpp}
-                                  itemName={line.item.name}
-                                  imageUrl={line.item.imageUrl}
-                                  thumbnailUrl={line.item.thumbnailUrl}
-                                  categoryName={line.item.category}
-                                  unit={line.item.unit}
+                                  itemId={effectiveItem.id}
+                                  itemCode={effectiveItem.mvpp}
+                                  itemName={effectiveItem.name}
+                                  imageUrl={effectiveItem.imageUrl}
+                                  thumbnailUrl={effectiveItem.thumbnailUrl}
+                                  categoryName={effectiveItem.category}
+                                  unit={effectiveItem.unit}
                                 />
                               ) : (
                                 <p className="font-bold text-slate-700 text-[11px] leading-snug whitespace-normal line-clamp-2">N/A</p>
                               )}
-                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{line.item?.mvpp || '—'}</span>
+                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{effectiveItem?.mvpp || '—'}</span>
                             </td>
                             <td className="px-5 py-4 text-center">
                               <span className="font-black text-sm text-indigo-600">
-                                {line.effectiveQty ?? (line.qtyOrdered || line.qtyApproved || line.qtyRequested)}
+                                {qty}
                               </span>
-                              <p className="text-[9px] font-bold text-slate-400 uppercase">{line.item?.unit}</p>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase">{effectiveItem?.unit}</p>
                             </td>
                             <td className="px-5 py-4 text-right">
-                              <p className="text-[11px] font-black text-slate-600">{Number(line.unitPrice || line.item?.price || 0).toLocaleString('vi-VN')} đ</p>
+                              <p className="text-[11px] font-black text-slate-600">{Number(price).toLocaleString('vi-VN')} đ</p>
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
