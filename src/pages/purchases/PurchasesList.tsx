@@ -220,6 +220,9 @@ function isVeSinhItem(item: any): boolean {
 
 function getItemCategoryType(item: any): 'VPP' | 'VE_SINH' | 'OTHER' {
   if (!item) return 'OTHER';
+  const itemType = normalizeClassificationText(item.itemType);
+  if (itemType === 'vpp') return 'VPP';
+  if (itemType === 've_sinh') return 'VE_SINH';
   if (isVeSinhItem(item)) return 'VE_SINH';
   if (isVppItem(item)) return 'VPP';
   return 'OTHER';
