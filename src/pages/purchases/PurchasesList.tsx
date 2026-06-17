@@ -110,24 +110,25 @@ function sortItemsForPrinting(items: any[]) {
   });
 }
 
+function normalizeClassificationText(val: any): string {
+  if (val === null || val === undefined) return '';
+  return val.toString()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .trim();
+}
+
 function isVppItem(item: any): boolean {
   if (!item) return false;
 
-  const normalize = (val: any): string => {
-    if (val === null || val === undefined) return '';
-    return val.toString()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/đ/g, "d")
-      .replace(/Đ/g, "D")
-      .toLowerCase()
-      .trim();
-  };
-
-  const mvppNorm = normalize(item.mvpp);
+  const mvppNorm = normalizeClassificationText(item.mvpp);
   if (mvppNorm.startsWith('vpp')) return true;
 
   const fields = [
+    item.name,
     item.itemType,
     item.category,
     item.categoryName,
@@ -151,13 +152,11 @@ function isVppItem(item: any): boolean {
     'kep bam',
     'kep mau',
     'ghim',
-    'so sach',
-    'bao',
-    'nhan'
+    'so sach'
   ];
 
   return fields.some(field => {
-    const norm = normalize(field);
+    const norm = normalizeClassificationText(field);
     if (!norm) return false;
     return vppKeywords.some(keyword => norm.includes(keyword));
   });
@@ -166,21 +165,11 @@ function isVppItem(item: any): boolean {
 function isVeSinhItem(item: any): boolean {
   if (!item) return false;
 
-  const normalize = (val: any): string => {
-    if (val === null || val === undefined) return '';
-    return val.toString()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/đ/g, "d")
-      .replace(/Đ/g, "D")
-      .toLowerCase()
-      .trim();
-  };
-
-  const mvppNorm = normalize(item.mvpp);
+  const mvppNorm = normalizeClassificationText(item.mvpp);
   if (mvppNorm.startsWith('vs')) return true;
 
   const fields = [
+    item.name,
     item.itemType,
     item.category,
     item.categoryName,
@@ -198,6 +187,23 @@ function isVeSinhItem(item: any): boolean {
     'nuoc nong',
     'coc',
     'khan',
+    'khan lau',
+    'cay lau',
+    'choi',
+    'tui rac',
+    'bao rac',
+    'thung rac',
+    'nuoc rua',
+    'nuoc lau',
+    'lau san',
+    'giay ve sinh',
+    'xa phong',
+    'rua bat',
+    'rua chen',
+    'tay rua',
+    'diet khuan',
+    'gang tay',
+    'khau trang',
     'vat tu giay',
     'nuoc uong',
     'thiet bi hanh chinh',
@@ -206,7 +212,7 @@ function isVeSinhItem(item: any): boolean {
   ];
 
   return fields.some(field => {
-    const norm = normalize(field);
+    const norm = normalizeClassificationText(field);
     if (!norm) return false;
     return veSinhKeywords.some(keyword => norm.includes(keyword));
   });
@@ -214,8 +220,11 @@ function isVeSinhItem(item: any): boolean {
 
 function getItemCategoryType(item: any): 'VPP' | 'VE_SINH' | 'OTHER' {
   if (!item) return 'OTHER';
-  if (isVppItem(item)) return 'VPP';
+  const itemType = normalizeClassificationText(item.itemType);
+  if (itemType === 'vpp') return 'VPP';
+  if (itemType === 've_sinh') return 'VE_SINH';
   if (isVeSinhItem(item)) return 'VE_SINH';
+  if (isVppItem(item)) return 'VPP';
   return 'OTHER';
 }
 
@@ -736,7 +745,8 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                         }))
                         .sort((a: any, b: any) => b.qty - a.qty)
                   };
-              }));
+              })
+              .filter(item => getItemCategoryType(item) === type));
           
           const groupApprovedTotal = items.reduce((s, i) => s + i.originalTotal, 0);
           const groupActualTotal = items.reduce((s, i) => s + i.actualTotal, 0);
