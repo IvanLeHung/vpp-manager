@@ -1234,19 +1234,18 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                
                                <button onClick={() => openIssueModal()} className="w-full py-2.5 bg-emerald-600 text-white rounded-lg font-black hover:bg-emerald-700 transition shadow-sm flex items-center justify-center transform hover:scale-[1.01] border border-emerald-600 text-xs"><Archive className="w-4 h-4 mr-2"/> CẤP PHÁT CHO NHÂN SỰ</button>
                                
-                               {(currentUser?.role === 'ADMIN' || currentUser?.role === 'WAREHOUSE') && ['PARTIALLY_ISSUED', 'PARTIALLY_DELIVERED', 'WAITING_HANDOVER', 'READY_TO_ISSUE', 'APPROVED', 'BACKORDER'].includes(data.status) && (
-                                   <button 
-                                     onClick={() => {
-                                       const reason = prompt('Nhập lý do không giao nữa / đóng phiếu:');
-                                       if (reason !== null) {
-                                         handleAction('/close-remaining', { reason }, 'Đóng phiếu thành công (không giao nữa)!');
-                                       }
-                                     }} 
-                                     className="w-full py-2 bg-transparent hover:bg-rose-50 text-rose-600 rounded-lg font-bold text-[11px] transition flex items-center justify-center gap-1.5 border border-dashed border-rose-200/40"
-                                   >
-                                     <StopCircle className="w-4 h-4"/> Không giao nữa (Đóng phiếu)
-                                   </button>
-                               )}
+                                {(currentUser?.role === 'ADMIN' || currentUser?.role === 'WAREHOUSE') && ['PARTIALLY_ISSUED', 'PARTIALLY_DELIVERED', 'WAITING_HANDOVER', 'READY_TO_ISSUE', 'APPROVED', 'BACKORDER'].includes(data.status) && (
+                                    <button 
+                                      onClick={() => {
+                                        if (window.confirm('Xác nhận hoàn thành phiếu này? Phần còn lại chưa giao sẽ được đóng và phiếu chuyển sang Hoàn tất.')) {
+                                          handleAction('/close-remaining', { reason: 'Hoàn thành phiếu thủ công' }, 'Hoàn thành phiếu thành công!');
+                                        }
+                                      }} 
+                                      className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-black text-xs transition flex items-center justify-center gap-1.5 border border-teal-600 shadow-sm shadow-teal-600/20"
+                                    >
+                                      <CheckCircle className="w-4 h-4"/> HOÀN THÀNH PHIẾU
+                                    </button>
+                                )}
                            </div>
                       )}
                       {currentUser?.role === 'ADMIN' && 
