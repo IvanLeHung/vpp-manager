@@ -240,12 +240,25 @@ function firstNumber(...values: any[]): number {
 
 function getEffectiveLineItem(line: any): any {
   if (!line) return null;
+  if (line.receiptReplacementItem) return line.receiptReplacementItem;
   const hasReplacement = !!line.requestLine?.replacementItemId;
   if (hasReplacement && line.requestLine?.replacementItem) return line.requestLine.replacementItem;
   return line.item || line.requestLine?.replacementItem || line.requestLine?.item || line.replacementItem || null;
 }
 
 function getLinePrintQty(line: any): number {
+  if (line?.receiptReplacementItem) {
+    return firstNumber(
+      line.receiptReplacementQty,
+      line.effectiveQty,
+      line.qtyDelivered,
+      line.qtyOrdered,
+      line.qtyApproved,
+      line.qtyRequested,
+      line.requestLine?.qtyApproved,
+      line.requestLine?.qtyRequested
+    );
+  }
   const hasReplacement = !!line?.requestLine?.replacementItemId;
   return hasReplacement
     ? firstNumber(
@@ -270,6 +283,16 @@ function getLinePrintQty(line: any): number {
 }
 
 function getLinePrintPrice(line: any, effectiveItem?: any): number {
+  if (line?.receiptReplacementItem) {
+    return firstNumber(
+      line.receiptReplacementPrice,
+      line.effectivePrice,
+      effectiveItem?.price,
+      line.unitPrice,
+      line.item?.price,
+      line.requestLine?.item?.price
+    );
+  }
   const hasReplacement = !!line?.requestLine?.replacementItemId;
   return hasReplacement
     ? firstNumber(
@@ -599,7 +622,8 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
           if (['CANCELLED', 'REJECTED'].includes(po.status)) return;
           
           po.lines?.forEach((line: any) => {
-              const isReplaced = !!line.requestLine?.replacementItemId;
+              const isReceiptReplaced = !!line.receiptReplacementItem;
+              const isReplaced = isReceiptReplaced || !!line.requestLine?.replacementItemId;
               const effectiveItem = getEffectiveLineItem(line);
               if (!effectiveItem) return;
 
@@ -655,7 +679,9 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               if (!specificNote) specificNote = line.note || '';
 
               const originalUnit = originalRequestLine?.item?.unit || line.item?.unit || effectiveItem.unit;
-              const allocationQty = isReplaced
+              const allocationQty = isReceiptReplaced
+                ? effectiveQty
+                : isReplaced
                 ? firstNumber(
                     originalRequestLine?.replacementQty,
                     originalRequestLine?.qtyApproved,
@@ -707,15 +733,19 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
               current.deptBreakdown.set(allocationKey, existingDept);
 
               if (isReplaced) {
-                const repKey = `${line.item?.mvpp || line.requestLine?.item?.mvpp || effectiveItem.mvpp || effectiveItem.id}-${line.requestLine.replacementReason}`;
+                const replacementReason = isReceiptReplaced ? line.receiptReplacementReason : line.requestLine?.replacementReason;
+                const originalItem = isReceiptReplaced
+                  ? (line.requestLine?.replacementItemId ? line.requestLine?.replacementItem : line.item)
+                  : (line.requestLine?.item || line.item);
+                const repKey = `${originalItem?.mvpp || effectiveItem.mvpp || effectiveItem.id}-${replacementReason || ''}`;
                 if (!current.replacements.some((r: any) => r.key === repKey)) {
                   current.replacements.push({
                     key: repKey,
-                    originalName: line.requestLine?.item?.name || line.item?.name,
-                    originalCode: line.requestLine?.item?.mvpp || line.item?.mvpp,
+                    originalName: originalItem?.name,
+                    originalCode: originalItem?.mvpp,
                     originalPrice: originalPrice,
                     originalQty: originalQty,
-                    reason: line.requestLine.replacementReason,
+                    reason: replacementReason,
                     diff: (originalQty * originalPrice) - (effectiveQty * effectivePrice)
                   });
                 }
@@ -839,7 +869,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
             const originalQty = firstNumber(reqLine?.qtyRequested, line.qtyRequested, line.qtyApproved, line.qtyOrdered, line.qtyDelivered);
             const lineProposed = originalPrice * originalQty;
 
-            const isReplaced = !!reqLine?.replacementItemId;
+            const isReplaced = !!line.receiptReplacementItem || !!reqLine?.replacementItemId;
             const actualPrice = getLinePrintPrice(line, effectiveItem);
             const actualQty = getLinePrintQty(line);
             const lineActual = actualPrice * actualQty;
