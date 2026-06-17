@@ -110,22 +110,129 @@ function sortItemsForPrinting(items: any[]) {
   });
 }
 
+function isVppItem(item: any): boolean {
+  if (!item) return false;
+
+  const normalize = (val: any): string => {
+    if (val === null || val === undefined) return '';
+    return val.toString()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .toLowerCase()
+      .trim();
+  };
+
+  const mvppNorm = normalize(item.mvpp);
+  if (mvppNorm.startsWith('vpp')) return true;
+
+  const fields = [
+    item.itemType,
+    item.category,
+    item.categoryName,
+    item.groupName,
+    item.warehouseGroup,
+    item.materialGroup
+  ];
+
+  const vppKeywords = [
+    'vpp',
+    'van phong pham',
+    'dung cu van phong',
+    'giay in',
+    'bang dinh',
+    'keo',
+    'bia tai lieu',
+    'hop so',
+    'ho kho',
+    'xoa',
+    'do doc',
+    'kep bam',
+    'kep mau',
+    'ghim',
+    'so sach',
+    'bao',
+    'nhan'
+  ];
+
+  return fields.some(field => {
+    const norm = normalize(field);
+    if (!norm) return false;
+    return vppKeywords.some(keyword => norm.includes(keyword));
+  });
+}
+
+function isVeSinhItem(item: any): boolean {
+  if (!item) return false;
+
+  const normalize = (val: any): string => {
+    if (val === null || val === undefined) return '';
+    return val.toString()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .toLowerCase()
+      .trim();
+  };
+
+  const mvppNorm = normalize(item.mvpp);
+  if (mvppNorm.startsWith('vs')) return true;
+
+  const fields = [
+    item.itemType,
+    item.category,
+    item.categoryName,
+    item.groupName,
+    item.warehouseGroup,
+    item.materialGroup
+  ];
+
+  const veSinhKeywords = [
+    've sinh',
+    'do ve sinh',
+    'tap hoa',
+    'hoa chat',
+    'hoa my pham',
+    'nuoc nong',
+    'coc',
+    'khan',
+    'vat tu giay',
+    'nuoc uong',
+    'thiet bi hanh chinh',
+    'bao ho lao dong',
+    'y te'
+  ];
+
+  return fields.some(field => {
+    const norm = normalize(field);
+    if (!norm) return false;
+    return veSinhKeywords.some(keyword => norm.includes(keyword));
+  });
+}
+
 function getItemCategoryType(item: any): 'VPP' | 'VE_SINH' | 'OTHER' {
   if (!item) return 'OTHER';
-  
-  const type = (item.itemType || '').toString().toUpperCase();
-  if (type === 'VPP' || type.includes('VĂN PHÒNG PHẨM')) return 'VPP';
-  if (type === 'VE_SINH' || type.includes('VỆ SINH')) return 'VE_SINH';
-  
-  const cat = (item.category || '').toString().toUpperCase();
-  if (cat.includes('VPP') || cat.includes('VĂN PHÒNG PHẨM')) return 'VPP';
-  if (cat.includes('VE_SINH') || cat.includes('VỆ SINH') || cat.includes('TẠP HÓA')) return 'VE_SINH';
-  
-  const mvpp = (item.mvpp || '').toString().toUpperCase();
-  if (mvpp.startsWith('VPP')) return 'VPP';
-  if (mvpp.startsWith('VS')) return 'VE_SINH';
-  
+  if (isVppItem(item)) return 'VPP';
+  if (isVeSinhItem(item)) return 'VE_SINH';
   return 'OTHER';
+}
+
+function getEligibleRequestCount(templateKey: 'VPP' | 'VE_SINH', selectedRequests: any[]): number {
+  if (!selectedRequests || selectedRequests.length === 0) return 0;
+  
+  const eligibleRequests = selectedRequests.filter(po => {
+    if (!po.lines) return false;
+    return po.lines.some((line: any) => {
+      const isReplaced = !!line.requestLine?.replacementItemId;
+      const effectiveItem = isReplaced ? line.requestLine.replacementItem : line.item;
+      if (!effectiveItem) return false;
+      return getItemCategoryType(effectiveItem) === templateKey;
+    });
+  });
+
+  return eligibleRequests.length;
 }
 
 function hasPermission(role: string, permission: string): boolean {
@@ -621,11 +728,16 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   }, [currentPrintGroups]);
 
   const printStats = useMemo(() => {
-    const vppCount = summaryGroups.find(g => g.type === 'VPP')?.items.length || 0;
-    const vsCount = summaryGroups.find(g => g.type === 'VE_SINH')?.items.length || 0;
+    const selectedRequests = selectedIds.length > 0 
+      ? data.filter(po => selectedIds.includes(po.id))
+      : [];
+
+    const vppCount = getEligibleRequestCount('VPP', selectedRequests);
+    const vsCount = getEligibleRequestCount('VE_SINH', selectedRequests);
     const otherCount = summaryGroups.find(g => !['VPP', 'VE_SINH'].includes(g.type))?.items.length || 0;
+
     return { vppCount, vsCount, otherCount, total: vppCount + vsCount + otherCount };
-  }, [summaryGroups]);
+  }, [selectedIds, data, summaryGroups]);
 
   const executiveData = useMemo(() => {
     let deptStats = new Map<string, { proposed: number, actual: number, savings: number }>();
