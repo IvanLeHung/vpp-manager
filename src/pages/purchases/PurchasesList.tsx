@@ -2299,6 +2299,9 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
             .map((group) => (
             <div key={group.type} className="print-sheet p-4">
                 {(() => {
+                    const targetData = selectedIds.length > 0 
+                      ? data.filter(d => selectedIds.includes(d.id))
+                      : filteredData;
                     const printTitle = group.type === 'VPP' 
                         ? 'PHIẾU TỔNG HỢP MUA SẮM VĂN PHÒNG PHẨM' 
                         : group.type === 'VE_SINH' 
