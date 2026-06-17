@@ -81,6 +81,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedMode, setSelectedMode] = useState<'NONE' | 'MANUAL' | 'ALL_FILTERED'>('NONE');
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH'>('ALL');
   const [printMode, setPrintMode] = useState<'SUMMARY' | 'INDIVIDUAL'>('SUMMARY');
@@ -167,7 +168,8 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   // Handle row selection changes when data changes
   useEffect(() => {
     setSelectedIds([]);
-  }, [statusFilters, searchTerm]);
+    setSelectedMode('NONE');
+  }, [statusFilters, searchTerm, deptFilter, priorityFilter]);
 
   const stats = useMemo(() => {
     return {
@@ -199,15 +201,21 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
 
 
   const toggleSelectAll = () => {
-     if (selectedIds.length === currentData.length && currentData.length !== 0) {
-        setSelectedIds([]);
-     } else {
-        setSelectedIds(currentData.map(r => r.id));
-     }
+    if (selectedMode === 'ALL_FILTERED') {
+      setSelectedMode('NONE');
+      setSelectedIds([]);
+    } else if (selectedIds.length === currentData.length && currentData.length !== 0) {
+      setSelectedMode('NONE');
+      setSelectedIds([]);
+    } else {
+      setSelectedMode('MANUAL');
+      setSelectedIds(currentData.map(r => r.id));
+    }
   };
 
   const selectAllFiltered = () => {
-    setSelectedIds(filteredRequests.map(r => r.id));
+    setSelectedMode('ALL_FILTERED');
+    setSelectedIds([]); // Clear manual ids since ALL_FILTERED overrides
     setShowHeaderMenu(false);
   };
 
@@ -217,7 +225,15 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   };
 
   const toggleSelect = (id: string) => {
-     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+     if (selectedMode === 'ALL_FILTERED') {
+         // If they were in ALL_FILTERED and uncheck one, we fall back to MANUAL (which is hard to calculate exactly without all IDs, so we just reset)
+         setSelectedMode('MANUAL');
+         const allIds = filteredRequests.map(r => r.id);
+         setSelectedIds(allIds.filter(x => x !== id));
+     } else {
+         setSelectedMode('MANUAL');
+         setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+     }
   };
 
   const toggleBulkMode = () => {
@@ -287,26 +303,27 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     }
   };
 
-  const handleExportExcel = () => {
-    const targetRequests = selectedIds.length > 0 
-      ? requests.filter(r => selectedIds.includes(r.id))
-      : filteredRequests;
-
-    const exportData = targetRequests.map((req, index) => ({
-       'STT': index + 1,
-       'Mã Phiếu': req.id,
-       'Thời gian lập': new Date(req.createdAt).toLocaleString('vi-VN'),
-       'Người đề xuất': req.requester?.fullName || '',
-       'Bộ phận': req.department,
-       'Loại Phiếu': req.requestType,
-       'Mức ưu tiên': req.priority,
-       'Lý do': req.purpose,
-       'Trạng thái': req.status
-    }));
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Danh_Sach_Phieu");
-    XLSX.writeFile(wb, `Danh_Sach_Phieu_VPP_${new Date().toISOString().slice(0,10)}.xlsx`);
+  const handleExportExcel = async () => {
+    try {
+      const payload = {
+        selectedMode: selectedMode === 'ALL_FILTERED' ? 'ALL_FILTERED' : (selectedIds.length > 0 ? 'MANUAL' : 'ALL_FILTERED'),
+        requestIds: selectedIds,
+        filterConfig: {
+           status: statusFilters.length > 0 ? statusFilters[0] : 'ALL',
+           department: deptFilter,
+           search: searchTerm
+        },
+        format: 'XLSX',
+        detailMode: 'LIST'
+      };
+      showToast('Đang tạo báo cáo, vui lòng đợi...');
+      const res = await api.post('/requests/export', payload);
+      if (res.data.fileUrl) {
+         window.open(api.defaults.baseURL?.replace('/api', '') + res.data.fileUrl, '_blank');
+      }
+    } catch (err: any) {
+       showToast(err.response?.data?.error || 'Lỗi xuất Excel', 'error');
+    }
   };
 
   const summaryGroups = useMemo(() => {
@@ -428,35 +445,27 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     }, 100);
   };
 
-  const handleExportSummaryExcel = () => {
-    if (summaryGroups.groups.length === 0) {
-        return showToast('Không có vật tư nào cần tổng hợp cấp phát.', 'warning');
+  const handleExportSummaryExcel = async () => {
+    try {
+      const payload = {
+        selectedMode: selectedMode === 'ALL_FILTERED' ? 'ALL_FILTERED' : (selectedIds.length > 0 ? 'MANUAL' : 'ALL_FILTERED'),
+        requestIds: selectedIds,
+        filterConfig: {
+           status: statusFilters.length > 0 ? statusFilters[0] : 'ALL',
+           department: deptFilter,
+           search: searchTerm
+        },
+        format: 'XLSX',
+        detailMode: 'GROUPED'
+      };
+      showToast('Đang tạo báo cáo tổng hợp...');
+      const res = await api.post('/requests/export', payload);
+      if (res.data.fileUrl) {
+         window.open(api.defaults.baseURL?.replace('/api', '') + res.data.fileUrl, '_blank');
+      }
+    } catch (err: any) {
+       showToast(err.response?.data?.error || 'Lỗi xuất Excel', 'error');
     }
-    
-    const wb = XLSX.utils.book_new();
-    
-    summaryGroups.groups.forEach(group => {
-        const exportData = group.items.map((item, index) => ({
-            'STT': index + 1,
-            'Mã Vật Tư': item.mvpp,
-            'Tên Vật Tư': item.name,
-            'Đơn Vị Tính': item.unit,
-            'Đơn Giá': item.price,
-            'Tổng Cầu (Duyệt)': item.qtyRequested,
-            'Đã Cấp': item.qtyDelivered,
-            'Cần Xuất (Còn Nợ)': item.qtyRequested - item.qtyDelivered,
-            'Thành Tiền': item.price * (item.qtyRequested - item.qtyDelivered)
-        }));
-        
-        const ws = XLSX.utils.json_to_sheet(exportData);
-        const wscols = [
-            {wch: 5}, {wch: 15}, {wch: 35}, {wch: 10}, {wch: 12}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 18}
-        ];
-        ws['!cols'] = wscols;
-        XLSX.utils.book_append_sheet(wb, ws, group.label.slice(0, 31));
-    });
-
-    XLSX.writeFile(wb, `Tong_Hop_Con_No_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
 

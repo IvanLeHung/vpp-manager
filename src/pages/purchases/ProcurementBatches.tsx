@@ -148,6 +148,20 @@ export default function ProcurementBatches() {
     }
   };
 
+  const handleRefreshReadyData = async () => {
+    if (!selectedBatchId) return;
+    try {
+      setDetailLoading(true);
+      // We just need to refetch the batch details which will pull the live data again since it is not LOCKED
+      await fetchBatchDetails(selectedBatchId);
+      toast.success('Đã làm mới dữ liệu!');
+    } catch (err: any) {
+      toast.error('Lỗi làm mới dữ liệu');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
   const handleSetReady = async () => {
     if (!selectedBatchId) return;
     try {
@@ -237,6 +251,7 @@ export default function ProcurementBatches() {
 
   const handleExportReport = async (reportType: string) => {
     try {
+      toast.info('Đang tạo báo cáo, vui lòng đợi...');
       setDetailLoading(true);
       const res = await api.post(`/procurement-batches/${selectedBatchId}/reports/export`, {
         reportType,
@@ -394,6 +409,11 @@ export default function ProcurementBatches() {
                     Người chốt: <span className="font-black text-slate-700">{batchDetail.lockedBy || 'Hệ thống'}</span>
                   </div>
                 )}
+                {batchDetail.status === 'LOCKED' && batchDetail.lockedAt && (
+                  <div>
+                    Thời gian chốt: <span className="font-black text-slate-700">{new Date(batchDetail.lockedAt).toLocaleString('vi-VN')}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -405,6 +425,15 @@ export default function ProcurementBatches() {
                 className="bg-indigo-650 hover:bg-indigo-755 text-white font-black text-xs uppercase px-5 py-3 rounded-xl tracking-wider shadow-md shadow-indigo-500/10 active:scale-95 transition cursor-pointer"
               >
                 Đánh dấu Sẵn sàng
+              </button>
+            )}
+            {batchDetail.status === 'READY' && (
+              <button
+                onClick={handleRefreshReadyData}
+                className="bg-sky-50 hover:bg-sky-100 text-sky-600 font-black text-xs uppercase px-4 py-3 rounded-xl tracking-wider border border-sky-200 active:scale-95 transition flex items-center gap-1.5 cursor-pointer"
+                title="Làm mới dữ liệu theo cấu hình lọc hiện tại"
+              >
+                <RefreshCw className="w-4 h-4" /> Làm mới
               </button>
             )}
             {batchDetail.status === 'READY' && (currentUser?.role === 'ADMIN' || currentUser?.role === 'WAREHOUSE') && (
