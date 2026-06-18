@@ -1183,7 +1183,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
             </Layout.Content>
 
           {/* RIGHT COLUMN: Actions & History */}
-          <Layout.Sider width={260} theme="light" className="no-print border-l border-slate-200 sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto">
+          <Layout.Sider width={260} theme="light" className="request-action-sider no-print border-l border-slate-200 sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto">
               <div className="p-6 flex flex-col gap-6">
                   <div className="bg-white rounded-2xl shadow-sm p-5 border border-slate-200 relative overflow-hidden text-slate-800">
                       <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500 rounded-full blur-[80px] opacity-10 transform translate-x-1/2 -translate-y-1/2"></div>
