@@ -238,6 +238,38 @@ function firstNumber(...values: any[]): number {
   return 0;
 }
 
+function getReportDownloadName(reportType: string, categoryType: string, format: 'DOCX' | 'XLSX'): string {
+  const typeSlug = categoryType === 'VE_SINH' ? 've-sinh' : 'vpp';
+  const reportSlug = reportType === 'PURCHASE_SUMMARY'
+    ? 'phieu-tong-hop-mua-sam'
+    : reportType === 'CONSUMPTION_BY_DEPARTMENT'
+      ? 'tong-hop-tieu-thu-theo-phong-ban'
+      : 'tong-hop-theo-phong-ban-de-xuat';
+  return `${reportSlug}-${typeSlug}.${format.toLowerCase()}`;
+}
+
+function getFilenameFromDisposition(disposition?: string): string | null {
+  if (!disposition) return null;
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) return decodeURIComponent(utf8Match[1].replace(/"/g, ''));
+  const asciiMatch = disposition.match(/filename="?([^";]+)"?/i);
+  return asciiMatch?.[1] || null;
+}
+
+async function readBlobError(error: any): Promise<string> {
+  const data = error?.response?.data;
+  if (data instanceof Blob) {
+    const text = await data.text();
+    try {
+      const parsed = JSON.parse(text);
+      return parsed?.error || parsed?.message || text;
+    } catch {
+      return text || 'Khong the xuat bao cao.';
+    }
+  }
+  return error?.response?.data?.error || error?.message || 'Khong the xuat bao cao.';
+}
+
 function getEffectiveLineItem(line: any): any {
   if (!line) return null;
   if (line.receiptReplacementItem) return line.receiptReplacementItem;
@@ -2379,17 +2411,38 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                             detailMode: setupDetailMode,
                             fromDate: selectedMonth && selectedIds.length === 0 ? `${selectedMonth}-01` : undefined,
                             toDate: undefined
+                          }, {
+                            responseType: 'blob'
                           });
-                         if (res.data.fileUrl) {
-                           window.open(res.data.fileUrl, '_blank');
-                         } else {
-                           alert('Không thể tạo file báo cáo. Vui lòng kiểm tra lại.');
-                         }
-                       } catch (err: any) {
-                         alert(err.response?.data?.error || 'Thao tác xuất thất bại');
-                       } finally {
-                         setExportLoading(false);
-                         setShowReportSetupModal(false);
+                        const contentType = (res.headers['content-type'] || '').toString().toLowerCase();
+                        if (contentType.includes('application/json')) {
+                          const text = await (res.data as Blob).text();
+                          const parsed = JSON.parse(text);
+                          throw new Error(parsed?.error || 'Khong the tao file bao cao.');
+                        }
+
+                        const fallbackName = getReportDownloadName(setupReportType, setupCategoryType, setupFormat);
+                        const fileName =
+                          getFilenameFromDisposition(res.headers['content-disposition']) ||
+                          res.headers['x-report-file-name'] ||
+                          fallbackName;
+                        const blob = new Blob([res.data], { type: res.headers['content-type'] || undefined });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = fileName;
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
+                        URL.revokeObjectURL(url);
+                        toast.success('Da tai file bao cao.');
+                        setShowReportSetupModal(false);
+                        return;
+                      } catch (err: any) {
+                        toast.error(await readBlobError(err));
+                        return;
+                      } finally {
+                        setExportLoading(false);
                        }
                      }
                    }}
