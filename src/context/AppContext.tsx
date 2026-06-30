@@ -88,16 +88,43 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const token = localStorage.getItem('vpp_token');
     const saved = localStorage.getItem('vpp_user');
-    return saved ? JSON.parse(saved) : null;
+
+    if (!token || !saved) {
+      localStorage.removeItem('vpp_token');
+      localStorage.removeItem('vpp_user');
+      return null;
+    }
+
+    try {
+      return JSON.parse(saved);
+    } catch {
+      localStorage.removeItem('vpp_token');
+      localStorage.removeItem('vpp_user');
+      return null;
+    }
   });
   
   const [items, setItems] = useState<VPPItem[]>([]);
   const [requests, setRequests] = useState<VPPRequest[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const logout = () => {
+    localStorage.removeItem('vpp_token');
+    localStorage.removeItem('vpp_user');
+    setCurrentUser(null);
+    setItems([]);
+    setRequests([]);
+  };
+
   const refreshData = async () => {
-    if (!currentUser) return;
+    const token = localStorage.getItem('vpp_token');
+    if (!currentUser || !token) {
+      if (currentUser && !token) logout();
+      return;
+    }
+
     try {
       setLoading(true);
       const [itemsRes, reqRes] = await Promise.all([
@@ -118,9 +145,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         isActive: i.isActive
       }));
       setItems(formattedItems);
-      setRequests(reqRes.data.data);
-    } catch (err) {
+      setRequests(Array.isArray(reqRes.data) ? reqRes.data : (reqRes.data?.data || []));
+    } catch (err: any) {
       console.error('Lỗi lấy dữ liệu Data:', err);
+      if (err.response?.status === 401) {
+        logout();
+      }
     } finally {
       setLoading(false);
     }
@@ -130,11 +160,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     refreshData();
   }, [currentUser]);
 
-  const logout = () => {
-    localStorage.removeItem('vpp_token');
-    localStorage.removeItem('vpp_user');
-    setCurrentUser(null);
-  };
+  useEffect(() => {
+    const handleUnauthorized = () => logout();
+    window.addEventListener('vpp:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('vpp:unauthorized', handleUnauthorized);
+  }, []);
 
   return (
     <AppContext.Provider value={{ currentUser, setCurrentUser, items, setItems, requests, loading, refreshData, logout }}>
