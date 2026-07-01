@@ -274,7 +274,6 @@ function ApprovedRequestEditShortcut() {
 
     if (!requestId || currentUser?.role !== 'ADMIN') return;
 
-    setLoading(true);
     api.get(`/requests/${requestId}`)
       .then((res) => {
         if (cancelled) return;
@@ -282,9 +281,6 @@ function ApprovedRequestEditShortcut() {
       })
       .catch(() => {
         if (!cancelled) setRequest(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
       });
 
     return () => {
@@ -292,60 +288,85 @@ function ApprovedRequestEditShortcut() {
     };
   }, [requestId, currentUser?.role]);
 
-  const editableApprovedStatuses = [
-    'APPROVED',
-    'READY_TO_ISSUE',
-    'PARTIAL_ADMIN_APPROVED',
-    'PARTIALLY_APPROVED',
-    'BACKORDER'
-  ];
+  const editableStatuses = ['APPROVED', 'READY_TO_ISSUE', 'PARTIAL_ADMIN_APPROVED', 'PARTIALLY_APPROVED', 'BACKORDER'];
   const totalDelivered = (request?.lines || []).reduce((sum: number, line: any) => {
     return sum + Number(line.qtyDelivered || line.deliveredQty || line.issuedQty || 0);
   }, 0);
 
-  const canReopenForEdit = Boolean(
+  const canReopen = Boolean(
     requestId &&
     currentUser?.role === 'ADMIN' &&
     request &&
-    editableApprovedStatuses.includes(request.status) &&
+    editableStatuses.includes(request.status) &&
     totalDelivered === 0
   );
 
-  const handleReopenForEdit = async () => {
-    const reason = window.prompt(
-      'Lý do mở lại phiếu để chỉnh sửa?',
-      'Admin mở lại phiếu đã duyệt để chỉnh sửa'
-    );
-    if (!reason?.trim()) return;
+  React.useEffect(() => {
+    const buttonId = 'admin-reopen-request-approval-action';
+    document.getElementById(buttonId)?.remove();
 
-    const confirmed = window.confirm('Mở lại phiếu này để người lập chỉnh sửa?');
-    if (!confirmed) return;
+    if (!canReopen || !requestId) return;
 
-    try {
-      setLoading(true);
-      await api.post(`/requests/${requestId}/return`, { reason: reason.trim() });
-      window.alert('Đã mở lại phiếu để chỉnh sửa.');
-      window.location.reload();
-    } catch (err: any) {
-      window.alert(err.response?.data?.error || 'Không mở lại được phiếu. Vui lòng thử lại.');
-    } finally {
-      setLoading(false);
+    let stopped = false;
+    let intervalId: number | undefined;
+
+    const mountButton = () => {
+      if (stopped || document.getElementById(buttonId)) return true;
+
+      const headings = Array.from(document.querySelectorAll('p'));
+      const heading = headings.find((el) => {
+        const text = (el.textContent || '').toLowerCase();
+        return text.includes('chức năng chính') || text.includes('chuc nang chinh');
+      });
+      const container = heading?.parentElement;
+      if (!container) return false;
+
+      const button = document.createElement('button');
+      button.id = buttonId;
+      button.type = 'button';
+      button.className = 'w-full py-2.5 bg-amber-500 text-white rounded-lg font-black hover:bg-amber-600 transition shadow-sm flex items-center justify-center transform hover:scale-[1.01] border border-amber-500 text-xs';
+      button.textContent = loading ? 'ĐANG MỞ...' : 'MỞ SỬA LẠI';
+      button.disabled = loading;
+      button.title = 'Mở lại bước phê duyệt Admin để chỉnh sửa';
+      button.onclick = async () => {
+        const reason = window.prompt('Lý do mở lại bước phê duyệt Admin?', 'Admin mở lại phiếu đã duyệt để chỉnh sửa');
+        if (!reason?.trim()) return;
+        if (!window.confirm('Mở lại phiếu này về trạng thái chờ Admin phê duyệt?')) return;
+
+        try {
+          setLoading(true);
+          button.disabled = true;
+          button.textContent = 'ĐANG MỞ...';
+          await api.post(`/requests/${requestId}/reopen-admin-approval`, { reason: reason.trim() });
+          window.alert('Đã mở lại phiếu về bước chờ Admin phê duyệt.');
+          window.location.reload();
+        } catch (err: any) {
+          window.alert(err.response?.data?.error || 'Không mở lại được phiếu. Vui lòng thử lại.');
+          button.disabled = false;
+          button.textContent = 'MỞ SỬA LẠI';
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      container.insertBefore(button, container.children[1] || null);
+      return true;
+    };
+
+    if (!mountButton()) {
+      intervalId = window.setInterval(() => {
+        if (mountButton() && intervalId) window.clearInterval(intervalId);
+      }, 300);
     }
-  };
 
-  if (!canReopenForEdit) return null;
+    return () => {
+      stopped = true;
+      if (intervalId) window.clearInterval(intervalId);
+      document.getElementById(buttonId)?.remove();
+    };
+  }, [canReopen, loading, requestId]);
 
-  return (
-    <button
-      type="button"
-      onClick={handleReopenForEdit}
-      disabled={loading}
-      className="fixed right-8 top-36 z-[120] rounded-xl border border-amber-200 bg-white px-4 py-3 text-xs font-black uppercase tracking-wide text-amber-700 shadow-xl shadow-slate-900/10 transition hover:-translate-y-0.5 hover:border-amber-300 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
-      title="Mở lại phiếu đã duyệt để chỉnh sửa"
-    >
-      {loading ? 'Đang mở...' : 'Mở sửa lại'}
-    </button>
-  );
+  return null;
 }
 
 function App() {
