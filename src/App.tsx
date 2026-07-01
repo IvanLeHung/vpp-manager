@@ -306,16 +306,33 @@ function ApprovedRequestEditShortcut() {
     let stopped = false;
     let intervalId: number | undefined;
 
-    const mountButton = () => {
-      if (stopped || document.getElementById(buttonId)) return true;
+    const findCommandTarget = () => {
+      const buttons = Array.from(document.querySelectorAll('button'));
+      const actionButton = buttons.find((btn) => {
+        const text = (btn.textContent || '').toLowerCase();
+        return text.includes('cấp phát') || text.includes('cap phat') || text.includes('hoàn thành phiếu') || text.includes('hoan thanh phieu');
+      });
+      if (actionButton?.parentElement) {
+        return { container: actionButton.parentElement, before: actionButton };
+      }
 
       const headings = Array.from(document.querySelectorAll('p'));
       const heading = headings.find((el) => {
         const text = (el.textContent || '').toLowerCase();
-        return text.includes('chức năng chính') || text.includes('chuc nang chinh');
+        return text.includes('chức năng chính') || text.includes('chuc nang chinh') || text.includes('các chức năng') || text.includes('cac chuc nang');
       });
-      const container = heading?.parentElement;
-      if (!container) return false;
+      if (heading?.parentElement) {
+        return { container: heading.parentElement, before: heading.nextElementSibling };
+      }
+
+      return null;
+    };
+
+    const mountButton = () => {
+      if (stopped || document.getElementById(buttonId)) return true;
+
+      const target = findCommandTarget();
+      if (!target) return false;
 
       const button = document.createElement('button');
       button.id = buttonId;
@@ -345,7 +362,7 @@ function ApprovedRequestEditShortcut() {
         }
       };
 
-      container.insertBefore(button, container.children[1] || null);
+      target.container.insertBefore(button, target.before || null);
       return true;
     };
 
