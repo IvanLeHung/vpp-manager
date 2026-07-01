@@ -259,10 +259,34 @@ function ApprovedRequestEditShortcut() {
   const location = useLocation();
   const { currentUser } = useAppContext();
   const [request, setRequest] = React.useState<any>(null);
+  const [detectedRequestId, setDetectedRequestId] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
 
-  const match = location.pathname.match(/^\/requests\/([^/]+)$/);
-  const requestId = match?.[1];
+  const routeMatch = location.pathname.match(/^\/requests\/([^/]+)$/);
+  const routeRequestId = routeMatch?.[1] || null;
+  const requestId = routeRequestId || detectedRequestId;
+
+  React.useEffect(() => {
+    if (!location.pathname.startsWith('/requests')) {
+      setDetectedRequestId(null);
+      return;
+    }
+
+    let stopped = false;
+    const scanRequestId = () => {
+      if (stopped || routeRequestId) return;
+      const text = document.body?.innerText || '';
+      const match = text.match(/PDX-\d{8}-\d+/);
+      if (match?.[0]) setDetectedRequestId(match[0]);
+    };
+
+    scanRequestId();
+    const interval = window.setInterval(scanRequestId, 500);
+    return () => {
+      stopped = true;
+      window.clearInterval(interval);
+    };
+  }, [location.pathname, routeRequestId]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -307,22 +331,30 @@ function ApprovedRequestEditShortcut() {
     let intervalId: number | undefined;
 
     const findCommandTarget = () => {
+      const labelNodes = Array.from(document.querySelectorAll('p, span, div'));
+      const printExportLabel = labelNodes.find((el) => {
+        const text = (el.textContent || '').toLowerCase();
+        return text.includes('tùy chọn in') || text.includes('tuy chon in') || text.includes('in & xuất') || text.includes('in & xuat');
+      });
+      if (printExportLabel?.parentElement) {
+        return { container: printExportLabel.parentElement, before: printExportLabel };
+      }
+
       const buttons = Array.from(document.querySelectorAll('button'));
+      const printButton = buttons.find((btn) => {
+        const text = (btn.textContent || '').toLowerCase();
+        return text.includes('in vpp') || text.includes('in vệ sinh') || text.includes('in ve sinh') || text.includes('xuất file excel') || text.includes('xuat file excel');
+      });
+      if (printButton?.parentElement?.parentElement) {
+        return { container: printButton.parentElement.parentElement, before: printButton.parentElement };
+      }
+
       const actionButton = buttons.find((btn) => {
         const text = (btn.textContent || '').toLowerCase();
         return text.includes('cấp phát') || text.includes('cap phat') || text.includes('hoàn thành phiếu') || text.includes('hoan thanh phieu');
       });
       if (actionButton?.parentElement) {
-        return { container: actionButton.parentElement, before: actionButton };
-      }
-
-      const headings = Array.from(document.querySelectorAll('p'));
-      const heading = headings.find((el) => {
-        const text = (el.textContent || '').toLowerCase();
-        return text.includes('chức năng chính') || text.includes('chuc nang chinh') || text.includes('các chức năng') || text.includes('cac chuc nang');
-      });
-      if (heading?.parentElement) {
-        return { container: heading.parentElement, before: heading.nextElementSibling };
+        return { container: actionButton.parentElement, before: actionButton.nextElementSibling };
       }
 
       return null;
@@ -337,7 +369,7 @@ function ApprovedRequestEditShortcut() {
       const button = document.createElement('button');
       button.id = buttonId;
       button.type = 'button';
-      button.className = 'w-full py-2.5 bg-amber-500 text-white rounded-lg font-black hover:bg-amber-600 transition shadow-sm flex items-center justify-center transform hover:scale-[1.01] border border-amber-500 text-xs';
+      button.className = 'w-full my-3 py-2.5 bg-amber-500 text-white rounded-lg font-black hover:bg-amber-600 transition shadow-sm flex items-center justify-center transform hover:scale-[1.01] border border-amber-500 text-xs';
       button.textContent = loading ? 'ĐANG MỞ...' : 'MỞ SỬA LẠI';
       button.disabled = loading;
       button.title = 'Mở lại bước phê duyệt Admin để chỉnh sửa';
