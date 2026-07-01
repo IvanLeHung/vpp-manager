@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { AppProvider, useAppContext } from './context/AppContext';
 import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
@@ -46,7 +46,7 @@ function Landing() {
     if (isRegisterMode && depts.length === 0) {
       api.get('/public/departments')
         .then(res => {
-          // Xử lý linh hoạt: nếu backend trả về [ ] hoặc { data: [ ] }
+          // Xá»­ lÃ½ linh hoáº¡t: náº¿u backend tráº£ vá» [ ] hoáº·c { data: [ ] }
           const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
           console.log('[DEBUG] App.tsx received depts:', data);
           setDepts(data);
@@ -54,7 +54,7 @@ function Landing() {
         .catch(err => {
           console.error('[App.tsx] Error fetching departments:', err);
           if (err.response?.status === 404) {
-            console.error('[DEBUG] URL bị lỗi 404 là:', err.config?.baseURL + err.config?.url);
+            console.error('[DEBUG] URL bá»‹ lá»—i 404 lÃ :', err.config?.baseURL + err.config?.url);
           }
         });
     }
@@ -69,12 +69,12 @@ function Landing() {
       setError('');
       setSuccessMsg('');
       await api.post('/auth/reset-password', { username, newPassword });
-      setSuccessMsg('Đổi mật khẩu thành công! Vui lòng đăng nhập lại.');
+      setSuccessMsg('Äá»•i máº­t kháº©u thÃ nh cÃ´ng! Vui lÃ²ng Ä‘Äƒng nháº­p láº¡i.');
       setIsResetMode(false);
       setPassword('');
       setNewPassword('');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Lỗi đổi mật khẩu');
+      setError(err.response?.data?.error || 'Lá»—i Ä‘á»•i máº­t kháº©u');
     } finally {
       setLoading(false);
     }
@@ -83,7 +83,7 @@ function Landing() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username || !password || !fullName || !deptId) {
-      setError('Vui lòng điền đầy đủ thông tin');
+      setError('Vui lÃ²ng Ä‘iá»n Ä‘áº§y Ä‘á»§ thÃ´ng tin');
       return;
     }
 
@@ -102,7 +102,7 @@ function Landing() {
       setIsRegisterMode(false);
       setPassword('');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Lỗi đăng ký tài khoản');
+      setError(err.response?.data?.error || 'Lá»—i Ä‘Äƒng kÃ½ tÃ i khoáº£n');
     } finally {
       setLoading(false);
     }
@@ -123,7 +123,7 @@ function Landing() {
       setCurrentUser(response.data.user);
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Lỗi đăng nhập');
+      setError(err.response?.data?.error || 'Lá»—i Ä‘Äƒng nháº­p');
     } finally {
       setLoading(false);
     }
@@ -146,10 +146,10 @@ function Landing() {
         </div>
         
         <h1 className="text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-700 mb-4 tracking-tight">
-          Văn phòng phẩm Danko Group
+          VÄƒn phÃ²ng pháº©m Danko Group
         </h1>
         <p className="text-slate-600 mb-8 text-lg font-medium leading-relaxed">
-          Nền tảng quản lý văn phòng phẩm thông minh và tối ưu nhất dành cho doanh nghiệp.
+          Ná»n táº£ng quáº£n lÃ½ vÄƒn phÃ²ng pháº©m thÃ´ng minh vÃ  tá»‘i Æ°u nháº¥t dÃ nh cho doanh nghiá»‡p.
         </p>
         <form onSubmit={isRegisterMode ? handleRegister : (isResetMode ? handleResetPassword : handleLogin)} className="flex flex-col gap-4">
           {error && <div className="text-rose-500 bg-rose-50 p-3 rounded-lg text-sm font-bold shadow-sm">{error}</div>}
@@ -157,7 +157,7 @@ function Landing() {
           
           <input 
             type="text" 
-            placeholder="Tên đăng nhập (VD: truong.phong, admin)" 
+            placeholder="TÃªn Ä‘Äƒng nháº­p (VD: truong.phong, admin)" 
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium transition"
@@ -167,7 +167,7 @@ function Landing() {
             <>
               <input 
                 type="text" 
-                placeholder="Họ và tên đầy đủ" 
+                placeholder="Há» vÃ  tÃªn Ä‘áº§y Ä‘á»§" 
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium transition"
@@ -177,7 +177,7 @@ function Landing() {
                 onChange={(e) => setDeptId(e.target.value)}
                 className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium transition italic"
               >
-                <option value="">-- Chọn Phòng ban --</option>
+                <option value="">-- Chá»n PhÃ²ng ban --</option>
                 {depts.map(d => (
                   <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
                 ))}
@@ -187,8 +187,8 @@ function Landing() {
                 onChange={(e) => setRole(e.target.value)}
                 className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-600 transition"
               >
-                <option value="EMPLOYEE">-- Vai trò: Nhân viên --</option>
-                <option value="MANAGER">-- Vai trò: Trưởng bộ phận --</option>
+                <option value="EMPLOYEE">-- Vai trÃ²: NhÃ¢n viÃªn --</option>
+                <option value="MANAGER">-- Vai trÃ²: TrÆ°á»Ÿng bá»™ pháº­n --</option>
               </select>
             </>
           )}
@@ -196,7 +196,7 @@ function Landing() {
           {(!isResetMode || isRegisterMode) && (
             <input 
               type="password" 
-              placeholder={isRegisterMode ? "Mật khẩu mong muốn" : "Mật khẩu"} 
+              placeholder={isRegisterMode ? "Máº­t kháº©u mong muá»‘n" : "Máº­t kháº©u"} 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium transition"
@@ -206,7 +206,7 @@ function Landing() {
           {isResetMode && !isRegisterMode && (
             <input 
               type="password" 
-              placeholder="Nhập mật khẩu mới" 
+              placeholder="Nháº­p máº­t kháº©u má»›i" 
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               className="w-full p-4 bg-emerald-50/50 border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-medium transition"
@@ -218,7 +218,7 @@ function Landing() {
             disabled={loading}
             className={`w-full px-6 py-4 text-white font-bold text-lg rounded-xl transition-all duration-300 transform hover:-translate-y-1 focus:ring-4 disabled:opacity-50 ${isResetMode ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-xl shadow-teal-500/30 ring-teal-500/20' : (isRegisterMode ? 'bg-gradient-to-r from-indigo-500 to-purple-600 shadow-xl shadow-purple-500/30' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-xl shadow-indigo-500/30 ring-blue-500/20')}`}
           >
-            {loading ? 'Đang xử lý...' : (isRegisterMode ? 'Gửi yêu cầu Khởi tạo' : (isResetMode ? 'Đặt lại mật khẩu' : 'Đăng nhập hệ thống'))}
+            {loading ? 'Äang xá»­ lÃ½...' : (isRegisterMode ? 'Gá»­i yÃªu cáº§u Khá»Ÿi táº¡o' : (isResetMode ? 'Äáº·t láº¡i máº­t kháº©u' : 'ÄÄƒng nháº­p há»‡ thá»‘ng'))}
           </button>
         </form>
 
@@ -236,7 +236,7 @@ function Landing() {
             }} 
             className="text-slate-500 font-bold hover:text-indigo-600 transition text-sm underline"
           >
-             {isRegisterMode ? 'Quay lại đăng nhập' : (isResetMode ? 'Quay lại màn hình Đăng nhập' : 'Quên mật khẩu?')}
+             {isRegisterMode ? 'Quay láº¡i Ä‘Äƒng nháº­p' : (isResetMode ? 'Quay láº¡i mÃ n hÃ¬nh ÄÄƒng nháº­p' : 'QuÃªn máº­t kháº©u?')}
           </button>
 
           {!isResetMode && !isRegisterMode && (
@@ -245,13 +245,13 @@ function Landing() {
                 onClick={() => { setIsRegisterMode(true); setError(''); setSuccessMsg(''); }}
                 className="text-indigo-600 font-black hover:text-indigo-800 transition text-sm"
             >
-                Chưa có tài khoản? Đăng ký tại đây
+                ChÆ°a cÃ³ tÃ i khoáº£n? ÄÄƒng kÃ½ táº¡i Ä‘Ã¢y
             </button>
           )}
         </div>
         <div className="mt-8 pt-6 border-t border-slate-200">
            <button onClick={() => navigate('/guest-request')} className="text-slate-500 font-bold hover:text-indigo-600 hover:underline transition">
-              Không có tài khoản? Tạo yêu cầu làm Khách
+              KhÃ´ng cÃ³ tÃ i khoáº£n? Táº¡o yÃªu cáº§u lÃ m KhÃ¡ch
            </button>
         </div>
       </div>
@@ -259,10 +259,100 @@ function Landing() {
   );
 }
 
+function ApprovedRequestEditShortcut() {
+  const location = useLocation();
+  const { currentUser } = useAppContext();
+  const [request, setRequest] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  const match = location.pathname.match(/^\/requests\/([^/]+)$/);
+  const requestId = match?.[1];
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setRequest(null);
+
+    if (!requestId || currentUser?.role !== 'ADMIN') return;
+
+    setLoading(true);
+    api.get(`/requests/${requestId}`)
+      .then((res) => {
+        if (cancelled) return;
+        setRequest(res.data?.data || res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setRequest(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [requestId, currentUser?.role]);
+
+  const editableApprovedStatuses = [
+    'APPROVED',
+    'READY_TO_ISSUE',
+    'PARTIAL_ADMIN_APPROVED',
+    'PARTIALLY_APPROVED',
+    'BACKORDER'
+  ];
+  const totalDelivered = (request?.lines || []).reduce((sum: number, line: any) => {
+    return sum + Number(line.qtyDelivered || line.deliveredQty || line.issuedQty || 0);
+  }, 0);
+
+  const canReopenForEdit = Boolean(
+    requestId &&
+    currentUser?.role === 'ADMIN' &&
+    request &&
+    editableApprovedStatuses.includes(request.status) &&
+    totalDelivered === 0
+  );
+
+  const handleReopenForEdit = async () => {
+    const reason = window.prompt(
+      'Lý do mở lại phiếu để chỉnh sửa?',
+      'Admin mở lại phiếu đã duyệt để chỉnh sửa'
+    );
+    if (!reason?.trim()) return;
+
+    const confirmed = window.confirm('Mở lại phiếu này để người lập chỉnh sửa?');
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      await api.post(`/requests/${requestId}/return`, { reason: reason.trim() });
+      window.alert('Đã mở lại phiếu để chỉnh sửa.');
+      window.location.reload();
+    } catch (err: any) {
+      window.alert(err.response?.data?.error || 'Không mở lại được phiếu. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!canReopenForEdit) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={handleReopenForEdit}
+      disabled={loading}
+      className="fixed right-8 top-36 z-[120] rounded-xl border border-amber-200 bg-white px-4 py-3 text-xs font-black uppercase tracking-wide text-amber-700 shadow-xl shadow-slate-900/10 transition hover:-translate-y-0.5 hover:border-amber-300 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
+      title="Mở lại phiếu đã duyệt để chỉnh sửa"
+    >
+      {loading ? 'Đang mở...' : 'Mở sửa lại'}
+    </button>
+  );
+}
+
 function App() {
   return (
     <AppProvider>
       <BrowserRouter>
+        <ApprovedRequestEditShortcut />
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/guest-request" element={<GuestRequest />} />
@@ -271,7 +361,7 @@ function App() {
           <Route path="/purchase-orders/:id/print" element={<PurchasePrint />} />
           <Route element={<MainLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
-            {/* Về sau sẽ tạo 2 trang này */}
+            {/* Vá» sau sáº½ táº¡o 2 trang nÃ y */}
             <Route path="/requests" element={<Requests />} />
             <Route path="/requests/:id" element={<Requests />} />
             <Route path="/inventory-report" element={<InventoryReport />} />
