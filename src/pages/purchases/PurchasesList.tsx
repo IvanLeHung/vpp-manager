@@ -2402,6 +2402,29 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                        // Trigger API call for DOCX/XLSX
                        try {
                          setExportLoading(true);
+                         const pdfSourceGroups = setupReportType === 'PURCHASE_SUMMARY'
+                           ? summaryGroups
+                               .filter(g => setupCategoryType === 'ALL' || g.type === setupCategoryType)
+                               .map(g => ({
+                                 type: g.type,
+                                 label: g.label,
+                                 poCount: g.poCount,
+                                 approvedTotal: g.approvedTotal,
+                                 actualTotal: g.actualTotal,
+                                 savings: g.savings,
+                                 items: g.items.map((item: any) => ({
+                                   mvpp: item.mvpp,
+                                   name: item.name,
+                                   unit: item.unit,
+                                   qty: item.qty,
+                                   price: item.price,
+                                   originalTotal: item.originalTotal,
+                                   actualTotal: item.actualTotal,
+                                   deptEntries: item.deptEntries,
+                                   replacements: item.replacements
+                                 }))
+                               }))
+                           : undefined;
                          const res = await api.post('/reports/generate', {
                             reportType: setupReportType,
                             itemCategoryType: setupCategoryType,
@@ -2409,6 +2432,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                             selectedType: 'PO',
                             outputFormat: setupFormat,
                             detailMode: setupDetailMode,
+                            pdfSourceGroups,
                             fromDate: selectedMonth && selectedIds.length === 0 ? `${selectedMonth}-01` : undefined,
                             toDate: undefined
                           }, {
