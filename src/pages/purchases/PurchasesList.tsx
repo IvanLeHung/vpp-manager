@@ -4,7 +4,7 @@ import {
   Plus, DollarSign,
   ShoppingCart, Package, Clock, ChevronRight, Truck, User as UserIcon,
   Printer, CheckSquare, ChevronDown, AlertTriangle, X, CheckCircle, Download, Eye,
-  FileText, ArrowLeft, RefreshCw, Layers
+  FileText, ArrowLeft, RefreshCw, Layers, Search
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import * as docx from 'docx';
@@ -278,6 +278,88 @@ function getEffectiveLineItem(line: any): any {
   return line.item || line.requestLine?.replacementItem || line.requestLine?.item || line.replacementItem || null;
 }
 
+function collectPurchaseSearchValues(po: any): string[] {
+  const values: any[] = [
+    po?.id,
+    po?.title,
+    po?.purpose,
+    po?.note,
+    po?.status,
+    po?.supplier,
+    po?.supplierName,
+    po?.requesterName,
+    po?.assignedToName,
+    po?.requester?.name,
+    po?.requester?.department?.name,
+    po?.requester?.departmentName,
+    po?.department,
+    po?.departmentName,
+    po?.warehouse,
+    po?.warehouseCode,
+    po?.warehouseName,
+    po?.sourceRequestId,
+    po?.linkedRequestId,
+    po?.requestId,
+    po?.fuzzyRequestCode,
+    po?.orderCode,
+    po?.poCode
+  ];
+
+  [po?.topItems, po?.depts, po?.warehouses, po?.tags].forEach((list) => {
+    if (Array.isArray(list)) values.push(...list);
+  });
+
+  if (Array.isArray(po?.lines)) {
+    po.lines.forEach((line: any) => {
+      const effectiveItem = getEffectiveLineItem(line);
+      const requestLine = line?.requestLine;
+      const request = requestLine?.request;
+      values.push(
+        line?.id,
+        line?.note,
+        line?.originalNote,
+        line?.fuzzyRequestCode,
+        line?.warehouseCode,
+        line?.warehouseName,
+        line?.unit,
+        line?.item?.name,
+        line?.item?.mvpp,
+        line?.item?.category,
+        line?.item?.itemType,
+        effectiveItem?.name,
+        effectiveItem?.mvpp,
+        effectiveItem?.category,
+        effectiveItem?.itemType,
+        requestLine?.note,
+        requestLine?.approvalNote,
+        requestLine?.replacementReason,
+        requestLine?.item?.name,
+        requestLine?.item?.mvpp,
+        requestLine?.replacementItem?.name,
+        requestLine?.replacementItem?.mvpp,
+        request?.id,
+        request?.title,
+        request?.purpose,
+        request?.requesterName,
+        request?.departmentName,
+        request?.requester?.name,
+        request?.requester?.department?.name,
+        line?.receiptReplacementItem?.name,
+        line?.receiptReplacementItem?.mvpp
+      );
+    });
+  }
+
+  return values.filter(value => value !== null && value !== undefined && value !== '');
+}
+
+function purchaseMatchesSearch(po: any, searchTerm: string): boolean {
+  const normalizedSearch = normalizeClassificationText(searchTerm);
+  if (!normalizedSearch) return true;
+  const haystack = normalizeClassificationText(collectPurchaseSearchValues(po).join(' '));
+  return normalizedSearch.split(/\s+/).filter(Boolean).every(term => haystack.includes(term));
+}
+
 function getLinePrintQty(line: any): number {
   if (line?.receiptReplacementItem) {
     return firstNumber(
@@ -384,7 +466,7 @@ function hasPermission(role: string, permission: string): boolean {
 const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail, onShowHistory, recreateConfig, clearRecreateConfig }) => {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('ALL');
   
   // Bulk Selection & Printing states
@@ -613,16 +695,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   };
 
   const filteredData = data.filter(d => {
-      const lowerSearch = searchTerm.toLowerCase();
-      const matchSearch = 
-          d.id.toLowerCase().includes(lowerSearch) || 
-          (d.title || '').toLowerCase().includes(lowerSearch) ||
-          (d.supplier || '').toLowerCase().includes(lowerSearch) ||
-          (d.requesterName || '').toLowerCase().includes(lowerSearch) ||
-          (d.assignedToName || '').toLowerCase().includes(lowerSearch) ||
-          d.topItems?.some((i: string) => i.toLowerCase().includes(lowerSearch)) ||
-          d.depts?.some((dp: string) => dp.toLowerCase().includes(lowerSearch)) ||
-          d.warehouses?.some((w: string) => w.toLowerCase().includes(lowerSearch));
+      const matchSearch = purchaseMatchesSearch(d, searchTerm);
       
       let matchTab = true;
       if (activeTab === 'DRAFT') matchTab = d.status === 'DRAFT';
@@ -1785,7 +1858,34 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
                 
                 {/* TOOLBAR */}
-                <div className="p-3.5 border-b border-slate-100 flex flex-wrap gap-3 justify-between items-center bg-slate-50/50">
+                <div className="p-3.5 border-b border-slate-100 bg-slate-50/50">
+                    <div className="flex flex-col xl:flex-row xl:items-center gap-3 mb-3">
+                        <div className="relative flex-1 min-w-[260px]">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="Tìm PO/BO, mã phiếu, NCC, phòng ban, vật tư, mã vật tư, ghi chú..."
+                                className="w-full h-11 pl-11 pr-11 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 placeholder:text-slate-400 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 shadow-sm transition"
+                            />
+                            {searchTerm && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearchTerm('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+                                    title="Xóa tìm kiếm"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
+                        <div className="shrink-0 px-3 py-2 rounded-xl bg-white border border-slate-200 text-[10px] font-black uppercase tracking-widest text-slate-500 shadow-sm">
+                            Hiển thị <span className="text-indigo-600">{filteredData.length}</span>/{data.length} phiếu
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-3 justify-between items-center">
                     <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
                         {[
                           { id: 'ALL', label: 'Tất Cả' },
@@ -1989,7 +2089,8 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                 <Plus className="w-4 h-4 mr-1.5" /> Tạo Đề Nghị
                             </button>
                         </div>
-                    </div>
+                        </div>
+                </div>
 
                 {/* TABLE */}
                 <div className="flex-1 overflow-auto rounded-b-3xl relative custom-scrollbar">
