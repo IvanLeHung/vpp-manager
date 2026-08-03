@@ -197,6 +197,7 @@ function isVeSinhItem(item: any): boolean {
     'nuoc lau',
     'lau san',
     'giay ve sinh',
+    'giay lau tay',
     'xa phong',
     'rua bat',
     'rua chen',
