@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Plus,
   XCircle,
@@ -73,10 +73,7 @@ export default function RequestsCreate({
   const [targetItems, setTargetItems] = useState<TargetItem[]>([]);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const searchRef = useRef<HTMLDivElement>(null);
 
   const isEditingDraft =
     !!activeRequest &&
@@ -166,32 +163,20 @@ export default function RequestsCreate({
     };
   }, [activeRequest, isEditingDraft, items]);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
-        setShowDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   const searchResults = useMemo(() => {
     const keyword = searchTerm.trim().toLowerCase();
-    if (!keyword) return [];
 
     return items
       .filter((i: VPPItem) => {
         // Only show active items
         if (i.isActive === false) return false;
 
-        return (
+        return !keyword || (
           i.name.toLowerCase().includes(keyword) ||
           i.mvpp.toLowerCase().includes(keyword)
         );
       })
-      .slice(0, 10);
+      .sort((a: VPPItem, b: VPPItem) => a.name.localeCompare(b.name, 'vi'));
   }, [items, searchTerm]);
 
   const handleAddItem = (item: VPPItem) => {
@@ -222,7 +207,6 @@ export default function RequestsCreate({
     });
 
     setSearchTerm('');
-    setShowDropdown(false);
   };
 
   const handleRemoveItem = (itemId: string) => {
@@ -524,23 +508,30 @@ export default function RequestsCreate({
             </div>
           </div>
 
-          <div className="p-4 border-b border-slate-100" ref={searchRef}>
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setShowDropdown(true);
-                }}
-                onFocus={() => setShowDropdown(true)}
-                placeholder="Nhập Mã hoặc Tên VPP để thêm vào lưới..."
-                className="w-full pl-12 pr-4 py-3.5 bg-indigo-50 border-2 border-indigo-100 rounded-xl focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 outline-none font-bold text-indigo-900 transition-all shadow-inner"
-              />
+          <div className="p-4 border-b border-slate-100">
+            <div>
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Nhập Mã hoặc Tên VPP để thêm vào lưới..."
+                  className="w-full pl-12 pr-4 py-3.5 bg-indigo-50 border-2 border-indigo-100 rounded-xl focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 outline-none font-bold text-indigo-900 transition-all shadow-inner"
+                />
+              </div>
 
-              {showDropdown && searchTerm && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 shadow-2xl rounded-xl z-50 max-h-72 overflow-y-auto overflow-hidden divide-y divide-slate-50 p-1">
+              <div className="mt-3 bg-white border border-slate-200 rounded-xl overflow-hidden">
+                <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-black text-slate-700 uppercase tracking-wider">Danh mục vật tư</p>
+                    <p className="text-[10px] font-medium text-slate-500">Bấm dấu + để thêm vào phiếu</p>
+                  </div>
+                  <span className="shrink-0 px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-[11px] font-black">
+                    {searchResults.length} vật tư
+                  </span>
+                </div>
+                <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 p-1">
                   {searchResults.length === 0 ? (
                     <div className="p-4 text-slate-500 text-center text-sm font-medium">
                       Không tìm thấy vật tư "{searchTerm}".
@@ -549,8 +540,7 @@ export default function RequestsCreate({
                     searchResults.map((item: any) => (
                       <div
                         key={item.id}
-                        onClick={() => handleAddItem(item)}
-                        className="p-3 hover:bg-slate-50 rounded-lg cursor-pointer transition flex items-center justify-between group"
+                        className="p-3 hover:bg-slate-50 rounded-lg transition flex items-center justify-between gap-3 group"
                       >
                         <div>
                           <p className="font-extrabold text-slate-800 text-sm group-hover:text-indigo-700">
@@ -571,14 +561,19 @@ export default function RequestsCreate({
                             </span>
                           </div>
                         </div>
-                        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg opacity-0 group-hover:opacity-100 transition">
+                        <button
+                          type="button"
+                          onClick={() => handleAddItem(item)}
+                          aria-label={`Thêm ${item.name} vào phiếu`}
+                          className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 active:scale-95 transition shadow-sm shrink-0"
+                        >
                           <Plus className="w-5 h-5" />
-                        </div>
+                        </button>
                       </div>
                     ))
                   )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
 
