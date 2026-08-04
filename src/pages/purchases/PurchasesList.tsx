@@ -195,6 +195,8 @@ function isVeSinhItem(item: any): boolean {
     'thung rac',
     'nuoc rua',
     'nuoc lau',
+    'nuoc tay',
+    'nha ve sinh',
     'lau san',
     'giay ve sinh',
     'giay lau tay',
@@ -222,9 +224,9 @@ function isVeSinhItem(item: any): boolean {
 function getItemCategoryType(item: any): 'VPP' | 'VE_SINH' | 'OTHER' {
   if (!item) return 'OTHER';
   const itemType = normalizeClassificationText(item.itemType);
-  if (itemType === 'vpp') return 'VPP';
-  if (itemType === 've_sinh') return 'VE_SINH';
+  if (itemType === 've_sinh' || itemType === 'vs') return 'VE_SINH';
   if (isVeSinhItem(item)) return 'VE_SINH';
+  if (itemType === 'vpp') return 'VPP';
   if (isVppItem(item)) return 'VPP';
   return 'OTHER';
 }
