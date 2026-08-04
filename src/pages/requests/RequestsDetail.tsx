@@ -179,6 +179,14 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
   const [autoCreateBackorder, setAutoCreateBackorder] = useState(true);
   const [activeTab, setActiveTab] = useState<'items' | 'deliveries' | 'history' | 'links'>('items');
   const [batchToPrint, setBatchToPrint] = useState<any>(null);
+  const [quantityCorrection, setQuantityCorrection] = useState<null | {
+    lineId: string;
+    itemName: string;
+    qtyAdminApproved: number;
+    qtyDelivered: number;
+    reason: string;
+  }>(null);
+  const [savingQuantityCorrection, setSavingQuantityCorrection] = useState(false);
 
 
   const fetchDetail = async () => {
@@ -253,6 +261,34 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
     } finally {
       setLoading(true); // Keep loading false only after all async work
       setLoading(false);
+    }
+  };
+
+  const saveQuantityCorrection = async () => {
+    if (!quantityCorrection) return;
+    if (quantityCorrection.qtyDelivered > quantityCorrection.qtyAdminApproved) {
+      showToast('Số lượng thực giao không được lớn hơn số lượng Admin duyệt', 'error');
+      return;
+    }
+    if (quantityCorrection.reason.trim().length < 3) {
+      showToast('Vui lòng nhập lý do hiệu chỉnh', 'warning');
+      return;
+    }
+    try {
+      setSavingQuantityCorrection(true);
+      await api.patch(`/requests/${requestId}/lines/${quantityCorrection.lineId}/correct-quantities`, {
+        qtyAdminApproved: Number(quantityCorrection.qtyAdminApproved),
+        qtyDelivered: Number(quantityCorrection.qtyDelivered),
+        reason: quantityCorrection.reason.trim(),
+      });
+      showToast(`Đã hiệu chỉnh số lượng “${quantityCorrection.itemName}”`, 'success');
+      setQuantityCorrection(null);
+      await fetchDetail();
+      await refreshData();
+    } catch (err: any) {
+      showToast(err.response?.data?.error || 'Không thể hiệu chỉnh số lượng', 'error');
+    } finally {
+      setSavingQuantityCorrection(false);
     }
   };
 
@@ -651,10 +687,25 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       className: 'text-blue-600 bg-blue-50/30',
       render: (l: any) => {
         return (
-          <div>
+          <div className="flex flex-col items-center gap-1">
             <span className="font-black text-base text-blue-600">{l.qtyDelivered ?? 0}</span>
             {l.qtyDelivered > 0 && l.qtyDelivered < (l.qtyApproved ?? l.qtyRequested) && (
                 <p className="text-[9px] font-bold text-rose-500 bg-rose-50 rounded px-1 mt-1">Còn nợ: {(l.qtyApproved ?? l.qtyRequested) - l.qtyDelivered}</p>
+            )}
+            {currentUser.role === 'ADMIN' && (
+              <button
+                type="button"
+                onClick={() => setQuantityCorrection({
+                  lineId: l.id,
+                  itemName: (l.issue_item || l.item).name,
+                  qtyAdminApproved: Number(l.qtyAdminApproved ?? l.qtyApproved ?? 0),
+                  qtyDelivered: Number(l.qtyDelivered ?? 0),
+                  reason: '',
+                })}
+                className="rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase text-amber-700 hover:bg-amber-100"
+              >
+                Hiệu chỉnh
+              </button>
             )}
           </div>
         );
@@ -2714,6 +2765,61 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
           </div>
        )}
        
+       {quantityCorrection && (
+         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+             <div className="mb-5 flex items-start justify-between gap-4">
+               <div>
+                 <h3 className="text-lg font-black text-slate-900">Hiệu chỉnh số lượng</h3>
+                 <p className="mt-1 text-xs font-bold text-slate-500">{quantityCorrection.itemName}</p>
+               </div>
+               <button type="button" onClick={() => setQuantityCorrection(null)} className="text-slate-400 hover:text-slate-700">
+                 <XCircle className="h-6 w-6" />
+               </button>
+             </div>
+             <div className="grid grid-cols-2 gap-4">
+               <label className="text-xs font-black text-slate-600">
+                 Admin duyệt
+                 <input
+                   type="number"
+                   min={0}
+                   max={data.lines.find((line: any) => line.id === quantityCorrection.lineId)?.qtyRequested ?? undefined}
+                   value={quantityCorrection.qtyAdminApproved}
+                   onChange={(event) => setQuantityCorrection({ ...quantityCorrection, qtyAdminApproved: Math.max(0, Number(event.target.value)) })}
+                   className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-base font-black outline-none focus:border-indigo-500"
+                 />
+               </label>
+               <label className="text-xs font-black text-slate-600">
+                 Thực giao
+                 <input
+                   type="number"
+                   min={0}
+                   max={quantityCorrection.qtyAdminApproved}
+                   value={quantityCorrection.qtyDelivered}
+                   onChange={(event) => setQuantityCorrection({ ...quantityCorrection, qtyDelivered: Math.max(0, Number(event.target.value)) })}
+                   className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-base font-black outline-none focus:border-indigo-500"
+                 />
+               </label>
+             </div>
+             <label className="mt-4 block text-xs font-black text-slate-600">
+               Lý do hiệu chỉnh
+               <textarea
+                 value={quantityCorrection.reason}
+                 onChange={(event) => setQuantityCorrection({ ...quantityCorrection, reason: event.target.value })}
+                 placeholder="Ví dụ: Điều chỉnh theo biên bản bàn giao thực tế"
+                 className="mt-2 min-h-24 w-full resize-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium outline-none focus:border-indigo-500"
+               />
+             </label>
+             <div className="mt-6 flex justify-end gap-3">
+               <button type="button" onClick={() => setQuantityCorrection(null)} className="rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-black text-slate-600">Hủy</button>
+               <button type="button" disabled={savingQuantityCorrection} onClick={saveQuantityCorrection} className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-black text-white disabled:opacity-50">
+                 {savingQuantityCorrection ? 'Đang lưu...' : 'Lưu hiệu chỉnh'}
+               </button>
+             </div>
+           </div>
+         </div>
+       )}
+
        {/* BATCH PRINT TEMPLATE (Only visible during batch printing) */}
        {batchToPrint && (
          <div className="hidden print:block fixed inset-0 bg-white z-[9999] p-10 text-black">
