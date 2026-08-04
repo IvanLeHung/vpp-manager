@@ -360,8 +360,8 @@ export default function RequestsCreate({
   }, [targetItems]);
 
   return (
-    <div className="flex flex-col h-full bg-slate-100 overflow-hidden relative print:bg-white print:overflow-auto">
-      <div className="h-16 bg-white border-b border-slate-200 flex justify-between items-center px-4 md:px-8 shrink-0 z-20 shadow-sm print:hidden">
+    <div className="min-h-full bg-slate-100 relative print:bg-white">
+      <div className="sticky top-0 min-h-16 bg-white border-b border-slate-200 flex flex-wrap justify-between items-center gap-3 px-4 md:px-8 py-3 z-30 shadow-sm print:hidden">
         <div className="flex items-center gap-4">
           <button
             onClick={() => setViewMode('LIST')}
@@ -395,7 +395,7 @@ export default function RequestsCreate({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col gap-6 w-full max-w-6xl mx-auto">
+      <div className="p-4 md:p-8 flex flex-col gap-6 w-full max-w-6xl mx-auto">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
           <h3 className="text-[11px] font-black text-indigo-700 uppercase tracking-widest flex items-center mb-6">
             <div className="w-6 h-6 rounded bg-indigo-100 text-indigo-700 flex items-center justify-center mr-2">
@@ -488,13 +488,13 @@ export default function RequestsCreate({
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-1 min-h-[450px]">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col">
           <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between rounded-t-2xl">
             <h3 className="text-[11px] font-black text-indigo-700 uppercase tracking-widest flex items-center">
               <div className="w-6 h-6 rounded bg-indigo-100 text-indigo-700 flex items-center justify-center mr-2">
                 2
               </div>
-              Lưới vật tư / Hàng hóa
+              Chọn vật tư cần đề xuất
             </h3>
 
             <div className="text-xs font-bold flex gap-4 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
@@ -531,7 +531,7 @@ export default function RequestsCreate({
                     {searchResults.length} vật tư
                   </span>
                 </div>
-                <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 p-1">
+                <div className="max-h-52 md:max-h-60 overflow-y-auto divide-y divide-slate-100 p-1">
                   {searchResults.length === 0 ? (
                     <div className="p-4 text-slate-500 text-center text-sm font-medium">
                       Không tìm thấy vật tư "{searchTerm}".
@@ -577,7 +577,17 @@ export default function RequestsCreate({
             </div>
           </div>
 
-          <div className="overflow-x-auto flex-1">
+          <div className="px-4 pt-4 flex items-center justify-between gap-3">
+            <div>
+              <h4 className="text-sm font-black text-slate-800">Vật tư đã chọn</h4>
+              <p className="text-xs text-slate-500">Điều chỉnh số lượng và ghi chú trước khi gửi duyệt</p>
+            </div>
+            <span className="shrink-0 text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1.5 rounded-lg">
+              {targetItems.length} mục
+            </span>
+          </div>
+
+          <div className="overflow-x-auto mt-3">
             <table className="w-full text-left whitespace-nowrap min-w-max">
               <thead className="bg-slate-50 border-b border-slate-200 relative">
                 <tr className="text-[10px] uppercase font-black text-slate-400 tracking-widest">
@@ -597,9 +607,9 @@ export default function RequestsCreate({
               <tbody className="divide-y divide-slate-100">
                 {targetItems.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="p-16 text-center text-slate-400 font-medium bg-slate-50/50">
-                      <Search className="w-12 h-12 text-slate-300 mx-auto mb-3 opacity-50" />
-                      Lưới chứng từ đang trống. Sử dụng thanh tìm kiếm phía trên để thêm hàng.
+                    <td colSpan={6} className="p-10 text-center text-slate-400 font-medium bg-slate-50/50">
+                      <Plus className="w-10 h-10 text-slate-300 mx-auto mb-3 opacity-60" />
+                      Chưa có vật tư nào. Chọn vật tư trong danh mục phía trên và bấm dấu +.
                     </td>
                   </tr>
                 )}
