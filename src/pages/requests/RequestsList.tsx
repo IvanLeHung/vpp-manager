@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Plus, Download, Search, FileText, CheckCircle, Clock, XCircle, ChevronLeft, ChevronRight, Eye, CheckSquare, GitBranch, Printer, ListChecks, ChevronDown, RotateCcw, FileSpreadsheet, CornerUpLeft } from 'lucide-react';
+import { Plus, Download, Search, FileText, CheckCircle, Clock, XCircle, ChevronLeft, ChevronRight, Eye, CheckSquare, GitBranch, Printer, ListChecks, ChevronDown, RotateCcw, FileSpreadsheet, CornerUpLeft, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { VPPRequest, User } from '../../context/AppContext';
 import { useAppContext } from '../../context/AppContext';
@@ -72,6 +72,15 @@ function sortLinesForPrinting(lines: any[]) {
   });
 }
 
+function normalizeSearchText(value: any) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase();
+}
+
 export default function RequestsList({ requests, currentUser, setViewMode, setActiveRequest, setNavigationIds, refreshData, showToast }: Props) {
   const { items: masterItems } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
@@ -79,6 +88,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   const [deptFilter, setDeptFilter] = useState<string>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [sortConfig, setSortConfig] = useState<{ key: 'id' | 'requester' | 'items' | 'status'; direction: 'asc' | 'desc' }>({ key: 'id', direction: 'desc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedMode, setSelectedMode] = useState<'NONE' | 'MANUAL' | 'ALL_FILTERED'>('NONE');
@@ -153,17 +163,62 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         filtered = filtered.filter(r => r.priority === priorityFilter);
     }
 
-    if (searchTerm) {
-      const lower = searchTerm.toLowerCase();
-      filtered = filtered.filter(r => 
-        (r.id?.toLowerCase().includes(lower)) || 
-        (r.requester?.fullName?.toLowerCase().includes(lower)) ||
-        (r.purpose?.toLowerCase().includes(lower)) ||
-        (r.department?.toLowerCase().includes(lower))
-      );
+    if (searchTerm.trim()) {
+      const terms = normalizeSearchText(searchTerm).split(/\s+/).filter(Boolean);
+      filtered = filtered.filter((r: any) => {
+        const lineValues = (r.lines || []).flatMap((line: any) => [
+          line.note,
+          line.issueNote,
+          line.item?.name,
+          line.item?.mvpp,
+          line.replacementItem?.name,
+          line.replacementItem?.mvpp,
+        ]);
+        const haystack = normalizeSearchText([
+          r.id,
+          r.requester?.fullName,
+          r.requester?.username,
+          r.purpose,
+          r.note,
+          r.department,
+          r.priority,
+          r.status,
+          ...lineValues,
+        ].join(' '));
+        return terms.every(term => haystack.includes(term));
+      });
     }
-    return filtered.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [requests, statusFilters, deptFilter, priorityFilter, searchTerm, currentUser]);
+
+    const getSortValue = (request: any) => {
+      if (sortConfig.key === 'requester') return `${request.requester?.fullName || ''} ${request.department || ''}`;
+      if (sortConfig.key === 'items') return Number(request.lines?.length || 0);
+      if (sortConfig.key === 'status') return request.status || '';
+      return request.id || '';
+    };
+
+    return [...filtered].sort((a: any, b: any) => {
+      const aValue = getSortValue(a);
+      const bValue = getSortValue(b);
+      const comparison = typeof aValue === 'number'
+        ? aValue - Number(bValue)
+        : String(aValue).localeCompare(String(bValue), 'vi', { numeric: true, sensitivity: 'base' });
+      return sortConfig.direction === 'asc' ? comparison : -comparison;
+    });
+  }, [requests, statusFilters, deptFilter, priorityFilter, searchTerm, currentUser, sortConfig]);
+
+  const toggleSort = (key: 'id' | 'requester' | 'items' | 'status') => {
+    setSortConfig(prev => prev.key === key
+      ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+      : { key, direction: 'asc' });
+    setCurrentPage(1);
+  };
+
+  const SortIcon = ({ column }: { column: 'id' | 'requester' | 'items' | 'status' }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="w-3.5 h-3.5 text-slate-300" />;
+    return sortConfig.direction === 'asc'
+      ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" />
+      : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />;
+  };
 
   // Handle row selection changes when data changes
   useEffect(() => {
@@ -563,15 +618,22 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                <button onClick={() => setViewMode('WORKFLOW')} className="px-3 py-1.5 rounded-lg font-bold text-xs transition bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 flex items-center gap-1"><GitBranch className="w-3.5 h-3.5" /> QUY TRÌNH</button>
             </div>
             <div className="flex items-center gap-2 w-full xl:w-auto">
-                <div className="relative flex-1 xl:w-56">
+                <div className="relative flex-1 xl:w-[420px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input type="text" placeholder="Tra mã phiếu..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-sm transition" />
+                    <input type="text" placeholder="Tìm mã phiếu, người đề xuất, phòng ban, vật tư, mã vật tư, ghi chú..." value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-sm transition" />
                 </div>
                 <button onClick={() => setShowAdvancedFilters(!showAdvancedFilters)} className={`px-3 py-2 rounded-xl border font-bold text-xs flex items-center gap-1.5 ${showAdvancedFilters ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-600'}`}>
                    <ListChecks className="w-4 h-4" /> 
                    Bộ lọc
-                   {(deptFilter !== 'ALL' || priorityFilter !== 'ALL') && <span className="w-2 h-2 bg-rose-500 rounded-full"></span>}
+                   {(statusFilters.length > 0 || deptFilter !== 'ALL' || priorityFilter !== 'ALL') && (
+                     <span className="min-w-5 h-5 px-1 rounded-full bg-indigo-600 text-white text-[10px] flex items-center justify-center">
+                       {statusFilters.length + Number(deptFilter !== 'ALL') + Number(priorityFilter !== 'ALL')}
+                     </span>
+                   )}
                 </button>
+                <div className="shrink-0 px-3 py-2 rounded-xl bg-white border border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                  Hiển thị <span className="text-indigo-600">{filteredRequests.length}</span>/{requests.length}
+                </div>
                 {(currentUser.role === 'MANAGER' || currentUser.role === 'ADMIN') && (
                   <button 
                     onClick={toggleBulkMode}
@@ -737,10 +799,10 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                                )}
                             </th>
                           )}
-                          <th className={`p-3 ${!isBulkMode ? 'pl-6' : ''}`}>Mã phiếu</th>
-                          <th className="p-3">Người đề xuất</th>
-                          <th className="p-3 text-center w-14">Mục</th>
-                          <th className="p-3 text-center">Trạng thái</th>
+                          <th className={`p-3 ${!isBulkMode ? 'pl-6' : ''}`}><button type="button" onClick={() => toggleSort('id')} className="inline-flex items-center gap-1.5 hover:text-indigo-700">Mã phiếu <SortIcon column="id" /></button></th>
+                          <th className="p-3"><button type="button" onClick={() => toggleSort('requester')} className="inline-flex items-center gap-1.5 hover:text-indigo-700">Người đề xuất <SortIcon column="requester" /></button></th>
+                          <th className="p-3 text-center w-14"><button type="button" onClick={() => toggleSort('items')} className="inline-flex items-center justify-center gap-1 hover:text-indigo-700">Mục <SortIcon column="items" /></button></th>
+                          <th className="p-3 text-center"><button type="button" onClick={() => toggleSort('status')} className="inline-flex items-center justify-center gap-1.5 hover:text-indigo-700">Trạng thái <SortIcon column="status" /></button></th>
                           <th className="p-3 text-right pr-4 w-28">Thao tác</th>
                       </tr>
                   </thead>
