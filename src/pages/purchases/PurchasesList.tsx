@@ -4,7 +4,7 @@ import {
   Plus, DollarSign,
   ShoppingCart, Package, Clock, ChevronRight, Truck, User as UserIcon,
   Printer, CheckSquare, ChevronDown, AlertTriangle, X, CheckCircle, Download, Eye,
-  FileText, ArrowLeft, RefreshCw, Layers, Search
+  FileText, ArrowLeft, RefreshCw, Layers, Search, ListFilter, ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import * as docx from 'docx';
@@ -471,6 +471,10 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('ALL');
+  const [showDataFilters, setShowDataFilters] = useState(false);
+  const [departmentFilter, setDepartmentFilter] = useState('ALL');
+  const [supplierFilter, setSupplierFilter] = useState('ALL');
+  const [sortConfig, setSortConfig] = useState<{ key: 'id' | 'item' | 'department' | 'warehouse' | 'supplier' | 'total' | 'assignee' | 'timeline'; direction: 'asc' | 'desc' }>({ key: 'timeline', direction: 'desc' });
   
   // Bulk Selection & Printing states
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -697,6 +701,14 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       );
   };
 
+  const departmentOptions = useMemo(() => Array.from(new Set(
+    data.flatMap((d: any) => d.depts || [d.department || d.departmentName]).filter(Boolean)
+  )).sort((a: any, b: any) => String(a).localeCompare(String(b), 'vi')), [data]);
+
+  const supplierOptions = useMemo(() => Array.from(new Set(
+    data.map((d: any) => d.supplier || d.supplierName).filter(Boolean)
+  )).sort((a: any, b: any) => String(a).localeCompare(String(b), 'vi')), [data]);
+
   const filteredData = data.filter(d => {
       const matchSearch = purchaseMatchesSearch(d, searchTerm);
       
@@ -715,8 +727,41 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
           matchMonth = poMonth === selectedMonth;
       }
 
-      return matchSearch && matchTab && matchMonth;
+      const matchDepartment = departmentFilter === 'ALL' || (d.depts || [d.department, d.departmentName]).includes(departmentFilter);
+      const matchSupplier = supplierFilter === 'ALL' || (d.supplier || d.supplierName) === supplierFilter;
+
+      return matchSearch && matchTab && matchMonth && matchDepartment && matchSupplier;
+  }).sort((a: any, b: any) => {
+      const getValue = (po: any) => {
+        if (sortConfig.key === 'item') return po.topItems?.join(' ') || '';
+        if (sortConfig.key === 'department') return po.depts?.join(' ') || po.department || po.departmentName || '';
+        if (sortConfig.key === 'warehouse') return po.warehouses?.join(' ') || po.warehouseName || '';
+        if (sortConfig.key === 'supplier') return `${po.supplier || po.supplierName || ''} ${po.status || ''}`;
+        if (sortConfig.key === 'total') return Number(po.actualTotal || po.totalAmount || 0);
+        if (sortConfig.key === 'assignee') return po.assignedToName || '';
+        if (sortConfig.key === 'timeline') return new Date(po.createdAt || po.orderDate || 0).getTime();
+        return po.id || '';
+      };
+      const aValue = getValue(a);
+      const bValue = getValue(b);
+      const comparison = typeof aValue === 'number'
+        ? aValue - Number(bValue)
+        : String(aValue).localeCompare(String(bValue), 'vi', { numeric: true, sensitivity: 'base' });
+      return sortConfig.direction === 'asc' ? comparison : -comparison;
   });
+
+  const togglePurchaseSort = (key: typeof sortConfig.key) => {
+    setSortConfig(prev => prev.key === key
+      ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+      : { key, direction: 'asc' });
+  };
+
+  const PurchaseSortIcon = ({ column }: { column: typeof sortConfig.key }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="w-3.5 h-3.5 text-slate-300" />;
+    return sortConfig.direction === 'asc'
+      ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" />
+      : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />;
+  };
 
   // Summary aggregation logic - Optimized for original request tracking
   const summaryGroups = useMemo(() => {
@@ -1886,7 +1931,45 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                         <div className="shrink-0 px-3 py-2 rounded-xl bg-white border border-slate-200 text-[10px] font-black uppercase tracking-widest text-slate-500 shadow-sm">
                             Hiển thị <span className="text-indigo-600">{filteredData.length}</span>/{data.length} phiếu
                         </div>
+                        <button
+                            type="button"
+                            onClick={() => setShowDataFilters(!showDataFilters)}
+                            className={`shrink-0 h-10 px-3 rounded-xl border text-[10px] font-black uppercase tracking-wider flex items-center gap-2 transition ${showDataFilters ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                        >
+                            <ListFilter className="w-4 h-4" /> Bộ lọc
+                            {(departmentFilter !== 'ALL' || supplierFilter !== 'ALL' || selectedMonth) && (
+                              <span className="min-w-5 h-5 px-1 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                                {[departmentFilter !== 'ALL', supplierFilter !== 'ALL', !!selectedMonth].filter(Boolean).length}
+                              </span>
+                            )}
+                        </button>
                     </div>
+
+                    {showDataFilters && (
+                      <div className="mb-3 p-3 bg-white border border-slate-200 rounded-xl flex flex-wrap items-end gap-3 shadow-sm">
+                        <div className="flex flex-col gap-1 min-w-[210px] flex-1">
+                          <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Phòng ban</label>
+                          <select value={departmentFilter} onChange={e => setDepartmentFilter(e.target.value)} className="h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-indigo-400">
+                            <option value="ALL">Tất cả phòng ban</option>
+                            {departmentOptions.map((department: any) => <option key={department} value={department}>{department}</option>)}
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1 min-w-[210px] flex-1">
+                          <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Nhà cung cấp</label>
+                          <select value={supplierFilter} onChange={e => setSupplierFilter(e.target.value)} className="h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-indigo-400">
+                            <option value="ALL">Tất cả nhà cung cấp</option>
+                            {supplierOptions.map((supplier: any) => <option key={supplier} value={supplier}>{supplier}</option>)}
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1 min-w-[170px]">
+                          <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Tháng</label>
+                          <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-indigo-400" />
+                        </div>
+                        <button type="button" onClick={() => { setDepartmentFilter('ALL'); setSupplierFilter('ALL'); setSelectedMonth(''); }} className="h-9 px-3 rounded-lg border border-rose-200 bg-rose-50 text-rose-600 text-[10px] font-black uppercase hover:bg-rose-100 transition">
+                          Xóa lọc
+                        </button>
+                      </div>
+                    )}
 
                     <div className="flex flex-wrap gap-3 justify-between items-center">
                     <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
@@ -1910,13 +1993,6 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                     </div>
 
                     <div className="flex items-center gap-2 w-full md:w-auto mt-1.5 md:mt-0">
-                        <input 
-                            type="month"
-                            value={selectedMonth}
-                            onChange={(e) => setSelectedMonth(e.target.value)}
-                            className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/5 shadow-sm transition"
-                            title="Lọc theo tháng báo cáo"
-                        />
                                  {/* UNIFIED REPORT PRINT & EXPORT BUTTON */}
                            <div className="relative">
                               <button 
@@ -2117,14 +2193,14 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                       />
                                    </th>
                                 )}
-                                <th className={`p-3.5 border-b border-slate-200 ${!isBulkMode ? 'pl-6' : ''}`}>Mã đơn / Nội dung</th>
-                                <th className="p-3.5 border-b border-slate-200">Vật tư chính</th>
-                                <th className="p-3.5 border-b border-slate-200">Phòng ban</th>
-                                <th className="p-3.5 border-b border-slate-200">Kho / Nhóm</th>
-                                <th className="p-3.5 border-b border-slate-200">Nhà cung cấp / Trạng thái</th>
-                                <th className="p-3.5 border-b border-slate-200 text-right">Tổng tiền</th>
-                                <th className="p-3.5 border-b border-slate-200 text-center">Phụ trách</th>
-                                <th className="p-3.5 border-b border-slate-200">Timeline</th>
+                                <th className={`p-3.5 border-b border-slate-200 ${!isBulkMode ? 'pl-6' : ''}`}><button type="button" onClick={() => togglePurchaseSort('id')} className="inline-flex items-center gap-1.5 hover:text-indigo-700">Mã đơn / Nội dung <PurchaseSortIcon column="id" /></button></th>
+                                <th className="p-3.5 border-b border-slate-200"><button type="button" onClick={() => togglePurchaseSort('item')} className="inline-flex items-center gap-1.5 hover:text-indigo-700">Vật tư chính <PurchaseSortIcon column="item" /></button></th>
+                                <th className="p-3.5 border-b border-slate-200"><button type="button" onClick={() => togglePurchaseSort('department')} className="inline-flex items-center gap-1.5 hover:text-indigo-700">Phòng ban <PurchaseSortIcon column="department" /></button></th>
+                                <th className="p-3.5 border-b border-slate-200"><button type="button" onClick={() => togglePurchaseSort('warehouse')} className="inline-flex items-center gap-1.5 hover:text-indigo-700">Kho / Nhóm <PurchaseSortIcon column="warehouse" /></button></th>
+                                <th className="p-3.5 border-b border-slate-200"><button type="button" onClick={() => togglePurchaseSort('supplier')} className="inline-flex items-center gap-1.5 hover:text-indigo-700">Nhà cung cấp / Trạng thái <PurchaseSortIcon column="supplier" /></button></th>
+                                <th className="p-3.5 border-b border-slate-200 text-right"><button type="button" onClick={() => togglePurchaseSort('total')} className="inline-flex items-center justify-end gap-1.5 hover:text-indigo-700">Tổng tiền <PurchaseSortIcon column="total" /></button></th>
+                                <th className="p-3.5 border-b border-slate-200 text-center"><button type="button" onClick={() => togglePurchaseSort('assignee')} className="inline-flex items-center justify-center gap-1.5 hover:text-indigo-700">Phụ trách <PurchaseSortIcon column="assignee" /></button></th>
+                                <th className="p-3.5 border-b border-slate-200"><button type="button" onClick={() => togglePurchaseSort('timeline')} className="inline-flex items-center gap-1.5 hover:text-indigo-700">Timeline <PurchaseSortIcon column="timeline" /></button></th>
                                 <th className="p-3.5 border-b border-slate-200 pr-6"></th>
                             </tr>
                         </thead>
