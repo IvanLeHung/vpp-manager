@@ -944,7 +944,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       });
 
       return Array.from(groups.entries()).map(([type, itemsMap]) => {
-          const items = sortItemsForPrinting(Array.from(itemsMap.values())
+          const items = Array.from(itemsMap.values())
               .map(item => {
                   return {
                       ...item,
@@ -960,7 +960,8 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                         }))
                         .sort((a: any, b: any) => b.qty - a.qty)
                   };
-              }));
+              })
+              .sort((a: any, b: any) => Number(b.actualTotal || 0) - Number(a.actualTotal || 0));
           
           const groupApprovedTotal = items.reduce((s, i) => s + i.originalTotal, 0);
           const groupActualTotal = items.reduce((s, i) => s + i.actualTotal, 0);
@@ -1664,7 +1665,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
         rows.push([]);
         
         // Table Headers
-        rows.push(["STT", "MÃ VT", "TÊN VẬT TƯ MUA", "ĐVT", "SL MUA", "ĐƠN GIÁ", "THÀNH TIỀN"]);
+        rows.push(["STT", "MÃ VT", "TÊN VẬT TƯ MUA", "ĐVT", "SL MUA", "ĐƠN GIÁ", "THÀNH TIỀN", "TỶ TRỌNG (%)"]);
         
         group.items.forEach((item: any, idx: number) => {
             // Main Item Row
@@ -1675,7 +1676,8 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                 item.unit,
                 item.qty,
                 item.price,
-                item.actualTotal
+                item.actualTotal,
+                `${(group.actualTotal > 0 ? (item.actualTotal / group.actualTotal) * 100 : 0).toFixed(2)}%`
             ]);
             
             // Allocation Rows
@@ -1687,7 +1689,8 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                     de.unit,
                     de.qty,
                     "",
-                    de.note ? `Ghi chú: ${de.note}` : ""
+                    de.note ? `Ghi chú: ${de.note}` : "",
+                    ""
                 ]);
             });
             
@@ -1700,19 +1703,20 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                     "",
                     "",
                     "",
-                    `Chênh lệch: ${rep.diff >= 0 ? 'Tiết kiệm' : 'Tăng'} ${Math.abs(rep.diff).toLocaleString('vi-VN')} đ`
+                    `Chênh lệch: ${rep.diff >= 0 ? 'Tiết kiệm' : 'Tăng'} ${Math.abs(rep.diff).toLocaleString('vi-VN')} đ`,
+                    ""
                 ]);
             });
         });
         
         rows.push([]);
-        rows.push(["TỔNG CỘNG", "", "", "", group.items.reduce((s:number, i:any) => s + i.qty, 0), "", group.actualTotal]);
+        rows.push(["TỔNG CỘNG", "", "", "", group.items.reduce((s:number, i:any) => s + i.qty, 0), "", group.actualTotal, "100.00%"]);
 
         const ws = XLSX.utils.aoa_to_sheet(rows);
         
         // Basic column widths
         ws['!cols'] = [
-            {wch: 5}, {wch: 15}, {wch: 60}, {wch: 10}, {wch: 10}, {wch: 15}, {wch: 20}
+            {wch: 5}, {wch: 15}, {wch: 60}, {wch: 10}, {wch: 10}, {wch: 15}, {wch: 20}, {wch: 14}
         ];
         
         XLSX.utils.book_append_sheet(wb, ws, group.label.slice(0, 31));
@@ -1853,7 +1857,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                         new docx.TableRow({
                             tableHeader: true,
                             children: [
-                                "STT", "MÃ VT", "TÊN VẬT TƯ MUA", "ĐVT", "SL MUA", "ĐƠN GIÁ", "THÀNH TIỀN"
+                                "STT", "MÃ VT", "TÊN VẬT TƯ MUA", "ĐVT", "SL MUA", "ĐƠN GIÁ", "THÀNH TIỀN", "TỶ TRỌNG"
                             ].map(text => new docx.TableCell({
                                 shading: { fill: "F1F5F9" },
                                 children: [new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text, bold: true, size: 16 })] })]
@@ -1869,6 +1873,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                     new docx.TableCell({ children: [new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: String(item.qty), size: 16 })] })] }),
                                     new docx.TableCell({ children: [new docx.Paragraph({ alignment: docx.AlignmentType.RIGHT, children: [new docx.TextRun({ text: Number(item.price).toLocaleString('vi-VN'), size: 16 })] })] }),
                                     new docx.TableCell({ children: [new docx.Paragraph({ alignment: docx.AlignmentType.RIGHT, children: [new docx.TextRun({ text: Number(item.actualTotal).toLocaleString('vi-VN'), size: 16 })] })] }),
+                                    new docx.TableCell({ children: [new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: `${(group.actualTotal > 0 ? (item.actualTotal / group.actualTotal) * 100 : 0).toFixed(2)}%`, bold: true, size: 16 })] })] }),
                                 ]
                             });
 
@@ -1876,7 +1881,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                 children: [
                                     new docx.TableCell({ children: [] }),
                                     new docx.TableCell({ 
-                                        columnSpan: 6,
+                                        columnSpan: 7,
                                         children: [
                                             new docx.Table({
                                                 width: { size: 100, type: docx.WidthType.PERCENTAGE },
@@ -1918,7 +1923,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                 children: [
                                     new docx.TableCell({ children: [] }),
                                     new docx.TableCell({
-                                        columnSpan: 6,
+                                        columnSpan: 7,
                                         shading: { fill: "F8FAFC" },
                                         children: [
                                             new docx.Paragraph({
@@ -3096,11 +3101,12 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                         <tr className="bg-slate-100 font-bold text-[8pt] text-center">
                             <th style={{width: '4%'}}>STT</th>
                             <th style={{width: '12%'}}>MÃ VT</th>
-                            <th style={{width: '28%'}}>TÊN VẬT TƯ MUA</th>
+                            <th style={{width: '24%'}}>TÊN VẬT TƯ MUA</th>
                             <th style={{width: '6%'}}>ĐVT</th>
                             <th style={{width: '8%'}}>SL MUA</th>
                             <th style={{width: '12%'}}>ĐƠN GIÁ</th>
                             <th style={{width: '14%'}}>THÀNH TIỀN</th>
+                            <th style={{width: '8%'}}>TỶ TRỌNG</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -3122,13 +3128,14 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                     <td className="text-center">{item.qty}</td>
                                     <td className="text-right">{Number(item.price).toLocaleString('vi-VN')}</td>
                                     <td className="text-right">{Number(item.actualTotal).toLocaleString('vi-VN')}</td>
+                                    <td className="text-center font-bold">{(group.actualTotal > 0 ? (item.actualTotal / group.actualTotal) * 100 : 0).toFixed(2)}%</td>
                                 </tr>
                                 
                                 {/* ALLOCATION ROWS - OPTIMIZED FOR CLEAR DEPT VIEW */}
                                 {item.deptEntries.length > 0 ? item.deptEntries.map((de: any, deIdx: number) => (
                                     <tr key={`de-${deIdx}`} className="allocation-row">
                                        <td style={{borderTop: 'none', borderBottom: 'none'}}></td>
-                                       <td colSpan={6} style={{borderTop: 'none', borderBottom: 'none'}}>
+                                       <td colSpan={7} style={{borderTop: 'none', borderBottom: 'none'}}>
                                           <div className="grid grid-cols-12 gap-2 px-2 py-0.5">
                                              <div className="col-span-7 flex flex-col">
                                                 <span className="allocation-department">- {de.dept || 'Chưa liên kết được phòng ban'}</span>
@@ -3146,7 +3153,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                 )) : (
                                   <tr className="allocation-row">
                                      <td style={{borderTop: 'none', borderBottom: 'none'}}></td>
-                                     <td colSpan={6} style={{borderTop: 'none', borderBottom: 'none'}} className="px-4 py-1 text-rose-500 italic font-bold">
+                                     <td colSpan={7} style={{borderTop: 'none', borderBottom: 'none'}} className="px-4 py-1 text-rose-500 italic font-bold">
                                         - Chưa liên kết được phòng ban đề xuất
                                      </td>
                                   </tr>
@@ -3156,7 +3163,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                 {item.replacements.length > 0 && item.replacements.map((rep: any, rIdx: number) => (
                                    <tr key={`rep-${rIdx}`} className="replacement-row">
                                       <td style={{borderTop: 'none'}}></td>
-                                      <td colSpan={6} style={{borderTop: 'none', paddingLeft: '20px'}}>
+                                      <td colSpan={7} style={{borderTop: 'none', paddingLeft: '20px'}}>
                                          <p className="font-bold text-slate-600">
                                             Thay cho: {rep.originalName} | Mã cũ: {rep.originalCode} | Giá cũ: {Number(rep.originalPrice).toLocaleString('vi-VN')}
                                          </p>
