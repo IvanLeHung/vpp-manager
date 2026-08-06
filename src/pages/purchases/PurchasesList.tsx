@@ -1707,8 +1707,6 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
         
         rows.push([]);
         rows.push(["TỔNG CỘNG", "", "", "", group.items.reduce((s:number, i:any) => s + i.qty, 0), "", group.actualTotal]);
-        rows.push(["TỔNG GIÁ TRỊ ĐỀ XUẤT ĐÃ DUYỆT", "", "", "", "", "", group.approvedTotal]);
-        rows.push([group.savings >= 0 ? "HIỆU QUẢ TỐI ƯU CHI PHÍ" : "CHÊNH LỆCH CHI PHÍ TĂNG", "", "", "", "", "", Math.abs(group.savings)]);
 
         const ws = XLSX.utils.aoa_to_sheet(rows);
         
@@ -1948,20 +1946,6 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                         new docx.TextRun({ text: `TỔNG CỘNG (${group.items.length} MẶT HÀNG):  `, bold: true, size: 18 }),
                         new docx.TextRun({ text: `${group.items.reduce((s:number, i:any) => s + i.qty, 0).toLocaleString('vi-VN')}  `, bold: true, size: 18 }),
                         new docx.TextRun({ text: `${Number(group.actualTotal).toLocaleString('vi-VN')} đ`, bold: true, size: 20, color: "4F46E5" })
-                    ]
-                }),
-                new docx.Paragraph({
-                    alignment: docx.AlignmentType.RIGHT,
-                    children: [
-                        new docx.TextRun({ text: `TỔNG GIÁ TRỊ ĐỀ XUẤT ĐÃ DUYỆT:  `, size: 16 }),
-                        new docx.TextRun({ text: `${Number(group.approvedTotal).toLocaleString('vi-VN')} đ`, size: 16 })
-                    ]
-                }),
-                new docx.Paragraph({
-                    alignment: docx.AlignmentType.RIGHT,
-                    children: [
-                        new docx.TextRun({ text: group.savings >= 0 ? "HIỆU QUẢ TỐI ƯU CHI PHÍ:  " : "CHÊNH LỆCH CHI PHÍ TĂNG:  ", bold: true, size: 18 }),
-                        new docx.TextRun({ text: `${Number(Math.abs(group.savings)).toLocaleString('vi-VN')} đ`, bold: true, size: 18, color: group.savings >= 0 ? "059669" : "E11D48" })
                     ]
                 }),
 
@@ -3195,22 +3179,6 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                       <div className="total-value text-right">{Number(group.actualTotal).toLocaleString('vi-VN')} đ</div>
                    </div>
                    
-                   <div className="mt-4 border-t pt-2 border-dashed">
-                      <div className="total-row text-[9pt]">
-                         <div className="total-label uppercase">TỔNG GIÁ TRỊ ĐỀ XUẤT ĐÃ DUYỆT:</div>
-                         <div className="total-value text-right">{Number(group.approvedTotal).toLocaleString('vi-VN')} đ</div>
-                      </div>
-                      <div className="total-row text-[9pt]">
-                         <div className="total-label uppercase">TỔNG GIÁ TRỊ MUA THỰC TẾ SAU RÀ SOÁT:</div>
-                         <div className="total-value text-right text-indigo-700">{Number(group.actualTotal).toLocaleString('vi-VN')} đ</div>
-                      </div>
-                      <div className="total-row text-[10pt] font-black border-t border-slate-200 mt-1 pt-1">
-                         <div className="total-label uppercase tracking-tight">{group.savings >= 0 ? 'HIỆU QUẢ TỐI ƯU CHI PHÍ MUA SẮM:' : 'CHÊNH LỆCH CHI PHÍ TĂNG:'}</div>
-                         <div className={`total-value text-right ${group.savings >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                            {Number(Math.abs(group.savings)).toLocaleString('vi-VN')} đ
-                         </div>
-                      </div>
-                   </div>
                 </div>
 
                 {/* FOOTER SIGNATURES */}
