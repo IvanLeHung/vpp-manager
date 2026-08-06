@@ -493,6 +493,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   const [setupCategoryType, setSetupCategoryType] = useState<'VPP' | 'VE_SINH'>('VPP');
   const [setupFormat, setSetupFormat] = useState<'PDF' | 'DOCX' | 'XLSX'>('PDF');
   const [setupDetailMode, setSetupDetailMode] = useState<'SUMMARY' | 'DETAIL'>('SUMMARY');
+  const [setupRightMarginCm, setSetupRightMarginCm] = useState(1);
   const [exportLoading, setExportLoading] = useState(false);
 
   // Export module states (Task 1, 2, 3)
@@ -1423,7 +1424,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       [`Tổng giá trị đề xuất gốc`, reportData.totalOriginalValue],
       [`Tổng giá trị sau thay đổi`, actualValue, `Chênh lệch`, reportData.differenceValue],
       [],
-      ['STT', 'MÃ VT', 'TÊN MẶT HÀNG SAU THAY ĐỔI', 'ĐVT', 'SL SAU ĐỔI', 'ĐƠN GIÁ CUỐI', 'THÀNH TIỀN', 'TỶ TRỌNG', 'PHÒNG BAN / PHIẾU', 'GHI CHÚ'],
+      ['STT', 'MÃ VT', 'DANH MỤC MẶT HÀNG', 'ĐVT', 'SL SAU ĐỔI', 'ĐƠN GIÁ CUỐI', 'THÀNH TIỀN', 'TỶ TRỌNG', 'PHÒNG BAN / PHIẾU', 'GHI CHÚ'],
     ];
 
     reportData.items.forEach((item: any, index: number) => {
@@ -1451,7 +1452,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       margins: { top: 80, bottom: 80, left: 80, right: 80 },
     });
     const tableRows: docx.TableRow[] = [
-      new docx.TableRow({ children: ['STT', 'MÃ VT', 'TÊN MẶT HÀNG SAU THAY ĐỔI', 'ĐVT', 'SL SAU ĐỔI', 'ĐƠN GIÁ CUỐI', 'THÀNH TIỀN', 'TỶ TRỌNG'].map(value => cell(value, true)) }),
+      new docx.TableRow({ children: ['STT', 'MÃ VT', 'DANH MỤC MẶT HÀNG', 'ĐVT', 'SL SAU ĐỔI', 'ĐƠN GIÁ CUỐI', 'THÀNH TIỀN', 'TỶ TRỌNG'].map(value => cell(value, true)) }),
     ];
 
     reportData.items.forEach((item: any, index: number) => {
@@ -1473,7 +1474,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       cell(`${Number(reportData.totalValue).toLocaleString('vi-VN')} đ`, true), cell('100.00%', true),
     ] }));
 
-    const document = new docx.Document({ sections: [{ children: [
+    const document = new docx.Document({ sections: [{ properties: { page: { margin: { top: 567, bottom: 567, left: 567, right: Math.round(setupRightMarginCm * 567) } } }, children: [
       new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: `TỔNG HỢP MẶT HÀNG ${categoryLabel} ĐƯỢC ĐỀ XUẤT`, bold: true, size: 28 })] }),
       new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: selectedIds.length > 0 ? `Theo phiếu đã chọn (${selectedIds.length} phiếu)` : 'Toàn hệ thống (Bộ lọc)', italics: true, size: 18 })] }),
       new docx.Paragraph({ children: [new docx.TextRun({ text: `Số phòng ban: ${reportData.departmentCount} | Số lượt yêu cầu: ${reportData.requestCount} | Số mặt hàng: ${reportData.itemCount}`, bold: true, size: 18 })] }),
@@ -2729,6 +2730,31 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                      </div>
                    </div>
                  )}
+
+                 {setupReportType === 'REQUEST_ITEM_SUMMARY' && (
+                   <div>
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Căn lề trang in</p>
+                     <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                       <div className="text-[11px] font-bold text-slate-600 leading-5">
+                         <p>Trên: <strong>1 cm</strong></p>
+                         <p>Dưới: <strong>1 cm</strong></p>
+                         <p>Trái: <strong>1 cm</strong></p>
+                       </div>
+                       <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                         Lề phải (cm)
+                         <input
+                           type="number"
+                           min="0.5"
+                           max="5"
+                           step="0.1"
+                           value={setupRightMarginCm}
+                           onChange={e => setSetupRightMarginCm(Math.min(5, Math.max(0.5, Number(e.target.value) || 1)))}
+                           className="mt-1 w-full h-9 px-3 bg-white border border-slate-200 rounded-lg text-sm font-black text-indigo-700 outline-none focus:border-indigo-400"
+                         />
+                       </label>
+                     </div>
+                   </div>
+                 )}
                </div>
 
                {/* Footer */}
@@ -2919,7 +2945,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
         <div className="hidden print:block print-area">
           <style dangerouslySetInnerHTML={{ __html: `
             @media print {
-              @page { size: A4 portrait; margin: 10mm; }
+              @page { size: A4 portrait; margin: 10mm ${setupRightMarginCm}cm 10mm 10mm; }
               * { background-color: transparent !important; color-adjust: exact; -webkit-print-color-adjust: exact; }
               .print-sheet { font-family: "Times New Roman", Times, serif; color: #000 !important; background: #fff !important; page-break-after: always; break-after: page; line-height: 1.3; }
               .print-sheet:last-child { page-break-after: auto; break-after: auto; }
@@ -3552,7 +3578,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                   <tr className="text-center">
                     <th style={{ width: '5%' }}>STT</th>
                     <th style={{ width: '12%' }}>MÃ VT</th>
-                    <th style={{ width: '32%' }}>TÊN MẶT HÀNG SAU THAY ĐỔI</th>
+                    <th style={{ width: '32%' }}>DANH MỤC MẶT HÀNG</th>
                     <th style={{ width: '7%' }}>ĐVT</th>
                     <th style={{ width: '9%' }}>SL SAU ĐỔI</th>
                     <th style={{ width: '13%' }}>ĐƠN GIÁ CUỐI</th>
