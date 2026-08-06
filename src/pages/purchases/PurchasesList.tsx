@@ -479,7 +479,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   // Bulk Selection & Printing states
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkMode, setIsBulkMode] = useState(false);
-  const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH' | 'DEPT_VPP' | 'DEPT_VS' | 'REQ_DEPT_VPP' | 'REQ_DEPT_VS'>('ALL');
+  const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH' | 'DEPT_VPP' | 'DEPT_VS' | 'REQ_DEPT_VPP' | 'REQ_DEPT_VS' | 'REQ_ITEM_VPP' | 'REQ_ITEM_VS'>('ALL');
   const [selectedPrintDetailMode, setSelectedPrintDetailMode] = useState<'SUMMARY' | 'DETAIL'>('SUMMARY');
   const [showPrintMenu, setShowPrintMenu] = useState(false);
   // const [showExportMenu, setShowExportMenu] = useState(false);
@@ -489,7 +489,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
   // New report setup states
   const [showReportSetupModal, setShowReportSetupModal] = useState(false);
-  const [setupReportType, setSetupReportType] = useState<'PURCHASE_SUMMARY' | 'CONSUMPTION_BY_DEPARTMENT' | 'REQUEST_DEPARTMENT_SUMMARY'>('PURCHASE_SUMMARY');
+  const [setupReportType, setSetupReportType] = useState<'PURCHASE_SUMMARY' | 'CONSUMPTION_BY_DEPARTMENT' | 'REQUEST_DEPARTMENT_SUMMARY' | 'REQUEST_ITEM_SUMMARY'>('PURCHASE_SUMMARY');
   const [setupCategoryType, setSetupCategoryType] = useState<'VPP' | 'VE_SINH'>('VPP');
   const [setupFormat, setSetupFormat] = useState<'PDF' | 'DOCX' | 'XLSX'>('PDF');
   const [setupDetailMode, setSetupDetailMode] = useState<'SUMMARY' | 'DETAIL'>('SUMMARY');
@@ -1318,7 +1318,78 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   const reqDeptReportDataVPP = useMemo(() => getReqDeptReportData('VPP'), [data, filteredData, selectedIds]);
   const reqDeptReportDataVS = useMemo(() => getReqDeptReportData('VE_SINH'), [data, filteredData, selectedIds]);
 
-  const handlePrintSummary = (type: 'ALL' | 'VPP' | 'VE_SINH' | 'DEPT_VPP' | 'DEPT_VS' | 'REQ_DEPT_VPP' | 'REQ_DEPT_VS' = 'ALL') => {
+  const getRequestedItemReportData = (category: 'VPP' | 'VE_SINH') => {
+    const targetData = selectedIds.length > 0
+      ? data.filter(d => selectedIds.includes(d.id))
+      : filteredData;
+    const itemMap = new Map<string, any>();
+    const processedLines = new Set<string>();
+    const departments = new Set<string>();
+    const requests = new Set<string>();
+
+    targetData.forEach((po: any) => {
+      (po.lines || []).forEach((line: any) => {
+        const requestLine = line.requestLine;
+        const originalItem = requestLine?.item || line.item;
+        if (!originalItem || getItemCategoryType(originalItem) !== category) return;
+
+        const uniqueLineKey = requestLine?.id || line.id;
+        if (uniqueLineKey && processedLines.has(uniqueLineKey)) return;
+        if (uniqueLineKey) processedLines.add(uniqueLineKey);
+
+        const request = requestLine?.request;
+        const requestCode = request?.id || po.sourceRequestId || po.requestId || po.id;
+        const department = request?.department || request?.departmentName || request?.requester?.department?.name || po.depts?.[0] || po.department || 'Chưa xác định';
+        const qty = firstNumber(requestLine?.qtyRequested, line.qtyRequested, line.qtyApproved, 0);
+        const price = firstNumber(requestLine?.unitPrice, originalItem.price, line.unitPrice, 0);
+        const value = qty * price;
+        const key = originalItem.id || originalItem.mvpp || originalItem.name;
+
+        departments.add(department);
+        requests.add(requestCode);
+
+        if (!itemMap.has(key)) {
+          itemMap.set(key, {
+            mvpp: originalItem.mvpp || '',
+            name: originalItem.name || 'Vật tư chưa xác định',
+            unit: originalItem.unit || line.unit || '',
+            qty: 0,
+            value: 0,
+            weightedPriceValue: 0,
+          });
+        }
+        const item = itemMap.get(key);
+        item.qty += qty;
+        item.value += value;
+        item.weightedPriceValue += value;
+      });
+    });
+
+    const totalValue = Array.from(itemMap.values()).reduce((sum, item) => sum + item.value, 0);
+    const items = Array.from(itemMap.values())
+      .map(item => ({
+        ...item,
+        price: item.qty > 0 ? item.weightedPriceValue / item.qty : 0,
+        percentage: totalValue > 0 ? (item.value / totalValue) * 100 : 0,
+      }))
+      .sort((a, b) => b.value - a.value);
+
+    return {
+      items,
+      totalValue,
+      totalQty: items.reduce((sum, item) => sum + item.qty, 0),
+      departmentCount: departments.size,
+      requestCount: requests.size,
+      itemCount: items.length,
+      topItem: items[0] || null,
+      sourceData: targetData,
+    };
+  };
+
+  const requestedItemReportVPP = useMemo(() => getRequestedItemReportData('VPP'), [data, filteredData, selectedIds]);
+  const requestedItemReportVS = useMemo(() => getRequestedItemReportData('VE_SINH'), [data, filteredData, selectedIds]);
+
+  const handlePrintSummary = (type: 'ALL' | 'VPP' | 'VE_SINH' | 'DEPT_VPP' | 'DEPT_VS' | 'REQ_DEPT_VPP' | 'REQ_DEPT_VS' | 'REQ_ITEM_VPP' | 'REQ_ITEM_VS' = 'ALL') => {
       setSelectedPrintType(type);
       setShowPrintMenu(false);
       setShowPrintConfirm(false);
@@ -2005,7 +2076,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                               {showPrintMenu && (
                                 <>
                                   <div className="fixed inset-0 z-40" onClick={() => setShowPrintMenu(false)}></div>
-                                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 py-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                                  <div className="absolute right-0 mt-2 w-80 max-h-[75vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 py-3 animate-in fade-in slide-in-from-top-2 duration-200">
 
                                      {selectedIds.length > 0 && (
 
@@ -2121,6 +2192,37 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                      </button>
 
                                      {/* Group 4 */}
+                                     <div className="px-4 py-1.5 mt-2 text-[9px] font-black text-slate-400 uppercase tracking-wider border-t border-slate-100 pt-2">Mặt hàng được đề xuất</div>
+                                     <button
+                                       disabled={requestedItemReportVPP.items.length === 0}
+                                       onClick={() => {
+                                         setSetupReportType('REQUEST_ITEM_SUMMARY');
+                                         setSetupCategoryType('VPP');
+                                         setSetupFormat('PDF');
+                                         setShowReportSetupModal(true);
+                                         setShowPrintMenu(false);
+                                       }}
+                                       className={`w-full px-4 py-2 text-left flex items-center justify-between transition ${requestedItemReportVPP.items.length === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-indigo-55'}`}
+                                     >
+                                       <span className="text-xs font-bold text-slate-700">Tổng hợp mặt hàng VPP được đề xuất</span>
+                                       <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{requestedItemReportVPP.itemCount}</span>
+                                     </button>
+                                     <button
+                                       disabled={requestedItemReportVS.items.length === 0}
+                                       onClick={() => {
+                                         setSetupReportType('REQUEST_ITEM_SUMMARY');
+                                         setSetupCategoryType('VE_SINH');
+                                         setSetupFormat('PDF');
+                                         setShowReportSetupModal(true);
+                                         setShowPrintMenu(false);
+                                       }}
+                                       className={`w-full px-4 py-2 text-left flex items-center justify-between transition ${requestedItemReportVS.items.length === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-indigo-55'}`}
+                                     >
+                                       <span className="text-xs font-bold text-slate-700">Tổng hợp mặt hàng Vệ sinh được đề xuất</span>
+                                       <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{requestedItemReportVS.itemCount}</span>
+                                     </button>
+
+                                     {/* Group 5 */}
                                      <div className="px-4 py-1.5 mt-2 text-[9px] font-black text-slate-400 uppercase tracking-wider border-t border-slate-100 pt-2">Xuất dữ liệu</div>
                                      <button 
                                        onClick={() => { handleExportExcelTemplate(); setShowPrintMenu(false); }}
@@ -2467,6 +2569,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                      {setupReportType === 'PURCHASE_SUMMARY' && `Phiếu tổng hợp mua sắm ${setupCategoryType}`}
                      {setupReportType === 'CONSUMPTION_BY_DEPARTMENT' && `Tổng hợp tiêu thụ ${setupCategoryType} theo phòng ban`}
                      {setupReportType === 'REQUEST_DEPARTMENT_SUMMARY' && `Tổng hợp ${setupCategoryType} theo phòng ban của đề xuất`}
+                     {setupReportType === 'REQUEST_ITEM_SUMMARY' && `Tổng hợp mặt hàng ${setupCategoryType === 'VPP' ? 'Văn phòng phẩm' : 'Vệ sinh'} được đề xuất`}
                    </p>
                    
                    <div className="mt-3 grid grid-cols-2 gap-4 border-t border-slate-200/60 pt-3 text-[11px] font-bold text-slate-500">
@@ -2484,12 +2587,12 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                  {/* Format selection */}
                  <div>
                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Định dạng đầu ra (Format)</p>
-                   <div className="grid grid-cols-3 gap-2">
+                   <div className={`grid gap-2 ${setupReportType === 'REQUEST_ITEM_SUMMARY' ? 'grid-cols-1' : 'grid-cols-3'}`}>
                      {[
                        { value: 'PDF', label: 'In PDF', permission: 'REPORT_EXPORT_PDF' },
                        { value: 'DOCX', label: 'Xuất Word', permission: 'REPORT_EXPORT_WORD' },
                        { value: 'XLSX', label: 'Xuất Excel', permission: 'REPORT_EXPORT_EXCEL' }
-                     ].map(fmt => {
+                     ].filter(fmt => setupReportType !== 'REQUEST_ITEM_SUMMARY' || fmt.value === 'PDF').map(fmt => {
                        const allowed = hasPermission(userRole, fmt.permission);
                        if (!allowed) return null;
                        return (
@@ -2550,7 +2653,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                  </button>
                  <button
                    onClick={async () => {
-                     if (selectedIds.length > 0) {
+                     if (selectedIds.length > 0 && setupReportType !== 'REQUEST_ITEM_SUMMARY') {
 
                        const hasMatch = checkHasMatchingItem(setupCategoryType);
 
@@ -2571,6 +2674,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                        setSelectedPrintType(
                          setupReportType === 'PURCHASE_SUMMARY' ? setupCategoryType :
                          setupReportType === 'CONSUMPTION_BY_DEPARTMENT' ? (setupCategoryType === 'VPP' ? 'DEPT_VPP' : 'DEPT_VS') :
+                         setupReportType === 'REQUEST_ITEM_SUMMARY' ? (setupCategoryType === 'VPP' ? 'REQ_ITEM_VPP' : 'REQ_ITEM_VS') :
                          (setupCategoryType === 'VPP' ? 'REQ_DEPT_VPP' : 'REQ_DEPT_VS') as any
                        );
                        setSelectedPrintDetailMode(setupDetailMode);
@@ -3266,6 +3370,120 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
           )}
 
           
+          {/* REQUESTED ITEM SUMMARY PRINT SHEETS */}
+          {([
+            { type: 'REQ_ITEM_VPP', label: 'VĂN PHÒNG PHẨM', data: requestedItemReportVPP },
+            { type: 'REQ_ITEM_VS', label: 'VỆ SINH', data: requestedItemReportVS },
+          ] as const).map(report => (selectedPrintType === report.type && report.data.totalValue > 0) ? (
+            <div key={report.type} className="print-sheet p-4">
+              {(() => {
+                const dates = report.data.sourceData
+                  .map((entry: any) => new Date(entry.createdAt || entry.orderDate).getTime())
+                  .filter((value: number) => Number.isFinite(value));
+                const periodLabel = selectedMonth
+                  ? `Tháng ${selectedMonth.split('-')[1]}/${selectedMonth.split('-')[0]}`
+                  : dates.length > 0
+                    ? `Từ ${new Date(Math.min(...dates)).toLocaleDateString('vi-VN')} đến ${new Date(Math.max(...dates)).toLocaleDateString('vi-VN')}`
+                    : 'Tất cả các kỳ';
+
+                return (
+                  <>
+                    <div className="flex justify-between items-start w-full border-b pb-4 mb-4">
+                      <div className="w-[45%] text-left header-text">
+                        <p className="font-bold uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
+                        <p className="font-bold italic">Báo cáo tổng hợp mặt hàng được đề xuất</p>
+                        <p>Ban Hành chính Nhân sự</p>
+                      </div>
+                      <div className="w-[45%] text-center header-text">
+                        <p className="font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+                        <p className="font-bold underline underline-offset-[4px] mt-1">Độc lập - Tự do - Hạnh phúc</p>
+                        <p className="mt-3 italic text-right mr-10">Hà Nội, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
+                      </div>
+                    </div>
+
+                    <h2 className="title-main uppercase text-center leading-tight">
+                      TỔNG HỢP MẶT HÀNG {report.label}<br />ĐƯỢC ĐỀ XUẤT
+                    </h2>
+
+                    <table className="print-table mb-3" style={{ fontSize: '8.2pt' }}>
+                      <thead>
+                        <tr><th colSpan={4} style={{ padding: '4px' }}>TỔNG HỢP NHANH SỐ LIỆU ĐỀ XUẤT</th></tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td className="font-bold" style={{ width: '25%' }}>Kỳ tổng hợp:</td>
+                          <td style={{ width: '25%' }}>{periodLabel}</td>
+                          <td className="font-bold" style={{ width: '25%' }}>Phạm vi:</td>
+                          <td style={{ width: '25%' }}>{selectedIds.length > 0 ? `Theo phiếu đã chọn (${selectedIds.length} phiếu)` : 'Toàn hệ thống (Bộ lọc)'}</td>
+                        </tr>
+                        <tr>
+                          <td className="font-bold">Số phòng ban phát sinh:</td>
+                          <td>{report.data.departmentCount} đơn vị</td>
+                          <td className="font-bold">Tổng số lượt yêu cầu:</td>
+                          <td>{report.data.requestCount} lượt</td>
+                        </tr>
+                        <tr>
+                          <td className="font-bold">Tổng số mặt hàng đề xuất:</td>
+                          <td>{report.data.itemCount} mặt hàng</td>
+                          <td className="font-bold">Tổng giá trị đề xuất:</td>
+                          <td className="font-bold">{Number(report.data.totalValue).toLocaleString('vi-VN')} đ</td>
+                        </tr>
+                        <tr>
+                          <td className="font-bold">Mặt hàng giá trị cao nhất:</td>
+                          <td>{report.data.topItem?.name || '—'}</td>
+                          <td className="font-bold">Giá trị cao nhất:</td>
+                          <td className="font-bold">{Number(report.data.topItem?.value || 0).toLocaleString('vi-VN')} đ</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <p className="text-right italic mb-1" style={{ fontSize: '7pt' }}>Chi tiết sắp xếp theo giá trị đề xuất giảm dần</p>
+                  </>
+                );
+              })()}
+
+              <table className="print-table" style={{ fontSize: '7.5pt' }}>
+                <thead>
+                  <tr className="text-center">
+                    <th style={{ width: '5%' }}>STT</th>
+                    <th style={{ width: '12%' }}>MÃ VT</th>
+                    <th style={{ width: '32%' }}>TÊN MẶT HÀNG</th>
+                    <th style={{ width: '7%' }}>ĐVT</th>
+                    <th style={{ width: '9%' }}>SL ĐỀ XUẤT</th>
+                    <th style={{ width: '13%' }}>ĐƠN GIÁ</th>
+                    <th style={{ width: '14%' }}>THÀNH TIỀN</th>
+                    <th style={{ width: '8%' }}>TỶ TRỌNG</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.data.items.map((item: any, index: number) => (
+                    <tr key={`${item.mvpp}-${item.name}`}>
+                      <td className="text-center">{index + 1}</td>
+                      <td className="text-center font-bold">{item.mvpp || '—'}</td>
+                      <td className="font-bold">{item.name}</td>
+                      <td className="text-center">{item.unit}</td>
+                      <td className="text-center font-bold">{Number(item.qty).toLocaleString('vi-VN')}</td>
+                      <td className="text-right">{Number(item.price).toLocaleString('vi-VN')} đ</td>
+                      <td className="text-right font-bold">{Number(item.value).toLocaleString('vi-VN')} đ</td>
+                      <td className="text-center font-bold">{item.percentage.toFixed(2)}%</td>
+                    </tr>
+                  ))}
+                  <tr className="print-highlight-row font-bold">
+                    <td colSpan={4} className="text-center">TỔNG CỘNG</td>
+                    <td className="text-center">{Number(report.data.totalQty).toLocaleString('vi-VN')}</td>
+                    <td></td>
+                    <td className="text-right">{Number(report.data.totalValue).toLocaleString('vi-VN')} đ</td>
+                    <td className="text-center">100.00%</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div className="footer-sign">
+                <div><p className="font-bold uppercase">Người lập báo cáo</p><p className="text-[7.5pt] italic">(Ký và ghi rõ họ tên)</p></div>
+                <div><p className="font-bold uppercase">Trưởng bộ phận</p><p className="text-[7.5pt] italic">(Ký và ghi rõ họ tên)</p></div>
+              </div>
+            </div>
+          ) : null)}
+
           {/* REQ_DEPT_VPP Print Sheet */}
           {(selectedPrintType === 'REQ_DEPT_VPP' || selectedPrintType === 'ALL') && reqDeptReportDataVPP.totalActual > 0 && (
             <div className="print-sheet p-4">
