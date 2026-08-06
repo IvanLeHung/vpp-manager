@@ -879,10 +879,6 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
               current.actualTotal += (effectiveQty * effectivePrice);
               
-              // Ensure the displayed price is consistent with the total if possible
-              // For the summary, we'll use the price from the latest PO line processed
-              if (effectivePrice > 0) current.price = effectivePrice;
-              
               current.deptBreakdown.set(allocationKey, existingDept);
 
               if (isReplaced) {
@@ -911,13 +907,10 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       return Array.from(groups.entries()).map(([type, itemsMap]) => {
           const items = sortItemsForPrinting(Array.from(itemsMap.values())
               .map(item => {
-                  // Normalize total to ensure consistency with displayed Price * Qty in the summary report
-                  // This prevents discrepancies when lines have slightly different prices or fallbacks.
-                  const normalizedTotal = Number(item.qty) * Number(item.price);
-                  
                   return {
                       ...item,
-                      actualTotal: normalizedTotal,
+                      price: Number(item.qty) > 0 ? Number(item.actualTotal) / Number(item.qty) : 0,
+                      actualTotal: Number(item.actualTotal),
                       deptEntries: Array.from(item.deptBreakdown.values())
                         .map((d: any) => ({ 
                           dept: d.dept, 
@@ -1356,12 +1349,21 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
             qty: 0,
             value: 0,
             weightedPriceValue: 0,
+            detailRows: [],
           });
         }
         const item = itemMap.get(key);
         item.qty += qty;
         item.value += value;
         item.weightedPriceValue += value;
+        item.detailRows.push({
+          requestCode,
+          department,
+          qty,
+          price,
+          value,
+          note: requestLine?.note || line.originalNote || line.note || '',
+        });
       });
     });
 
@@ -1396,6 +1398,80 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       setTimeout(() => {
           window.print();
       }, 200);
+  };
+
+  const exportRequestedItemExcel = (reportData: any, category: 'VPP' | 'VE_SINH', detailMode: 'SUMMARY' | 'DETAIL') => {
+    const categoryLabel = category === 'VPP' ? 'VĂN PHÒNG PHẨM' : 'VỆ SINH';
+    const actualValue = summaryGroups.find(group => group.type === category)?.actualTotal || 0;
+    const rows: any[][] = [
+      [`TỔNG HỢP MẶT HÀNG ${categoryLabel} ĐƯỢC ĐỀ XUẤT`],
+      [`Phạm vi`, selectedIds.length > 0 ? `Theo phiếu đã chọn (${selectedIds.length} phiếu)` : 'Toàn hệ thống (Bộ lọc)'],
+      [`Số phòng ban`, reportData.departmentCount, `Số lượt yêu cầu`, reportData.requestCount],
+      [`Số mặt hàng`, reportData.itemCount, `Tổng số lượng`, reportData.totalQty],
+      [`Tổng giá trị đề xuất`, reportData.totalValue],
+      [`Tổng giá trị mua thực tế`, actualValue, `Chênh lệch`, reportData.totalValue - actualValue],
+      [],
+      ['STT', 'MÃ VT', 'TÊN MẶT HÀNG', 'ĐVT', 'SL ĐỀ XUẤT', 'ĐƠN GIÁ', 'THÀNH TIỀN', 'TỶ TRỌNG', 'PHÒNG BAN / PHIẾU', 'GHI CHÚ'],
+    ];
+
+    reportData.items.forEach((item: any, index: number) => {
+      rows.push([index + 1, item.mvpp, item.name, item.unit, item.qty, item.price, item.value, item.percentage / 100, '', '']);
+      if (detailMode === 'DETAIL') {
+        item.detailRows.forEach((detail: any) => rows.push([
+          '', '', `- ${detail.department}`, item.unit, detail.qty, detail.price, detail.value, '', detail.requestCode, detail.note,
+        ]));
+      }
+    });
+    rows.push(['TỔNG CỘNG', '', '', '', reportData.totalQty, '', reportData.totalValue, 1, '', '']);
+
+    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+    worksheet['!cols'] = [{ wch: 8 }, { wch: 16 }, { wch: 42 }, { wch: 10 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 12 }, { wch: 28 }, { wch: 40 }];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, category === 'VPP' ? 'VPP đề xuất' : 'Vệ sinh đề xuất');
+    XLSX.writeFile(workbook, `tong-hop-mat-hang-${category === 'VPP' ? 'vpp' : 've-sinh'}-duoc-de-xuat.xlsx`);
+  };
+
+  const exportRequestedItemWord = async (reportData: any, category: 'VPP' | 'VE_SINH', detailMode: 'SUMMARY' | 'DETAIL') => {
+    const categoryLabel = category === 'VPP' ? 'VĂN PHÒNG PHẨM' : 'VỆ SINH';
+    const actualValue = summaryGroups.find(group => group.type === category)?.actualTotal || 0;
+    const cell = (text: any, bold = false) => new docx.TableCell({
+      children: [new docx.Paragraph({ children: [new docx.TextRun({ text: String(text ?? ''), bold, size: 17 })] })],
+      margins: { top: 80, bottom: 80, left: 80, right: 80 },
+    });
+    const tableRows: docx.TableRow[] = [
+      new docx.TableRow({ children: ['STT', 'MÃ VT', 'TÊN MẶT HÀNG', 'ĐVT', 'SL ĐỀ XUẤT', 'ĐƠN GIÁ', 'THÀNH TIỀN', 'TỶ TRỌNG'].map(value => cell(value, true)) }),
+    ];
+
+    reportData.items.forEach((item: any, index: number) => {
+      tableRows.push(new docx.TableRow({ children: [
+        cell(index + 1), cell(item.mvpp, true), cell(item.name, true), cell(item.unit),
+        cell(Number(item.qty).toLocaleString('vi-VN'), true), cell(`${Number(item.price).toLocaleString('vi-VN')} đ`),
+        cell(`${Number(item.value).toLocaleString('vi-VN')} đ`, true), cell(`${item.percentage.toFixed(2)}%`),
+      ] }));
+      if (detailMode === 'DETAIL') {
+        item.detailRows.forEach((detail: any) => tableRows.push(new docx.TableRow({ children: [
+          cell(''), cell(''), cell(`- ${detail.department} (${detail.requestCode})${detail.note ? ` — ${detail.note}` : ''}`), cell(item.unit),
+          cell(Number(detail.qty).toLocaleString('vi-VN')), cell(`${Number(detail.price).toLocaleString('vi-VN')} đ`),
+          cell(`${Number(detail.value).toLocaleString('vi-VN')} đ`), cell(''),
+        ] })));
+      }
+    });
+    tableRows.push(new docx.TableRow({ children: [
+      cell('TỔNG CỘNG', true), cell(''), cell(''), cell(''), cell(Number(reportData.totalQty).toLocaleString('vi-VN'), true), cell(''),
+      cell(`${Number(reportData.totalValue).toLocaleString('vi-VN')} đ`, true), cell('100.00%', true),
+    ] }));
+
+    const document = new docx.Document({ sections: [{ children: [
+      new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: `TỔNG HỢP MẶT HÀNG ${categoryLabel} ĐƯỢC ĐỀ XUẤT`, bold: true, size: 28 })] }),
+      new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: selectedIds.length > 0 ? `Theo phiếu đã chọn (${selectedIds.length} phiếu)` : 'Toàn hệ thống (Bộ lọc)', italics: true, size: 18 })] }),
+      new docx.Paragraph({ children: [new docx.TextRun({ text: `Số phòng ban: ${reportData.departmentCount} | Số lượt yêu cầu: ${reportData.requestCount} | Số mặt hàng: ${reportData.itemCount}`, bold: true, size: 18 })] }),
+      new docx.Paragraph({ children: [new docx.TextRun({ text: `Tổng số lượng: ${Number(reportData.totalQty).toLocaleString('vi-VN')} | Tổng giá trị đề xuất: ${Number(reportData.totalValue).toLocaleString('vi-VN')} đ`, bold: true, size: 18 })] }),
+      new docx.Paragraph({ children: [new docx.TextRun({ text: `Tổng giá trị mua thực tế: ${Number(actualValue).toLocaleString('vi-VN')} đ | Chênh lệch: ${Number(reportData.totalValue - actualValue).toLocaleString('vi-VN')} đ`, bold: true, size: 18 })] }),
+      new docx.Paragraph({ children: [new docx.TextRun({ text: '' })] }),
+      new docx.Table({ width: { size: 100, type: docx.WidthType.PERCENTAGE }, rows: tableRows }),
+    ] }] });
+    const blob = await docx.Packer.toBlob(document);
+    saveAs(blob, `tong-hop-mat-hang-${category === 'VPP' ? 'vpp' : 've-sinh'}-duoc-de-xuat.docx`);
   };
 
   const handleExportExcel = () => {
@@ -2592,7 +2668,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                        { value: 'PDF', label: 'In PDF', permission: 'REPORT_EXPORT_PDF' },
                        { value: 'DOCX', label: 'Xuất Word', permission: 'REPORT_EXPORT_WORD' },
                        { value: 'XLSX', label: 'Xuất Excel', permission: 'REPORT_EXPORT_EXCEL' }
-                     ].filter(fmt => setupReportType !== 'REQUEST_ITEM_SUMMARY' || fmt.value === 'PDF').map(fmt => {
+                     ].map(fmt => {
                        const allowed = hasPermission(userRole, fmt.permission);
                        if (!allowed) return null;
                        return (
@@ -2613,8 +2689,8 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                    </div>
                  </div>
 
-                 {/* Detail mode (Only for REQUEST_DEPARTMENT_SUMMARY) */}
-                 {setupReportType === 'REQUEST_DEPARTMENT_SUMMARY' && (
+                 {/* Detail mode */}
+                 {(setupReportType === 'REQUEST_DEPARTMENT_SUMMARY' || setupReportType === 'REQUEST_ITEM_SUMMARY') && (
                    <div>
                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Tùy chọn hiển thị</p>
                      <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
@@ -2667,6 +2743,18 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
                      }
 
+
+                     if (setupReportType === 'REQUEST_ITEM_SUMMARY' && setupFormat !== 'PDF') {
+                       const reportData = setupCategoryType === 'VPP' ? requestedItemReportVPP : requestedItemReportVS;
+                       if (setupFormat === 'XLSX') {
+                         exportRequestedItemExcel(reportData, setupCategoryType, setupDetailMode);
+                       } else {
+                         await exportRequestedItemWord(reportData, setupCategoryType, setupDetailMode);
+                       }
+                       toast.success('Đã tạo file báo cáo từ dữ liệu các phiếu được chọn.');
+                       setShowReportSetupModal(false);
+                       return;
+                     }
 
                      if (setupFormat === 'PDF') {
 
@@ -3372,8 +3460,8 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
           
           {/* REQUESTED ITEM SUMMARY PRINT SHEETS */}
           {([
-            { type: 'REQ_ITEM_VPP', label: 'VĂN PHÒNG PHẨM', data: requestedItemReportVPP },
-            { type: 'REQ_ITEM_VS', label: 'VỆ SINH', data: requestedItemReportVS },
+            { type: 'REQ_ITEM_VPP', label: 'VĂN PHÒNG PHẨM', data: requestedItemReportVPP, actualValue: summaryGroups.find(group => group.type === 'VPP')?.actualTotal || 0 },
+            { type: 'REQ_ITEM_VS', label: 'VỆ SINH', data: requestedItemReportVS, actualValue: summaryGroups.find(group => group.type === 'VE_SINH')?.actualTotal || 0 },
           ] as const).map(report => (selectedPrintType === report.type && report.data.totalValue > 0) ? (
             <div key={report.type} className="print-sheet p-4">
               {(() => {
@@ -3434,6 +3522,12 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                           <td className="font-bold">Giá trị cao nhất:</td>
                           <td className="font-bold">{Number(report.data.topItem?.value || 0).toLocaleString('vi-VN')} đ</td>
                         </tr>
+                        <tr>
+                          <td className="font-bold">Tổng giá trị mua thực tế:</td>
+                          <td className="font-bold">{Number(report.actualValue).toLocaleString('vi-VN')} đ</td>
+                          <td className="font-bold">Chênh lệch đề xuất / thực mua:</td>
+                          <td className="font-bold">{Number(report.data.totalValue - report.actualValue).toLocaleString('vi-VN')} đ</td>
+                        </tr>
                       </tbody>
                     </table>
                     <p className="text-right italic mb-1" style={{ fontSize: '7pt' }}>Chi tiết sắp xếp theo giá trị đề xuất giảm dần</p>
@@ -3456,16 +3550,33 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                 </thead>
                 <tbody>
                   {report.data.items.map((item: any, index: number) => (
-                    <tr key={`${item.mvpp}-${item.name}`}>
-                      <td className="text-center">{index + 1}</td>
-                      <td className="text-center font-bold">{item.mvpp || '—'}</td>
-                      <td className="font-bold">{item.name}</td>
-                      <td className="text-center">{item.unit}</td>
-                      <td className="text-center font-bold">{Number(item.qty).toLocaleString('vi-VN')}</td>
-                      <td className="text-right">{Number(item.price).toLocaleString('vi-VN')} đ</td>
-                      <td className="text-right font-bold">{Number(item.value).toLocaleString('vi-VN')} đ</td>
-                      <td className="text-center font-bold">{item.percentage.toFixed(2)}%</td>
-                    </tr>
+                    <React.Fragment key={`${item.mvpp}-${item.name}`}>
+                      <tr>
+                        <td className="text-center">{index + 1}</td>
+                        <td className="text-center font-bold">{item.mvpp || '—'}</td>
+                        <td className="font-bold">{item.name}</td>
+                        <td className="text-center">{item.unit}</td>
+                        <td className="text-center font-bold">{Number(item.qty).toLocaleString('vi-VN')}</td>
+                        <td className="text-right">{Number(item.price).toLocaleString('vi-VN')} đ</td>
+                        <td className="text-right font-bold">{Number(item.value).toLocaleString('vi-VN')} đ</td>
+                        <td className="text-center font-bold">{item.percentage.toFixed(2)}%</td>
+                      </tr>
+                      {selectedPrintDetailMode === 'DETAIL' && item.detailRows.map((detail: any, detailIndex: number) => (
+                        <tr key={`${detail.requestCode}-${detailIndex}`} className="allocation-row">
+                          <td></td>
+                          <td colSpan={2}>
+                            <span className="allocation-department">- {detail.department}</span>
+                            <span className="allocation-request-code"> ({detail.requestCode})</span>
+                            {detail.note && <span className="allocation-note"> — {detail.note}</span>}
+                          </td>
+                          <td className="text-center">{item.unit}</td>
+                          <td className="text-center allocation-quantity">{Number(detail.qty).toLocaleString('vi-VN')}</td>
+                          <td className="text-right">{Number(detail.price).toLocaleString('vi-VN')} đ</td>
+                          <td className="text-right">{Number(detail.value).toLocaleString('vi-VN')} đ</td>
+                          <td></td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
                   ))}
                   <tr className="print-highlight-row font-bold">
                     <td colSpan={4} className="text-center">TỔNG CỘNG</td>
