@@ -411,9 +411,10 @@ function getLinePrintQty(line: any): number {
 
 function getLinePrintPrice(line: any, effectiveItem?: any): number {
   if (line?.receiptReplacementItem) {
+    if (line.receiptReplacementPrice !== null && line.receiptReplacementPrice !== undefined && line.receiptReplacementPrice !== '') {
+      return Number(line.receiptReplacementPrice) || 0;
+    }
     return firstPositivePrice(
-      line.receiptReplacementPrice,
-      line.effectivePrice,
       line.unitPrice,
       effectiveItem?.price,
       line.item?.price,
@@ -421,22 +422,25 @@ function getLinePrintPrice(line: any, effectiveItem?: any): number {
     );
   }
   const hasReplacement = !!line?.requestLine?.replacementItemId;
-  return hasReplacement
-    ? firstPositivePrice(
-        line.effectivePrice,
-        line.requestLine?.replacementPrice,
-        line.unitPrice,
-        effectiveItem?.price,
-        line.item?.price,
-        line.requestLine?.item?.price
-      )
-    : firstPositivePrice(
-        line.effectivePrice,
+  if (hasReplacement) {
+    const replacementPrice = line.requestLine?.replacementPrice;
+    if (replacementPrice !== null && replacementPrice !== undefined && replacementPrice !== '') {
+      return Number(replacementPrice) || 0;
+    }
+    return firstPositivePrice(
         line.unitPrice,
         effectiveItem?.price,
         line.item?.price,
         line.requestLine?.item?.price
       );
+  }
+  return firstPositivePrice(
+    line.effectivePrice,
+    line.unitPrice,
+    effectiveItem?.price,
+    line.item?.price,
+    line.requestLine?.item?.price
+  );
 }
 
 function getEligibleRequestCount(templateKey: 'VPP' | 'VE_SINH', selectedRequests: any[]): number {
@@ -670,17 +674,33 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
   useEffect(() => {
     fetchData();
+    const refreshSilently = () => fetchData(true);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') refreshSilently();
+    };
+    const intervalId = window.setInterval(refreshSilently, 10000);
+    window.addEventListener('focus', refreshSilently);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshSilently);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await api.get('/purchases');
       setData(res.data);
+      setPreviewPO((current: any) => current
+        ? (res.data.find((purchase: any) => purchase.id === current.id) || current)
+        : null
+      );
     } catch(e) {
       console.error(e);
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   };
 
   const getStatusBadge = (status: string, hasReplacement?: boolean, pendingReplacement?: boolean) => {
@@ -773,6 +793,14 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" />
       : <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />;
   };
+
+  const previewEffectiveTotal = useMemo(() => {
+    if (!previewPO?.lines) return 0;
+    return previewPO.lines.reduce((sum: number, line: any) => {
+      const effectiveItem = getEffectiveLineItem(line);
+      return sum + getLinePrintQty(line) * getLinePrintPrice(line, effectiveItem);
+    }, 0);
+  }, [previewPO]);
 
   // Summary aggregation logic - Optimized for original request tracking
   const summaryGroups = useMemo(() => {
@@ -2626,7 +2654,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                       </div>
                       <div>
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Thành tiền</p>
-                        <p className="text-xl font-black text-indigo-600 italic">{Number(previewPO.actualTotal || previewPO.totalAmount).toLocaleString('vi-VN')} đ</p>
+                        <p className="text-xl font-black text-indigo-600 italic">{Number(previewEffectiveTotal).toLocaleString('vi-VN')} đ</p>
                       </div>
                     </div>
                     <button onClick={() => onViewDetail(previewPO.id, filteredData.map(d => d.id))} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg shadow-indigo-200">
