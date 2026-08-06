@@ -1317,35 +1317,45 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       : filteredData;
     const itemMap = new Map<string, any>();
     const processedLines = new Set<string>();
+    const processedOriginalLines = new Set<string>();
     const departments = new Set<string>();
     const requests = new Set<string>();
+    let totalOriginalValue = 0;
 
     targetData.forEach((po: any) => {
       (po.lines || []).forEach((line: any) => {
         const requestLine = line.requestLine;
-        const originalItem = requestLine?.item || line.item;
-        if (!originalItem || getItemCategoryType(originalItem) !== category) return;
+        const effectiveItem = getEffectiveLineItem(line);
+        if (!effectiveItem || getItemCategoryType(effectiveItem) !== category) return;
 
-        const uniqueLineKey = requestLine?.id || line.id;
+        const uniqueLineKey = line.id || `${po.id}-${requestLine?.id || effectiveItem.id}`;
         if (uniqueLineKey && processedLines.has(uniqueLineKey)) return;
         if (uniqueLineKey) processedLines.add(uniqueLineKey);
 
         const request = requestLine?.request;
         const requestCode = request?.id || po.sourceRequestId || po.requestId || po.id;
         const department = request?.department || request?.departmentName || request?.requester?.department?.name || po.depts?.[0] || po.department || 'Chưa xác định';
-        const qty = firstNumber(requestLine?.qtyRequested, line.qtyRequested, line.qtyApproved, 0);
-        const price = firstNumber(requestLine?.unitPrice, originalItem.price, line.unitPrice, 0);
+        const qty = getLinePrintQty(line);
+        const price = getLinePrintPrice(line, effectiveItem);
         const value = qty * price;
-        const key = originalItem.id || originalItem.mvpp || originalItem.name;
+        const key = effectiveItem.id || effectiveItem.mvpp || effectiveItem.name;
+
+        const originalLineKey = requestLine?.id || uniqueLineKey;
+        if (!processedOriginalLines.has(originalLineKey)) {
+          processedOriginalLines.add(originalLineKey);
+          const originalQty = firstNumber(requestLine?.qtyRequested, line.qtyRequested, line.qtyApproved, qty);
+          const originalPrice = firstNumber(requestLine?.unitPrice, requestLine?.item?.price, line.unitPrice, line.item?.price, price);
+          totalOriginalValue += originalQty * originalPrice;
+        }
 
         departments.add(department);
         requests.add(requestCode);
 
         if (!itemMap.has(key)) {
           itemMap.set(key, {
-            mvpp: originalItem.mvpp || '',
-            name: originalItem.name || 'Vật tư chưa xác định',
-            unit: originalItem.unit || line.unit || '',
+            mvpp: effectiveItem.mvpp || '',
+            name: effectiveItem.name || 'Vật tư chưa xác định',
+            unit: effectiveItem.unit || line.unit || '',
             qty: 0,
             value: 0,
             weightedPriceValue: 0,
@@ -1362,7 +1372,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
           qty,
           price,
           value,
-          note: requestLine?.note || line.originalNote || line.note || '',
+          note: line.receiptReplacementReason || requestLine?.replacementReason || requestLine?.note || line.originalNote || line.note || '',
         });
       });
     });
@@ -1379,6 +1389,8 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
     return {
       items,
       totalValue,
+      totalOriginalValue,
+      differenceValue: totalOriginalValue - totalValue,
       totalQty: items.reduce((sum, item) => sum + item.qty, 0),
       departmentCount: departments.size,
       requestCount: requests.size,
@@ -1402,16 +1414,16 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
   const exportRequestedItemExcel = (reportData: any, category: 'VPP' | 'VE_SINH', detailMode: 'SUMMARY' | 'DETAIL') => {
     const categoryLabel = category === 'VPP' ? 'VĂN PHÒNG PHẨM' : 'VỆ SINH';
-    const actualValue = summaryGroups.find(group => group.type === category)?.actualTotal || 0;
+    const actualValue = reportData.totalValue;
     const rows: any[][] = [
       [`TỔNG HỢP MẶT HÀNG ${categoryLabel} ĐƯỢC ĐỀ XUẤT`],
       [`Phạm vi`, selectedIds.length > 0 ? `Theo phiếu đã chọn (${selectedIds.length} phiếu)` : 'Toàn hệ thống (Bộ lọc)'],
       [`Số phòng ban`, reportData.departmentCount, `Số lượt yêu cầu`, reportData.requestCount],
       [`Số mặt hàng`, reportData.itemCount, `Tổng số lượng`, reportData.totalQty],
-      [`Tổng giá trị đề xuất`, reportData.totalValue],
-      [`Tổng giá trị mua thực tế`, actualValue, `Chênh lệch`, reportData.totalValue - actualValue],
+      [`Tổng giá trị đề xuất gốc`, reportData.totalOriginalValue],
+      [`Tổng giá trị sau thay đổi`, actualValue, `Chênh lệch`, reportData.differenceValue],
       [],
-      ['STT', 'MÃ VT', 'TÊN MẶT HÀNG', 'ĐVT', 'SL ĐỀ XUẤT', 'ĐƠN GIÁ', 'THÀNH TIỀN', 'TỶ TRỌNG', 'PHÒNG BAN / PHIẾU', 'GHI CHÚ'],
+      ['STT', 'MÃ VT', 'TÊN MẶT HÀNG SAU THAY ĐỔI', 'ĐVT', 'SL SAU ĐỔI', 'ĐƠN GIÁ CUỐI', 'THÀNH TIỀN', 'TỶ TRỌNG', 'PHÒNG BAN / PHIẾU', 'GHI CHÚ'],
     ];
 
     reportData.items.forEach((item: any, index: number) => {
@@ -1433,13 +1445,13 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
   const exportRequestedItemWord = async (reportData: any, category: 'VPP' | 'VE_SINH', detailMode: 'SUMMARY' | 'DETAIL') => {
     const categoryLabel = category === 'VPP' ? 'VĂN PHÒNG PHẨM' : 'VỆ SINH';
-    const actualValue = summaryGroups.find(group => group.type === category)?.actualTotal || 0;
+    const actualValue = reportData.totalValue;
     const cell = (text: any, bold = false) => new docx.TableCell({
       children: [new docx.Paragraph({ children: [new docx.TextRun({ text: String(text ?? ''), bold, size: 17 })] })],
       margins: { top: 80, bottom: 80, left: 80, right: 80 },
     });
     const tableRows: docx.TableRow[] = [
-      new docx.TableRow({ children: ['STT', 'MÃ VT', 'TÊN MẶT HÀNG', 'ĐVT', 'SL ĐỀ XUẤT', 'ĐƠN GIÁ', 'THÀNH TIỀN', 'TỶ TRỌNG'].map(value => cell(value, true)) }),
+      new docx.TableRow({ children: ['STT', 'MÃ VT', 'TÊN MẶT HÀNG SAU THAY ĐỔI', 'ĐVT', 'SL SAU ĐỔI', 'ĐƠN GIÁ CUỐI', 'THÀNH TIỀN', 'TỶ TRỌNG'].map(value => cell(value, true)) }),
     ];
 
     reportData.items.forEach((item: any, index: number) => {
@@ -1465,8 +1477,8 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: `TỔNG HỢP MẶT HÀNG ${categoryLabel} ĐƯỢC ĐỀ XUẤT`, bold: true, size: 28 })] }),
       new docx.Paragraph({ alignment: docx.AlignmentType.CENTER, children: [new docx.TextRun({ text: selectedIds.length > 0 ? `Theo phiếu đã chọn (${selectedIds.length} phiếu)` : 'Toàn hệ thống (Bộ lọc)', italics: true, size: 18 })] }),
       new docx.Paragraph({ children: [new docx.TextRun({ text: `Số phòng ban: ${reportData.departmentCount} | Số lượt yêu cầu: ${reportData.requestCount} | Số mặt hàng: ${reportData.itemCount}`, bold: true, size: 18 })] }),
-      new docx.Paragraph({ children: [new docx.TextRun({ text: `Tổng số lượng: ${Number(reportData.totalQty).toLocaleString('vi-VN')} | Tổng giá trị đề xuất: ${Number(reportData.totalValue).toLocaleString('vi-VN')} đ`, bold: true, size: 18 })] }),
-      new docx.Paragraph({ children: [new docx.TextRun({ text: `Tổng giá trị mua thực tế: ${Number(actualValue).toLocaleString('vi-VN')} đ | Chênh lệch: ${Number(reportData.totalValue - actualValue).toLocaleString('vi-VN')} đ`, bold: true, size: 18 })] }),
+      new docx.Paragraph({ children: [new docx.TextRun({ text: `Tổng số lượng sau đổi: ${Number(reportData.totalQty).toLocaleString('vi-VN')} | Tổng giá trị đề xuất gốc: ${Number(reportData.totalOriginalValue).toLocaleString('vi-VN')} đ`, bold: true, size: 18 })] }),
+      new docx.Paragraph({ children: [new docx.TextRun({ text: `Tổng giá trị sau thay đổi: ${Number(actualValue).toLocaleString('vi-VN')} đ | Chênh lệch: ${Number(reportData.differenceValue).toLocaleString('vi-VN')} đ`, bold: true, size: 18 })] }),
       new docx.Paragraph({ children: [new docx.TextRun({ text: '' })] }),
       new docx.Table({ width: { size: 100, type: docx.WidthType.PERCENTAGE }, rows: tableRows }),
     ] }] });
@@ -3460,8 +3472,8 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
           
           {/* REQUESTED ITEM SUMMARY PRINT SHEETS */}
           {([
-            { type: 'REQ_ITEM_VPP', label: 'VĂN PHÒNG PHẨM', data: requestedItemReportVPP, actualValue: summaryGroups.find(group => group.type === 'VPP')?.actualTotal || 0 },
-            { type: 'REQ_ITEM_VS', label: 'VỆ SINH', data: requestedItemReportVS, actualValue: summaryGroups.find(group => group.type === 'VE_SINH')?.actualTotal || 0 },
+            { type: 'REQ_ITEM_VPP', label: 'VĂN PHÒNG PHẨM', data: requestedItemReportVPP },
+            { type: 'REQ_ITEM_VS', label: 'VỆ SINH', data: requestedItemReportVS },
           ] as const).map(report => (selectedPrintType === report.type && report.data.totalValue > 0) ? (
             <div key={report.type} className="print-sheet p-4">
               {(() => {
@@ -3513,8 +3525,8 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                         <tr>
                           <td className="font-bold">Tổng số mặt hàng đề xuất:</td>
                           <td>{report.data.itemCount} mặt hàng</td>
-                          <td className="font-bold">Tổng giá trị đề xuất:</td>
-                          <td className="font-bold">{Number(report.data.totalValue).toLocaleString('vi-VN')} đ</td>
+                          <td className="font-bold">Tổng giá trị đề xuất gốc:</td>
+                          <td className="font-bold">{Number(report.data.totalOriginalValue).toLocaleString('vi-VN')} đ</td>
                         </tr>
                         <tr>
                           <td className="font-bold">Mặt hàng giá trị cao nhất:</td>
@@ -3523,10 +3535,10 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                           <td className="font-bold">{Number(report.data.topItem?.value || 0).toLocaleString('vi-VN')} đ</td>
                         </tr>
                         <tr>
-                          <td className="font-bold">Tổng giá trị mua thực tế:</td>
-                          <td className="font-bold">{Number(report.actualValue).toLocaleString('vi-VN')} đ</td>
-                          <td className="font-bold">Chênh lệch đề xuất / thực mua:</td>
-                          <td className="font-bold">{Number(report.data.totalValue - report.actualValue).toLocaleString('vi-VN')} đ</td>
+                          <td className="font-bold">Tổng giá trị sau thay đổi:</td>
+                          <td className="font-bold">{Number(report.data.totalValue).toLocaleString('vi-VN')} đ</td>
+                          <td className="font-bold">Chênh lệch gốc / sau đổi:</td>
+                          <td className="font-bold">{Number(report.data.differenceValue).toLocaleString('vi-VN')} đ</td>
                         </tr>
                       </tbody>
                     </table>
@@ -3540,10 +3552,10 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                   <tr className="text-center">
                     <th style={{ width: '5%' }}>STT</th>
                     <th style={{ width: '12%' }}>MÃ VT</th>
-                    <th style={{ width: '32%' }}>TÊN MẶT HÀNG</th>
+                    <th style={{ width: '32%' }}>TÊN MẶT HÀNG SAU THAY ĐỔI</th>
                     <th style={{ width: '7%' }}>ĐVT</th>
-                    <th style={{ width: '9%' }}>SL ĐỀ XUẤT</th>
-                    <th style={{ width: '13%' }}>ĐƠN GIÁ</th>
+                    <th style={{ width: '9%' }}>SL SAU ĐỔI</th>
+                    <th style={{ width: '13%' }}>ĐƠN GIÁ CUỐI</th>
                     <th style={{ width: '14%' }}>THÀNH TIỀN</th>
                     <th style={{ width: '8%' }}>TỶ TRỌNG</th>
                   </tr>
