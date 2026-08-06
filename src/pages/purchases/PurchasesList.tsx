@@ -241,6 +241,16 @@ function firstNumber(...values: any[]): number {
   return 0;
 }
 
+function firstPositivePrice(...values: any[]): number {
+  for (const value of values) {
+    if (value !== null && value !== undefined && value !== '') {
+      const numberValue = Number(value);
+      if (!Number.isNaN(numberValue) && numberValue > 0) return numberValue;
+    }
+  }
+  return 0;
+}
+
 function getReportDownloadName(reportType: string, categoryType: string, format: 'DOCX' | 'XLSX'): string {
   const typeSlug = categoryType === 'VE_SINH' ? 've-sinh' : 'vpp';
   const reportSlug = reportType === 'PURCHASE_SUMMARY'
@@ -401,18 +411,18 @@ function getLinePrintQty(line: any): number {
 
 function getLinePrintPrice(line: any, effectiveItem?: any): number {
   if (line?.receiptReplacementItem) {
-    return firstNumber(
+    return firstPositivePrice(
       line.receiptReplacementPrice,
       line.effectivePrice,
-      effectiveItem?.price,
       line.unitPrice,
+      effectiveItem?.price,
       line.item?.price,
       line.requestLine?.item?.price
     );
   }
   const hasReplacement = !!line?.requestLine?.replacementItemId;
   return hasReplacement
-    ? firstNumber(
+    ? firstPositivePrice(
         line.effectivePrice,
         line.requestLine?.replacementPrice,
         line.unitPrice,
@@ -420,7 +430,7 @@ function getLinePrintPrice(line: any, effectiveItem?: any): number {
         line.item?.price,
         line.requestLine?.item?.price
       )
-    : firstNumber(
+    : firstPositivePrice(
         line.effectivePrice,
         line.unitPrice,
         effectiveItem?.price,
