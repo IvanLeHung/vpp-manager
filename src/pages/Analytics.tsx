@@ -367,28 +367,32 @@ export default function Analytics() {
     try {
       setLoading(true);
       const res = await api.get('/reports/vpp-giao-nhan');
-      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
-        setTickets(res.data);
-        localStorage.setItem('vpp_delivery_tickets', JSON.stringify(res.data));
-      } else {
-        // Fallback to local storage or initial templates if empty
-        const saved = localStorage.getItem('vpp_delivery_tickets');
-        if (saved) {
-          setTickets(JSON.parse(saved));
-        } else {
-          localStorage.setItem('vpp_delivery_tickets', JSON.stringify(INITIAL_TICKETS));
-          setTickets(INITIAL_TICKETS);
-        }
-      }
+      const normalizeItemName = (value: string) => value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D')
+        .toLowerCase();
+      const isJanitorialItem = (name: string) => {
+        const normalized = normalizeItemName(name || '');
+        return normalized.includes('nuoc tay') || normalized.includes('nha ve sinh');
+      };
+
+      const liveTickets: DeliveryTicket[] = Array.isArray(res.data) ? res.data : [];
+      const vppTickets = liveTickets
+        .map(ticket => ({
+          ...ticket,
+          items: ticket.items.filter(item => !isJanitorialItem(item.name))
+        }))
+        .filter(ticket => ticket.items.length > 0);
+
+      setTickets(vppTickets);
+      localStorage.setItem('vpp_delivery_tickets', JSON.stringify(vppTickets));
     } catch (err: any) {
       console.error('Lỗi tải báo cáo VPP:', err);
-      // Fallback
-      const saved = localStorage.getItem('vpp_delivery_tickets');
-      if (saved) {
-        setTickets(JSON.parse(saved));
-      } else {
-        setTickets(INITIAL_TICKETS);
-      }
+      // Do not display stale cached report data when the live API is unavailable.
+      localStorage.removeItem('vpp_delivery_tickets');
+      setTickets([]);
     } finally {
       setLoading(false);
     }
