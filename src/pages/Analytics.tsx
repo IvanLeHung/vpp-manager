@@ -21,6 +21,7 @@ const COLORS = ['#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6'];
 interface VppItem {
   name: string;
   unit: string;
+  price?: number;
   qtyRequested: number;
   qtyApproved: number;
   qtyReceived: number;
@@ -599,6 +600,7 @@ export default function Analytics() {
     const map = new Map<string, {
       name: string;
       unit: string;
+      price: number;
       qtyRequested: number;
       qtyApproved: number;
       qtyReceived: number;
@@ -611,6 +613,7 @@ export default function Analytics() {
         const exist = map.get(i.name) || {
           name: i.name,
           unit: i.unit,
+          price: Number(i.price || 0),
           qtyRequested: 0,
           qtyApproved: 0,
           qtyReceived: 0,
@@ -621,6 +624,7 @@ export default function Analytics() {
         exist.qtyRequested += i.qtyRequested;
         exist.qtyApproved += i.qtyApproved;
         exist.qtyReceived += i.qtyReceived;
+        if (!exist.price && i.price) exist.price = Number(i.price);
         if (i.note) exist.notes.push(`${t.department}: ${i.note}`);
         exist.statuses.push(i.status);
         map.set(i.name, exist);
@@ -648,6 +652,7 @@ export default function Analytics() {
         stt: idx + 1,
         ...val,
         remaining,
+        amount: val.qtyReceived * val.price,
         status: finalStatus,
         note: val.notes.join('; ')
       };
@@ -886,6 +891,8 @@ export default function Analytics() {
       'SL Đề xuất ban đầu': item.qtyRequested,
       'SL Được duyệt': item.qtyApproved,
       'SL Thực nhận': item.qtyReceived,
+      'Đơn giá': item.price,
+      'Thành tiền': item.amount,
       'SL Còn thiếu': item.remaining,
       'Tình trạng': item.status,
       'Ghi chú': item.note
@@ -900,6 +907,8 @@ export default function Analytics() {
       'SL Đề xuất ban đầu': stats.totalRequested,
       'SL Được duyệt': stats.totalApproved,
       'SL Thực nhận': stats.totalReceived,
+      'Đơn giá': '',
+      'Thành tiền': aggregatedItems.reduce((sum, item) => sum + item.amount, 0),
       'SL Còn thiếu': stats.totalMissing,
       'Tình trạng': stats.receiveRate + '% thực nhận',
       'Ghi chú': ''
@@ -2531,6 +2540,8 @@ export default function Analytics() {
                     <th className="p-4 text-right">SL đề xuất</th>
                     <th className="p-4 text-right">SL được duyệt</th>
                     <th className="p-4 text-right">SL thực giao</th>
+                    <th className="p-4 text-right">Đơn giá</th>
+                    <th className="p-4 text-right">Thành tiền</th>
                     <th className="p-4 text-right">SL còn thiếu</th>
                     <th className="p-4 text-center">Trạng thái bàn giao</th>
                     <th className="p-4 text-center">Xác nhận bàn giao</th>
@@ -2539,7 +2550,7 @@ export default function Analytics() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
                   {aggregatedItems.length === 0 && (
-                    <tr><td colSpan={10} className="p-10 text-center text-slate-400 italic">Không có dữ liệu</td></tr>
+                    <tr><td colSpan={12} className="p-10 text-center text-slate-400 italic">Không có dữ liệu</td></tr>
                   )}
                   {aggregatedItems.map(item => (
                     <tr key={item.name} className="hover:bg-slate-50/50 transition-colors">
@@ -2549,6 +2560,8 @@ export default function Analytics() {
                       <td className="p-4 text-right font-bold tabular-nums">{item.qtyRequested}</td>
                       <td className="p-4 text-right font-bold tabular-nums">{item.qtyApproved}</td>
                       <td className="p-4 text-right font-bold text-emerald-600 tabular-nums">{item.qtyReceived}</td>
+                      <td className="p-4 text-right tabular-nums">{item.price.toLocaleString('vi-VN')}</td>
+                      <td className="p-4 text-right font-black text-indigo-600 tabular-nums">{item.amount.toLocaleString('vi-VN')}</td>
                       <td className="p-4 text-right font-bold text-amber-600 tabular-nums">{item.remaining}</td>
                       <td className="p-4 text-center">
                         <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${getStatusBadgeClass(item.status)}`}>{item.status}</span>
@@ -2568,6 +2581,8 @@ export default function Analytics() {
                       <td className="p-4 text-right tabular-nums">{stats.totalRequested}</td>
                       <td className="p-4 text-right tabular-nums">{stats.totalApproved}</td>
                       <td className="p-4 text-right text-emerald-400 tabular-nums">{stats.totalReceived}</td>
+                      <td className="p-4"></td>
+                      <td className="p-4 text-right text-indigo-300 tabular-nums">{aggregatedItems.reduce((sum, item) => sum + item.amount, 0).toLocaleString('vi-VN')}</td>
                       <td className="p-4 text-right text-amber-400 tabular-nums">{stats.totalMissing}</td>
                       <td className="p-4 text-center text-indigo-300" colSpan={2}>{stats.receiveRate}% thực giao</td>
                       <td className="p-4"></td>
@@ -2916,6 +2931,8 @@ export default function Analytics() {
                 <th style={{width: '95px'}}>SL đề xuất ban đầu</th>
                 <th style={{width: '95px'}}>SL được duyệt</th>
                 <th style={{width: '95px'}}>SL thực giao</th>
+                <th style={{width: '105px'}}>Đơn giá</th>
+                <th style={{width: '120px'}}>Thành tiền</th>
                 <th style={{width: '95px'}}>SL còn thiếu</th>
                 <th style={{width: '130px'}}>Xác nhận bàn giao</th>
                 <th>Ghi chú</th>
@@ -2930,6 +2947,8 @@ export default function Analytics() {
                   <td className="text-right-print">{item.qtyRequested}</td>
                   <td className="text-right-print">{item.qtyApproved}</td>
                   <td className="text-right-print" style={{fontWeight: 'bold'}}>{item.qtyReceived}</td>
+                  <td className="text-right-print">{Number(item.price || 0).toLocaleString('vi-VN')}</td>
+                  <td className="text-right-print" style={{fontWeight: 'bold'}}>{(item.qtyReceived * Number(item.price || 0)).toLocaleString('vi-VN')}</td>
                   <td className="text-right-print">{Math.max(0, item.qtyApproved - item.qtyReceived)}</td>
                   <td className="text-center" style={{fontSize: '9.5pt'}}>{getStatusLabel(item.status)}</td>
                   <td style={{fontSize: '9.5pt', fontStyle: 'italic'}}>{item.note || '-'}</td>
@@ -2947,6 +2966,13 @@ export default function Analytics() {
                 </td>
                 <td className="text-right-print">
                   {selectedTicket ? selectedTicket.items.reduce((s, i) => s + i.qtyReceived, 0) : stats.totalReceived}
+                </td>
+                <td></td>
+                <td className="text-right-print">
+                  {(selectedTicket
+                    ? selectedTicket.items.reduce((sum, item) => sum + item.qtyReceived * Number(item.price || 0), 0)
+                    : aggregatedItems.reduce((sum, item) => sum + item.amount, 0)
+                  ).toLocaleString('vi-VN')}
                 </td>
                 <td className="text-right-print">
                   {selectedTicket ? selectedTicket.items.reduce((s, i) => s + Math.max(0, i.qtyApproved - i.qtyReceived), 0) : stats.totalMissing}
