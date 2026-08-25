@@ -19,6 +19,8 @@ import { toast } from 'react-toastify';
 const COLORS = ['#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6'];
 
 interface VppItem {
+  requestLineId?: string;
+  itemId?: string;
   name: string;
   unit: string;
   price?: number;
@@ -590,6 +592,12 @@ export default function JanitorialReports() {
       qtyReceived: number;
       notes: string[];
       statuses: VppItem['status'][];
+      sources: Array<{
+        requestId: string;
+        requestLineId?: string;
+        itemId?: string;
+        qtyApproved: number;
+      }>;
     }>();
 
     filteredTickets.forEach(t => {
@@ -602,7 +610,8 @@ export default function JanitorialReports() {
           qtyApproved: 0,
           qtyReceived: 0,
           notes: [],
-          statuses: []
+          statuses: [],
+          sources: []
         };
         
         exist.qtyRequested += i.qtyRequested;
@@ -611,6 +620,12 @@ export default function JanitorialReports() {
         if (!exist.price && i.price) exist.price = Number(i.price);
         if (i.note) exist.notes.push(`${t.department}: ${i.note}`);
         exist.statuses.push(i.status);
+        exist.sources.push({
+          requestId: t.id,
+          requestLineId: i.requestLineId,
+          itemId: i.itemId,
+          qtyApproved: i.qtyApproved
+        });
         map.set(i.name, exist);
       });
     });
@@ -1408,16 +1423,27 @@ export default function JanitorialReports() {
 
     try {
       setLoading(true);
-      const targetIds = filteredTickets.map(t => t.id);
-      
-      for (const rId of targetIds) {
+      const details = aggregatedItems.find(item => item.name === selectedItemName);
+      if (!details) throw new Error('Không tìm thấy mặt hàng trong báo cáo hiện tại');
+      const requestedTotal = Number(confirmSingleForm.qtyReceived);
+      if (requestedTotal < 0 || requestedTotal > details.qtyApproved) {
+        throw new Error(`Số lượng thực giao phải từ 0 đến ${details.qtyApproved}`);
+      }
+
+      let remaining = requestedTotal;
+      for (const source of details.sources) {
+        const allocatedQty = Math.min(remaining, source.qtyApproved);
+        remaining -= allocatedQty;
         await api.post('/reports/vesinh-confirm', {
-          requestId: rId,
+          requestId: source.requestId,
+          requestLineId: source.requestLineId,
+          itemId: source.itemId,
           itemName: selectedItemName,
-          qtyReceived: Number(confirmSingleForm.qtyReceived),
-          status: confirmSingleForm.status,
+          qtyReceived: allocatedQty,
+          status: allocatedQty >= source.qtyApproved ? 'Đã nhận đủ' : allocatedQty > 0 ? 'Nhận thiếu' : 'Chưa nhận',
           note: confirmSingleForm.note,
-          confirmedBy: confirmSingleForm.confirmedBy
+          confirmedBy: confirmSingleForm.confirmedBy,
+          confirmedAt: confirmSingleForm.confirmedAt
         });
       }
 
@@ -3470,6 +3496,7 @@ export default function JanitorialReports() {
                   type="number"
                   required
                   min="0"
+                  max={aggregatedItems.find(item => item.name === selectedItemName)?.qtyApproved}
                   value={confirmSingleForm.qtyReceived}
                   onChange={e => setConfirmSingleForm({ ...confirmSingleForm, qtyReceived: Number(e.target.value) })}
                   className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-emerald-600 text-right outline-none"
