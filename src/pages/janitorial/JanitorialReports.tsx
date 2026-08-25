@@ -640,7 +640,9 @@ export default function JanitorialReports() {
       
       // Determine aggregated status
       let finalStatus: VppItem['status'] = 'Chờ giao hàng';
-      if (val.qtyReceived === 0 && val.qtyApproved > 0) {
+      if (val.qtyApproved === 0 && val.statuses.every(status => status === 'Không giao hàng' || status === 'Hủy')) {
+        finalStatus = val.statuses.includes('Hủy') ? 'Hủy' : 'Không giao hàng';
+      } else if (val.qtyReceived === 0 && val.qtyApproved > 0) {
         finalStatus = 'Chưa nhận';
       } else if (val.statuses.includes('Nhận sai hàng')) {
         finalStatus = 'Nhận sai hàng';
