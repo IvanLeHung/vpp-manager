@@ -27,7 +27,7 @@ interface VppItem {
   qtyRequested: number;
   qtyApproved: number;
   qtyReceived: number;
-  status: 'Đã nhận đủ' | 'Nhận thiếu' | 'Chưa nhận' | 'Nhận sai hàng' | 'Chờ bổ sung' | 'Chờ giao hàng' | 'Không giao hàng' | 'Hành chính xuất kho' | 'Hủy' | 'Đã giao hàng';
+  status: 'Đã nhận đủ' | 'Chưa nhận' | 'Nhận sai hàng' | 'Chờ bổ sung' | 'Chờ giao hàng' | 'Không giao hàng' | 'Hành chính xuất kho' | 'Hủy' | 'Đã giao hàng';
   note: string;
   confirmedBy?: string;
   confirmedAt?: string;
@@ -100,7 +100,7 @@ const INITIAL_TICKETS: DeliveryTicket[] = [
     receiverSignature: "Lê Văn C",
     generalNote: "Nhà cung cấp hết hàng kẹp giấy và mực in",
     items: [
-      { name: "Nước tẩy bồn cầu Vim", unit: "Hộp", qtyRequested: 30, qtyApproved: 30, qtyReceived: 20, status: "Nhận thiếu", note: "Thiếu 10 hộp do NCC hết hàng" },
+      { name: "Nước tẩy bồn cầu Vim", unit: "Hộp", qtyRequested: 30, qtyApproved: 30, qtyReceived: 20, status: "Chờ bổ sung", note: "Chờ bổ sung 10 hộp do NCC hết hàng" },
       { name: "Nước lau sàn Sunlight", unit: "Lọ", qtyRequested: 5, qtyApproved: 4, qtyReceived: 4, status: "Đã nhận đủ", note: "" },
       { name: "Cây lau nhà san hô", unit: "Cuốn", qtyRequested: 15, qtyApproved: 12, qtyReceived: 0, status: "Chưa nhận", note: "Chưa giao sổ tay da" }
     ]
@@ -649,7 +649,7 @@ export default function JanitorialReports() {
       } else if (val.statuses.includes('Chờ bổ sung')) {
         finalStatus = 'Chờ bổ sung';
       } else if (remaining > 0 && val.qtyReceived > 0) {
-        finalStatus = 'Nhận thiếu';
+        finalStatus = 'Chờ bổ sung';
       } else if (remaining === 0 && val.qtyReceived > 0) {
         finalStatus = 'Đã nhận đủ';
       }
@@ -779,7 +779,7 @@ export default function JanitorialReports() {
         } else if (itemExist.qtyReceived >= itemExist.qtyApproved && itemExist.qtyApproved > 0) {
           itemExist.status = 'Đã nhận đủ';
         } else if (itemExist.qtyReceived > 0) {
-          itemExist.status = 'Nhận thiếu';
+          itemExist.status = 'Chờ bổ sung';
         } else {
           itemExist.status = 'Chưa nhận';
         }
@@ -802,7 +802,7 @@ export default function JanitorialReports() {
       } else if (val.qtyReceived === val.qtyApproved && val.qtyApproved > 0) {
         overallStatus = 'Đã giao đủ';
       } else if (val.qtyReceived > 0) {
-        overallStatus = 'Giao thiếu';
+        overallStatus = 'Chờ bổ sung';
       }
 
       return {
@@ -862,7 +862,7 @@ export default function JanitorialReports() {
 
     return [
       { name: 'Đã giao đủ', value: counts.full },
-      { name: 'Giao thiếu', value: counts.short },
+      { name: 'Chờ bổ sung', value: counts.short },
       { name: 'Giao sai hàng', value: counts.wrong },
       { name: 'Chưa giao / Chờ giao', value: counts.pending + counts.none }
     ].filter(v => v.value > 0);
@@ -876,8 +876,7 @@ export default function JanitorialReports() {
       case 'Đã giao hàng':
       case 'RECEIVED_FULL':
         return 'bg-emerald-50 text-emerald-700 border-emerald-150';
-      case 'Nhận thiếu':
-      case 'Giao thiếu':
+      case 'Chờ bổ sung':
       case 'RECEIVED_SHORT':
         return 'bg-amber-50 text-amber-700 border-amber-150';
       case 'Nhận sai hàng':
@@ -912,8 +911,7 @@ export default function JanitorialReports() {
       case 'Đã nhận đủ':
         return 'Đã giao đủ';
       case 'RECEIVED_SHORT':
-      case 'Nhận thiếu':
-        return 'Giao thiếu';
+        return 'Chờ bổ sung';
       case 'WRONG_ITEMS':
       case 'Nhận sai hàng':
         return 'Giao sai hàng';
@@ -957,8 +955,7 @@ export default function JanitorialReports() {
       'SL Được duyệt': item.qtyApproved,
       'SL Thực nhận': item.qtyReceived,
       'Đơn giá': item.price,
-      'Thành tiền': item.amount,
-      'SL Còn thiếu': item.remaining,
+      'SL chờ bổ sung': item.remaining,
       'Tình trạng': item.status,
       'Ghi chú': item.note
     }));
@@ -973,8 +970,7 @@ export default function JanitorialReports() {
       'SL Được duyệt': stats.totalApproved,
       'SL Thực nhận': stats.totalReceived,
       'Đơn giá': '',
-      'Thành tiền': aggregatedItems.reduce((sum, item) => sum + item.amount, 0),
-      'SL Còn thiếu': stats.totalMissing,
+      'SL chờ bổ sung': stats.totalMissing,
       'Tình trạng': stats.receiveRate + '% thực nhận',
       'Ghi chú': ''
     }], { skipHeader: true, origin: -1 });
@@ -987,8 +983,7 @@ export default function JanitorialReports() {
       'Tổng SL Đề xuất': d.qtyRequested,
       'Tổng SL Được duyệt': d.qtyApproved,
       'Tổng SL Thực nhận': d.qtyReceived,
-      'Thành tiền': d.amount,
-      'Tổng Còn thiếu': d.remaining,
+      'SL chờ bổ sung': d.remaining,
       'Tỷ lệ thực nhận (%)': d.receiveRate + '%',
       'Trạng thái tổng thể': d.overallStatus
     }));
@@ -1053,7 +1048,7 @@ export default function JanitorialReports() {
               <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 110px;">Tổng SL đề xuất</th>
               <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 110px;">Tổng SL được duyệt</th>
               <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 110px;">Tổng SL thực nhận</th>
-              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 110px;">Tổng còn thiếu</th>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 110px;">SL chờ bổ sung</th>
               <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 110px;">Tỷ lệ thực nhận</th>
               <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 120px;">Trạng thái tổng thể</th>
               <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2;">Ghi chú</th>
@@ -1100,7 +1095,7 @@ export default function JanitorialReports() {
               <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 100px;">SL đề xuất ban đầu</th>
               <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 100px;">SL được duyệt</th>
               <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 100px;">SL thực nhận</th>
-              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 100px;">SL còn thiếu</th>
+              <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 100px;">SL chờ bổ sung</th>
               <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2; width: 120px;">Xác nhận nhận hàng</th>
               <th style="border: 1px solid #000; padding: 6px; font-weight: bold; background-color: #f2f2f2;">Ghi chú</th>
             </tr>
@@ -1427,7 +1422,7 @@ export default function JanitorialReports() {
             const qtyRec = Number(val);
             if (qtyRec === qtyApp) copy.status = 'Đã nhận đủ';
             else if (qtyRec === 0) copy.status = 'Chưa nhận';
-            else if (qtyRec < qtyApp) copy.status = 'Nhận thiếu';
+            else if (qtyRec < qtyApp) copy.status = 'Chờ bổ sung';
           }
         }
         return copy;
@@ -1567,7 +1562,7 @@ export default function JanitorialReports() {
     const hasWrong = aggregatedItems.some(i => i.status === 'Nhận sai hàng');
     if (hasWrong) return 'Có hàng giao sai';
     if (stats.totalReceived === stats.totalApproved && stats.totalApproved > 0) return 'Đã giao đủ';
-    if (stats.totalReceived > 0) return 'Giao thiếu';
+    if (stats.totalReceived > 0) return 'Chờ bổ sung';
     return 'Chưa giao';
   };
 
@@ -2024,7 +2019,7 @@ export default function JanitorialReports() {
             >
               <option value="ALL">Tất cả trạng thái</option>
               <option value="RECEIVED_FULL">Đã giao đủ</option>
-              <option value="RECEIVED_SHORT">Giao thiếu</option>
+              <option value="RECEIVED_SHORT">Chờ bổ sung</option>
               <option value="WRONG_ITEMS">Giao sai hàng</option>
               <option value="PENDING">Chờ giao hàng</option>
             </select>
@@ -2457,7 +2452,7 @@ export default function JanitorialReports() {
         <StatCard label="Tổng đề xuất" value={stats.totalRequested} color="indigo" />
         <StatCard label="Được duyệt" value={stats.totalApproved} color="emerald" />
         <StatCard label="Thực giao" value={stats.totalReceived} color="emerald" />
-        <StatCard label="Tổng còn thiếu" value={stats.totalMissing} color="amber" />
+        <StatCard label="SL chờ bổ sung" value={stats.totalMissing} color="amber" />
         <StatCard label="Tỷ lệ thực giao" value={stats.receiveRate + '%'} color={stats.receiveRate < 60 ? 'rose' : 'emerald'} />
         <StatCard label="Phiếu chưa xong" value={stats.pendingCount} color={stats.pendingCount > 0 ? 'amber' : 'slate'} />
       </div>
@@ -2553,8 +2548,7 @@ export default function JanitorialReports() {
                     <th className="p-4 text-right">Tổng SL đề xuất</th>
                     <th className="p-4 text-right">Tổng SL được duyệt</th>
                     <th className="p-4 text-right">Tổng SL thực giao</th>
-                    <th className="p-4 text-right">Thành tiền</th>
-                    <th className="p-4 text-right">Tổng còn thiếu</th>
+                    <th className="p-4 text-right">SL chờ bổ sung</th>
                     <th className="p-4 text-center">Tỷ lệ thực giao</th>
                     <th className="p-4 text-center">Trạng thái tổng thể</th>
                     <th className="p-4 text-center w-36">Chi tiết</th>
@@ -2562,7 +2556,7 @@ export default function JanitorialReports() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs font-bold text-slate-700">
                   {displayedDepartmentalSummary.length === 0 && (
-                    <tr><td colSpan={10} className="p-10 text-center text-slate-400 italic">Không có dữ liệu</td></tr>
+                    <tr><td colSpan={9} className="p-10 text-center text-slate-400 italic">Không có dữ liệu</td></tr>
                   )}
                   {displayedDepartmentalSummary.map(d => (
                     <Fragment key={d.department}>
@@ -2572,7 +2566,6 @@ export default function JanitorialReports() {
                         <td className="p-4 text-right tabular-nums">{d.qtyRequested}</td>
                         <td className="p-4 text-right tabular-nums">{d.qtyApproved}</td>
                         <td className="p-4 text-right tabular-nums text-emerald-600">{d.qtyReceived}</td>
-                        <td className="p-4 text-right tabular-nums font-black text-indigo-600">{d.amount.toLocaleString('vi-VN')}</td>
                         <td className="p-4 text-right tabular-nums text-amber-600">{d.remaining}</td>
                         <td className="p-4 text-center tabular-nums text-indigo-600">{d.receiveRate}%</td>
                         <td className="p-4 text-center">
@@ -2595,7 +2588,7 @@ export default function JanitorialReports() {
                       </tr>
                       {expandedDepts[d.department] && (
                         <tr className="bg-slate-50/70">
-                          <td colSpan={10} className="p-6">
+                          <td colSpan={9} className="p-6">
                             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 overflow-hidden animate-in slide-in-from-top-1 duration-200">
                               <h5 className="text-xs font-black text-indigo-700 uppercase tracking-widest mb-3 italic">
                                 Danh mục hàng hóa của {d.department}
@@ -2614,7 +2607,7 @@ export default function JanitorialReports() {
                                         <th className="p-3 text-right">Số lượng đề xuất ban đầu</th>
                                         <th className="p-3 text-right">Số lượng được duyệt</th>
                                         <th className="p-3 text-right">Số lượng thực giao</th>
-                                        <th className="p-3 text-right">Số lượng còn thiếu</th>
+                                        <th className="p-3 text-right">SL chờ bổ sung</th>
                                         <th className="p-3 text-center">Trạng thái bàn giao</th>
                                         <th className="p-3">Ghi chú</th>
                                       </tr>
@@ -2659,7 +2652,6 @@ export default function JanitorialReports() {
                       <td className="p-4 text-right">{displayedDepartmentTotals.requested}</td>
                       <td className="p-4 text-right">{displayedDepartmentTotals.approved}</td>
                       <td className="p-4 text-right text-emerald-400">{displayedDepartmentTotals.received}</td>
-                      <td className="p-4 text-right text-indigo-300">{displayedDepartmentTotals.amount.toLocaleString('vi-VN')}</td>
                       <td className="p-4 text-right text-amber-400">{displayedDepartmentTotals.missing}</td>
                       <td className="p-4 text-center">{displayedDepartmentTotals.approved > 0 ? Math.round(displayedDepartmentTotals.received / displayedDepartmentTotals.approved * 100) : 0}%</td>
                       <td className="p-4 text-center" colSpan={2}>{getOverallStatusLabel()}</td>
@@ -2699,8 +2691,7 @@ export default function JanitorialReports() {
                     <th className="p-4 text-right">SL được duyệt</th>
                     <th className="p-4 text-right">SL thực giao</th>
                     <th className="p-4 text-right">Đơn giá</th>
-                    <th className="p-4 text-right">Thành tiền</th>
-                    <th className="p-4 text-right">SL còn thiếu</th>
+                    <th className="p-4 text-right">SL chờ bổ sung</th>
                     <th className="p-4 text-center">Trạng thái bàn giao</th>
                     <th className="p-4 text-center">Xác nhận bàn giao</th>
                     <th className="p-4">Ghi chú</th>
@@ -2708,7 +2699,7 @@ export default function JanitorialReports() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
                   {displayedAggregatedItems.length === 0 && (
-                    <tr><td colSpan={12} className="p-10 text-center text-slate-400 italic">Không có dữ liệu</td></tr>
+                    <tr><td colSpan={11} className="p-10 text-center text-slate-400 italic">Không có dữ liệu</td></tr>
                   )}
                   {displayedAggregatedItems.map(item => (
                     <tr key={item.name} className="hover:bg-slate-50/50 transition-colors">
@@ -2719,7 +2710,6 @@ export default function JanitorialReports() {
                       <td className="p-4 text-right font-bold tabular-nums">{item.qtyApproved}</td>
                       <td className="p-4 text-right font-bold text-emerald-600 tabular-nums">{item.qtyReceived}</td>
                       <td className="p-4 text-right tabular-nums">{item.price.toLocaleString('vi-VN')}</td>
-                      <td className="p-4 text-right font-black text-indigo-600 tabular-nums">{item.amount.toLocaleString('vi-VN')}</td>
                       <td className="p-4 text-right font-bold text-amber-600 tabular-nums">{item.remaining}</td>
                       <td className="p-4 text-center">
                         <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${getStatusBadgeClass(item.status)}`}>{getHandoverStatusIcon(item.status)} {item.status}</span>
@@ -2747,7 +2737,6 @@ export default function JanitorialReports() {
                       <td className="p-4 text-right tabular-nums">{displayedItemTotals.approved}</td>
                       <td className="p-4 text-right text-emerald-400 tabular-nums">{displayedItemTotals.received}</td>
                       <td className="p-4"></td>
-                      <td className="p-4 text-right text-indigo-300 tabular-nums">{displayedItemTotals.amount.toLocaleString('vi-VN')}</td>
                       <td className="p-4 text-right text-amber-400 tabular-nums">{displayedItemTotals.missing}</td>
                       <td className="p-4 text-center text-indigo-300" colSpan={2}>{stats.receiveRate}% thực giao</td>
                       <td className="p-4"></td>
@@ -3051,8 +3040,7 @@ export default function JanitorialReports() {
                 <th style={{width: '120px'}} className="text-right">Tổng SL đề xuất</th>
                 <th style={{width: '120px'}} className="text-right">Tổng SL được duyệt</th>
                 <th style={{width: '120px'}} className="text-right">Tổng SL thực giao</th>
-                <th style={{width: '130px'}} className="text-right">Thành tiền</th>
-                <th style={{width: '120px'}} className="text-right">Tổng còn thiếu</th>
+                <th style={{width: '120px'}} className="text-right">SL chờ bổ sung</th>
                 <th style={{width: '120px'}} className="text-center">Tỷ lệ thực giao</th>
                 <th style={{width: '140px'}} className="text-center">Trạng thái tổng thể</th>
                 <th>Ghi chú</th>
@@ -3067,7 +3055,6 @@ export default function JanitorialReports() {
                   <td className="text-right-print">{d.qtyRequested}</td>
                   <td className="text-right-print">{d.qtyApproved}</td>
                   <td className="text-right-print" style={{fontWeight: 'bold'}}>{d.qtyReceived}</td>
-                  <td className="text-right-print" style={{fontWeight: 'bold'}}>{d.amount.toLocaleString('vi-VN')}</td>
                   <td className="text-right-print">{d.remaining}</td>
                   <td className="text-center-print">{d.receiveRate}%</td>
                   <td className="text-center" style={{fontSize: '9.5pt'}}>{d.overallStatus}</td>
@@ -3081,7 +3068,6 @@ export default function JanitorialReports() {
                 <td className="text-right-print">{stats.totalRequested}</td>
                 <td className="text-right-print">{stats.totalApproved}</td>
                 <td className="text-right-print">{stats.totalReceived}</td>
-                <td className="text-right-print">{departmentalSummary.reduce((sum, d) => sum + d.amount, 0).toLocaleString('vi-VN')}</td>
                 <td className="text-right-print">{stats.totalMissing}</td>
                 <td className="text-center-print">{stats.receiveRate}%</td>
                 <td className="text-center" style={{fontSize: '10pt'}}>{getOverallStatusLabel()}</td>
@@ -3100,8 +3086,7 @@ export default function JanitorialReports() {
                 <th style={{width: '95px'}}>SL được duyệt</th>
                 <th style={{width: '95px'}}>SL thực giao</th>
                 <th style={{width: '105px'}}>Đơn giá</th>
-                <th style={{width: '120px'}}>Thành tiền</th>
-                <th style={{width: '95px'}}>SL còn thiếu</th>
+                <th style={{width: '95px'}}>SL chờ bổ sung</th>
                 <th style={{width: '130px'}}>Xác nhận bàn giao</th>
                 <th>Ghi chú</th>
               </tr>
@@ -3116,7 +3101,6 @@ export default function JanitorialReports() {
                   <td className="text-right-print">{item.qtyApproved}</td>
                   <td className="text-right-print" style={{fontWeight: 'bold'}}>{item.qtyReceived}</td>
                   <td className="text-right-print">{Number(item.price || 0).toLocaleString('vi-VN')}</td>
-                  <td className="text-right-print" style={{fontWeight: 'bold'}}>{(item.qtyReceived * Number(item.price || 0)).toLocaleString('vi-VN')}</td>
                   <td className="text-right-print">{Math.max(0, item.qtyApproved - item.qtyReceived)}</td>
                   <td className="text-center" style={{fontSize: '9.5pt'}}>{getStatusLabel(item.status)}</td>
                   <td style={{fontSize: '9.5pt', fontStyle: 'italic'}}>{item.note || '-'}</td>
@@ -3136,12 +3120,6 @@ export default function JanitorialReports() {
                   {selectedTicket ? selectedTicket.items.reduce((s, i) => s + i.qtyReceived, 0) : stats.totalReceived}
                 </td>
                 <td></td>
-                <td className="text-right-print">
-                  {(selectedTicket
-                    ? selectedTicket.items.reduce((sum, item) => sum + item.qtyReceived * Number(item.price || 0), 0)
-                    : aggregatedItems.reduce((sum, item) => sum + item.amount, 0)
-                  ).toLocaleString('vi-VN')}
-                </td>
                 <td className="text-right-print">
                   {selectedTicket ? selectedTicket.items.reduce((s, i) => s + Math.max(0, i.qtyApproved - i.qtyReceived), 0) : stats.totalMissing}
                 </td>
@@ -3578,7 +3556,7 @@ export default function JanitorialReports() {
                               className="w-full px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs"
                             >
                               <option value="Đã nhận đủ">Đã giao đủ</option>
-                              <option value="Nhận thiếu">Giao thiếu</option>
+                              <option value="Chờ bổ sung">Chờ bổ sung</option>
                               <option value="Chưa nhận">Chưa giao</option>
                               <option value="Nhận sai hàng">Giao sai hàng</option>
                               <option value="Chờ bổ sung">Chờ bổ sung</option>
@@ -3663,7 +3641,7 @@ export default function JanitorialReports() {
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none"
                 >
                   <option value="Đã nhận đủ">Đã giao đủ</option>
-                  <option value="Nhận thiếu">Giao thiếu</option>
+                  <option value="Chờ bổ sung">Chờ bổ sung</option>
                   <option value="Chưa nhận">Chưa giao</option>
                   <option value="Nhận sai hàng">Giao sai hàng</option>
                   <option value="Chờ bổ sung">Chờ bổ sung</option>
