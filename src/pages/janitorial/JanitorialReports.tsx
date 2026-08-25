@@ -3128,27 +3128,27 @@ export default function JanitorialReports() {
           <div className="print-signature">
             <div>
               <span className="sig-title">BÊN GIAO</span>
-              <span className="sig-title">ĐƠN VẸ CUNG CẤP</span>
+              <span className="sig-title">ĐƠN VỊ CUNG CẤP</span>
               <span className="sig-note">(Ký và xác nhận đối chiếu đúng hàng)</span>
               <span className="sig-line"></span>
               <span className="sig-name">{selectedTicket?.deliverer || '---'}</span>
             </div>
             <div>
               <span className="sig-title">THỦ KHO</span>
-              <span className="sig-title">NGƯỜI KIỂM ĐịNH</span>
+              <span className="sig-title">NGƯỜI KIỂM ĐỊNH</span>
               <span className="sig-note">(Ký, ghi rõ họ tên xác nhận nhận hàng)</span>
               <span className="sig-line"></span>
               <span className="sig-name">{selectedTicket?.receiver || '---'}</span>
             </div>
             <div>
-              <span className="sig-title">NGƯỜI LậP BIỂU</span>
+              <span className="sig-title">NGƯỜI LẬP BIỂU</span>
               <span className="sig-title">&nbsp;</span>
               <span className="sig-note">(Ký &amp; ghi rõ họ tên)</span>
               <span className="sig-line"></span>
               <span className="sig-name">{reporter}</span>
             </div>
             <div>
-              <span className="sig-title">TRƯỞNG BỘ PHẪN</span>
+              <span className="sig-title">TRƯỞNG BỘ PHẬN</span>
               <span className="sig-title">&nbsp;</span>
               <span className="sig-note">(Ký &amp; đóng dấu)</span>
               <span className="sig-line"></span>
@@ -3158,11 +3158,11 @@ export default function JanitorialReports() {
         ) : (
           <div className="print-signature-single">
             <div className="sig-spacer"></div>
-            <div>
-              <span className="sig-title">NGƯỜI LậP BIỂU</span>
-              <span className="sig-note">(Ký &amp; ghi rõ họ tên)</span>
-              <span className="sig-line"></span>
-              <span className="sig-name">{reporter}</span>
+            <div className="flex flex-col items-center text-center">
+              <div className="sig-title block font-bold">NGƯỜI LẬP BIỂU</div>
+              <div className="sig-note block text-xs italic">(Ký &amp; ghi rõ họ tên)</div>
+              <div className="sig-line block w-4/5"></div>
+              <div className="sig-name block font-bold">{reporter}</div>
             </div>
           </div>
         )}
