@@ -936,6 +936,10 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         {previewReq && (() => {
           const actName = getActionName(previewReq);
           const isActionable = actName !== 'Chi tiết';
+          const previewTotalAmount = (previewReq.lines || []).reduce((sum: number, line: any) => {
+            const displayItem = line.issue_item || line.item;
+            return sum + Number(line.qtyRequested || 0) * Number(displayItem?.price || 0);
+          }, 0);
           return (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden" style={{width:'45%'}}>
             <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-indigo-50 to-slate-50 flex justify-between items-start shrink-0">
@@ -958,6 +962,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                     <th className="px-4 py-2.5 text-center w-20">SL Yêu cầu</th>
                     <th className="px-4 py-2.5 text-center w-14">ĐVT</th>
                     <th className="px-4 py-2.5 text-right w-24">Đơn giá</th>
+                    <th className="px-4 py-2.5 text-right w-28">Thành tiền</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -993,6 +998,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                         <td className="px-4 py-2.5 text-center"><span className="font-black text-base text-indigo-600">{line.qtyRequested}</span></td>
                         <td className="px-4 py-2.5 text-center text-xs font-bold text-slate-500">{displayItem?.unit || '—'}</td>
                         <td className="px-4 py-2.5 text-right text-xs font-bold text-slate-600">{displayItem?.price ? Number(displayItem.price).toLocaleString('vi-VN') : '—'}</td>
+                        <td className="px-4 py-2.5 text-right text-xs font-black text-slate-800">{displayItem?.price ? (Number(line.qtyRequested || 0) * Number(displayItem.price)).toLocaleString('vi-VN') : '—'}</td>
                       </tr>
                     );
                   })}
@@ -1003,6 +1009,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
               <div className="flex gap-5">
                 <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Hạng mục</p><p className="text-lg font-black text-slate-800">{previewReq.lines?.length || 0}</p></div>
                 <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tổng SL</p><p className="text-lg font-black text-indigo-600">{(previewReq.lines||[]).reduce((s:number,l:any)=>s+(l.qtyRequested||0),0)}</p></div>
+                <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tổng thành tiền</p><p className="text-lg font-black text-emerald-600 whitespace-nowrap">{previewTotalAmount.toLocaleString('vi-VN')} đ</p></div>
               </div>
               <div className="flex gap-3">
                 {isActionable && (
