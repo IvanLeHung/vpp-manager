@@ -590,6 +590,7 @@ export default function JanitorialReports() {
       qtyRequested: number;
       qtyApproved: number;
       qtyReceived: number;
+      amount: number;
       notes: string[];
       statuses: VppItem['status'][];
       sources: Array<{
@@ -696,6 +697,7 @@ export default function JanitorialReports() {
         qtyRequested: 0,
         qtyApproved: 0,
         qtyReceived: 0,
+        amount: 0,
         hasWrong: false,
         generalNotes: [] as string[],
         itemsMap: new Map()
@@ -713,6 +715,7 @@ export default function JanitorialReports() {
         exist.qtyRequested += i.qtyRequested;
         exist.qtyApproved += i.qtyApproved;
         exist.qtyReceived += i.qtyReceived;
+        exist.amount += i.qtyReceived * Number(i.price || 0);
         if (i.status === 'Nhận sai hàng') exist.hasWrong = true;
 
         if (i.note && i.note.trim()) {
@@ -776,6 +779,7 @@ export default function JanitorialReports() {
         qtyRequested: val.qtyRequested,
         qtyApproved: val.qtyApproved,
         qtyReceived: val.qtyReceived,
+        amount: val.amount,
         remaining,
         receiveRate: val.qtyApproved > 0 ? Math.round((val.qtyReceived / val.qtyApproved) * 100) : 0,
         overallStatus,
@@ -921,6 +925,7 @@ export default function JanitorialReports() {
       'Tổng SL Đề xuất': d.qtyRequested,
       'Tổng SL Được duyệt': d.qtyApproved,
       'Tổng SL Thực nhận': d.qtyReceived,
+      'Thành tiền': d.amount,
       'Tổng Còn thiếu': d.remaining,
       'Tỷ lệ thực nhận (%)': d.receiveRate + '%',
       'Trạng thái tổng thể': d.overallStatus
@@ -2441,6 +2446,7 @@ export default function JanitorialReports() {
                     <th className="p-4 text-right">Tổng SL đề xuất</th>
                     <th className="p-4 text-right">Tổng SL được duyệt</th>
                     <th className="p-4 text-right">Tổng SL thực giao</th>
+                    <th className="p-4 text-right">Thành tiền</th>
                     <th className="p-4 text-right">Tổng còn thiếu</th>
                     <th className="p-4 text-center">Tỷ lệ thực giao</th>
                     <th className="p-4 text-center">Trạng thái tổng thể</th>
@@ -2449,7 +2455,7 @@ export default function JanitorialReports() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs font-bold text-slate-700">
                   {departmentalSummary.length === 0 && (
-                    <tr><td colSpan={9} className="p-10 text-center text-slate-400 italic">Không có dữ liệu</td></tr>
+                    <tr><td colSpan={10} className="p-10 text-center text-slate-400 italic">Không có dữ liệu</td></tr>
                   )}
                   {departmentalSummary.map(d => (
                     <Fragment key={d.department}>
@@ -2459,6 +2465,7 @@ export default function JanitorialReports() {
                         <td className="p-4 text-right tabular-nums">{d.qtyRequested}</td>
                         <td className="p-4 text-right tabular-nums">{d.qtyApproved}</td>
                         <td className="p-4 text-right tabular-nums text-emerald-600">{d.qtyReceived}</td>
+                        <td className="p-4 text-right tabular-nums font-black text-indigo-600">{d.amount.toLocaleString('vi-VN')}</td>
                         <td className="p-4 text-right tabular-nums text-amber-600">{d.remaining}</td>
                         <td className="p-4 text-center tabular-nums text-indigo-600">{d.receiveRate}%</td>
                         <td className="p-4 text-center">
@@ -2481,7 +2488,7 @@ export default function JanitorialReports() {
                       </tr>
                       {expandedDepts[d.department] && (
                         <tr className="bg-slate-50/70">
-                          <td colSpan={9} className="p-6">
+                          <td colSpan={10} className="p-6">
                             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 overflow-hidden animate-in slide-in-from-top-1 duration-200">
                               <h5 className="text-xs font-black text-indigo-700 uppercase tracking-widest mb-3 italic">
                                 Danh mục hàng hóa của {d.department}
@@ -2537,6 +2544,21 @@ export default function JanitorialReports() {
                     </Fragment>
                   ))}
                 </tbody>
+                {departmentalSummary.length > 0 && (
+                  <tfoot className="bg-slate-900 text-white text-xs font-black uppercase tracking-wider italic">
+                    <tr>
+                      <td className="p-4">Tổng cộng</td>
+                      <td className="p-4 text-center">{departmentalSummary.reduce((sum, d) => sum + d.itemsCount, 0)} món</td>
+                      <td className="p-4 text-right">{stats.totalRequested}</td>
+                      <td className="p-4 text-right">{stats.totalApproved}</td>
+                      <td className="p-4 text-right text-emerald-400">{stats.totalReceived}</td>
+                      <td className="p-4 text-right text-indigo-300">{departmentalSummary.reduce((sum, d) => sum + d.amount, 0).toLocaleString('vi-VN')}</td>
+                      <td className="p-4 text-right text-amber-400">{stats.totalMissing}</td>
+                      <td className="p-4 text-center">{stats.receiveRate}%</td>
+                      <td className="p-4 text-center" colSpan={2}>{getOverallStatusLabel()}</td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           </div>
@@ -2902,6 +2924,7 @@ export default function JanitorialReports() {
                 <th style={{width: '120px'}} className="text-right">Tổng SL đề xuất</th>
                 <th style={{width: '120px'}} className="text-right">Tổng SL được duyệt</th>
                 <th style={{width: '120px'}} className="text-right">Tổng SL thực giao</th>
+                <th style={{width: '130px'}} className="text-right">Thành tiền</th>
                 <th style={{width: '120px'}} className="text-right">Tổng còn thiếu</th>
                 <th style={{width: '120px'}} className="text-center">Tỷ lệ thực giao</th>
                 <th style={{width: '140px'}} className="text-center">Trạng thái tổng thể</th>
@@ -2917,6 +2940,7 @@ export default function JanitorialReports() {
                   <td className="text-right-print">{d.qtyRequested}</td>
                   <td className="text-right-print">{d.qtyApproved}</td>
                   <td className="text-right-print" style={{fontWeight: 'bold'}}>{d.qtyReceived}</td>
+                  <td className="text-right-print" style={{fontWeight: 'bold'}}>{d.amount.toLocaleString('vi-VN')}</td>
                   <td className="text-right-print">{d.remaining}</td>
                   <td className="text-center-print">{d.receiveRate}%</td>
                   <td className="text-center" style={{fontSize: '9.5pt'}}>{d.overallStatus}</td>
@@ -2930,6 +2954,7 @@ export default function JanitorialReports() {
                 <td className="text-right-print">{stats.totalRequested}</td>
                 <td className="text-right-print">{stats.totalApproved}</td>
                 <td className="text-right-print">{stats.totalReceived}</td>
+                <td className="text-right-print">{departmentalSummary.reduce((sum, d) => sum + d.amount, 0).toLocaleString('vi-VN')}</td>
                 <td className="text-right-print">{stats.totalMissing}</td>
                 <td className="text-center-print">{stats.receiveRate}%</td>
                 <td className="text-center" style={{fontSize: '10pt'}}>{getOverallStatusLabel()}</td>
