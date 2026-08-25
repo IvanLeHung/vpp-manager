@@ -94,6 +94,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   const [deptFilter, setDeptFilter] = useState<string>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
   const [createdDateFilter, setCreatedDateFilter] = useState('');
+  const [showDateCalendar, setShowDateCalendar] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -728,27 +729,29 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                         <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Mức độ ưu tiên</label>
                         <select value={priorityFilter} onChange={e => { setPriorityFilter(e.target.value); setCurrentPage(1); }} className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-700 outline-none min-w-[150px] hover:bg-slate-100 transition"><option value="ALL">Tất cả mức độ</option><option value="Bình thường">Bình thường</option><option value="Khẩn cấp">Khẩn cấp</option></select>
                     </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Ngày tạo phiếu</label>
+                        <div className="flex items-center gap-1.5">
+                          <button onClick={() => setShowDateCalendar(prev => !prev)} className={`min-w-[150px] px-2 py-1.5 rounded-lg border text-xs font-bold flex items-center justify-between gap-2 transition ${createdDateFilter ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'}`}>
+                            <span>{createdDateFilter ? new Date(`${createdDateFilter}T00:00:00`).toLocaleDateString('vi-VN') : 'Tất cả ngày'}</span>
+                            <CalendarDays className="w-3.5 h-3.5" />
+                          </button>
+                          {createdDateFilter && (
+                            <button onClick={() => { setCreatedDateFilter(''); setShowDateCalendar(false); setCurrentPage(1); }} className="w-7 h-7 rounded-lg text-rose-500 hover:bg-rose-50 flex items-center justify-center" title="Xóa ngày">
+                              <XCircle className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                    </div>
                     <div className="flex items-end pb-0.5 ml-auto">
-                        <button onClick={() => { setDeptFilter('ALL'); setPriorityFilter('ALL'); setCreatedDateFilter(''); setSearchTerm(''); setStatusFilters([]); setCurrentPage(1); }} className="text-[10px] font-black text-rose-500 uppercase hover:text-rose-600 flex items-center gap-1">
+                        <button onClick={() => { setDeptFilter('ALL'); setPriorityFilter('ALL'); setCreatedDateFilter(''); setShowDateCalendar(false); setSearchTerm(''); setStatusFilters([]); setCurrentPage(1); }} className="text-[10px] font-black text-rose-500 uppercase hover:text-rose-600 flex items-center gap-1">
                           <RotateCcw className="w-3.5 h-3.5"/> Đặt lại tất cả
                         </button>
                     </div>
                  </div>
 
+                 {showDateCalendar && (
                  <div className="border-t border-slate-100 pt-3">
-                   <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Lọc theo ngày tạo phiếu</label>
-                     <div className="flex items-center gap-2">
-                       <span className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-[10px] font-black uppercase flex items-center gap-1.5 shadow-sm">
-                         <CalendarDays className="w-3.5 h-3.5" /> Theo ngày
-                       </span>
-                       {createdDateFilter && (
-                         <button onClick={() => { setCreatedDateFilter(''); setCurrentPage(1); }} className="text-[10px] font-black text-rose-500 hover:text-rose-600 uppercase">
-                           Xóa ngày
-                         </button>
-                       )}
-                     </div>
-                   </div>
                    <div className="w-[280px] max-w-full rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
                      <div className="flex items-center justify-between mb-3">
                        <button onClick={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Tháng trước">
@@ -766,7 +769,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                        {calendarDays.map((date, index) => date ? (
                          <button
                            key={toLocalDateKey(date)}
-                           onClick={() => { setCreatedDateFilter(toLocalDateKey(date)); setCurrentPage(1); }}
+                           onClick={() => { setCreatedDateFilter(toLocalDateKey(date)); setShowDateCalendar(false); setCurrentPage(1); }}
                            className={`aspect-square rounded-lg border text-xs font-bold transition ${createdDateFilter === toLocalDateKey(date) ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : toLocalDateKey(date) === toLocalDateKey(new Date()) ? 'border-indigo-300 text-indigo-600 bg-indigo-50' : 'border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50'}`}
                          >
                            {date.getDate()}
@@ -775,6 +778,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                      </div>
                    </div>
                  </div>
+                 )}
              </div>
           )}
           {/* Batch actions redesigned */}
