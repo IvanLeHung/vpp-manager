@@ -1476,19 +1476,8 @@ export default function Analytics() {
     let totalQty = item.qtyApproved;
     let reason = 'Đã giao đủ số lượng được duyệt';
     if (status !== 'Đã giao hàng') {
-      const qtyInput = window.prompt(`Nhập số lượng thực tế cho "${item.name}" (0-${item.qtyApproved}):`, String(item.qtyReceived));
-      if (qtyInput === null) return;
-      totalQty = Number(qtyInput);
-      if (!Number.isFinite(totalQty) || totalQty < 0 || totalQty > item.qtyApproved) {
-        toast.error(`Số lượng phải từ 0 đến ${item.qtyApproved}`);
-        return;
-      }
-      const reasonInput = window.prompt(`Nhập lý do cho trạng thái "${status}":`, '');
-      if (!reasonInput?.trim()) {
-        toast.error('Cần nhập rõ lý do cho trạng thái này');
-        return;
-      }
-      reason = reasonInput.trim();
+      openConfirmSingleItemModal(item.name, status as VppItem['status']);
+      return;
     }
 
     try {
@@ -1517,14 +1506,14 @@ export default function Analytics() {
     }
   };
 
-  const openConfirmSingleItemModal = (itemName: string) => {
+  const openConfirmSingleItemModal = (itemName: string, statusOverride?: VppItem['status']) => {
     // Find aggregate values for default
     const details = aggregatedItems.find(i => i.name === itemName);
     if (!details) return;
     setSelectedItemName(itemName);
     setConfirmSingleForm({
       qtyReceived: details.qtyReceived,
-      status: details.status,
+      status: statusOverride || details.status,
       confirmedBy: currentUser?.fullName || '',
       confirmedAt: new Date().toISOString().split('T')[0],
       note: details.note || ''
@@ -1544,6 +1533,9 @@ export default function Analytics() {
       if (requestedTotal < 0 || requestedTotal > details.qtyApproved) {
         throw new Error(`Số lượng thực giao phải từ 0 đến ${details.qtyApproved}`);
       }
+      if (confirmSingleForm.status !== 'Đã giao hàng' && !confirmSingleForm.note.trim()) {
+        throw new Error('Cần nhập rõ lý do cho trạng thái này');
+      }
 
       let remaining = requestedTotal;
       for (const source of details.sources) {
@@ -1555,7 +1547,7 @@ export default function Analytics() {
           itemId: source.itemId,
           itemName: selectedItemName,
           qtyReceived: allocatedQty,
-          status: allocatedQty >= source.qtyApproved ? 'Đã nhận đủ' : allocatedQty > 0 ? 'Nhận thiếu' : 'Chưa nhận',
+          status: confirmSingleForm.status,
           note: confirmSingleForm.note,
           confirmedBy: confirmSingleForm.confirmedBy,
           confirmedAt: confirmSingleForm.confirmedAt
@@ -3688,6 +3680,11 @@ export default function Analytics() {
                   <option value="Chưa nhận">Chưa giao</option>
                   <option value="Nhận sai hàng">Giao sai hàng</option>
                   <option value="Chờ bổ sung">Chờ bổ sung</option>
+                  <option value="Chờ giao hàng">Chờ giao hàng</option>
+                  <option value="Không giao hàng">Không giao hàng</option>
+                  <option value="Hành chính xuất kho">Hành chính xuất kho</option>
+                  <option value="Hủy">Hủy</option>
+                  <option value="Đã giao hàng">Đã giao hàng</option>
                 </select>
               </div>
 
