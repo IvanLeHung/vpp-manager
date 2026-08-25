@@ -141,6 +141,8 @@ export default function Analytics() {
   const [activeView, setActiveView] = useState<'report' | 'tickets'>('report');
   const [itemNameFilter, setItemNameFilter] = useState('');
   const [itemNameSort, setItemNameSort] = useState<'asc' | 'desc'>('asc');
+  const [departmentNameFilter, setDepartmentNameFilter] = useState('');
+  const [departmentNameSort, setDepartmentNameSort] = useState<'asc' | 'desc'>('asc');
   
   // ── FILTER STATES ──
   const [deptFilter, setDeptFilter] = useState('ALL');
@@ -832,6 +834,25 @@ export default function Analytics() {
       };
     });
   }, [filteredTickets]);
+
+  const displayedDepartmentalSummary = useMemo(() => {
+    const query = normalizeSearchText(departmentNameFilter);
+    return departmentalSummary
+      .filter(row => !query || normalizeSearchText(row.department).includes(query))
+      .sort((a, b) => {
+        const comparison = a.department.localeCompare(b.department, 'vi', { sensitivity: 'base' });
+        return departmentNameSort === 'asc' ? comparison : -comparison;
+      });
+  }, [departmentalSummary, departmentNameFilter, departmentNameSort]);
+
+  const displayedDepartmentTotals = useMemo(() => ({
+    items: displayedDepartmentalSummary.reduce((sum, row) => sum + row.itemsCount, 0),
+    requested: displayedDepartmentalSummary.reduce((sum, row) => sum + row.qtyRequested, 0),
+    approved: displayedDepartmentalSummary.reduce((sum, row) => sum + row.qtyApproved, 0),
+    received: displayedDepartmentalSummary.reduce((sum, row) => sum + row.qtyReceived, 0),
+    amount: displayedDepartmentalSummary.reduce((sum, row) => sum + row.amount, 0),
+    missing: displayedDepartmentalSummary.reduce((sum, row) => sum + row.remaining, 0)
+  }), [displayedDepartmentalSummary]);
 
   // Chart Data Calculations
   const chartCompareData = useMemo(() => {
@@ -2472,14 +2493,22 @@ export default function Analytics() {
         <div className="space-y-8 no-print">
           {/* TAB 1: BẢNG TỔNG HỢP THEO PHÒNG BAN */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+            <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-wrap justify-between items-center gap-3">
               <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest italic">1. Bảng tổng hợp số lượng theo phòng ban</h4>
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input value={departmentNameFilter} onChange={event => setDepartmentNameFilter(event.target.value)} placeholder="Lọc theo tên phòng ban..." className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+              </div>
             </div>
             <div className="table-wrapper">
               <table className="min-w-[900px] w-full text-left">
                 <thead>
                   <tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                    <th className="p-4">Phòng ban</th>
+                    <th className="p-4">
+                      <button type="button" onClick={() => setDepartmentNameSort(current => current === 'asc' ? 'desc' : 'asc')} className="flex items-center gap-1.5 uppercase cursor-pointer hover:text-indigo-600">
+                        Phòng ban <span>{departmentNameSort === 'asc' ? 'A–Z ↑' : 'Z–A ↓'}</span>
+                      </button>
+                    </th>
                     <th className="p-4 text-center">Số loại VPP</th>
                     <th className="p-4 text-right">Tổng SL đề xuất</th>
                     <th className="p-4 text-right">Tổng SL được duyệt</th>
@@ -2492,10 +2521,10 @@ export default function Analytics() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs font-bold text-slate-700">
-                  {departmentalSummary.length === 0 && (
+                  {displayedDepartmentalSummary.length === 0 && (
                     <tr><td colSpan={10} className="p-10 text-center text-slate-400 italic">Không có dữ liệu</td></tr>
                   )}
-                  {departmentalSummary.map(d => (
+                  {displayedDepartmentalSummary.map(d => (
                     <Fragment key={d.department}>
                       <tr className="hover:bg-slate-50/50 transition-colors border-b border-slate-100">
                         <td className="p-4 text-slate-900">{d.department}</td>
@@ -2582,17 +2611,17 @@ export default function Analytics() {
                     </Fragment>
                   ))}
                 </tbody>
-                {departmentalSummary.length > 0 && (
+                {displayedDepartmentalSummary.length > 0 && (
                   <tfoot className="bg-slate-900 text-white text-xs font-black uppercase tracking-wider italic">
                     <tr>
                       <td className="p-4">Tổng cộng</td>
-                      <td className="p-4 text-center">{departmentalSummary.reduce((sum, d) => sum + d.itemsCount, 0)} món</td>
-                      <td className="p-4 text-right">{stats.totalRequested}</td>
-                      <td className="p-4 text-right">{stats.totalApproved}</td>
-                      <td className="p-4 text-right text-emerald-400">{stats.totalReceived}</td>
-                      <td className="p-4 text-right text-indigo-300">{departmentalSummary.reduce((sum, d) => sum + d.amount, 0).toLocaleString('vi-VN')}</td>
-                      <td className="p-4 text-right text-amber-400">{stats.totalMissing}</td>
-                      <td className="p-4 text-center">{stats.receiveRate}%</td>
+                      <td className="p-4 text-center">{displayedDepartmentTotals.items} món</td>
+                      <td className="p-4 text-right">{displayedDepartmentTotals.requested}</td>
+                      <td className="p-4 text-right">{displayedDepartmentTotals.approved}</td>
+                      <td className="p-4 text-right text-emerald-400">{displayedDepartmentTotals.received}</td>
+                      <td className="p-4 text-right text-indigo-300">{displayedDepartmentTotals.amount.toLocaleString('vi-VN')}</td>
+                      <td className="p-4 text-right text-amber-400">{displayedDepartmentTotals.missing}</td>
+                      <td className="p-4 text-center">{displayedDepartmentTotals.approved > 0 ? Math.round(displayedDepartmentTotals.received / displayedDepartmentTotals.approved * 100) : 0}%</td>
                       <td className="p-4 text-center" colSpan={2}>{getOverallStatusLabel()}</td>
                     </tr>
                   </tfoot>
