@@ -187,6 +187,13 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
     reason: string;
   }>(null);
   const [savingQuantityCorrection, setSavingQuantityCorrection] = useState(false);
+  const [showAddLineModal, setShowAddLineModal] = useState(false);
+  const [addLineSearch, setAddLineSearch] = useState('');
+  const [addLineResults, setAddLineResults] = useState<any[]>([]);
+  const [addLineItem, setAddLineItem] = useState<any>(null);
+  const [addLineQty, setAddLineQty] = useState(1);
+  const [addLineNote, setAddLineNote] = useState('');
+  const [savingAddLine, setSavingAddLine] = useState(false);
 
 
   const fetchDetail = async () => {
@@ -261,6 +268,35 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
     } finally {
       setLoading(true); // Keep loading false only after all async work
       setLoading(false);
+    }
+  };
+
+  const searchAddLineItems = async (query: string) => {
+    setAddLineSearch(query);
+    if (!query.trim()) return setAddLineResults([]);
+    try {
+      const response = await api.get('/items', { params: { q: query } });
+      const existingIds = new Set((data.lines || []).map((line: any) => line.itemId));
+      setAddLineResults((response.data || []).filter((item: any) => item.isActive !== false && !existingIds.has(item.id)).slice(0, 10));
+    } catch {
+      showToast('Không thể tìm kiếm vật tư', 'error');
+    }
+  };
+
+  const saveAddLine = async () => {
+    if (!addLineItem || addLineQty < 1) return showToast('Vui lòng chọn vật tư và nhập số lượng hợp lệ', 'warning');
+    try {
+      setSavingAddLine(true);
+      await api.post(`/requests/${requestId}/lines`, { itemId: addLineItem.id, qtyRequested: addLineQty, note: addLineNote });
+      setShowAddLineModal(false);
+      setAddLineItem(null); setAddLineSearch(''); setAddLineResults([]); setAddLineQty(1); setAddLineNote('');
+      await fetchDetail();
+      await refreshData();
+      showToast('Đã bổ sung vật tư vào phiếu', 'success');
+    } catch (err: any) {
+      showToast(err.response?.data?.error || 'Không thể bổ sung vật tư', 'error');
+    } finally {
+      setSavingAddLine(false);
     }
   };
 
@@ -1108,6 +1144,11 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                     }}
                                     className="RequestsDetailTable"
                                 />
+                                {currentUser.role === 'ADMIN' && (
+                                  <button type="button" onClick={() => setShowAddLineModal(true)} className="mt-3 w-full rounded-xl border-2 border-dashed border-indigo-200 bg-indigo-50/50 py-3 text-xs font-black uppercase tracking-wider text-indigo-600 transition hover:border-indigo-400 hover:bg-indigo-50 flex items-center justify-center gap-2">
+                                    <Plus className="h-4 w-4" /> Thêm dòng để bổ sung vật tư
+                                  </button>
+                                )}
                             </div>
                         </>
                     )}
@@ -2838,6 +2879,34 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                  {savingQuantityCorrection ? 'Đang lưu...' : 'Lưu hiệu chỉnh'}
                </button>
              </div>
+           </div>
+         </div>
+       )}
+
+       {showAddLineModal && (
+         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+           <div className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl">
+             <div className="mb-5 flex items-start justify-between">
+               <div><h3 className="text-lg font-black text-slate-900">Bổ sung vật tư</h3><p className="mt-1 text-xs font-bold text-slate-500">Thêm một dòng mới vào phiếu {data.id}</p></div>
+               <button type="button" onClick={() => setShowAddLineModal(false)}><XCircle className="h-6 w-6 text-slate-400" /></button>
+             </div>
+             {!addLineItem ? (
+               <div>
+                 <label className="text-xs font-black text-slate-600">Tìm theo tên hoặc mã vật tư</label>
+                 <div className="relative mt-2"><Search className="absolute left-3 top-3 h-4 w-4 text-slate-400"/><input autoFocus value={addLineSearch} onChange={e => searchAddLineItems(e.target.value)} className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3 text-sm font-bold outline-none focus:border-indigo-500" placeholder="Nhập tên hoặc mã vật tư..." /></div>
+                 <div className="mt-3 max-h-64 overflow-auto divide-y divide-slate-100 rounded-xl border border-slate-100">
+                   {addLineResults.map(item => <button key={item.id} type="button" onClick={() => setAddLineItem(item)} className="w-full p-3 text-left hover:bg-indigo-50"><p className="text-sm font-black text-slate-800">{item.name}</p><p className="text-[10px] font-bold text-slate-400">{item.mvpp} • {item.unit} • {Number(item.price || 0).toLocaleString('vi-VN')} đ</p></button>)}
+                   {addLineSearch && addLineResults.length === 0 && <p className="p-4 text-center text-xs font-bold text-slate-400">Không tìm thấy vật tư phù hợp</p>}
+                 </div>
+               </div>
+             ) : (
+               <div className="space-y-4">
+                 <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3 flex justify-between"><div><p className="text-sm font-black text-indigo-800">{addLineItem.name}</p><p className="text-[10px] font-bold text-indigo-500">{addLineItem.mvpp} • {addLineItem.unit}</p></div><button onClick={() => setAddLineItem(null)} className="text-xs font-black text-indigo-600">Đổi</button></div>
+                 <label className="block text-xs font-black text-slate-600">Số lượng<input type="number" min={1} value={addLineQty} onChange={e => setAddLineQty(Math.max(1, Number(e.target.value)))} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-base font-black outline-none focus:border-indigo-500" /></label>
+                 <label className="block text-xs font-black text-slate-600">Ghi chú<textarea value={addLineNote} onChange={e => setAddLineNote(e.target.value)} className="mt-2 min-h-20 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500" placeholder="Lý do bổ sung hoặc yêu cầu chi tiết" /></label>
+               </div>
+             )}
+             <div className="mt-6 flex justify-end gap-3"><button onClick={() => setShowAddLineModal(false)} className="rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-black text-slate-600">Hủy</button><button disabled={!addLineItem || savingAddLine} onClick={saveAddLine} className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-black text-white disabled:opacity-50">{savingAddLine ? 'Đang lưu...' : 'Thêm vật tư'}</button></div>
            </div>
          </div>
        )}
