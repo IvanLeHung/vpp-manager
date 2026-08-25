@@ -557,6 +557,15 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
 
   const hasRemaining = data?.lines?.some((l: any) => (l.qtyApproved ?? l.qtyRequested) > (l.qtyDelivered || 0));
   const canUrge = (['PARTIALLY_ISSUED', 'APPROVED', 'READY_TO_ISSUE', 'BACKORDER'].includes(data.status)) && currentUid === data.requesterId && hasRemaining;
+  const lineTotals = (data.lines || []).reduce((totals: any, line: any) => {
+    const item = line.issue_item || line.item;
+    totals.requested += Number(line.qtyRequested || 0);
+    totals.managerApproved += Number(line.qtyManagerApproved || 0);
+    totals.adminApproved += Number(line.replacementQty ?? line.qtyAdminApproved ?? line.qtyApproved ?? 0);
+    totals.delivered += Number(line.qtyDelivered || 0);
+    totals.amount += Number(item?.price || 0) * Number(line.qtyApproved ?? line.qtyRequested ?? 0);
+    return totals;
+  }, { requested: 0, managerApproved: 0, adminApproved: 0, delivered: 0, amount: 0 });
 
   const columns = [
     {
@@ -1075,6 +1084,19 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                     pagination={false}
                                     sticky={false}
                                     scroll={{ x: 'max-content' }}
+                                    summary={() => (
+                                      <Table.Summary.Row className="bg-slate-100 font-black">
+                                        <Table.Summary.Cell index={0} colSpan={3} className="text-right uppercase tracking-wider text-slate-700">Tổng</Table.Summary.Cell>
+                                        <Table.Summary.Cell index={3} className="text-center text-slate-800">{lineTotals.requested.toLocaleString('vi-VN')}</Table.Summary.Cell>
+                                        <Table.Summary.Cell index={4} className="text-center text-amber-600">{lineTotals.managerApproved.toLocaleString('vi-VN')}</Table.Summary.Cell>
+                                        <Table.Summary.Cell index={5} className="text-center text-emerald-600">{lineTotals.adminApproved.toLocaleString('vi-VN')}</Table.Summary.Cell>
+                                        <Table.Summary.Cell index={6} className="text-center text-blue-600">{lineTotals.delivered.toLocaleString('vi-VN')}</Table.Summary.Cell>
+                                        <Table.Summary.Cell index={7} />
+                                        <Table.Summary.Cell index={8} className="text-right text-emerald-700 whitespace-nowrap">{lineTotals.amount.toLocaleString('vi-VN')} đ</Table.Summary.Cell>
+                                        <Table.Summary.Cell index={9} />
+                                        <Table.Summary.Cell index={10} />
+                                      </Table.Summary.Row>
+                                    )}
                                     rowClassName={(record: any) => {
                                          const displayItem = record.issue_item || record.item;
                                          const stocks = displayItem?.stocks || [];
