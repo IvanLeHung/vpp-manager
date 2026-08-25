@@ -947,14 +947,13 @@ export default function JanitorialReports() {
     XLSX.utils.book_append_sheet(wb, wsCover, "Thong_Tin_Bao_Cao");
 
     // Item Detailed List
-    const detailedData = aggregatedItems.map(item => ({
-      'STT': item.stt,
+    const detailedData = [...aggregatedItems].sort((a, b) => a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' })).map((item, index) => ({
+      'STT': index + 1,
       'Tên món hàng': item.name,
       'ĐVT': item.unit,
       'SL Đề xuất ban đầu': item.qtyRequested,
       'SL Được duyệt': item.qtyApproved,
       'SL Thực nhận': item.qtyReceived,
-      'Đơn giá': item.price,
       'SL chờ bổ sung': item.remaining,
       'Tình trạng': item.status,
       'Ghi chú': item.note
@@ -969,7 +968,6 @@ export default function JanitorialReports() {
       'SL Đề xuất ban đầu': stats.totalRequested,
       'SL Được duyệt': stats.totalApproved,
       'SL Thực nhận': stats.totalReceived,
-      'Đơn giá': '',
       'SL chờ bổ sung': stats.totalMissing,
       'Tình trạng': stats.receiveRate + '% thực nhận',
       'Ghi chú': ''
@@ -1084,7 +1082,7 @@ export default function JanitorialReports() {
         </table>
       `;
     } else {
-      const itemsList = selectedTicket ? selectedTicket.items : aggregatedItems;
+      const itemsList = [...(selectedTicket ? selectedTicket.items : aggregatedItems)].sort((a, b) => a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' }));
       tableHtml = `
         <table style="width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px;">
           <thead>
@@ -1110,7 +1108,7 @@ export default function JanitorialReports() {
                 <td style="border: 1px solid #000; padding: 6px; text-align: right;">${item.qtyApproved}</td>
                 <td style="border: 1px solid #000; padding: 6px; text-align: right; font-weight: bold;">${item.qtyReceived}</td>
                 <td style="border: 1px solid #000; padding: 6px; text-align: right;">${Math.max(0, item.qtyApproved - item.qtyReceived)}</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${getStatusLabel(item.status)}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align: center;">${getStatusLabel(item.status) === 'Đã giao đủ' ? 'Đã giao đủ' : ''}</td>
                 <td style="border: 1px solid #000; padding: 6px; font-style: italic;">${item.note || '-'}</td>
               </tr>
             `).join('')}
@@ -1130,7 +1128,7 @@ export default function JanitorialReports() {
                 ${selectedTicket ? selectedTicket.items.reduce((s, i) => s + Math.max(0, i.qtyApproved - i.qtyReceived), 0) : stats.totalMissing}
               </td>
               <td style="border: 1px solid #000; padding: 6px; text-align: center;">
-                ${selectedTicket ? getStatusLabel(selectedTicket.deliveryStatus) : getOverallStatusLabel()}
+                ${(selectedTicket ? getStatusLabel(selectedTicket.deliveryStatus) : getOverallStatusLabel()) === 'Đã giao đủ' ? 'Đã giao đủ' : ''}
               </td>
               <td style="border: 1px solid #000; padding: 6px;">
                 Tỷ lệ thực nhận: ${selectedTicket ? Math.round((selectedTicket.items.reduce((s, i) => s + i.qtyReceived, 0) / (selectedTicket.items.reduce((s, i) => s + i.qtyApproved, 0) || 1)) * 100) : stats.receiveRate}%
@@ -2690,7 +2688,6 @@ export default function JanitorialReports() {
                     <th className="p-4 text-right">SL đề xuất</th>
                     <th className="p-4 text-right">SL được duyệt</th>
                     <th className="p-4 text-right">SL thực giao</th>
-                    <th className="p-4 text-right">Đơn giá</th>
                     <th className="p-4 text-right">SL chờ bổ sung</th>
                     <th className="p-4 text-center">Trạng thái bàn giao</th>
                     <th className="p-4 text-center">Xác nhận bàn giao</th>
@@ -2699,7 +2696,7 @@ export default function JanitorialReports() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
                   {displayedAggregatedItems.length === 0 && (
-                    <tr><td colSpan={11} className="p-10 text-center text-slate-400 italic">Không có dữ liệu</td></tr>
+                    <tr><td colSpan={10} className="p-10 text-center text-slate-400 italic">Không có dữ liệu</td></tr>
                   )}
                   {displayedAggregatedItems.map(item => (
                     <tr key={item.name} className="hover:bg-slate-50/50 transition-colors">
@@ -2709,7 +2706,6 @@ export default function JanitorialReports() {
                       <td className="p-4 text-right font-bold tabular-nums">{item.qtyRequested}</td>
                       <td className="p-4 text-right font-bold tabular-nums">{item.qtyApproved}</td>
                       <td className="p-4 text-right font-bold text-emerald-600 tabular-nums">{item.qtyReceived}</td>
-                      <td className="p-4 text-right tabular-nums">{item.price.toLocaleString('vi-VN')}</td>
                       <td className="p-4 text-right font-bold text-amber-600 tabular-nums">{item.remaining}</td>
                       <td className="p-4 text-center">
                         <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${getStatusBadgeClass(item.status)}`}>{getHandoverStatusIcon(item.status)} {item.status}</span>
@@ -2736,7 +2732,6 @@ export default function JanitorialReports() {
                       <td className="p-4 text-right tabular-nums">{displayedItemTotals.requested}</td>
                       <td className="p-4 text-right tabular-nums">{displayedItemTotals.approved}</td>
                       <td className="p-4 text-right text-emerald-400 tabular-nums">{displayedItemTotals.received}</td>
-                      <td className="p-4"></td>
                       <td className="p-4 text-right text-amber-400 tabular-nums">{displayedItemTotals.missing}</td>
                       <td className="p-4 text-center text-indigo-300" colSpan={2}>{stats.receiveRate}% thực giao</td>
                       <td className="p-4"></td>
@@ -3085,14 +3080,13 @@ export default function JanitorialReports() {
                 <th style={{width: '95px'}}>SL đề xuất ban đầu</th>
                 <th style={{width: '95px'}}>SL được duyệt</th>
                 <th style={{width: '95px'}}>SL thực giao</th>
-                <th style={{width: '105px'}}>Đơn giá</th>
                 <th style={{width: '95px'}}>SL chờ bổ sung</th>
                 <th style={{width: '130px'}}>Xác nhận bàn giao</th>
                 <th>Ghi chú</th>
               </tr>
             </thead>
             <tbody>
-              {(selectedTicket ? selectedTicket.items : aggregatedItems).map((item, idx) => (
+              {[...(selectedTicket ? selectedTicket.items : aggregatedItems)].sort((a, b) => a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' })).map((item, idx) => (
                 <tr key={idx}>
                   <td className="text-center">{idx + 1}</td>
                   <td style={{fontWeight: 'bold'}}>{item.name}</td>
@@ -3100,9 +3094,8 @@ export default function JanitorialReports() {
                   <td className="text-right-print">{item.qtyRequested}</td>
                   <td className="text-right-print">{item.qtyApproved}</td>
                   <td className="text-right-print" style={{fontWeight: 'bold'}}>{item.qtyReceived}</td>
-                  <td className="text-right-print">{Number(item.price || 0).toLocaleString('vi-VN')}</td>
                   <td className="text-right-print">{Math.max(0, item.qtyApproved - item.qtyReceived)}</td>
-                  <td className="text-center" style={{fontSize: '9.5pt'}}>{getStatusLabel(item.status)}</td>
+                  <td className="text-center" style={{fontSize: '9.5pt'}}>{getStatusLabel(item.status) === 'Đã giao đủ' ? 'Đã giao đủ' : ''}</td>
                   <td style={{fontSize: '9.5pt', fontStyle: 'italic'}}>{item.note || '-'}</td>
                 </tr>
               ))}
@@ -3119,12 +3112,11 @@ export default function JanitorialReports() {
                 <td className="text-right-print">
                   {selectedTicket ? selectedTicket.items.reduce((s, i) => s + i.qtyReceived, 0) : stats.totalReceived}
                 </td>
-                <td></td>
                 <td className="text-right-print">
                   {selectedTicket ? selectedTicket.items.reduce((s, i) => s + Math.max(0, i.qtyApproved - i.qtyReceived), 0) : stats.totalMissing}
                 </td>
                 <td className="text-center" style={{fontSize: '10pt'}}>
-                  {selectedTicket ? getStatusLabel(selectedTicket.deliveryStatus) : getOverallStatusLabel()}
+                  {(selectedTicket ? getStatusLabel(selectedTicket.deliveryStatus) : getOverallStatusLabel()) === 'Đã giao đủ' ? 'Đã giao đủ' : ''}
                 </td>
                 <td>Tỷ lệ thực giao: {selectedTicket ? Math.round((selectedTicket.items.reduce((s, i) => s + i.qtyReceived, 0) / (selectedTicket.items.reduce((s, i) => s + i.qtyApproved, 0) || 1)) * 100) : stats.receiveRate}%</td>
               </tr>
