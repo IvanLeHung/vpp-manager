@@ -27,7 +27,7 @@ interface VppItem {
   qtyRequested: number;
   qtyApproved: number;
   qtyReceived: number;
-  status: 'Đã nhận đủ' | 'Nhận thiếu' | 'Chưa nhận' | 'Nhận sai hàng' | 'Chờ bổ sung' | 'Chờ giao hàng';
+  status: 'Đã nhận đủ' | 'Nhận thiếu' | 'Chưa nhận' | 'Nhận sai hàng' | 'Chờ bổ sung' | 'Chờ giao hàng' | 'Không giao hàng' | 'Hành chính xuất kho' | 'Hủy' | 'Đã giao hàng';
   note: string;
   confirmedBy?: string;
   confirmedAt?: string;
@@ -887,6 +887,7 @@ export default function Analytics() {
     switch (status) {
       case 'Đã nhận đủ':
       case 'Đã giao đủ':
+      case 'Đã giao hàng':
       case 'RECEIVED_FULL':
         return 'bg-emerald-50 text-emerald-700 border-emerald-150';
       case 'Nhận thiếu':
@@ -894,12 +895,15 @@ export default function Analytics() {
       case 'RECEIVED_SHORT':
         return 'bg-amber-50 text-amber-700 border-amber-150';
       case 'Nhận sai hàng':
+      case 'Không giao hàng':
+      case 'Hủy':
       case 'Giao sai hàng':
       case 'WRONG_ITEMS':
       case 'Có hàng nhận sai':
       case 'Có hàng giao sai':
         return 'bg-rose-50 text-rose-700 border-rose-150';
       case 'Chờ giao hàng':
+      case 'Hành chính xuất kho':
       case 'PENDING':
         return 'bg-blue-50 text-blue-700 border-blue-150';
       case 'Chưa nhận':
@@ -907,6 +911,13 @@ export default function Analytics() {
       default:
         return 'bg-slate-100 text-slate-500 border-slate-200';
     }
+  };
+
+  const getHandoverStatusIcon = (status: string) => {
+    if (status === 'Đã giao hàng' || status === 'Đã nhận đủ') return '✓';
+    if (status === 'Không giao hàng' || status === 'Hủy') return '×';
+    if (status === 'Hành chính xuất kho') return '!';
+    return '…';
   };
 
   const getStatusLabel = (status: string) => {
@@ -1459,6 +1470,51 @@ export default function Analytics() {
   };
 
   // OPEN CONFIRM SINGLE ITEM MODAL
+  const handleInlineHandoverStatus = async (item: any, status: string) => {
+    let totalQty = item.qtyApproved;
+    let reason = 'Đã giao đủ số lượng được duyệt';
+    if (status !== 'Đã giao hàng') {
+      const qtyInput = window.prompt(`Nhập số lượng thực tế cho "${item.name}" (0-${item.qtyApproved}):`, String(item.qtyReceived));
+      if (qtyInput === null) return;
+      totalQty = Number(qtyInput);
+      if (!Number.isFinite(totalQty) || totalQty < 0 || totalQty > item.qtyApproved) {
+        toast.error(`Số lượng phải từ 0 đến ${item.qtyApproved}`);
+        return;
+      }
+      const reasonInput = window.prompt(`Nhập lý do cho trạng thái "${status}":`, '');
+      if (!reasonInput?.trim()) {
+        toast.error('Cần nhập rõ lý do cho trạng thái này');
+        return;
+      }
+      reason = reasonInput.trim();
+    }
+
+    try {
+      setLoading(true);
+      let remaining = totalQty;
+      for (const source of item.sources) {
+        const allocatedQty = Math.min(remaining, source.qtyApproved);
+        remaining -= allocatedQty;
+        await api.post('/reports/vpp-confirm', {
+          requestId: source.requestId,
+          requestLineId: source.requestLineId,
+          itemId: source.itemId,
+          itemName: item.name,
+          qtyReceived: allocatedQty,
+          status,
+          note: reason,
+          confirmedBy: currentUser?.fullName || ''
+        });
+      }
+      toast.success(`Đã cập nhật "${item.name}": ${status}`);
+      await fetchTickets();
+    } catch (err: any) {
+      toast.error('Không thể cập nhật trạng thái: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const openConfirmSingleItemModal = (itemName: string) => {
     // Find aggregate values for default
     const details = aggregatedItems.find(i => i.name === itemName);
@@ -2682,10 +2738,17 @@ export default function Analytics() {
                       <td className="p-4 text-right font-black text-indigo-600 tabular-nums">{item.amount.toLocaleString('vi-VN')}</td>
                       <td className="p-4 text-right font-bold text-amber-600 tabular-nums">{item.remaining}</td>
                       <td className="p-4 text-center">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${getStatusBadgeClass(item.status)}`}>{item.status}</span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${getStatusBadgeClass(item.status)}`}>{getHandoverStatusIcon(item.status)} {item.status}</span>
                       </td>
                       <td className="p-4 text-center">
-                        <button onClick={() => openConfirmSingleItemModal(item.name)} className="px-3 py-1 bg-indigo-50 border border-indigo-200 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all cursor-pointer">Xác nhận</button>
+                        <select defaultValue="" onChange={event => { const value = event.target.value; event.target.value = ''; if (value) handleInlineHandoverStatus(item, value); }} className="px-2 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg text-[10px] font-black uppercase outline-none cursor-pointer">
+                          <option value="" disabled>Chọn trạng thái</option>
+                          <option value="Chờ giao hàng">Chờ giao hàng</option>
+                          <option value="Không giao hàng">Không giao hàng</option>
+                          <option value="Hành chính xuất kho">Hành chính xuất kho</option>
+                          <option value="Hủy">Hủy</option>
+                          <option value="Đã giao hàng">Đã giao hàng</option>
+                        </select>
                       </td>
                       <td className="p-4 text-slate-400 italic text-[11px] max-w-xs truncate" title={item.note}>{item.note || '-'}</td>
                     </tr>
