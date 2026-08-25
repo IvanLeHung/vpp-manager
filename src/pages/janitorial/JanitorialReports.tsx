@@ -139,6 +139,8 @@ export default function JanitorialReports() {
   }, [tickets]);
   const [loading, setLoading] = useState(true);
   const [activeView, setActiveView] = useState<'report' | 'tickets'>('report');
+  const [itemNameFilter, setItemNameFilter] = useState('');
+  const [itemNameSort, setItemNameSort] = useState<'asc' | 'desc'>('asc');
   
   // ── FILTER STATES ──
   const [deptFilter, setDeptFilter] = useState('ALL');
@@ -658,6 +660,32 @@ export default function JanitorialReports() {
       };
     });
   }, [filteredTickets]);
+
+  const normalizeSearchText = (value: string) => value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim();
+
+  const displayedAggregatedItems = useMemo(() => {
+    const query = normalizeSearchText(itemNameFilter);
+    return aggregatedItems
+      .filter(item => !query || normalizeSearchText(item.name).includes(query))
+      .sort((a, b) => {
+        const comparison = a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' });
+        return itemNameSort === 'asc' ? comparison : -comparison;
+      });
+  }, [aggregatedItems, itemNameFilter, itemNameSort]);
+
+  const displayedItemTotals = useMemo(() => ({
+    requested: displayedAggregatedItems.reduce((sum, item) => sum + item.qtyRequested, 0),
+    approved: displayedAggregatedItems.reduce((sum, item) => sum + item.qtyApproved, 0),
+    received: displayedAggregatedItems.reduce((sum, item) => sum + item.qtyReceived, 0),
+    amount: displayedAggregatedItems.reduce((sum, item) => sum + item.amount, 0),
+    missing: displayedAggregatedItems.reduce((sum, item) => sum + item.remaining, 0)
+  }), [displayedAggregatedItems]);
 
   // Expanded Departments state for sub-table view
   const [expandedDepts, setExpandedDepts] = useState<Record<string, boolean>>({});
@@ -2565,15 +2593,28 @@ export default function JanitorialReports() {
 
           {/* TAB 2: BẢNG CHI TIẾT THEO MÓN HÀNG VPP */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+            <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-wrap justify-between items-center gap-3">
               <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest italic">2. Chi tiết tổng hợp theo từng món hàng</h4>
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  value={itemNameFilter}
+                  onChange={event => setItemNameFilter(event.target.value)}
+                  placeholder="Lọc theo tên món hàng..."
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                />
+              </div>
             </div>
             <div className="table-wrapper">
               <table className="min-w-[900px] w-full text-left">
                 <thead>
                   <tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
                     <th className="p-4 text-center w-12">STT</th>
-                    <th className="p-4">Tên món hàng</th>
+                    <th className="p-4">
+                      <button type="button" onClick={() => setItemNameSort(current => current === 'asc' ? 'desc' : 'asc')} className="flex items-center gap-1.5 uppercase cursor-pointer hover:text-indigo-600">
+                        Tên món hàng <span>{itemNameSort === 'asc' ? 'A–Z ↑' : 'Z–A ↓'}</span>
+                      </button>
+                    </th>
                     <th className="p-4 text-center">ĐVT</th>
                     <th className="p-4 text-right">SL đề xuất</th>
                     <th className="p-4 text-right">SL được duyệt</th>
@@ -2587,10 +2628,10 @@ export default function JanitorialReports() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
-                  {aggregatedItems.length === 0 && (
+                  {displayedAggregatedItems.length === 0 && (
                     <tr><td colSpan={12} className="p-10 text-center text-slate-400 italic">Không có dữ liệu</td></tr>
                   )}
-                  {aggregatedItems.map(item => (
+                  {displayedAggregatedItems.map(item => (
                     <tr key={item.name} className="hover:bg-slate-50/50 transition-colors">
                       <td className="p-4 text-center font-bold text-slate-400">{item.stt}</td>
                       <td className="p-4 font-bold text-slate-900">{item.name}</td>
@@ -2611,17 +2652,17 @@ export default function JanitorialReports() {
                     </tr>
                   ))}
                 </tbody>
-                {aggregatedItems.length > 0 && (
+                {displayedAggregatedItems.length > 0 && (
                   <tfoot className="bg-slate-900 text-white font-black text-xs uppercase tracking-wider italic">
                     <tr>
                       <td className="p-4 text-center"></td>
                       <td className="p-4" colSpan={2}>TỔNG CỘNG</td>
-                      <td className="p-4 text-right tabular-nums">{stats.totalRequested}</td>
-                      <td className="p-4 text-right tabular-nums">{stats.totalApproved}</td>
-                      <td className="p-4 text-right text-emerald-400 tabular-nums">{stats.totalReceived}</td>
+                      <td className="p-4 text-right tabular-nums">{displayedItemTotals.requested}</td>
+                      <td className="p-4 text-right tabular-nums">{displayedItemTotals.approved}</td>
+                      <td className="p-4 text-right text-emerald-400 tabular-nums">{displayedItemTotals.received}</td>
                       <td className="p-4"></td>
-                      <td className="p-4 text-right text-indigo-300 tabular-nums">{aggregatedItems.reduce((sum, item) => sum + item.amount, 0).toLocaleString('vi-VN')}</td>
-                      <td className="p-4 text-right text-amber-400 tabular-nums">{stats.totalMissing}</td>
+                      <td className="p-4 text-right text-indigo-300 tabular-nums">{displayedItemTotals.amount.toLocaleString('vi-VN')}</td>
+                      <td className="p-4 text-right text-amber-400 tabular-nums">{displayedItemTotals.missing}</td>
                       <td className="p-4 text-center text-indigo-300" colSpan={2}>{stats.receiveRate}% thực giao</td>
                       <td className="p-4"></td>
                     </tr>
