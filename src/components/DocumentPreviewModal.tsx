@@ -14,6 +14,7 @@ import {
   Truck
 } from 'lucide-react';
 import api from '../lib/api';
+import { getRequestStatusLabel } from '../lib/statusLabels';
 import { useNavigate } from 'react-router-dom';
 
 interface DocumentPreviewModalProps {
@@ -77,17 +78,17 @@ export default function DocumentPreviewModal({
 
   const renderStatusBadge = (status: string) => {
     let classes = 'bg-slate-50 text-slate-600 border-slate-100';
-    let text = status;
+    let text = docType === 'PR' ? getRequestStatusLabel(status) : status;
 
     if (docType === 'PR') {
       const statusMap: Record<string, { cls: string, label: string }> = {
         DRAFT: { cls: 'bg-slate-100 text-slate-500 border-slate-200', label: 'Nháp' },
         PENDING_MANAGER: { cls: 'bg-amber-50 text-amber-600 border-amber-100', label: 'Chờ TBP duyệt' },
-        PENDING_ADMIN: { cls: 'bg-blue-50 text-blue-600 border-blue-100', label: 'Chờ Admin duyệt' },
+        PENDING_ADMIN: { cls: 'bg-blue-50 text-blue-600 border-blue-100', label: 'Chờ Hành chính duyệt' },
         APPROVED: { cls: 'bg-emerald-50 text-emerald-600 border-emerald-100', label: 'Đã duyệt' },
         READY_TO_ISSUE: { cls: 'bg-indigo-50 text-indigo-600 border-indigo-100', label: 'Chờ cấp phát' },
         COMPLETED: { cls: 'bg-emerald-500 text-white border-emerald-600', label: 'Hoàn tất' },
-        BACKORDER: { cls: 'bg-amber-500 text-white border-amber-600', label: 'Báo thiếu' },
+        BACKORDER: { cls: 'bg-amber-500 text-white border-amber-600', label: 'Chờ mua bổ sung' },
         REJECTED: { cls: 'bg-rose-50 text-rose-600 border-rose-100', label: 'Từ chối' },
         CANCELLED: { cls: 'bg-slate-100 text-slate-400 border-slate-200', label: 'Đã hủy' }
       };

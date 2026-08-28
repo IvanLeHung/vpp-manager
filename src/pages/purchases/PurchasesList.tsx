@@ -277,10 +277,10 @@ async function readBlobError(error: any): Promise<string> {
       const parsed = JSON.parse(text);
       return parsed?.error || parsed?.message || text;
     } catch {
-      return text || 'Khong the xuat bao cao.';
+      return text || 'Không thể xuất báo cáo.';
     }
   }
-  return error?.response?.data?.error || error?.message || 'Khong the xuat bao cao.';
+  return error?.response?.data?.error || error?.message || 'Không thể xuất báo cáo.';
 }
 
 function getEffectiveLineItem(line: any): any {
@@ -2879,7 +2879,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                         if (contentType.includes('application/json')) {
                           const text = await (res.data as Blob).text();
                           const parsed = JSON.parse(text);
-                          throw new Error(parsed?.error || 'Khong the tao file bao cao.');
+                          throw new Error(parsed?.error || 'Không thể tạo file báo cáo.');
                         }
 
                         const fallbackName = getReportDownloadName(setupReportType, setupCategoryType, setupFormat);
@@ -2896,7 +2896,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                         link.click();
                         link.remove();
                         URL.revokeObjectURL(url);
-                        toast.success('Da tai file bao cao.');
+                        toast.success('Đã tải file báo cáo.');
                         setShowReportSetupModal(false);
                         return;
                       } catch (err: any) {

@@ -12,13 +12,15 @@ import {
 import api from '../../lib/api';
 import { useAppContext } from '../../context/AppContext';
 import type { VPPRequest, VPPItem } from '../../context/AppContext';
-import type { ViewMode } from '../Requests';
+import type { RequestSupplyType, ViewMode } from '../Requests';
+import MonthlyApprovalHistoryTooltip from '../../components/MonthlyApprovalHistoryTooltip';
 
 interface Props {
   setViewMode: (mode: ViewMode) => void;
   refreshData: () => Promise<void>;
   showToast: (m: string, t?: 'success' | 'error' | 'warning') => void;
   activeRequest: VPPRequest | null;
+  initialSupplyType: RequestSupplyType;
 }
 
 type TargetItem = {
@@ -37,6 +39,7 @@ function buildFallbackItem(line: any): VPPItem {
     stock: Number(line.item?.stock ?? line.availableQtyAtRequest ?? 0),
     price: Number(line.item?.price ?? line.unitPrice ?? 0),
     quota: Number(line.item?.quota ?? line.quotaRemainingAtRequest ?? 0),
+    itemType: line.item?.itemType,
   } as VPPItem;
 }
 
@@ -55,6 +58,7 @@ function normalizeHydratedItem(raw: any, line: any): VPPItem {
     ),
     price: Number(raw?.price ?? line.unitPrice ?? 0),
     quota: Number(raw?.quota ?? line.quotaRemainingAtRequest ?? 0),
+    itemType: raw?.itemType ?? line.item?.itemType,
   } as VPPItem;
 }
 
@@ -63,9 +67,11 @@ export default function RequestsCreate({
   refreshData,
   showToast,
   activeRequest,
+  initialSupplyType,
 }: Props) {
-  const { items } = useAppContext();
+  const { items, currentUser } = useAppContext();
 
+  const [supplyType, setSupplyType] = useState<RequestSupplyType>(initialSupplyType);
   const [reqType, setReqType] = useState('Định kỳ');
   const [priority, setPriority] = useState('Thường');
   const [purpose, setPurpose] = useState('');
@@ -84,6 +90,7 @@ export default function RequestsCreate({
 
     const hydrateDraft = async () => {
       if (!activeRequest || !isEditingDraft) {
+        setSupplyType(initialSupplyType);
         setReqType('Định kỳ');
         setPriority('Thường');
         setPurpose('');
@@ -102,6 +109,11 @@ export default function RequestsCreate({
       }
 
       setReqType(sourceRequest.requestType || 'Định kỳ');
+      const sourceSupplyType: RequestSupplyType = sourceRequest.warehouseCode === 'VE_SINH'
+        || sourceRequest.lines?.some((line: any) => line.item?.itemType === 'VE_SINH')
+        ? 'VE_SINH'
+        : 'VPP';
+      setSupplyType(sourceSupplyType);
       setPriority(sourceRequest.priority || 'Thường');
       setPurpose(sourceRequest.purpose || '');
       setNeededByDate(
@@ -161,7 +173,7 @@ export default function RequestsCreate({
     return () => {
       cancelled = true;
     };
-  }, [activeRequest, isEditingDraft, items]);
+  }, [activeRequest, initialSupplyType, isEditingDraft, items]);
 
   const searchResults = useMemo(() => {
     const keyword = searchTerm.trim().toLowerCase();
@@ -170,6 +182,8 @@ export default function RequestsCreate({
       .filter((i: VPPItem) => {
         // Only show active items
         if (i.isActive === false) return false;
+        const itemSupplyType: RequestSupplyType = String(i.itemType || 'VPP').toUpperCase() === 'VE_SINH' ? 'VE_SINH' : 'VPP';
+        if (itemSupplyType !== supplyType) return false;
 
         return !keyword || (
           i.name.toLowerCase().includes(keyword) ||
@@ -177,7 +191,18 @@ export default function RequestsCreate({
         );
       })
       .sort((a: VPPItem, b: VPPItem) => a.name.localeCompare(b.name, 'vi'));
-  }, [items, searchTerm]);
+  }, [items, searchTerm, supplyType]);
+
+  const handleSupplyTypeChange = (nextType: RequestSupplyType) => {
+    if (nextType === supplyType) return;
+    if (targetItems.length > 0) {
+      const confirmed = window.confirm('Đổi nhóm đề xuất sẽ xóa toàn bộ vật tư đang chọn. Bạn có muốn tiếp tục?');
+      if (!confirmed) return;
+      setTargetItems([]);
+    }
+    setSupplyType(nextType);
+    setSearchTerm('');
+  };
 
   const handleAddItem = (item: VPPItem) => {
     if (Number(item.stock || 0) === 0) {
@@ -230,7 +255,9 @@ export default function RequestsCreate({
 
   const validateBeforeSubmit = (): string | null => {
     if (targetItems.length === 0) {
-      return 'Chưa có mặt hàng VPP nào trong danh sách';
+      return supplyType === 'VE_SINH'
+        ? 'Chưa có mặt hàng Đồ vệ sinh nào trong danh sách'
+        : 'Chưa có mặt hàng Văn phòng phẩm nào trong danh sách';
     }
 
     if (!purpose.trim()) {
@@ -262,32 +289,11 @@ export default function RequestsCreate({
 
     setIsSubmitting(true);
     try {
-      // Determine warehouseCode dynamically based on item category
-      let calculatedWarehouseCode = 'MAIN';
-      const hasVeSinhItem = targetItems.some((t) => {
-        const item = t.item;
-        if (!item) return false;
-        const type = (item.itemType || '').toString().toUpperCase();
-        const cat = (item.category || '').toString().toUpperCase();
-        const mvpp = (item.mvpp || '').toString().toUpperCase();
-        return (
-          type === 'VE_SINH' ||
-          type.includes('VỆ SINH') ||
-          cat.includes('VE_SINH') ||
-          cat.includes('VỆ SINH') ||
-          cat.includes('TẠP HÓA') ||
-          mvpp.startsWith('VS')
-        );
-      });
-      if (hasVeSinhItem) {
-        calculatedWarehouseCode = 'VE_SINH';
-      }
-
       const payload = {
         requestType: reqType,
         priority,
         purpose,
-        warehouseCode: calculatedWarehouseCode,
+        warehouseCode: supplyType === 'VE_SINH' ? 'VE_SINH' : 'MAIN',
         neededByDate: neededByDate
           ? new Date(neededByDate).toISOString()
           : undefined,
@@ -370,7 +376,10 @@ export default function RequestsCreate({
             <XCircle className="w-6 h-6" />
           </button>
           <h2 className="text-xl font-black text-slate-800 tracking-tight">
-            {isEditingDraft ? 'Cập nhật Phiếu' : 'Lập Phiếu Đề Xuất Trực Tuyến'}
+            {isEditingDraft ? 'Cập nhật Phiếu' : 'Lập Phiếu Đề Xuất'}{' '}
+            <span className={supplyType === 'VE_SINH' ? 'text-cyan-700' : 'text-indigo-700'}>
+              {supplyType === 'VE_SINH' ? 'Đồ vệ sinh' : 'Văn phòng phẩm'}
+            </span>
           </h2>
         </div>
 
@@ -390,7 +399,7 @@ export default function RequestsCreate({
             className="flex items-center px-5 py-2 border-2 border-indigo-700 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl font-bold transition shadow-md shadow-indigo-500/30 disabled:opacity-50"
           >
             <Send className="w-4 h-4 mr-2" />
-            Gửi Trình Duyệt
+            Gửi trình duyệt
           </button>
         </div>
       </div>
@@ -404,10 +413,32 @@ export default function RequestsCreate({
             Thông tin chung & Pháp lý
           </h3>
 
+          <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-500">Nhóm hàng của phiếu</p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => handleSupplyTypeChange('VPP')}
+                className={`rounded-xl border-2 px-4 py-3 text-left transition ${supplyType === 'VPP' ? 'border-indigo-500 bg-indigo-50 text-indigo-800 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200'}`}
+              >
+                <span className="block text-sm font-black">Văn phòng phẩm</span>
+                <span className="text-[10px] font-semibold">Chỉ hiện danh mục VPP</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSupplyTypeChange('VE_SINH')}
+                className={`rounded-xl border-2 px-4 py-3 text-left transition ${supplyType === 'VE_SINH' ? 'border-cyan-500 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-cyan-200'}`}
+              >
+                <span className="block text-sm font-black">Đồ vệ sinh</span>
+                <span className="text-[10px] font-semibold">Chỉ hiện danh mục vệ sinh</span>
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">
-                Mã phiếu (Auto-gen)
+                Mã phiếu (tự động tạo)
               </label>
               <input
                 type="text"
@@ -516,7 +547,7 @@ export default function RequestsCreate({
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Nhập Mã hoặc Tên VPP để thêm vào lưới..."
+                  placeholder={`Nhập mã hoặc tên ${supplyType === 'VE_SINH' ? 'Đồ vệ sinh' : 'VPP'} để thêm vào phiếu...`}
                   className="w-full pl-12 pr-4 py-3.5 bg-indigo-50 border-2 border-indigo-100 rounded-xl focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 outline-none font-bold text-indigo-900 transition-all shadow-inner"
                 />
               </div>
@@ -592,12 +623,12 @@ export default function RequestsCreate({
               <thead className="bg-slate-50 border-b border-slate-200 relative">
                 <tr className="text-[10px] uppercase font-black text-slate-400 tracking-widest">
                   <th className="p-3 w-12 text-center border-r border-slate-100">STT</th>
-                  <th className="p-3">Hàng hoá (VPP)</th>
+                  <th className="p-3">{supplyType === 'VE_SINH' ? 'Đồ vệ sinh' : 'Văn phòng phẩm'}</th>
                   <th className="p-3 text-center border-l border-slate-100 hidden md:table-cell">
-                    Hệ lượng
+                    Tồn kho / Định mức
                   </th>
                   <th className="p-3 text-center w-40 border-x-2 border-indigo-100 bg-indigo-50/50">
-                    SL YÊU CẦU
+                    SL ĐỀ XUẤT
                   </th>
                   <th className="p-3 max-w-[200px]">Ghi chú & Thuyết minh</th>
                   <th className="p-3 text-center w-12">Xóa</th>
@@ -649,7 +680,7 @@ export default function RequestsCreate({
 
                           <div className="text-center px-2 py-1 bg-slate-50 rounded border border-slate-100 flex-1">
                             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                              Quota
+                              Định mức
                             </p>
                             <p className="text-xs font-black text-indigo-600">{t.item.quota}</p>
                           </div>
@@ -657,17 +688,24 @@ export default function RequestsCreate({
                       </td>
 
                       <td className="p-3 border-x-2 border-indigo-100 relative bg-white group-hover:bg-slate-50 transition-colors align-middle">
-                        <input
-                          type="number"
-                          min="1"
-                          value={t.quantity || ''}
-                          onChange={(e) => handleQuantityChange(t.itemId, e.target.value)}
-                          className={`w-full text-center py-2.5 bg-slate-100/50 border outline-none rounded-lg focus:ring-4 focus:ring-indigo-100 focus:bg-white font-black text-lg transition ${
-                            isOverQuota
-                              ? 'text-rose-600 border-rose-300 ring-4 ring-rose-50'
-                              : 'text-indigo-700 border-slate-200 focus:border-indigo-400'
-                          }`}
-                        />
+                        <MonthlyApprovalHistoryTooltip
+                          itemId={t.itemId}
+                          itemName={t.item.name}
+                          department={currentUser?.department}
+                        >
+                          <input
+                            type="number"
+                            min="1"
+                            value={t.quantity || ''}
+                            onChange={(e) => handleQuantityChange(t.itemId, e.target.value)}
+                            aria-label={`Số lượng đề xuất ${t.item.name}; trỏ chuột để xem lịch sử duyệt`}
+                            className={`w-full text-center py-2.5 bg-slate-100/50 border outline-none rounded-lg focus:ring-4 focus:ring-indigo-100 focus:bg-white font-black text-lg transition ${
+                              isOverQuota
+                                ? 'text-rose-600 border-rose-300 ring-4 ring-rose-50'
+                                : 'text-indigo-700 border-slate-200 focus:border-indigo-400'
+                            }`}
+                          />
+                        </MonthlyApprovalHistoryTooltip>
                         {isOverQuota && (
                           <div
                             className="absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2"

@@ -27,7 +27,7 @@ export default function GuestRequest() {
     const fetchItems = async () => {
       try {
         setLoadingItems(true);
-        const res = await api.get('/public/items');
+        const res = await api.get('/public/items', { params: { type: 'VPP' } });
         setItems(res.data);
       } catch (err) {
         console.error('Failed to load items', err);
@@ -99,7 +99,7 @@ export default function GuestRequest() {
         purpose,
         lines: targetItems.map(t => ({ itemId: t.item.id, qtyRequested: t.quantity, note: t.note }))
       });
-      alert('Đã gửi yêu cầu thành công! Vui lòng liên hệ Admin để theo dõi.');
+      alert('Đã gửi yêu cầu thành công! Vui lòng liên hệ Hành chính để theo dõi.');
       navigate('/');
     } catch(e: any) { 
       alert(e.response?.data?.error || 'Lỗi khi gửi yêu cầu'); 

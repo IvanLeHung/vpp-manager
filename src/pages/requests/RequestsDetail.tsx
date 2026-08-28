@@ -6,6 +6,8 @@ import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
 import LinkedDocumentReferences from '../../components/LinkedDocumentReferences';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import DocumentChainMap from '../../components/DocumentChainMap';
+import MonthlyApprovalHistoryTooltip from '../../components/MonthlyApprovalHistoryTooltip';
+import { getApprovalActionLabel, getLineStatusLabel, getRequestStatusLabel } from '../../lib/statusLabels';
 import type { User } from '../../context/AppContext';
 import type { ViewMode } from '../Requests';
 import { Layout, Card, Table, Tooltip, Avatar } from 'antd';
@@ -482,9 +484,9 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
           [`Người đề xuất: ${data.requester.fullName} (${data.department})`],
           [`Lý do/Mục đích: ${data.purpose || "—"}`],
           [`Ngày tạo: ${new Date(data.createdAt).toLocaleString('vi-VN')}`],
-          [`Trạng thái: ${data.status}`],
+          [`Trạng thái: ${getRequestStatusLabel(data.status)}`],
           [],
-          ["STT", "Mã VT", "Tên Vật tư / Hàng hóa", "ĐVT", "SL Xin", "TBP Duyệt", "Admin Duyệt", "Lấy Thực", "Ghi chú"]
+          ["STT", "Mã VT", "Tên Vật tư / Hàng hóa", "ĐVT", "SL đề xuất", "TBP duyệt", "Hành chính duyệt", "SL thực giao", "Ghi chú"]
       ];
 
       const lineData = data.lines.map((l: any, idx: number) => {
@@ -538,26 +540,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
     return Math.min(100, Math.max(basePercent, deliveryPercent));
   };
 
-  const getActionLabel = (action: string) => {
-    if (!action) return '—';
-    switch(action.toUpperCase()) {
-      case 'SUBMIT': return 'Gửi trình duyệt';
-      case 'TBP_APPROVE': return 'Trưởng bộ phận Duyệt';
-      case 'ADMIN_APPROVE': return 'Hành chính Duyệt';
-      case 'RETURN_FOR_REVISION': case 'RETURN_FOR_EDIT': return 'Trả lại chỉnh sửa';
-      case 'REJECT': return 'Từ chối toàn bộ';
-      case 'CANCEL': return 'Hủy phiếu';
-      case 'ISSUE': case 'ISSUED': return 'Xuất kho / Giao hàng';
-      case 'PARTIAL_DELIVERY_CONFIRMED': return 'Xác nhận Giao hàng Một phần';
-      case 'CONFIRM_RECEIPT': return 'Đã nhận hàng';
-      case 'APPROVE': return 'Duyệt (Approve)';
-      case 'TBP_REJECT': return 'Trưởng bộ phận Từ chối';
-      case 'ADMIN_REJECT': return 'Hành chính Từ chối';
-      case 'WITHDRAW': return 'Rút phiếu';
-      case 'URGE_DELIVERY': return 'Hối thúc giao hàng';
-      default: return action;
-    }
-  };
+  const getActionLabel = getApprovalActionLabel;
 
   if (loading || !data || !currentUser) {
     return (
@@ -684,15 +667,21 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       }
     },
     {
-      title: 'SL Xin',
+      title: 'SL đề xuất',
       key: 'qtyRequested',
       align: 'center' as const,
       className: 'border-x border-slate-100',
       render: (l: any) => (
-        <div>
-          <span className="font-black text-base text-slate-700">{l.qtyRequested}</span>{' '}
-          <span className="text-[9px] font-bold text-slate-400 uppercase">{l.item.unit}</span>
-        </div>
+        <MonthlyApprovalHistoryTooltip
+          itemId={l.itemId || l.item?.id}
+          itemName={l.item?.name || 'Vật tư'}
+          department={data.department}
+        >
+          <span>
+            <span className="font-black text-base text-slate-700">{l.qtyRequested}</span>{' '}
+            <span className="text-[9px] font-bold text-slate-400 uppercase">{l.item.unit}</span>
+          </span>
+        </MonthlyApprovalHistoryTooltip>
       )
     },
     {
@@ -711,7 +700,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       }
     },
     {
-      title: 'Admin Duyệt',
+      title: 'Hành chính duyệt',
       key: 'qtyAdminApproved',
       align: 'center' as const,
       className: 'text-emerald-600 bg-emerald-50/30 border-r border-slate-100',
@@ -721,7 +710,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                 <span className="font-black text-base text-emerald-600">{l.replacementQty ?? l.qtyAdminApproved ?? l.qtyApproved}</span>
             </div>
         ) : (
-            <span className="text-[9px] font-bold text-slate-400 uppercase">Chờ Admin</span>
+            <span className="text-[9px] font-bold text-slate-400 uppercase">Chờ Hành chính</span>
         );
       }
     },
@@ -794,7 +783,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
         };
         return (
           <span className={`rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-widest ring-1 ${getLineStatusColor(l.status)}`}>
-              {l.status.replace(/_/g, ' ')}
+              {getLineStatusLabel(l.status)}
           </span>
         );
       }
@@ -861,7 +850,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                 </div>
                 <div>
                   <span className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest shadow-md ${getStatusColor(data.status)}`}>
-                    {data.status.replace(/_/g, ' ')}
+                    {getRequestStatusLabel(data.status)}
                   </span>
                 </div>
               </div>
@@ -938,7 +927,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-rose-500 mt-0.5 shrink-0" />
                 <div>
-                  <h4 className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Lý do {data.status.replace(/_/g, ' ')}</h4>
+                  <h4 className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Lý do: {getRequestStatusLabel(data.status)}</h4>
                   <p className="text-sm font-bold text-rose-700 leading-tight">
                     {data.rejectReason || data.returnReason || data.cancelReason || data.revisionReason || 'Không rõ lý do'}
                   </p>
@@ -1511,7 +1500,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
               <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[95vh] animate-slide-up">
                   <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-emerald-500 text-white shrink-0">
                       <div>
-                        <h3 className="text-xl font-black">{data.status === 'PENDING_MANAGER' ? 'Phê duyệt Cấp 1 – Trưởng bộ phận' : 'Phê duyệt Cấp 2 – Hành chính (Admin)'}</h3>
+                        <h3 className="text-xl font-black">{data.status === 'PENDING_MANAGER' ? 'Phê duyệt Cấp 1 – Trưởng bộ phận' : 'Phê duyệt Cấp 2 – Hành chính'}</h3>
                         <p className="text-[10px] text-emerald-100 font-bold uppercase tracking-widest mt-1">Kiểm tra từng mặt hàng, chỉnh số lượng duyệt nếu cần, sau đó xác nhận phê duyệt.</p>
                       </div>
                       <button onClick={()=>setShowApproveModal(false)} className="text-emerald-100 hover:text-white transition p-2 hover:bg-white/10 rounded-full"><XCircle className="w-7 h-7"/></button>
@@ -1538,11 +1527,11 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                               }).length}</p>
                           </div>
                           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tổng SL Xin</p>
+                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tổng SL đề xuất</p>
                              <p className="text-xl font-black text-indigo-600">{data.lines.reduce((s:number, l:any) => s + l.qtyRequested, 0)}</p>
                           </div>
                           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tổng SL Duyệt</p>
+                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tổng SL duyệt</p>
                              <p className="text-xl font-black text-emerald-600">{approvals.reduce((s:number, a:any) => s + (a.selected ? a.qtyApproved : 0), 0)}</p>
                           </div>
                       </div>
@@ -1554,7 +1543,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                   <th className="p-4 rounded-tl-xl w-12 text-center">Chọn</th>
                                   <th className="p-4 min-w-[280px] max-w-[360px]">Hàng Hóa</th>
                                   <th className="p-4 text-center">Tồn Kho</th>
-                                  <th className="p-4 text-center">SL Yêu cầu</th>
+                                  <th className="p-4 text-center">SL đề xuất</th>
                                   <th className="p-4 text-center">SL Duyệt</th>
                                    <th className="p-4 text-right">Đơn giá</th>
                                    <th className="p-4 text-right">Thành tiền</th>
@@ -1686,7 +1675,15 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                               {currentStock}
                                             </div>
                                         </td>
-                                        <td className="p-4 text-center font-black text-indigo-600 bg-indigo-50/30 align-top pt-5">{l.qtyRequested}</td>
+                                        <td className="p-4 text-center font-black text-indigo-600 bg-indigo-50/30 align-top pt-5">
+                                          <MonthlyApprovalHistoryTooltip
+                                            itemId={l.itemId || l.item?.id}
+                                            itemName={l.item?.name || 'Vật tư'}
+                                            department={data.department}
+                                          >
+                                            <span>{l.qtyRequested}</span>
+                                          </MonthlyApprovalHistoryTooltip>
+                                        </td>
                                         <td className="p-4 align-top pt-4">
                                             <div className="flex items-center justify-center gap-2">
                                                 <button 
@@ -1732,7 +1729,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                   <div className="p-6 bg-slate-50 border-t border-slate-200 flex flex-col gap-6 shrink-0">
                       <div className="flex flex-col md:flex-row gap-4 items-start">
                           <div className="flex-1 w-full">
-                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Ghi chú chung (Optional)</p>
+                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Ghi chú chung (không bắt buộc)</p>
                              <textarea 
                                 value={globalApproveReason}
                                 onChange={(e) => setGlobalApproveReason(e.target.value)}
@@ -1749,7 +1746,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                    className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
                                  />
                                  <label htmlFor="autoBackorder" className="text-xs font-bold text-amber-700 cursor-pointer flex items-center gap-1.5">
-                                   <ShoppingCart className="w-3.5 h-3.5"/> Tự động tạo Đơn mua sắm (Backorder) cho các mặt hàng thiếu/giảm SL
+                                   <ShoppingCart className="w-3.5 h-3.5"/> Tự động tạo đơn mua sắm bổ sung cho các mặt hàng thiếu/giảm số lượng
                                  </label>
                                </div>
                              )}
@@ -1776,7 +1773,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                 onClick={() => {
                                   const finalApprovals = approvals.map(a => {
                                       if (!a.selected) {
-                                          return { ...a, qtyApproved: 0, note: a.note || 'Bỏ qua (Reject)' };
+                                          return { ...a, qtyApproved: 0, note: a.note || 'Bỏ qua (không duyệt)' };
                                       }
                                       return a;
                                   });
@@ -1826,13 +1823,13 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                           return app?.selected && app.qtyApproved > stock;
                                       });
                                       if (hasOverStock) {
-                                          if (!window.confirm('Cảnh báo: Bạn đang duyệt Số lượng vượt quá Tồn Kho thực tế. Hệ thống sẽ báo nợ (Backorder) hoặc Kho không thể xuất dòng này. Vẫn tiếp tục?')) return;
+                                          if (!window.confirm('Cảnh báo: Bạn đang duyệt số lượng vượt quá tồn kho thực tế. Hệ thống sẽ ghi nhận chờ mua bổ sung hoặc Kho không thể xuất dòng này. Vẫn tiếp tục?')) return;
                                       }
                                   }
                                   // Khi Admin/Manager phê duyệt, nếu bỏ qua dòng nào thì mặc định là Reject dòng đó (SL duyệt = 0)
                                   const finalApprovals = approvals.map(a => {
                                       if (!a.selected) {
-                                          return { ...a, qtyApproved: 0, note: a.note || 'Admin/Manager bỏ qua (Reject)' };
+                                          return { ...a, qtyApproved: 0, note: a.note || 'Người duyệt bỏ qua (không duyệt)' };
                                       }
                                       return a;
                                   });
@@ -2053,7 +2050,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                  <button 
                                    onClick={() => {
                                      if(window.confirm('Hệ thống sẽ tạo Đơn mua sắm (PO) cho phần còn thiếu và chuyển trạng thái phiếu sang BACKORDER. Tiếp tục?')) {
-                                       handleAction('/create_po', {}, 'Đã tạo yêu cầu Backorder thành công!');
+                                       handleAction('/create_po', {}, 'Đã tạo yêu cầu mua bổ sung thành công!');
                                        setShowIssueModal(false);
                                      }
                                    }}

@@ -57,6 +57,7 @@ export type VPPRequest = {
   requesterId: string;
   requester: { fullName: string, department: string };
   department: string;
+  warehouseCode?: 'MAIN' | 'VE_SINH' | string;
   requestType: string;
   priority: string;
   purpose: string;

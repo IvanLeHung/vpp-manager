@@ -11,6 +11,7 @@ import RequestsWorkflow from './requests/RequestsWorkflow';
 import type { VPPRequest } from '../context/AppContext';
 
 export type ViewMode = 'LIST' | 'CREATE' | 'VIEW' | 'WORKFLOW';
+export type RequestSupplyType = 'VPP' | 'VE_SINH';
 
 export default function Requests() {
   const { currentUser } = useAppContext();
@@ -20,6 +21,7 @@ export default function Requests() {
   const [viewMode, setViewMode] = useState<ViewMode>('LIST');
   const [requests, setRequests] = useState<VPPRequest[]>([]);
   const [activeRequest, setActiveRequest] = useState<VPPRequest | null>(null);
+  const [createSupplyType, setCreateSupplyType] = useState<RequestSupplyType>('VPP');
   const [navigationIds, setNavigationIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'warning'} | null>(null);
@@ -86,6 +88,7 @@ export default function Requests() {
           currentUser={currentUser!}
           setViewMode={setViewMode}
           setActiveRequest={setActiveRequest}
+          setCreateSupplyType={setCreateSupplyType}
           setNavigationIds={setNavigationIds}
           refreshData={fetchRequests}
           showToast={showToast}
@@ -98,6 +101,7 @@ export default function Requests() {
           refreshData={fetchRequests}
           showToast={showToast}
           activeRequest={activeRequest}
+          initialSupplyType={createSupplyType}
         />
       )}
 
