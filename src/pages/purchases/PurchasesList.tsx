@@ -1443,6 +1443,66 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   const requestedItemReportVPP = useMemo(() => getRequestedItemReportData('VPP'), [data, filteredData, selectedIds]);
   const requestedItemReportVS = useMemo(() => getRequestedItemReportData('VE_SINH'), [data, filteredData, selectedIds]);
 
+  const getOriginalRequestIdsForPrint = (category: 'VPP' | 'VE_SINH'): string[] => {
+    const targetData = selectedIds.length > 0
+      ? data.filter(po => selectedIds.includes(po.id))
+      : filteredData;
+    const requestIds = new Set<string>();
+
+    targetData.forEach((po: any) => {
+      (po.lines || []).forEach((line: any) => {
+        const effectiveItem = getEffectiveLineItem(line);
+        if (!effectiveItem || getItemCategoryType(effectiveItem) !== category) return;
+
+        const candidates = [
+          line.requestLine?.request?.id,
+          line.fuzzyRequestCode,
+          po.sourceRequestId,
+          po.requestId,
+        ];
+        const originalRequestId = candidates
+          .map(value => String(value || '').match(/PDX-\d{8}-\d{4}/i)?.[0])
+          .find(Boolean);
+        if (originalRequestId) requestIds.add(originalRequestId.toUpperCase());
+      });
+    });
+
+    return Array.from(requestIds).sort((a, b) => a.localeCompare(b, 'vi'));
+  };
+
+  const requestPrintIdsVPP = useMemo(
+    () => getOriginalRequestIdsForPrint('VPP'),
+    [data, filteredData, selectedIds]
+  );
+  const requestPrintIdsVS = useMemo(
+    () => getOriginalRequestIdsForPrint('VE_SINH'),
+    [data, filteredData, selectedIds]
+  );
+
+  const handlePrintOriginalRequests = (category: 'VPP' | 'VE_SINH') => {
+    const requestIds = category === 'VPP' ? requestPrintIdsVPP : requestPrintIdsVS;
+    if (requestIds.length === 0) {
+      toast.error('Không tìm thấy số PDX gốc phù hợp trong các phiếu đã chọn.');
+      return;
+    }
+
+    const params = new URLSearchParams({
+      printType: category === 'VPP' ? 'VPP' : 'VS',
+      ids: requestIds.join(','),
+    });
+    const printWindow = window.open(
+      `/requests/${encodeURIComponent(requestIds[0])}/print?${params.toString()}`,
+      '_blank'
+    );
+    if (!printWindow) {
+      toast.error('Trình duyệt đang chặn cửa sổ in. Vui lòng cho phép mở cửa sổ và thử lại.');
+      return;
+    }
+    printWindow.opener = null;
+    setShowPrintMenu(false);
+    toast.success(`Đang chuẩn bị ${requestIds.length} phiếu ${category === 'VPP' ? 'VPP' : 'Vệ sinh'} để in một lần.`);
+  };
+
   const handlePrintSummary = (type: 'ALL' | 'VPP' | 'VE_SINH' | 'DEPT_VPP' | 'DEPT_VS' | 'REQ_DEPT_VPP' | 'REQ_DEPT_VS' | 'REQ_ITEM_VPP' | 'REQ_ITEM_VS' = 'ALL') => {
       setSelectedPrintType(type);
       setShowPrintMenu(false);
@@ -2310,32 +2370,20 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                                      {/* Group 4 */}
                                      <div className="px-4 py-1.5 mt-2 text-[9px] font-black text-slate-400 uppercase tracking-wider border-t border-slate-100 pt-2">Mặt hàng được đề xuất</div>
                                      <button
-                                       disabled={requestedItemReportVPP.items.length === 0}
-                                       onClick={() => {
-                                         setSetupReportType('REQUEST_ITEM_SUMMARY');
-                                         setSetupCategoryType('VPP');
-                                         setSetupFormat('PDF');
-                                         setShowReportSetupModal(true);
-                                         setShowPrintMenu(false);
-                                       }}
-                                       className={`w-full px-4 py-2 text-left flex items-center justify-between transition ${requestedItemReportVPP.items.length === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-indigo-55'}`}
+                                       disabled={requestPrintIdsVPP.length === 0}
+                                       onClick={() => handlePrintOriginalRequests('VPP')}
+                                       className={`w-full px-4 py-2 text-left flex items-center justify-between transition ${requestPrintIdsVPP.length === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-indigo-55'}`}
                                      >
                                        <span className="text-xs font-bold text-slate-700">Tổng hợp mặt hàng VPP được đề xuất</span>
-                                       <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{requestedItemReportVPP.itemCount}</span>
+                                       <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{requestPrintIdsVPP.length} phiếu</span>
                                      </button>
                                      <button
-                                       disabled={requestedItemReportVS.items.length === 0}
-                                       onClick={() => {
-                                         setSetupReportType('REQUEST_ITEM_SUMMARY');
-                                         setSetupCategoryType('VE_SINH');
-                                         setSetupFormat('PDF');
-                                         setShowReportSetupModal(true);
-                                         setShowPrintMenu(false);
-                                       }}
-                                       className={`w-full px-4 py-2 text-left flex items-center justify-between transition ${requestedItemReportVS.items.length === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-indigo-55'}`}
+                                       disabled={requestPrintIdsVS.length === 0}
+                                       onClick={() => handlePrintOriginalRequests('VE_SINH')}
+                                       className={`w-full px-4 py-2 text-left flex items-center justify-between transition ${requestPrintIdsVS.length === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-indigo-55'}`}
                                      >
                                        <span className="text-xs font-bold text-slate-700">Tổng hợp mặt hàng Vệ sinh được đề xuất</span>
-                                       <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{requestedItemReportVS.itemCount}</span>
+                                       <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{requestPrintIdsVS.length} phiếu</span>
                                      </button>
 
                                      {/* Group 5 */}
