@@ -572,20 +572,12 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                    </div>
               </div>
             )}
-            <div className="flex overflow-hidden rounded-xl shadow-lg shadow-indigo-500/20">
-              <button
-                onClick={() => { setActiveRequest(null); setCreateSupplyType('VPP'); setViewMode('CREATE'); }}
-                className="flex items-center px-4 py-2.5 bg-indigo-600 text-white hover:bg-indigo-700 transition font-bold border-r border-indigo-500"
-              >
-                <Plus className="w-4 h-4 mr-1.5"/> Đề xuất VPP
-              </button>
-              <button
-                onClick={() => { setActiveRequest(null); setCreateSupplyType('VE_SINH'); setViewMode('CREATE'); }}
-                className="flex items-center px-4 py-2.5 bg-cyan-600 text-white hover:bg-cyan-700 transition font-bold"
-              >
-                <Plus className="w-4 h-4 mr-1.5"/> Đề xuất Đồ vệ sinh
-              </button>
-            </div>
+            <button
+              onClick={() => { setActiveRequest(null); setCreateSupplyType('VPP'); setViewMode('CREATE'); }}
+              className="flex items-center rounded-xl bg-indigo-600 px-5 py-2.5 font-bold text-white shadow-lg shadow-indigo-500/30 transition hover:bg-indigo-700"
+            >
+              <Plus className="mr-2 h-5 w-5"/> Tạo đề xuất
+            </button>
         </div>
       </div>
 

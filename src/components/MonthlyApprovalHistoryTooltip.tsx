@@ -34,22 +34,27 @@ export default function MonthlyApprovalHistoryTooltip({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [history, setHistory] = useState<ApprovalHistoryResponse | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
   const cacheKey = `${itemId}|${department || ''}|${year}`;
 
   useEffect(() => {
-    if (!open || !itemId || history || loading || error) return;
+    if (!open || !itemId) return;
 
     const cached = historyCache.get(cacheKey);
     if (cached) {
       setHistory(cached);
+      setLoading(false);
+      setError('');
       return;
     }
 
     let cancelled = false;
     setLoading(true);
+    setHistory(null);
     setError('');
     api.get('/requests/admin-approval-history', {
       params: { itemId, department: department || undefined, year },
+      timeout: 15000,
     })
       .then(response => {
         if (cancelled) return;
@@ -59,7 +64,11 @@ export default function MonthlyApprovalHistoryTooltip({
       })
       .catch(err => {
         if (!cancelled) {
-          setError(err.response?.data?.error || 'Không tải được lịch sử Hành chính duyệt');
+          setError(
+            err.code === 'ECONNABORTED'
+              ? 'Máy chủ phản hồi quá chậm (quá 15 giây).'
+              : err.response?.data?.error || 'Không tải được lịch sử Hành chính duyệt'
+          );
         }
       })
       .finally(() => {
@@ -69,7 +78,7 @@ export default function MonthlyApprovalHistoryTooltip({
     return () => {
       cancelled = true;
     };
-  }, [cacheKey, department, error, history, itemId, loading, open, year]);
+  }, [cacheKey, department, itemId, open, retryToken, year]);
 
   const months = useMemo(() => {
     const values = new Map((history?.months || []).map(month => [month.month, month.quantity]));
@@ -84,7 +93,16 @@ export default function MonthlyApprovalHistoryTooltip({
       {loading ? (
         <div className="w-72 py-5 text-center text-xs font-bold text-slate-500">Đang tải lịch sử duyệt...</div>
       ) : error ? (
-        <div className="w-72 py-3 text-xs font-bold text-rose-600">{error}</div>
+        <div className="w-72 py-3 text-center text-xs font-bold text-rose-600">
+          <p>{error}</p>
+          <button
+            type="button"
+            onClick={() => setRetryToken(token => token + 1)}
+            className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-[10px] font-black uppercase text-rose-700 hover:bg-rose-100"
+          >
+            Thử lại
+          </button>
+        </div>
       ) : history ? (
         <div className="min-w-[780px]">
           <div className="mb-2 flex items-end justify-between gap-4">
@@ -130,7 +148,6 @@ export default function MonthlyApprovalHistoryTooltip({
       open={open}
       onOpenChange={(nextOpen) => {
         setOpen(nextOpen);
-        if (!nextOpen) setError('');
       }}
     >
       <span className="inline-flex w-full cursor-help justify-center border-b border-dashed border-indigo-300" tabIndex={0}>
