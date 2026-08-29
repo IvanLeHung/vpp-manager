@@ -31,8 +31,8 @@ const getActionLabel = (action: string) => {
   if (!action) return '—';
   switch(action.toUpperCase()) {
     case 'SUBMIT': return 'Gửi trình duyệt';
-    case 'TBP_APPROVE': return 'Trưởng bộ phận Duyệt';
-    case 'ADMIN_APPROVE': return 'Hành chính Duyệt';
+    case 'TBP_APPROVE': return 'Trưởng bộ phận duyệt';
+    case 'ADMIN_APPROVE': return 'Hành chính duyệt';
     case 'RETURN_FOR_REVISION': case 'RETURN_FOR_EDIT': return 'Trả lại chỉnh sửa';
     case 'REJECT': return 'Từ chối toàn bộ';
     case 'CANCEL': return 'Hủy phiếu';

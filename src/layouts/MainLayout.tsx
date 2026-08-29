@@ -320,7 +320,7 @@ export default function MainLayout() {
                 <PanelLeftClose className="w-5 h-5 desktop-menu-close-icon hidden" />
               </button>
               <h1 className="text-lg lg:text-xl font-bold text-slate-800 tracking-tight truncate">
-                {currentUser?.role === 'EMPLOYEE' ? 'Cửa sổ Nhân viên Danko' : 'Hệ thống Quan tri VPP noi bo'}
+                {currentUser?.role === 'EMPLOYEE' ? 'Cửa sổ Nhân viên Danko' : 'Hệ thống Quản trị VPP nội bộ'}
               </h1>
               {currentUser?.role === 'ADMIN' && <span className="admin-badge bg-rose-100 text-rose-700 font-bold text-xs px-2 py-1 rounded flex items-center"><ShieldAlert className="w-3 h-3 mr-1"/> Quyền Admin</span>}
             </div>

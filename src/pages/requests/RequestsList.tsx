@@ -5,13 +5,15 @@ import type { VPPRequest, User } from '../../context/AppContext';
 import { useAppContext } from '../../context/AppContext';
 import api from '../../lib/api';
 import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
-import type { ViewMode } from '../Requests';
+import type { RequestSupplyType, ViewMode } from '../Requests';
+import { getApprovalActionLabel, getRequestStatusLabel } from '../../lib/statusLabels';
 
 interface Props {
   requests: VPPRequest[];
   currentUser: User;
   setViewMode: (mode: ViewMode) => void;
   setActiveRequest: (req: VPPRequest | null) => void;
+  setCreateSupplyType: (type: RequestSupplyType) => void;
   setNavigationIds?: (ids: string[]) => void;
   refreshData: () => Promise<void>;
   showToast: (m: string, t?: 'success' | 'error' | 'warning') => void;
@@ -37,27 +39,6 @@ function sortItemsForPrinting(items: any[]) {
     if (a.name !== b.name) return (a.name || '').localeCompare(b.name || '', "vi");
     return (a.mvpp || '').localeCompare(b.mvpp || '', "vi");
   });
-}
-
-function getActionLabel(action: string) {
-  if (!action) return '—';
-  switch(action.toUpperCase()) {
-    case 'SUBMIT': return 'Gửi trình duyệt';
-    case 'TBP_APPROVE': return 'Trưởng bộ phận Duyệt';
-    case 'ADMIN_APPROVE': return 'Hành chính Duyệt';
-    case 'RETURN_FOR_REVISION': case 'RETURN_FOR_EDIT': return 'Trả lại chỉnh sửa';
-    case 'REJECT': return 'Từ chối toàn bộ';
-    case 'CANCEL': return 'Hủy phiếu';
-    case 'ISSUE': case 'ISSUED': return 'Xuất kho / Giao hàng';
-    case 'PARTIAL_DELIVERY_CONFIRMED': return 'Xác nhận Giao hàng Một phần';
-    case 'CONFIRM_RECEIPT': return 'Đã nhận hàng';
-    case 'APPROVE': return 'Duyệt (Approve)';
-    case 'TBP_REJECT': return 'Trưởng bộ phận Từ chối';
-    case 'ADMIN_REJECT': return 'Hành chính Từ chối';
-    case 'WITHDRAW': return 'Rút phiếu';
-    case 'URGE_DELIVERY': return 'Hối thúc giao hàng';
-    default: return action;
-  }
 }
 
 function sortLinesForPrinting(lines: any[]) {
@@ -87,7 +68,7 @@ function toLocalDateKey(value: string | Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-export default function RequestsList({ requests, currentUser, setViewMode, setActiveRequest, setNavigationIds, refreshData, showToast }: Props) {
+export default function RequestsList({ requests, currentUser, setViewMode, setActiveRequest, setCreateSupplyType, setNavigationIds, refreshData, showToast }: Props) {
   const { items: masterItems } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
@@ -267,7 +248,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
 
   const getActionName = (req: VPPRequest) => {
       if (currentUser.role === 'MANAGER' && req.status === 'PENDING_MANAGER' && req.currentApproverId === currentUid) return 'Duyệt (BP)';
-      if (currentUser.role === 'ADMIN' && (req.status === 'PENDING_ADMIN' || req.status === 'PENDING_MANAGER')) return 'Duyệt (HChính)';
+      if (currentUser.role === 'ADMIN' && (req.status === 'PENDING_ADMIN' || req.status === 'PENDING_MANAGER')) return 'Duyệt (Hành chính)';
       if (currentUser.role === 'WAREHOUSE' && req.status === 'READY_TO_ISSUE') return 'Xuất Kho';
       if (currentUid === req.requesterId && req.status === 'WAITING_HANDOVER') return 'Xác nhận Bàn giao';
       if (currentUid === req.requesterId && (req.status === 'DRAFT' || req.status === 'RETURNED' || req.status === 'NEED_REVISION')) return 'Chỉnh sửa';
@@ -591,9 +572,20 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                    </div>
               </div>
             )}
-            <button onClick={() => { setActiveRequest(null); setViewMode('CREATE'); }} className="flex items-center px-5 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition font-bold shadow-lg shadow-indigo-500/30">
-               <Plus className="w-5 h-5 mr-2"/> {currentUser.role === 'EMPLOYEE' ? 'Tạo yêu cầu' : 'Tạo Đề Xuất'}
-            </button>
+            <div className="flex overflow-hidden rounded-xl shadow-lg shadow-indigo-500/20">
+              <button
+                onClick={() => { setActiveRequest(null); setCreateSupplyType('VPP'); setViewMode('CREATE'); }}
+                className="flex items-center px-4 py-2.5 bg-indigo-600 text-white hover:bg-indigo-700 transition font-bold border-r border-indigo-500"
+              >
+                <Plus className="w-4 h-4 mr-1.5"/> Đề xuất VPP
+              </button>
+              <button
+                onClick={() => { setActiveRequest(null); setCreateSupplyType('VE_SINH'); setViewMode('CREATE'); }}
+                className="flex items-center px-4 py-2.5 bg-cyan-600 text-white hover:bg-cyan-700 transition font-bold"
+              >
+                <Plus className="w-4 h-4 mr-1.5"/> Đề xuất Đồ vệ sinh
+              </button>
+            </div>
         </div>
       </div>
 
@@ -678,13 +670,13 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                     <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1">
                       {[
                         { val: 'MY_ACTION', lab: '🚩 Cần xử lý', color: 'amber' },
-                        { val: 'BACKORDER', lab: '📦 Backorder (Nợ)', color: 'slate' },
-                        { val: 'PENDING_MANAGER', lab: '⏳ Chờ QL BP', color: 'amber' },
+                        { val: 'BACKORDER', lab: '📦 Chờ mua bổ sung', color: 'slate' },
+                        { val: 'PENDING_MANAGER', lab: '⏳ Chờ Trưởng bộ phận', color: 'amber' },
                         { val: 'PENDING_ADMIN', lab: '⏳ Chờ Hành chính', color: 'amber' },
                         { val: 'APPROVED', lab: '✅ Đã duyệt', color: 'emerald' },
                         { val: 'READY_TO_ISSUE', lab: '🚚 Sẵn sàng xuất', color: 'emerald' },
                         { val: 'WAITING_HANDOVER', lab: '🤝 Chờ bàn giao', color: 'blue' },
-                        { val: 'PARTIALLY_DELIVERED', lab: '🚚 Đang giao dở', color: 'teal' },
+                        { val: 'PARTIALLY_DELIVERED', lab: '🚚 Đã giao một phần', color: 'teal' },
                         { val: 'COMPLETED', lab: '🏁 Hoàn thành', color: 'emerald' },
                         { val: 'REJECTED', lab: '❌ Từ chối', color: 'rose' },
                         { val: 'CANCELLED', lab: '🚫 Đã hủy', color: 'rose' },
@@ -727,7 +719,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                     </div>
                     <div className="flex flex-col gap-1">
                         <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Mức độ ưu tiên</label>
-                        <select value={priorityFilter} onChange={e => { setPriorityFilter(e.target.value); setCurrentPage(1); }} className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-700 outline-none min-w-[150px] hover:bg-slate-100 transition"><option value="ALL">Tất cả mức độ</option><option value="Bình thường">Bình thường</option><option value="Khẩn cấp">Khẩn cấp</option></select>
+                        <select value={priorityFilter} onChange={e => { setPriorityFilter(e.target.value); setCurrentPage(1); }} className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-700 outline-none min-w-[150px] hover:bg-slate-100 transition"><option value="ALL">Tất cả mức độ</option><option value="Thường">Thường</option><option value="Cao">Cao</option><option value="Khẩn cấp">Khẩn cấp</option></select>
                     </div>
                     <div className="flex flex-col gap-1">
                         <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Ngày tạo phiếu</label>
@@ -856,10 +848,10 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                                         Chọn tất cả phiếu <span className="text-[10px] text-slate-400">{filteredRequests.length}</span>
                                       </button>
                                       <button onClick={() => selectByStatus('PENDING_ADMIN')} className="w-full px-4 py-2 text-xs font-bold text-amber-600 hover:bg-amber-50 flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 bg-amber-500 rounded-full"></div> Chỉ chọn Pending Admin
+                                        <div className="w-1.5 h-1.5 bg-amber-500 rounded-full"></div> Chỉ chọn phiếu chờ Hành chính
                                       </button>
                                       <button onClick={() => selectByStatus('DRAFT')} className="w-full px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 bg-slate-400 rounded-full"></div> Chỉ chọn Draft
+                                        <div className="w-1.5 h-1.5 bg-slate-400 rounded-full"></div> Chỉ chọn phiếu nháp
                                       </button>
                                       <button onClick={() => { setSelectedIds([]); setShowHeaderMenu(false); }} className="w-full px-4 py-2 text-xs font-bold text-rose-500 hover:bg-rose-50 flex items-center gap-2 mt-1 border-t border-slate-100 pt-2">
                                         <RotateCcw className="w-3 h-3"/> Bỏ chọn tất cả
@@ -908,7 +900,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                                   <p className="text-[10px] text-slate-400 font-semibold">{req.department}</p>
                               </td>
                               <td className="p-3 text-center"><span className="text-xs font-black text-slate-600">{req.lines?.length || 0}</span></td>
-                              <td className="p-3 text-center"><span className={`px-2 py-0.5 rounded text-[9px] font-bold border uppercase ${getStatusColor(req.status)}`}>{req.status.replace(/_/g,' ')}</span></td>
+                              <td className="p-3 text-center"><span className={`px-2 py-0.5 rounded text-[9px] font-bold border uppercase ${getStatusColor(req.status)}`}>{getRequestStatusLabel(req.status)}</span></td>
                               <td className="p-3 pr-4 text-right" onClick={e => e.stopPropagation()}>
                                   <button onClick={() => handleOpenDetail(req, actName === 'Chỉnh sửa' ? 'CREATE' : 'VIEW')}
                                     className={`px-2 py-1 rounded-lg font-bold text-[11px] inline-flex items-center ${isActionable ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
@@ -946,7 +938,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="text-sm font-black text-indigo-700">{previewReq.id}</h3>
-                  <span className={`px-2 py-0.5 rounded text-[9px] font-bold border uppercase ${getStatusColor(previewReq.status)}`}>{previewReq.status.replace(/_/g,' ')}</span>
+                  <span className={`px-2 py-0.5 rounded text-[9px] font-bold border uppercase ${getStatusColor(previewReq.status)}`}>{getRequestStatusLabel(previewReq.status)}</span>
                 </div>
                 <p className="text-xs font-semibold text-slate-600">{previewReq.requester?.fullName} • {previewReq.department}</p>
                 <p className="text-[10px] text-slate-400 mt-0.5 truncate" title={previewReq.purpose}>{previewReq.purpose || 'Không có lý do'}</p>
@@ -1494,7 +1486,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                               {h.approver?.fullName} {h.approver?.role === 'ADMIN' ? '(ADM)' : ''}
                             </td>
                             <td style={{ border: '0.7px solid #000', padding: '3px 4px', fontSize: '9px' }}>
-                              <span className="font-bold">{getActionLabel(h.action)}</span>
+                              <span className="font-bold">{getApprovalActionLabel(h.action)}</span>
                             </td>
                             <td style={{ border: '0.7px solid #000', padding: '3px 4px', fontStyle: 'italic', fontSize: '9px' }}>
                               {h.reason || '—'}

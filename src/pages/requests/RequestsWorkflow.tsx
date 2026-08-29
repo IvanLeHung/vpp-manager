@@ -39,10 +39,10 @@ export default function RequestsWorkflow({ onBack }: Props) {
       id: 3,
       title: 'Phê duyệt Hành chính',
       role: 'ADMIN',
-      desc: 'Admin kiểm tra tồn kho, hạn mức và ra quyết định cấp phát chính thức.',
+      desc: 'Hành chính kiểm tra tồn kho, hạn mức và ra quyết định cấp phát chính thức.',
       actions: ['Điều chỉnh SL duyệt', 'Phân bổ kho xuất', 'Chỉ định vật tư thay thế'],
       rules: 'Ưu tiên đơn vị khẩn cấp; Kiểm tra hạn mức tiêu dùng của phòng ban.',
-      outcome: 'Phiếu sẵn sàng xuất kho (APPROVED).',
+      outcome: 'Phiếu đã duyệt và sẵn sàng xuất kho.',
       icon: <ShieldCheck className="w-6 h-6" />,
       color: 'bg-indigo-500',
       status: 'PENDING_ADMIN'
@@ -217,7 +217,7 @@ export default function RequestsWorkflow({ onBack }: Props) {
                         <MousePointer2 className="w-7 h-7" />
                     </div>
                     <div>
-                        <h5 className="font-black text-slate-800 text-lg">Tự thu hồi (Withdraw)</h5>
+                        <h5 className="font-black text-slate-800 text-lg">Tự rút phiếu</h5>
                         <p className="text-sm text-slate-500 mt-2 font-medium">Người lập có quyền rút phiếu để sửa chữa trước khi có người duyệt thực hiện thao tác đầu tiên.</p>
                     </div>
                 </div>
@@ -234,7 +234,7 @@ export default function RequestsWorkflow({ onBack }: Props) {
                </div>
                <div>
                   <h3 className="text-2xl font-black text-slate-800 uppercase tracking-wider">3. Quy trình Mua sắm (Nếu kho báo thiếu)</h3>
-                  <p className="text-sm font-semibold text-amber-600 mt-0.5">Tự động kết nối với quy trình Thu mua (Procurement flow)</p>
+                  <p className="text-sm font-semibold text-amber-600 mt-0.5">Tự động kết nối với quy trình thu mua</p>
                </div>
              </div>
 
@@ -244,11 +244,11 @@ export default function RequestsWorkflow({ onBack }: Props) {
                         <div className="w-12 h-12 bg-rose-50 text-rose-500 rounded-xl flex items-center justify-center shrink-0">
                             <AlertCircle className="w-6 h-6" />
                         </div>
-                        <span className="text-[10px] font-black text-rose-500 bg-rose-50 px-2 py-0.5 rounded uppercase">Trigger</span>
+                        <span className="text-[10px] font-black text-rose-500 bg-rose-50 px-2 py-0.5 rounded uppercase">Điều kiện</span>
                     </div>
                     <div>
                         <p className="font-black text-slate-800 text-lg italic">"Duyệt xong nhưng kho báo thiếu"</p>
-                        <p className="text-sm text-slate-500 mt-3 font-medium leading-relaxed">Khi số lượng duyệt &gt; Tồn kho khả dụng (Available Stock), hệ thống tự ghi nhận nợ (BACKORDER) cho những dòng hàng này.</p>
+                        <p className="text-sm text-slate-500 mt-3 font-medium leading-relaxed">Khi số lượng duyệt lớn hơn tồn kho khả dụng, hệ thống tự ghi nhận chờ mua bổ sung cho những dòng hàng này.</p>
                     </div>
                  </div>
                  
@@ -263,11 +263,11 @@ export default function RequestsWorkflow({ onBack }: Props) {
                         <div className="w-12 h-12 bg-amber-50 text-amber-500 rounded-xl flex items-center justify-center shrink-0">
                             <ShoppingCart className="w-6 h-6" />
                         </div>
-                        <span className="text-[10px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded uppercase">Action</span>
+                        <span className="text-[10px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded uppercase">Thao tác</span>
                     </div>
                     <div>
-                        <p className="font-black text-slate-800 text-lg italic">"Admin khởi tạo Đơn Mua (PO)"</p>
-                        <p className="text-sm text-slate-500 mt-3 font-medium leading-relaxed">Admin thực hiện chức năng "Tạo PO báo thiếu". Các mặt hàng này sẽ được đẩy sang luồng mua sắm chuyên biệt.</p>
+                        <p className="font-black text-slate-800 text-lg italic">"Hành chính khởi tạo Đơn Mua (PO)"</p>
+                        <p className="text-sm text-slate-500 mt-3 font-medium leading-relaxed">Hành chính thực hiện chức năng "Tạo đơn mua bổ sung". Các mặt hàng này sẽ được đẩy sang luồng mua sắm chuyên biệt.</p>
                     </div>
                  </div>
 
@@ -282,11 +282,11 @@ export default function RequestsWorkflow({ onBack }: Props) {
                         <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center shrink-0 backdrop-blur-sm">
                             <CheckCircle2 className="w-6 h-6" />
                         </div>
-                        <span className="text-[10px] font-black text-emerald-100 bg-white/10 px-2 py-0.5 rounded uppercase backdrop-blur-md">Final</span>
+                        <span className="text-[10px] font-black text-emerald-100 bg-white/10 px-2 py-0.5 rounded uppercase backdrop-blur-md">Kết quả</span>
                     </div>
                     <div>
                         <p className="font-black text-lg">"Nhập kho & Tự động trả hàng"</p>
-                        <p className="text-sm text-emerald-50 mt-3 font-medium leading-relaxed">Ngay khi PO được nhập kho, hệ thống tự động thông báo và hướng dẫn người dùng nhận hàng Backorder.</p>
+                        <p className="text-sm text-emerald-50 mt-3 font-medium leading-relaxed">Ngay khi PO được nhập kho, hệ thống tự động thông báo và hướng dẫn người dùng nhận hàng mua bổ sung.</p>
                     </div>
                  </div>
              </div>
