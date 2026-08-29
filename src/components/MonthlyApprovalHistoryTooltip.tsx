@@ -7,6 +7,7 @@ type MonthHistory = { month: number; quantity: number };
 type ApprovalHistoryResponse = {
   item: { id: string; name: string; mvpp: string; unit: string };
   department: string;
+  departmentId?: string | null;
   year: number;
   months: MonthHistory[];
   total: number;
@@ -17,6 +18,8 @@ interface Props {
   itemId: string;
   itemName: string;
   department?: string;
+  departmentId?: string | null;
+  requestId?: string;
   year?: number;
   children: ReactNode;
 }
@@ -27,6 +30,8 @@ export default function MonthlyApprovalHistoryTooltip({
   itemId,
   itemName,
   department,
+  departmentId,
+  requestId,
   year = new Date().getFullYear(),
   children,
 }: Props) {
@@ -35,7 +40,7 @@ export default function MonthlyApprovalHistoryTooltip({
   const [error, setError] = useState('');
   const [history, setHistory] = useState<ApprovalHistoryResponse | null>(null);
   const [retryToken, setRetryToken] = useState(0);
-  const cacheKey = `${itemId}|${department || ''}|${year}`;
+  const cacheKey = `${itemId}|${requestId || ''}|${departmentId || ''}|${department || ''}|${year}`;
 
   useEffect(() => {
     if (!open || !itemId) return;
@@ -53,7 +58,13 @@ export default function MonthlyApprovalHistoryTooltip({
     setHistory(null);
     setError('');
     api.get('/requests/admin-approval-history', {
-      params: { itemId, department: department || undefined, year },
+      params: {
+        itemId,
+        requestId: requestId || undefined,
+        departmentId: departmentId || undefined,
+        department: department || undefined,
+        year,
+      },
       timeout: 15000,
     })
       .then(response => {
@@ -78,7 +89,7 @@ export default function MonthlyApprovalHistoryTooltip({
     return () => {
       cancelled = true;
     };
-  }, [cacheKey, department, itemId, open, retryToken, year]);
+  }, [cacheKey, department, departmentId, itemId, open, requestId, retryToken, year]);
 
   const months = useMemo(() => {
     const values = new Map((history?.months || []).map(month => [month.month, month.quantity]));
@@ -89,11 +100,11 @@ export default function MonthlyApprovalHistoryTooltip({
   }, [history]);
 
   const content = (
-    <div className="max-w-[92vw] overflow-x-auto py-1">
+    <div className="max-w-[calc(100vw-32px)] py-1">
       {loading ? (
-        <div className="w-72 py-5 text-center text-xs font-bold text-slate-500">Đang tải lịch sử duyệt...</div>
+        <div className="w-[360px] max-w-full py-5 text-center text-xs font-bold text-slate-500">Đang tổng hợp theo phòng ban...</div>
       ) : error ? (
-        <div className="w-72 py-3 text-center text-xs font-bold text-rose-600">
+        <div className="w-[360px] max-w-full py-3 text-center text-xs font-bold text-rose-600">
           <p>{error}</p>
           <button
             type="button"
@@ -104,36 +115,45 @@ export default function MonthlyApprovalHistoryTooltip({
           </button>
         </div>
       ) : history ? (
-        <div className="min-w-[780px]">
-          <div className="mb-2 flex items-end justify-between gap-4">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Phòng ban đang đề xuất</p>
-              <p className="text-xs font-black text-slate-800">{history.department}</p>
+        <div className="w-[620px] max-w-full">
+          <div className="mb-3 flex items-start justify-between gap-4 border-b border-slate-200 pb-2.5">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-indigo-600">Lịch sử Hành chính duyệt</p>
+              <p className="mt-0.5 truncate text-sm font-black text-slate-900">{history.department}</p>
+              <p className="mt-1 truncate text-[11px] font-semibold text-slate-500" title={history.item?.name || itemName}>
+                {history.item?.name || itemName}
+              </p>
             </div>
-            <p className="text-[10px] font-bold text-slate-500">
-              Năm {history.year} · {history.approvedRequestCount} phiếu · theo ngày Hành chính duyệt
-            </p>
+            <div className="shrink-0 text-right">
+              <span className="inline-flex rounded-lg bg-indigo-50 px-2 py-1 text-[10px] font-black text-indigo-700">Năm {history.year}</span>
+              <p className="mt-1 text-[10px] font-bold text-slate-400">{history.approvedRequestCount} phiếu đã duyệt</p>
+            </div>
           </div>
-          <table className="w-full table-fixed overflow-hidden rounded-xl border border-slate-200 text-center text-[10px]">
-            <thead className="bg-slate-100 font-black uppercase text-slate-500">
-              <tr>
-                <th className="w-52 border-r border-slate-200 px-2 py-2 text-left">Mặt hàng</th>
-                {months.map(month => <th key={month.month} className="px-1 py-2">T{month.month}</th>)}
-                <th className="w-14 border-l border-slate-200 px-1 py-2">Tổng</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="bg-white font-bold text-slate-700">
-                <td className="border-r border-slate-200 px-2 py-2 text-left whitespace-normal">{history.item?.name || itemName}</td>
-                {months.map(month => (
-                  <td key={month.month} className={month.quantity > 0 ? 'px-1 py-2 font-black text-indigo-700' : 'px-1 py-2 text-slate-300'}>
-                    {month.quantity > 0 ? month.quantity.toLocaleString('vi-VN') : '—'}
-                  </td>
-                ))}
-                <td className="border-l border-slate-200 px-1 py-2 font-black text-emerald-700">{history.total.toLocaleString('vi-VN')}</td>
-              </tr>
-            </tbody>
-          </table>
+
+          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+            {months.map(month => (
+              <div
+                key={month.month}
+                className={`rounded-lg border px-2 py-1.5 text-center ${month.quantity > 0 ? 'border-indigo-200 bg-indigo-50/70' : 'border-slate-200 bg-slate-50'}`}
+              >
+                <p className="text-[9px] font-black uppercase text-slate-400">Tháng {month.month}</p>
+                <p className={`mt-0.5 text-sm font-black tabular-nums ${month.quantity > 0 ? 'text-indigo-700' : 'text-slate-300'}`}>
+                  {month.quantity > 0 ? month.quantity.toLocaleString('vi-VN') : '—'}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-2.5 flex items-center justify-between rounded-xl bg-slate-900 px-3 py-2 text-white">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Cộng tất cả người đề xuất cùng phòng ban</p>
+              <p className="text-[10px] font-semibold text-slate-300">Tính theo ngày Hành chính duyệt</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[9px] font-black uppercase text-slate-400">Tổng</p>
+              <p className="text-lg font-black tabular-nums text-emerald-400">{history.total.toLocaleString('vi-VN')}</p>
+            </div>
+          </div>
         </div>
       ) : null}
     </div>
