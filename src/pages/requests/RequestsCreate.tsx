@@ -692,6 +692,8 @@ export default function RequestsCreate({
                           itemId={t.itemId}
                           itemName={t.item.name}
                           department={currentUser?.department}
+                          departmentId={currentUser?.departmentId}
+                          requestId={activeRequest?.id}
                         >
                           <input
                             type="number"

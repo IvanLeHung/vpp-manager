@@ -676,6 +676,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
           itemId={l.itemId || l.item?.id}
           itemName={l.item?.name || 'Vật tư'}
           department={data.department}
+          departmentId={data.requester?.departmentId}
+          requestId={data.id}
         >
           <span>
             <span className="font-black text-base text-slate-700">{l.qtyRequested}</span>{' '}
@@ -1680,6 +1682,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                             itemId={l.itemId || l.item?.id}
                                             itemName={l.item?.name || 'Vật tư'}
                                             department={data.department}
+                                            departmentId={data.requester?.departmentId}
+                                            requestId={data.id}
                                           >
                                             <span>{l.qtyRequested}</span>
                                           </MonthlyApprovalHistoryTooltip>

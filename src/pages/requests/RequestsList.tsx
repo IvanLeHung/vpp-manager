@@ -5,6 +5,7 @@ import type { VPPRequest, User } from '../../context/AppContext';
 import { useAppContext } from '../../context/AppContext';
 import api from '../../lib/api';
 import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
+import MonthlyApprovalHistoryTooltip from '../../components/MonthlyApprovalHistoryTooltip';
 import type { RequestSupplyType, ViewMode } from '../Requests';
 import { getApprovalActionLabel, getRequestStatusLabel } from '../../lib/statusLabels';
 
@@ -943,7 +944,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                   <tr className="text-[9px] uppercase font-black text-slate-400 tracking-widest">
                     <th className="px-4 py-2.5 text-center w-10">STT</th>
                     <th className="px-4 py-2.5">Tên Vật tư / Hàng hóa</th>
-                    <th className="px-4 py-2.5 text-center w-20">SL Yêu cầu</th>
+                    <th className="px-4 py-2.5 text-center w-20">SL đề xuất</th>
                     <th className="px-4 py-2.5 text-center w-14">ĐVT</th>
                     <th className="px-4 py-2.5 text-right w-24">Đơn giá</th>
                     <th className="px-4 py-2.5 text-right w-28">Thành tiền</th>
@@ -979,7 +980,16 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                           )}
                           <span className="text-[9px] font-black text-slate-400 tracking-wider">{displayItem?.mvpp || '-'}</span>
                         </td>
-                        <td className="px-4 py-2.5 text-center"><span className="font-black text-base text-indigo-600">{line.qtyRequested}</span></td>
+                        <td className="px-4 py-2.5 text-center">
+                          <MonthlyApprovalHistoryTooltip
+                            itemId={line.itemId || line.item?.id}
+                            itemName={line.item?.name || displayItem?.name || 'Vật tư'}
+                            department={previewReq.department}
+                            requestId={previewReq.id}
+                          >
+                            <span className="font-black text-base text-indigo-600">{line.qtyRequested}</span>
+                          </MonthlyApprovalHistoryTooltip>
+                        </td>
                         <td className="px-4 py-2.5 text-center text-xs font-bold text-slate-500">{displayItem?.unit || '—'}</td>
                         <td className="px-4 py-2.5 text-right text-xs font-bold text-slate-600">{displayItem?.price ? Number(displayItem.price).toLocaleString('vi-VN') : '—'}</td>
                         <td className="px-4 py-2.5 text-right text-xs font-black text-slate-800">{displayItem?.price ? (Number(line.qtyRequested || 0) * Number(displayItem.price)).toLocaleString('vi-VN') : '—'}</td>
