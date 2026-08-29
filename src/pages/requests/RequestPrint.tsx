@@ -52,19 +52,29 @@ const RequestPrint: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const selectedPrintType = searchParams.get('printType') || 'ALL';
+  const requestedPrintType = searchParams.get('printType') || 'ALL';
+  const selectedPrintType = requestedPrintType === 'VS' ? 'VE_SINH' : requestedPrintType;
+  const bulkRequestIdsParam = searchParams.get('ids') || '';
+  const bulkRequestIds = bulkRequestIdsParam
+    .split(',')
+    .map(value => value.trim())
+    .filter(Boolean);
   const [data, setData] = useState<any>(null);
+  const [printRequests, setPrintRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchRequest = async () => {
       try {
-        const res = await api.get(`/requests/${id}`);
-        setData(res.data);
+        const requestIds = Array.from(new Set(bulkRequestIds.length > 0 ? bulkRequestIds : (id ? [id] : [])));
+        const responses = await Promise.all(requestIds.map(requestId => api.get(`/requests/${encodeURIComponent(requestId)}`)));
+        const requests = responses.map(response => response.data).filter(Boolean);
+        setPrintRequests(requests);
+        setData(requests[0] || null);
       } catch (err: any) {
         console.error(err);
-        setError(err.response?.data?.error || 'Không thể tải thông tin phiếu đề xuất');
+        setError(err.response?.data?.error || 'Không thể tải đầy đủ các phiếu đề xuất đã chọn');
       } finally {
         setLoading(false);
       }
@@ -73,16 +83,33 @@ const RequestPrint: React.FC = () => {
     if (id) {
       fetchRequest();
     }
-  }, [id]);
+  }, [id, bulkRequestIdsParam]);
 
   useEffect(() => {
-    if (data) {
-      const timer = setTimeout(() => {
-        window.print();
-      }, 800);
-      return () => clearTimeout(timer);
+    if (printRequests.length > 0) {
+      let cancelled = false;
+      let printTimer: ReturnType<typeof setTimeout> | undefined;
+      const waitForImages = Promise.all(
+        Array.from(document.images).map(image => image.complete
+          ? Promise.resolve()
+          : new Promise<void>(resolve => {
+              image.addEventListener('load', () => resolve(), { once: true });
+              image.addEventListener('error', () => resolve(), { once: true });
+            }))
+      );
+      const imageTimeout = new Promise<void>(resolve => setTimeout(resolve, 3000));
+
+      Promise.race([waitForImages, imageTimeout]).then(() => {
+        if (cancelled) return;
+        printTimer = setTimeout(() => window.print(), 300);
+      });
+
+      return () => {
+        cancelled = true;
+        if (printTimer) clearTimeout(printTimer);
+      };
     }
-  }, [data]);
+  }, [printRequests]);
 
   if (loading) {
     return (
@@ -118,7 +145,7 @@ const RequestPrint: React.FC = () => {
     return 'VPP';
   };
 
-  const filteredLines = sortLinesForPrinting(data.lines || []).filter((l: any) => {
+  const getFilteredLines = (requestData: any) => sortLinesForPrinting(requestData.lines || []).filter((l: any) => {
     if (selectedPrintType === 'ALL') return true;
     const type = getItemCategoryType(l.item);
     return type === selectedPrintType;
@@ -135,12 +162,14 @@ const RequestPrint: React.FC = () => {
           <ArrowLeft className="w-4 h-4" /> Đóng Tab in
         </button>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500 font-semibold">Nếu hộp thoại in không tự động mở, vui lòng nhấn:</span>
+          <span className="text-xs text-slate-500 font-semibold">
+            Đã chuẩn bị {printRequests.length} phiếu riêng lẻ. Nếu hộp thoại in không tự động mở, vui lòng nhấn:
+          </span>
           <button
             onClick={() => window.print()}
             className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition shadow-sm"
           >
-            <Printer className="w-4 h-4" /> In Phiếu Đề Xuất
+            <Printer className="w-4 h-4" /> In {printRequests.length} Phiếu Đề Xuất
           </button>
         </div>
       </div>
@@ -158,6 +187,14 @@ const RequestPrint: React.FC = () => {
           @page {
             size: A4 portrait;
             margin: 12mm 12mm 15mm 12mm;
+          }
+          .print-page {
+            page-break-after: always;
+            break-after: page;
+          }
+          .print-page:last-child {
+            page-break-after: auto;
+            break-after: auto;
           }
         }
         .print-page {
@@ -225,7 +262,10 @@ const RequestPrint: React.FC = () => {
       `}</style>
 
       {/* Print content container */}
-      <div className="print-page">
+      {printRequests.map((data, requestIndex) => {
+        const filteredLines = getFilteredLines(data);
+        return (
+      <div key={data.id || requestIndex} className="print-page">
         {/* Header */}
         <div className="print-header">
           <div className="w-[35%] text-left">
@@ -519,6 +559,8 @@ const RequestPrint: React.FC = () => {
           <p>Hệ thống Quản lý VPP - {data.id} • Trang 1/1</p>
         </div>
       </div>
+        );
+      })}
     </div>
   );
 };
