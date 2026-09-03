@@ -483,6 +483,7 @@ function hasPermission(role: string, permission: string): boolean {
 const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail, onShowHistory, recreateConfig, clearRecreateConfig }) => {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('ALL');
   const [showDataFilters, setShowDataFilters] = useState(false);
@@ -697,8 +698,10 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
     fetchInFlightRef.current = true;
     if (!silent) setLoading(true);
+    setLoadError('');
     try {
-      const res = await api.get('/purchases');
+      const res = await api.get('/purchases', { timeout: 30000 });
+      if (!Array.isArray(res.data)) throw new Error('Invalid purchase list response');
       setData(res.data);
       lastFetchedAtRef.current = Date.now();
       setPreviewPO((current: any) => current
@@ -707,6 +710,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       );
     } catch(e) {
       console.error(e);
+      setLoadError('Không tải được danh sách đơn mua sắm. Vui lòng thử lại.');
     } finally {
       fetchInFlightRef.current = false;
       if (!silent) setLoading(false);
@@ -2455,6 +2459,10 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                         </div>
                 </div>
 
+                {loadError && <div role="alert" className="mx-4 my-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                  <div><p className="font-semibold">{loadError}</p><p className="mt-1 text-xs">{data.length > 0 ? 'Đang hiển thị dữ liệu đã tải trước đó; số liệu có thể chưa cập nhật.' : 'Chưa thể xác định số phiếu. Đây là lỗi tải dữ liệu, không phải danh sách trống.'}</p></div>
+                  <button type="button" disabled={loading} onClick={() => fetchData(false, true)} className="rounded-lg border border-rose-200 bg-white px-3 py-2 font-semibold disabled:opacity-50">Thử tải lại</button>
+                </div>}
                 {/* TABLE */}
                 <div className="flex-1 overflow-auto rounded-b-3xl relative custom-scrollbar">
                     {loading && (
@@ -2489,7 +2497,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                             </tr>
                         </thead>
                         <tbody className="bg-white">
-                            {filteredData.length === 0 && !loading && (
+                            {filteredData.length === 0 && !loading && !loadError && (
                                 <tr>
                                     <td colSpan={isBulkMode ? 10 : 9} className="p-20 text-center text-slate-300">
                                         <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
