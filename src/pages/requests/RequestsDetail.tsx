@@ -8,6 +8,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import DocumentChainMap from '../../components/DocumentChainMap';
 import MonthlyApprovalHistoryTooltip from '../../components/MonthlyApprovalHistoryTooltip';
 import ReopenAdminApprovalAction from '../../components/ReopenAdminApprovalAction';
+import RequestHistoryActor from '../../components/RequestHistoryActor';
 import { getApprovalActionLabel, getLineStatusLabel, getRequestStatusLabel } from '../../lib/statusLabels';
 import { getRequestLineAmount, getRequestLineUnitPrice } from '../../lib/requestPricing';
 import type { User } from '../../context/AppContext';
@@ -1254,7 +1255,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                             </div>
                                             <p className="text-sm font-black text-slate-800 uppercase tracking-tighter">{getActionLabel(audit.action)}</p>
                                             <p className="text-[11px] font-bold text-slate-400 mt-1 tracking-tight">
-                                                {new Date(audit.createdAt).toLocaleString('vi-VN')} • <span className="text-slate-600 font-black italic">{audit.approver?.fullName}</span>
+                                                {new Date(audit.createdAt).toLocaleString('vi-VN')} • <span className="text-slate-600 font-black italic"><RequestHistoryActor history={audit} requester={data.requester} /></span>
                                             </p>
                                             {audit.reason && (
                                                 <div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-100 relative max-w-2xl">
@@ -2721,7 +2722,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                   })}
                               </td>
                               <td className="border border-slate-300 p-1.5 font-bold uppercase text-slate-700">
-                                  {h.approver?.fullName} {h.approver?.role === 'ADMIN' ? '(ADM)' : ''}
+                                  <RequestHistoryActor history={h} requester={data.requester} showAdminSuffix />
                               </td>
                               <td className="border border-slate-300 p-1.5">
                                   <span className={`px-1.5 py-0.5 rounded-sm font-bold text-[9px] ${
@@ -2807,7 +2808,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                                   Verified
                                               </span>
                                           </div>
-                                          <p className="text-xs font-bold text-slate-400 mt-1">{new Date(audit.createdAt).toLocaleString('vi-VN')} • <span className="text-indigo-600 font-black">{audit.approver?.fullName}</span></p>
+                                          <p className="text-xs font-bold text-slate-400 mt-1">{new Date(audit.createdAt).toLocaleString('vi-VN')} • <span className="text-indigo-600 font-black"><RequestHistoryActor history={audit} requester={data.requester} /></span></p>
                                           {audit.reason && (
                                               <div className="mt-4 p-5 bg-slate-50/50 rounded-2xl border border-slate-100 relative overflow-hidden">
                                                   <div className="absolute left-0 top-0 w-1 h-full bg-slate-200"></div>

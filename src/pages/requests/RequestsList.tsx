@@ -7,6 +7,7 @@ import api from '../../lib/api';
 import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
 import MonthlyApprovalHistoryTooltip from '../../components/MonthlyApprovalHistoryTooltip';
 import ReopenAdminApprovalAction from '../../components/ReopenAdminApprovalAction';
+import RequestHistoryActor from '../../components/RequestHistoryActor';
 import type { RequestSupplyType, ViewMode } from '../Requests';
 import { getApprovalActionLabel, getRequestStatusLabel } from '../../lib/statusLabels';
 import { getOriginalRequestLineUnitPrice, getRequestLineAmount, getRequestLineUnitPrice } from '../../lib/requestPricing';
@@ -1495,7 +1496,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                               })}
                             </td>
                             <td style={{ border: '0.7px solid #000', padding: '3px 4px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '9px' }}>
-                              {h.approver?.fullName} {h.approver?.role === 'ADMIN' ? '(ADM)' : ''}
+                              <RequestHistoryActor history={h} requester={req.requester} showAdminSuffix />
                             </td>
                             <td style={{ border: '0.7px solid #000', padding: '3px 4px', fontSize: '9px' }}>
                               <span className="font-bold">{getApprovalActionLabel(h.action)}</span>

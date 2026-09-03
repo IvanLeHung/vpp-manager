@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../lib/api';
 import { Printer, ArrowLeft } from 'lucide-react';
 import { getRequestLineAmount, getRequestLineUnitPrice } from '../../lib/requestPricing';
+import RequestHistoryActor from '../../components/RequestHistoryActor';
 
 function getItemSortGroupName(itemName: string) {
   if (!itemName) return '';
@@ -526,7 +527,7 @@ const RequestPrint: React.FC = () => {
                     })}
                   </td>
                   <td className="border border-slate-300 p-1.5 font-bold uppercase text-slate-700">
-                    {h.approver?.fullName} {h.approver?.role === 'ADMIN' ? '(ADM)' : ''}
+                    <RequestHistoryActor history={h} requester={data.requester} showAdminSuffix />
                   </td>
                   <td className="border border-slate-300 p-1.5">
                     <span className={`px-1.5 py-0.5 rounded-sm font-bold text-[9px] ${
