@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../lib/api';
 import { 
   Search, Calendar, Package, 
-  CheckCircle, Clock, ChevronRight, AlertTriangle, PlusCircle
+  CheckCircle, Clock, ChevronRight, AlertTriangle, PlusCircle, RefreshCw
 } from 'lucide-react';
 
 interface ReceiptsListProps {
@@ -12,6 +12,7 @@ interface ReceiptsListProps {
 const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('PENDING');
 
@@ -49,13 +50,17 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
 
   const fetchData = async () => {
     setLoading(true);
+    setLoadError('');
     try {
-      const res = await api.get('/receipts');
+      const res = await api.get('/receipts', { timeout: 30000 });
+      if (!Array.isArray(res.data)) throw new Error('Invalid receipt list response');
       setData(res.data);
     } catch(e) {
       console.error(e);
+      setLoadError('Không tải được danh sách phiếu nhập kho. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const getStatusBadge = (status: string) => {
@@ -157,6 +162,7 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
                     </div>
 
                     <div className="flex items-center gap-3 w-full md:w-auto mt-2 md:mt-0">
+                        <button type="button" onClick={fetchData} disabled={loading} className="flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Làm mới</button>
                         <div className="relative flex-1 md:w-72">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <input 
@@ -168,6 +174,10 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
                     </div>
                 </div>
 
+                {loadError && <div role="alert" className="mx-4 my-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                    <div><p className="font-semibold">{loadError}</p><p className="mt-1 text-xs">{data.length > 0 ? 'Đang hiển thị dữ liệu đã tải trước đó; số liệu có thể chưa cập nhật.' : 'Chưa thể xác định số phiếu. Đây là lỗi tải dữ liệu, không phải danh sách trống.'}</p></div>
+                    <button type="button" disabled={loading} onClick={fetchData} className="rounded-lg border border-rose-200 bg-white px-3 py-2 font-semibold disabled:opacity-50">Thử tải lại</button>
+                </div>}
                 <div className="flex-1 overflow-auto rounded-b-3xl relative">
                     {loading && (
                         <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
@@ -188,11 +198,12 @@ const ReceiptsList: React.FC<ReceiptsListProps> = ({ onViewDetail }) => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 bg-white">
-                            {filteredData.length === 0 && !loading && (
+                            {filteredData.length === 0 && !loading && !loadError && (
                                 <tr>
                                     <td colSpan={6} className="p-10 text-center text-slate-500">
                                         <Package className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-                                        <p className="font-bold">Không tìm thấy Phiếu Nhập Kho nào</p>
+                                        <p className="font-bold">{!data.length ? 'Chưa có phiếu nhập kho.' : searchTerm ? 'Không có phiếu khớp từ khóa trong tab đang chọn.' : activeTab === 'PENDING' ? 'Không có phiếu đang chờ kiểm hàng / nhập kho.' : activeTab === 'DISCREPANCY' ? 'Không có phiếu báo lệch / lỗi.' : activeTab === 'COMPLETED' ? 'Không có phiếu đã nhập đủ.' : 'Không có phiếu phù hợp bộ lọc.'}</p>
+                                        {data.length > 0 && <><p className="mt-2 text-sm">Hệ thống có {data.length} phiếu nhập kho; các phiếu này nằm ngoài bộ lọc đang chọn.</p><button type="button" onClick={() => { setActiveTab('ALL'); setSearchTerm(''); }} className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700">Xem tất cả phiếu</button></>}
                                     </td>
                                 </tr>
                             )}
