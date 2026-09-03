@@ -9,6 +9,7 @@ import DocumentChainMap from '../../components/DocumentChainMap';
 import MonthlyApprovalHistoryTooltip from '../../components/MonthlyApprovalHistoryTooltip';
 import ReopenAdminApprovalAction from '../../components/ReopenAdminApprovalAction';
 import { getApprovalActionLabel, getLineStatusLabel, getRequestStatusLabel } from '../../lib/statusLabels';
+import { getRequestLineAmount, getRequestLineUnitPrice } from '../../lib/requestPricing';
 import type { User } from '../../context/AppContext';
 import type { ViewMode } from '../Requests';
 import { Layout, Card, Table, Tooltip, Avatar } from 'antd';
@@ -578,12 +579,14 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
   const hasRemaining = data?.lines?.some((l: any) => (l.qtyApproved ?? l.qtyRequested) > (l.qtyDelivered || 0));
   const canUrge = (['PARTIALLY_ISSUED', 'APPROVED', 'READY_TO_ISSUE', 'BACKORDER'].includes(data.status)) && currentUid === data.requesterId && hasRemaining;
   const lineTotals = (data.lines || []).reduce((totals: any, line: any) => {
-    const item = line.issue_item || line.item;
     totals.requested += Number(line.qtyRequested || 0);
     totals.managerApproved += Number(line.qtyManagerApproved || 0);
     totals.adminApproved += Number(line.replacementQty ?? line.qtyAdminApproved ?? line.qtyApproved ?? 0);
     totals.delivered += Number(line.qtyDelivered || 0);
-    totals.amount += Number(item?.price || 0) * Number(line.qtyApproved ?? line.qtyRequested ?? 0);
+    totals.amount += getRequestLineAmount(
+      line,
+      line.replacementQty ?? line.qtyAdminApproved ?? line.qtyApproved ?? line.qtyRequested ?? 0,
+    );
     return totals;
   }, { requested: 0, managerApproved: 0, adminApproved: 0, delivered: 0, amount: 0 });
 
@@ -753,7 +756,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       key: 'price',
       align: 'right' as const,
       render: (l: any) => (
-        <span className="text-xs font-bold text-slate-500">{((l.issue_item || l.item).price || 0).toLocaleString('vi-VN')}</span>
+        <span className="text-xs font-bold text-slate-500">{getRequestLineUnitPrice(l).toLocaleString('vi-VN')}</span>
       )
     },
     {
@@ -761,7 +764,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       key: 'totalPrice',
       align: 'right' as const,
       render: (l: any) => (
-        <span className="text-xs font-black text-slate-800">{(((l.issue_item || l.item).price || 0) * (l.qtyApproved ?? l.qtyRequested)).toLocaleString('vi-VN')}</span>
+        <span className="text-xs font-black text-slate-800">{getRequestLineAmount(l, l.replacementQty ?? l.qtyApproved ?? l.qtyRequested).toLocaleString('vi-VN')}</span>
       )
     },
     {
@@ -1568,7 +1571,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                     const approval = approvals.find((a:any)=>a.lineId===l.id) || { selected: false, qtyApproved: 0, note: '', replacementItemId: null, replacementItemName: null, replacementItem: null };
                                     const effectivePrice = (approval.replacementItemId && approval.replacementItem)
                                       ? (approval.replacementItem.price || 0)
-                                      : (l.item.price || 0);
+                                      : getRequestLineUnitPrice(l);
                                     const displayItem = (approval.replacementItemId && approval.replacementItem) ? approval.replacementItem : l.item;
                                     const wh = getEffectiveWarehouseCode(displayItem, data.warehouseCode || 'MAIN');
                                     const currentStock = displayItem.stocks?.find((s:any)=>s.warehouseCode===wh)?.quantityOnHand || 0;
@@ -2549,10 +2552,10 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                    )}
                                </td>
                                <td className="border border-black p-2 text-right font-medium">
-                                   {(displayItem.price || 0).toLocaleString('vi-VN')}
+                                   {getRequestLineUnitPrice(l).toLocaleString('vi-VN')}
                                </td>
                                <td className="border border-black p-2 text-right font-bold">
-                                   {((displayItem.price || 0) * (displayQtyApproved ?? displayQtyRequested)).toLocaleString('vi-VN')}
+                                   {getRequestLineAmount(l, displayQtyApproved ?? displayQtyRequested).toLocaleString('vi-VN')}
                                </td>
                                <td className="border border-black p-2 text-[10px] italic leading-tight">{l.note || '—'}</td>
                            </tr>
@@ -2564,9 +2567,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                             </td>
                             <td className="border border-black p-2 text-right" colSpan={2}>
                                 {filteredLines.reduce((sum: number, line: any) => {
-                                  const item = line.issue_item || line.item;
                                   const qty = line.replacementQty ?? line.qtyApproved ?? line.qtyRequested;
-                                  return sum + ((item.price || 0) * qty);
+                                  return sum + getRequestLineAmount(line, qty);
                                 }, 0).toLocaleString('vi-VN')} VNĐ
                             </td>
                             <td className="border border-black p-2"></td>

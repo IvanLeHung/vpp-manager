@@ -41,6 +41,8 @@ export type RequestLine = {
   qtyAdminApproved: number | null;
   qtyApproved: number | null;
   qtyDelivered: number;
+  unitPrice?: number | null;
+  lineAmount?: number | null;
   status: string;
   note: string;
   replacementItemId?: string | null;
