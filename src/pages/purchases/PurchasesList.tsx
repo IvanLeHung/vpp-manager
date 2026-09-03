@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import api from '../../lib/api';
 import { 
   Plus, DollarSign,
@@ -522,6 +522,8 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
   const [showExportPreviewModal, setShowExportPreviewModal] = useState(false);
   const [previewActiveTab, setPreviewActiveTab] = useState<'SUMMARY' | 'DETAIL' | 'ITEMS' | 'CLASSIFICATION'>('SUMMARY');
+  const lastFetchedAtRef = useRef(0);
+  const fetchInFlightRef = useRef(false);
   const [itemsClassification, setItemsClassification] = useState<any[]>([]);
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -673,34 +675,42 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
 
 
   useEffect(() => {
-    fetchData();
+    fetchData(false, true);
+    // Refresh only when the user returns to the page and the current data is
+    // already stale. The previous 10-second full refresh downloaded every PO
+    // and every line repeatedly, which exhausted Neon network transfer.
     const refreshSilently = () => fetchData(true);
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') refreshSilently();
     };
-    const intervalId = window.setInterval(refreshSilently, 10000);
     window.addEventListener('focus', refreshSilently);
     document.addEventListener('visibilitychange', handleVisibility);
     return () => {
-      window.clearInterval(intervalId);
       window.removeEventListener('focus', refreshSilently);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, []);
 
-  const fetchData = async (silent = false) => {
+  const fetchData = async (silent = false, force = false) => {
+    if (fetchInFlightRef.current) return;
+    if (!force && silent && Date.now() - lastFetchedAtRef.current < 2 * 60 * 1000) return;
+
+    fetchInFlightRef.current = true;
     if (!silent) setLoading(true);
     try {
       const res = await api.get('/purchases');
       setData(res.data);
+      lastFetchedAtRef.current = Date.now();
       setPreviewPO((current: any) => current
         ? (res.data.find((purchase: any) => purchase.id === current.id) || current)
         : null
       );
     } catch(e) {
       console.error(e);
+    } finally {
+      fetchInFlightRef.current = false;
+      if (!silent) setLoading(false);
     }
-    if (!silent) setLoading(false);
   };
 
   const getStatusBadge = (status: string, hasReplacement?: boolean, pendingReplacement?: boolean) => {
@@ -2427,6 +2437,14 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                            <button onClick={() => setIsBulkMode(!isBulkMode)} className={`p-2.5 rounded-xl border transition flex items-center gap-1.5 text-[10px] font-black uppercase ${isBulkMode ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-slate-200 text-slate-500'}`}>
                               <CheckSquare className="w-4 h-4"/> {isBulkMode ? 'Ẩn ô chọn' : 'Chọn nhiều'}
                            </button>
+                            <button
+                              onClick={() => fetchData(false, true)}
+                              disabled={loading}
+                              className="bg-white hover:bg-slate-50 disabled:opacity-50 border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-[10px] font-black transition-all flex items-center shadow-sm whitespace-nowrap active:scale-95 uppercase gap-1.5 cursor-pointer"
+                              title="Tải dữ liệu mới nhất"
+                            >
+                              <RefreshCw className={`w-4 h-4 text-indigo-600 ${loading ? 'animate-spin' : ''}`} /> Làm mới
+                            </button>
                                                        <button onClick={onShowHistory} className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl text-[10px] font-black transition-all flex items-center shadow-sm whitespace-nowrap active:scale-95 uppercase gap-1.5 cursor-pointer">
                                 <FileText className="w-4 h-4 text-indigo-600" /> Lịch sử báo cáo
                             </button>

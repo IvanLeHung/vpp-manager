@@ -128,10 +128,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     try {
       setLoading(true);
-      const [itemsRes, reqRes] = await Promise.all([
-        api.get('/items'),
-        api.get('/requests')
-      ]);
+      // Requests are loaded by the Requests screen itself. Fetching the whole
+      // request history here made every login download it once, then the screen
+      // immediately downloaded the same data again.
+      const itemsRes = await api.get('/items');
       
       const formattedItems = itemsRes.data.map((i: any) => ({
         id: i.id,
@@ -146,7 +146,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         isActive: i.isActive
       }));
       setItems(formattedItems);
-      setRequests(Array.isArray(reqRes.data) ? reqRes.data : (reqRes.data?.data || []));
+      setRequests([]);
     } catch (err: any) {
       console.error('Lỗi lấy dữ liệu Data:', err);
       if (err.response?.status === 401) {
