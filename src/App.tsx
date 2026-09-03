@@ -427,31 +427,16 @@ function WarehouseTicketRealtimeRefresh() {
 
     let cancelled = false;
 
-    const getSignature = (payload: any) => {
-      if (Array.isArray(payload?.data)) {
-        return payload.data
-          .map((ticket: any) => `${ticket.id}:${ticket.status}:${ticket.updatedAt || ticket.executedAt || ticket.approvedAt || ticket.submittedAt || ticket.createdAt}`)
-          .sort()
-          .join('|');
-      }
-
-      if (payload?.id) {
-        return `${payload.id}:${payload.status}:${payload.updatedAt || payload.executedAt || payload.approvedAt || payload.submittedAt || payload.createdAt}:${payload.auditTrail?.length || 0}`;
-      }
-
-      return JSON.stringify(payload || {});
-    };
-
     const fetchRealtimeState = async () => {
       if (document.hidden || cancelled) return;
 
       try {
         const parts = location.pathname.split('/').filter(Boolean);
         const ticketId = parts.length === 2 ? parts[1] : null;
-        const response = ticketId
-          ? await api.get(`/warehouse-tickets/${ticketId}`)
-          : await api.get('/warehouse-tickets');
-        const signature = getSignature(response.data);
+        const response = await api.get('/warehouse-tickets/sync-signature', {
+          params: ticketId ? { ticketId } : undefined,
+        });
+        const signature = String(response.data?.signature || '');
 
         if (lastSignatureRef.current && lastSignatureRef.current !== signature) {
           window.location.reload();
@@ -465,11 +450,19 @@ function WarehouseTicketRealtimeRefresh() {
     };
 
     fetchRealtimeState();
-    const interval = window.setInterval(fetchRealtimeState, 5000);
+    const interval = window.setInterval(fetchRealtimeState, 30000);
+    const handleFocus = () => fetchRealtimeState();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchRealtimeState();
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       cancelled = true;
       window.clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [location.pathname, currentUser]);
 

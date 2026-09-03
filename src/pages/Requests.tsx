@@ -34,7 +34,7 @@ export default function Requests() {
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/requests');
+      const res = await api.get('/requests', { params: { view: 'list' } });
       setRequests(res.data?.data || res.data || []);
     } catch (err: any) {
       showToast(err.response?.data?.error || 'Lỗi tải danh sách phiếu', 'error');
