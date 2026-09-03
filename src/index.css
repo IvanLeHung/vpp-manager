@@ -325,6 +325,13 @@
   margin: 0mm !important;
 }
 
+/* Keep the named page with the default rule so Chromium honors its margins.
+   Other reports keep the original page setup. */
+@page proposal-batch {
+  size: A4 landscape;
+  margin: 8mm !important;
+}
+
 /* Custom Scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;

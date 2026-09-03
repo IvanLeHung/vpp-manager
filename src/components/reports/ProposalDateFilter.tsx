@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
+import api from '../../lib/api';
 
 export type ProposalDateSelection = {
   params: { dates?: string; startDate?: string; endDate?: string };
@@ -34,7 +35,19 @@ const dayModes: { id: DayMode; name: string; description: string }[] = [
   { id: 'range', name: 'Khoảng ngày', description: 'Chọn ngày bắt đầu và kết thúc' },
 ];
 
-export default function ProposalDateFilter({ onChange }: { onChange: (value: ProposalDateSelection) => void }) {
+type CalendarCounts = { countsByDate: Record<string, number> };
+type DateFilterProps = {
+  onChange: (value: ProposalDateSelection) => void;
+  itemType: 'VPP' | 'VE_SINH';
+  scopeKey: string;
+  refreshKey: number;
+};
+
+function CountBadge({ count }: { count: number }) {
+  return count > 0 ? <span aria-hidden="true" className="proposal-calendar-count">{count > 99 ? '99+' : count}</span> : null;
+}
+
+export default function ProposalDateFilter({ onChange, itemType, scopeKey, refreshKey }: DateFilterProps) {
   const [tab, setTab] = useState<'day' | 'month'>('day');
   const [expanded, setExpanded] = useState(false);
   const [viewMonth, setViewMonth] = useState(() => bangkokDateKey().slice(0, 7));
@@ -47,6 +60,48 @@ export default function ProposalDateFilter({ onChange }: { onChange: (value: Pro
   const [monthEnd, setMonthEnd] = useState('');
   const [monthMode, setMonthMode] = useState<'single' | 'range'>('single');
   const [year, month] = viewMonth.split('-').map(Number);
+  const countsCache = useRef(new Map<string, { data: CalendarCounts; loadedAt: number }>());
+  const [countsResult, setCountsResult] = useState<{ key: string; data: CalendarCounts } | null>(null);
+  const [countsFailure, setCountsFailure] = useState<{ key: string; message: string } | null>(null);
+  const [retryIndex, setRetryIndex] = useState(0);
+  const countsKey = `${scopeKey}:${itemType}:${year}:${refreshKey}:${retryIndex}`;
+  const counts = countsResult?.key === countsKey ? countsResult.data.countsByDate : null;
+  const countsError = countsFailure?.key === countsKey ? countsFailure.message : '';
+  const monthCounts = useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const [day, count] of Object.entries(counts || {})) {
+      const key = day.slice(0, 7);
+      totals[key] = (totals[key] || 0) + count;
+    }
+    return totals;
+  }, [counts]);
+
+  useEffect(() => {
+    if (!expanded) return;
+    const cached = countsCache.current.get(countsKey);
+    if (cached && Date.now() - cached.loadedAt < 60000) {
+      setCountsResult({ key: countsKey, data: cached.data });
+      setCountsFailure(null);
+      return;
+    }
+    const controller = new AbortController();
+    setCountsResult(null);
+    setCountsFailure(null);
+    api.get<CalendarCounts>('/reports/proposal-calendar-counts', {
+      params: { year, itemType }, signal: controller.signal, timeout: 30000,
+    }).then(response => {
+      if (controller.signal.aborted) return;
+      // Keep this cache bounded; changing selected days never reloads the year counts.
+      if (countsCache.current.size >= 8) countsCache.current.clear();
+      countsCache.current.set(countsKey, { data: response.data, loadedAt: Date.now() });
+      setCountsResult({ key: countsKey, data: response.data });
+    }).catch((error: unknown) => {
+      if (controller.signal.aborted) return;
+      const message = (error as { response?: { data?: { error?: string } } }).response?.data?.error;
+      setCountsFailure({ key: countsKey, message: message || 'Không tải được số phiếu trên lịch.' });
+    });
+    return () => controller.abort();
+  }, [expanded, countsKey, year, itemType]);
 
   const selection = useMemo<ProposalDateSelection>(() => {
     if (tab === 'month') return monthSelection(monthStart || viewMonth, monthEnd || monthStart || viewMonth);
@@ -123,12 +178,14 @@ export default function ProposalDateFilter({ onChange }: { onChange: (value: Pro
             </div>
             {tab === 'day' ? <>
               <div className="mb-1 grid grid-cols-7 text-center text-[10px] font-semibold text-slate-400">{['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((label, index) => <span key={label} className={index === 6 ? 'text-rose-500' : index === 5 ? 'text-indigo-500' : ''}>{label}</span>)}</div>
-              <div className="grid grid-cols-7 gap-1" onMouseLeave={() => setHoverDay('')}>
+              <div className="grid grid-cols-7 gap-1.5 pt-1" onMouseLeave={() => setHoverDay('')}>
                 {days.map(day => {
                   const end = rangeEnd || hoverDay;
                   const inRange = mode === 'range' && rangeStart && end && day.key >= (rangeStart < end ? rangeStart : end) && day.key <= (rangeStart > end ? rangeStart : end);
                   const selected = mode === 'range' ? day.key === rangeStart || day.key === rangeEnd : selectedDays.includes(day.key);
-                  return <button key={day.key} type="button" disabled={!day.current} aria-label={formatReportDate(day.key)} aria-pressed={Boolean(selected)} onMouseEnter={() => setHoverDay(day.key)} onFocus={() => setHoverDay(day.key)} onClick={() => selectDay(day.key)} className={`h-8 rounded-md border text-xs tabular-nums transition-colors ${!day.current ? 'border-transparent text-slate-200' : selected ? 'border-indigo-600 bg-indigo-600 font-bold text-white' : inRange ? 'border-indigo-100 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-400'}`}>{day.day}</button>;
+                  const count = day.current ? counts?.[day.key] || 0 : 0;
+                  const description = day.current && counts ? `${count} phiếu ${itemType === 'VPP' ? 'VPP' : 'Vệ sinh'} được tạo ngày ${formatReportDate(day.key)}` : undefined;
+                  return <button key={day.key} type="button" disabled={!day.current} aria-label={formatReportDate(day.key)} aria-description={description} title={description} aria-pressed={Boolean(selected)} onMouseEnter={() => setHoverDay(day.key)} onFocus={() => setHoverDay(day.key)} onClick={() => selectDay(day.key)} className={`relative h-8 rounded-md border text-xs tabular-nums transition-colors ${!day.current ? 'border-transparent text-slate-200' : selected ? 'border-indigo-600 bg-indigo-600 font-bold text-white' : inRange ? 'border-indigo-100 bg-indigo-50 text-indigo-700' : count ? 'border-rose-200 bg-rose-50/40 font-semibold text-slate-700 hover:border-indigo-400' : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-400'}`}>{day.day}<CountBadge count={count} /></button>;
                 })}
               </div>
             </> : <div className="grid grid-cols-3 gap-2">
@@ -136,9 +193,16 @@ export default function ProposalDateFilter({ onChange }: { onChange: (value: Pro
                 const key = `${year}-${String(index + 1).padStart(2, '0')}`;
                 const selected = key === monthStart || key === monthEnd || (!monthStart && key === viewMonth);
                 const inRange = monthStart && monthEnd && key >= monthStart && key <= monthEnd;
-                return <button key={key} type="button" aria-pressed={Boolean(selected || inRange)} onClick={() => selectMonth(key)} className={`rounded-lg border px-2 py-2.5 text-xs font-semibold ${selected ? 'border-indigo-600 bg-indigo-600 text-white' : inRange ? 'border-indigo-100 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:border-indigo-300'}`}>Tháng {index + 1}</button>;
+                const count = monthCounts[key] || 0;
+                const description = counts ? `${count} phiếu ${itemType === 'VPP' ? 'VPP' : 'Vệ sinh'} được tạo trong tháng ${index + 1}/${year}` : undefined;
+                return <button key={key} type="button" aria-label={`Tháng ${index + 1}`} aria-description={description} title={description} aria-pressed={Boolean(selected || inRange)} onClick={() => selectMonth(key)} className={`relative rounded-lg border px-2 py-2.5 text-xs font-semibold ${selected ? 'border-indigo-600 bg-indigo-600 text-white' : inRange ? 'border-indigo-100 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:border-indigo-300'}`}>Tháng {index + 1}<CountBadge count={count} /></button>;
               })}
             </div>}
+            <div className="mt-3 text-[10px] leading-relaxed text-slate-500" aria-live="polite">
+              {countsError ? <><p className="text-rose-600">{countsError}</p><button type="button" onClick={() => setRetryIndex(value => value + 1)} className="font-semibold text-indigo-600 underline underline-offset-2">Thử lại số phiếu</button></>
+                : !counts ? <p>Đang tải số phiếu…</p>
+                  : <p><span aria-hidden="true" className="mr-1 inline-block h-2 w-2 rounded-full bg-rose-500" />Ô tròn: số phiếu được tạo (mọi trạng thái).</p>}
+            </div>
           </div>
           <div className="flex min-w-0 flex-1 flex-col gap-3">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Chế độ chọn {tab === 'day' ? 'ngày' : 'tháng'}</p>
