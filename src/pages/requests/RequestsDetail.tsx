@@ -7,6 +7,7 @@ import LinkedDocumentReferences from '../../components/LinkedDocumentReferences'
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import DocumentChainMap from '../../components/DocumentChainMap';
 import MonthlyApprovalHistoryTooltip from '../../components/MonthlyApprovalHistoryTooltip';
+import ReopenAdminApprovalAction from '../../components/ReopenAdminApprovalAction';
 import { getApprovalActionLabel, getLineStatusLabel, getRequestStatusLabel } from '../../lib/statusLabels';
 import type { User } from '../../context/AppContext';
 import type { ViewMode } from '../Requests';
@@ -1331,6 +1332,16 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                              </div>
                           </>
                       )}
+
+                      <ReopenAdminApprovalAction
+                        request={data}
+                        currentUserRole={currentUser?.role}
+                        showToast={showToast}
+                        onSuccess={async () => {
+                          await refreshData();
+                          await fetchDetail();
+                        }}
+                      />
 
                       {/* --- THAO TÁC CỦA KHO --- */}
                       {(isWarehouse || currentUser?.role === 'ADMIN' || currentUser?.role === 'WAREHOUSE') && ['APPROVED', 'READY_TO_ISSUE', 'PARTIALLY_ISSUED', 'PARTIALLY_APPROVED', 'PARTIAL_ADMIN_APPROVED', 'BACKORDER', 'PARTIALLY_DELIVERED', 'PENDING_REMAINING_DELIVERY'].includes(data.status) && (
