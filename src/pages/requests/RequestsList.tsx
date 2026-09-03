@@ -6,6 +6,7 @@ import { useAppContext } from '../../context/AppContext';
 import api from '../../lib/api';
 import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
 import MonthlyApprovalHistoryTooltip from '../../components/MonthlyApprovalHistoryTooltip';
+import ReopenAdminApprovalAction from '../../components/ReopenAdminApprovalAction';
 import type { RequestSupplyType, ViewMode } from '../Requests';
 import { getApprovalActionLabel, getRequestStatusLabel } from '../../lib/statusLabels';
 
@@ -1006,6 +1007,16 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                 <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tổng thành tiền</p><p className="text-lg font-black text-emerald-600 whitespace-nowrap">{previewTotalAmount.toLocaleString('vi-VN')} đ</p></div>
               </div>
               <div className="flex gap-3">
+                <ReopenAdminApprovalAction
+                  request={previewReq}
+                  currentUserRole={currentUser.role}
+                  showToast={showToast}
+                  variant="preview"
+                  onSuccess={async () => {
+                    setPreviewReq(null);
+                    await refreshData();
+                  }}
+                />
                 {isActionable && (
                   <button onClick={() => handleOpenDetail(previewReq, actName === 'Chỉnh sửa' ? 'CREATE' : 'VIEW')}
                     className={`px-4 py-2 rounded-xl font-bold text-xs transition shadow-md flex items-center gap-1.5 ${actName.includes('Duyệt') || actName.includes('Xuất') ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-500/20' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-500/20'}`}>
