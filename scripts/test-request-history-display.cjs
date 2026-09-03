@@ -16,6 +16,16 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     const actor = Object.freeze({ fullName: 'Lê Thanh Hùng (ADM)', role: 'ADMIN' });
     const requester = Object.freeze({ id: 'requester-a', fullName: 'Người đề xuất A', role: 'USER' });
     const event = Object.freeze({ id: 'full', action: 'COMPLETED', reason: 'Người dùng xác nhận đã nhận ĐỦ hàng', approver: actor, createdAt: '2026-08-29T03:00:00Z' });
+    const partial = Object.freeze({ ...event, id: 'partial', action: 'PARTIAL_DELIVERY_CONFIRMED', reason: 'Người dùng xác nhận đã nhận hàng (Một phần)' });
+    const plain = Object.freeze({ ...event, id: 'plain', reason: 'Người dùng xác nhận đã nhận hàng' });
+    for (const receipt of [partial, plain, { ...plain, action: 'PARTIAL_DELIVERY_CONFIRMED' }, { ...plain, reason: '  NGƯỜI DÙNG xác nhận   đã nhận hàng  '.normalize('NFD') }]) {
+      const snapshot = JSON.stringify(receipt);
+      assert.equal(getRequestHistoryDisplay(receipt, requester).person, requester);
+      assert.equal(getRequestHistoryDisplay(receipt, requester).originalActor, actor);
+      assert.equal(JSON.stringify(receipt), snapshot);
+      assert.equal(getRequestHistoryDisplay({ ...receipt, approver: { fullName: 'Admin khác', role: 'ADMIN' } }, requester).showRequester, false);
+      assert.equal(getRequestHistoryDisplay(receipt, null).person, actor);
+    }
     const before = JSON.stringify({ event, requester });
     const result = getRequestHistoryDisplay(event, requester);
     assert.equal(result.person, requester);
@@ -26,6 +36,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     }
     for (const otherEvent of [
       { ...event, action: 'ADMIN_APPROVE' },
+      { ...plain, action: 'ADMIN_APPROVE' },
+      { ...partial, action: 'ISSUED' },
+      { ...plain, reason: 'Người dùng xác nhận đã nhận hàng lỗi' },
       { ...event, reason: 'Người dùng xác nhận đã nhận hàng (Một phần)' },
       { ...event, reason: 'Hoàn thành tự động' },
       { ...event, approver: { fullName: 'Admin khác', role: 'ADMIN' } },
@@ -43,7 +56,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
       department: 'Phòng kiểm thử', warehouseCode: 'MAIN', requestType: 'Định kỳ', priority: 'Thường',
       createdAt: '2026-08-01T03:00:00Z', handoverAt: event.createdAt, closedAt: event.createdAt,
       lines: [], approvalSteps: [], deliveryBatches: [],
-      approvalHistories: [event, { ...event, id: 'partial', action: 'PARTIAL_DELIVERY_CONFIRMED', reason: 'Người dùng xác nhận đã nhận hàng (Một phần)' }],
+      approvalHistories: [event, partial, plain, { ...event, id: 'approve', action: 'ADMIN_APPROVE', reason: 'Hành chính duyệt' }],
     });
     const fixtures = [request('PDX-TEST-A', 'Người đề xuất A'), request('PDX-TEST-B', 'Người đề xuất B')];
     browser = await chromium.launch({ headless: true, ...(process.env.REPORT_TEST_BROWSER ? { executablePath: process.env.REPORT_TEST_BROWSER } : {}) });
@@ -74,8 +87,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     await page.screenshot({ path: path.join(output, 'history-display.png'), fullPage: true });
 
     await page.goto('http://127.0.0.1:4178/requests/PDX-TEST-A/print?ids=PDX-TEST-A,PDX-TEST-B');
-    await renamed.nth(1).waitFor();
-    assert.deepEqual(await renamed.allTextContents(), ['Người đề xuất A', 'Người đề xuất B']);
+    await renamed.nth(5).waitFor();
+    assert.deepEqual(await renamed.allTextContents(), ['Người đề xuất A', 'Người đề xuất A', 'Người đề xuất A', 'Người đề xuất B', 'Người đề xuất B', 'Người đề xuất B']);
     const completionRows = page.locator('tr').filter({ hasText: 'Người dùng xác nhận đã nhận ĐỦ hàng' });
     assert.equal(await completionRows.count(), 2);
     for (const row of await completionRows.all()) {
@@ -83,9 +96,15 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     }
     const partialRows = page.locator('tr').filter({ hasText: 'Người dùng xác nhận đã nhận hàng (Một phần)' });
     assert.equal(await partialRows.count(), 2);
-    for (const row of await partialRows.all()) assert.match(await row.innerText(), /Lê Thanh Hùng/i);
+    for (const row of await partialRows.all()) assert.doesNotMatch(await row.innerText(), /Lê Thanh Hùng|\(ADM\)/i);
+    const plainRows = page.locator('tr').filter({ has: page.getByText('Người dùng xác nhận đã nhận hàng', { exact: true }) });
+    assert.equal(await plainRows.count(), 2);
+    for (const row of await plainRows.all()) assert.doesNotMatch(await row.innerText(), /Lê Thanh Hùng|\(ADM\)/i);
+    const approvalRows = page.locator('tr').filter({ hasText: 'Hành chính duyệt' });
+    assert.equal(await approvalRows.count(), 2);
+    for (const row of await approvalRows.all()) assert.match(await row.innerText(), /Lê Thanh Hùng/i);
     assert.deepEqual(errors, []);
-    console.log('PASS: exact matching, unchanged audit data, excluded actors/actions/partial receipts, missing requester fallback, detail history and separate requester names in bulk print.');
+    console.log('PASS: full/plain/partial receipt confirmations, unchanged audit data, excluded actors/actions, missing requester fallback, detail history and separate requester names in bulk print.');
   } finally {
     if (browser) await browser.close();
     await server.close();
