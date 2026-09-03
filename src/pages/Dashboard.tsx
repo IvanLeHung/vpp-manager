@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { 
-  Package, Search, Download, LayoutDashboard, FileText, 
+  Package, LayoutDashboard, FileText,
   AlertCircle, PlusCircle, 
   BarChart3, Clock, Settings, ShoppingBag, 
   History, ShieldCheck,
@@ -8,9 +8,9 @@ import {
   Truck, ListChecks, FileSearch, ClipboardCheck, Bell
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
 import api from '../lib/api';
 import { useAppContext } from '../context/AppContext';
+import ProposalBatchReport from '../components/reports/ProposalBatchReport';
 
 
 
@@ -27,9 +27,7 @@ export default function Dashboard() {
   const [summary, setSummary] = useState<any>(null);
   const [stocks, setStocks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentTab, setCurrentTab] = useState<'OVERVIEW' | 'INVENTORY'>('OVERVIEW');
-  const [currentInventoryTab, setCurrentInventoryTab] = useState('VPP'); 
-  const [searchQuery, setSearchQuery] = useState('');
+  const [currentTab, setCurrentTab] = useState<'OVERVIEW' | 'REPORT'>('OVERVIEW');
 
   const fetchData = async () => {
     try {
@@ -56,44 +54,6 @@ export default function Dashboard() {
     }
     fetchData();
   }, [currentUser, navigate]);
-
-  const displayedStocks = stocks.filter(item => {
-    if (!item) return false;
-
-    const type = item.itemType || 'VPP';
-    const matchesTab = currentInventoryTab === 'VPP' ? type === 'VPP' : type === 'VE_SINH';
-    
-    if (!matchesTab) return false;
-
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return item.name.toLowerCase().includes(q) || item.mvpp.toLowerCase().includes(q);
-    }
-    return true;
-  });
-
-  const formatCurrency = (value: number) => value.toLocaleString('vi-VN') + ' đ';
-
-  const handleExport = () => {
-    const exportData = displayedStocks.map((stock, index) => {
-      const item = stock.item;
-      const price = Number(item.price);
-      return {
-        'STT': index + 1,
-        'MVPP': item.mvpp,
-        'SP': item.name,
-        'Nhóm': item.category,
-        'ĐVT': item.unit,
-        'Tồn kho': stock.quantityOnHand,
-        'Giá': price,
-        'VAT': '8%'
-      };
-    });
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "TonKho");
-    XLSX.writeFile(wb, `TonKho_${new Date().toISOString().slice(0,10)}.xlsx`);
-  };
 
   if (loading && !summary) {
     return (
@@ -150,10 +110,10 @@ export default function Dashboard() {
               {currentTab === 'OVERVIEW' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full shadow-[0_-2px_10px_rgba(79,70,229,0.5)]"></div>}
             </button>
             <button 
-              onClick={() => setCurrentTab('INVENTORY')}
-              className={`py-4 flex items-center font-black text-xs uppercase tracking-widest transition-all relative cursor-pointer ${currentTab === 'INVENTORY' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'}`}>
-              <Package className="w-4 h-4 mr-2"/> Kiểm soát Tồn kho
-              {currentTab === 'INVENTORY' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full shadow-[0_-2px_10px_rgba(16,185,129,0.5)]"></div>}
+              onClick={() => setCurrentTab('REPORT')}
+              className={`py-4 flex items-center font-black text-xs uppercase tracking-widest transition-all relative cursor-pointer ${currentTab === 'REPORT' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
+              <FileText className="w-4 h-4 mr-2"/> Tổng hợp theo đợt đề xuất
+              {currentTab === 'REPORT' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full"></div>}
             </button>
         </div>
       )}
@@ -214,9 +174,9 @@ export default function Dashboard() {
                         />
                         <MainActionCard 
                           icon={<ClipboardCheck className="w-6 h-6" />} 
-                          title="Xác nhận nhận hàng" 
-                          desc={currentUser?.role === 'EMPLOYEE' ? 'Xác nhận các phiếu đã bàn giao' : 'Xem tồn kho hiện tại theo mặt hàng và kho'} 
-                          onClick={() => currentUser?.role === 'EMPLOYEE' ? navigate('/requests?status=DELIVERED') : setCurrentTab('INVENTORY')} 
+                          title={currentUser?.role === 'EMPLOYEE' ? 'Xác nhận nhận hàng' : 'Tổng hợp đề xuất'}
+                          desc={currentUser?.role === 'EMPLOYEE' ? 'Xác nhận các phiếu đã bàn giao' : 'Báo cáo số lượng được duyệt theo mặt hàng và phòng ban'}
+                          onClick={() => currentUser?.role === 'EMPLOYEE' ? navigate('/requests?status=DELIVERED') : setCurrentTab('REPORT')}
                         />
                         <MainActionCard 
                           icon={<History className="w-6 h-6" />} 
@@ -276,8 +236,7 @@ export default function Dashboard() {
                                 <TaskRow 
                                     icon={<AlertCircle className="w-4 h-4 text-slate-400" />}
                                     label={`${stocks.filter(s => s.stock <= 15).length} mặt hàng sắp hết tồn`}
-                                    link="#"
-                                    onClick={() => setCurrentTab('INVENTORY')}
+                                    link="/office-supplies-warehouse"
                                 />
                               </>
                             )}
@@ -386,7 +345,7 @@ export default function Dashboard() {
                             icon={<AlertCircle className="w-4 h-4 text-rose-400" />}
                             title={`Mặt hàng "Giấy A4 Double A" sắp dưới mức tồn tối thiểu`}
                             date="20/05/2025 08:05"
-                            onClick={() => setCurrentTab('INVENTORY')}
+                            onClick={() => navigate('/office-supplies-warehouse')}
                         />
                     </div>
                     <button className="w-full text-center mt-6 text-[10px] font-black uppercase text-indigo-600 tracking-widest hover:underline cursor-pointer">
@@ -405,76 +364,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {currentTab === 'INVENTORY' && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-                {/* Action Bar */}
-                <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 mb-8">
-                  <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200">
-                      <button onClick={() => setCurrentInventoryTab('VPP')} className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${currentInventoryTab === 'VPP' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Văn Phòng Phẩm</button>
-                      <button onClick={() => setCurrentInventoryTab('VE_SINH')} className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${currentInventoryTab === 'VE_SINH' ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Tạp Hóa / Vệ Sinh</button>
-                  </div>
-                  <div className="flex items-center gap-4 w-full xl:w-auto">
-                    <div className="relative flex-1 xl:w-96">
-                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
-                      <input 
-                        type="text" 
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder={`Tra cứu Mã / Tên vật tư...`}
-                        className="w-full pl-12 pr-6 py-3 bg-white border border-slate-200 rounded-[1.25rem] focus:outline-none focus:ring-4 focus:ring-indigo-500/10 shadow-sm transition-all font-bold placeholder:text-slate-300"
-                      />
-                    </div>
-                    <button onClick={handleExport} className="p-3.5 bg-white border-2 border-slate-100 text-slate-600 rounded-2xl hover:bg-slate-50 transition-all shadow-sm cursor-pointer">
-                      <Download className="w-6 h-6" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Table Area */}
-                <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden relative z-0">
-                  <table className="w-full text-left border-collapse whitespace-nowrap">
-                    <thead>
-                      <tr className="bg-slate-50/50 border-b border-slate-100 text-[10px] uppercase font-black text-slate-400 tracking-[0.2em] italic">
-                        <th className="px-10 py-6">Mã Vật Tư</th>
-                        <th className="px-10 py-6">Tên Sản Phẩm</th>
-                        <th className="px-10 py-6 text-center">Tổng Tồn Hệ Thống</th>
-                        <th className="px-10 py-6 text-right">Giá / Đơn Vị</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {displayedStocks.map((item) => {
-                        const isLow = item.stock <= 15;
-                        return (
-                          <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
-                            <td className="px-10 py-6">
-                                <span className="font-black text-indigo-600 uppercase tracking-tighter">{item.mvpp}</span>
-                            </td>
-                            <td className="px-10 py-6">
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-black text-slate-800 uppercase tracking-tighter">{item.name}</span>
-                                    <span className="text-[10px] font-bold text-slate-400 italic">
-                                      {item.category} • {item.unit} • Tất cả kho
-                                    </span>
-                                </div>
-                            </td>
-                            <td className="px-10 py-6 text-center">
-                                <div className={`inline-flex items-center px-4 py-1.5 rounded-xl font-black text-sm shadow-sm ${isLow ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
-                                    {isLow && <AlertCircle className="w-3 h-3 mr-2" />}
-                                    {item.stock}
-                                </div>
-                            </td>
-                            <td className="px-10 py-6 text-right text-sm font-black text-slate-600 tabular-nums italic">{formatCurrency(Number(item.price))}</td>
-                          </tr>
-                        );
-                      })}
-                      {displayedStocks.length === 0 && (
-                        <tr><td colSpan={4} className="px-10 py-20 text-center text-slate-300 font-black uppercase italic tracking-widest italic animate-pulse">Không tìm thấy vật tư lưu kho</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-            </div>
-          )}
+          {currentTab === 'REPORT' && <ProposalBatchReport />}
       </div>
     </div>
   );
