@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { Download, FileSpreadsheet, LoaderCircle, Printer, RefreshCw } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -6,6 +7,7 @@ import api from '../../lib/api';
 import { useAppContext } from '../../context/AppContext';
 import ProposalDateFilter, { bangkokDateKey, currentProposalMonth, formatReportDate } from './ProposalDateFilter';
 import type { ProposalDateSelection } from './ProposalDateFilter';
+import { printDepartmentLabels } from './proposalPrintLayout';
 import './proposalBatchReport.css';
 
 type Department = { id: string; name: string };
@@ -23,52 +25,64 @@ const numberFormat = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }
 const formatNumber = (value: number) => numberFormat.format(value);
 const reportTitle = (type: string) => `Báo cáo tổng hợp đồ ${type === 'VPP' ? 'Văn phòng phẩm' : 'Vệ sinh'} theo đợt đề xuất`;
 
-function ReportDocument({ report, period, reportDate, reporter, departments = report.departments, groupLabel = '' }: {
+function ReportDocument({ report, period, reportDate, reporter, print = false }: {
   report: SummaryReport; period: string; reportDate: string; reporter: string;
-  departments?: Department[]; groupLabel?: string;
+  print?: boolean;
 }) {
+  const departments = print ? printDepartmentLabels(report.departments) : report.departments.map(department => ({ ...department, label: department.name }));
+  const abbreviations = departments.filter(department => department.label !== department.name);
+  const printFontSize = departments.length > 24 ? '7.5px' : departments.length > 16 ? '8px' : departments.length > 8 ? '9px' : '10px';
   return (
     <article className="proposal-report-document">
       <header className="proposal-report-letterhead">
         <div><p className="font-bold uppercase">Công ty Cổ phần Tập đoàn Danko</p><p className="mt-1">MST: 3702070613</p></div>
         <div className="text-center"><p className="font-bold uppercase">Cộng hòa Xã hội Chủ nghĩa Việt Nam</p><p className="mt-1 font-semibold">Độc lập - Tự do - Hạnh phúc</p><div className="mx-auto mt-2 w-32 border-b border-slate-500" /></div>
       </header>
-      <div className="px-5 pb-5 text-center">
+      <div className="proposal-report-heading px-5 pb-5 text-center">
         <h2 className="text-lg font-bold uppercase leading-relaxed text-slate-900">{reportTitle(report.itemType)}</h2>
         <p className="mt-2 text-xs text-slate-600">Ngày tạo phiếu: <span className="font-medium">{period}</span></p>
         <p className="mt-1 text-xs text-slate-500">{report.requestCount} phiếu • {report.itemCount} mặt hàng • Số lượng Hành chính duyệt</p>
-        {groupLabel && <p className="mt-2 text-xs font-semibold">{groupLabel}. Tổng số lượng và thành tiền là tổng của tất cả phòng ban.</p>}
       </div>
       <div className="proposal-report-table-scroll" tabIndex={0} role="region" aria-label="Bảng tổng hợp theo phòng ban, cuộn ngang để xem thêm cột">
-        <table className="proposal-report-table">
+        <table className="proposal-report-table" style={{ '--proposal-department-count': departments.length, '--proposal-print-font-size': printFontSize } as CSSProperties}>
+          <colgroup>
+            <col className="proposal-item-column" /><col className="proposal-unit-column" />
+            {departments.map(department => <col key={department.id} />)}
+            <col className="proposal-total-column" /><col className="proposal-price-column" /><col className="proposal-amount-column" />
+          </colgroup>
           <thead><tr>
             <th scope="col" className="proposal-item-column">Danh mục {report.itemType === 'VPP' ? 'VPP' : 'Vệ sinh'}</th>
             <th scope="col" className="proposal-unit-column">ĐVT</th>
-            {departments.map(department => <th key={department.id} scope="col" className="proposal-department-column">{department.name}</th>)}
+            {departments.map(department => <th key={department.id} scope="col" className="proposal-department-column" title={department.name}>{department.label}</th>)}
             <th scope="col" className="proposal-total-column">Tổng số lượng</th>
             <th scope="col" className="proposal-price-column">Đơn giá<br /><span className="font-normal">(VNĐ)</span></th>
             <th scope="col" className="proposal-amount-column">Thành tiền<br /><span className="font-normal">(VNĐ)</span></th>
           </tr></thead>
           <tbody>
             {report.rows.map((row, index) => <tr key={row.key}>
-              <th scope="row" className="proposal-item-column"><span className="mr-2 text-[10px] font-normal text-slate-400">{index + 1}.</span>{row.name}<span className="mt-1 block text-[10px] font-normal text-slate-400">{row.mvpp}</span></th>
+              <th scope="row" className="proposal-item-column"><span className="proposal-row-index mr-2 text-[10px] font-normal text-slate-400">{index + 1}.</span>{row.name}<span className="proposal-item-code mt-1 block text-[10px] font-normal text-slate-400">{row.mvpp}</span></th>
               <td className="text-center text-slate-500">{row.unit}</td>
               {departments.map(department => <td key={department.id} className="text-center tabular-nums">{row.departmentQuantities[department.id] ? formatNumber(row.departmentQuantities[department.id]) : <span className="text-slate-300">—</span>}</td>)}
               <td className="proposal-total-column text-center font-bold tabular-nums">{formatNumber(row.totalQuantity)}</td>
-              <td className="text-right tabular-nums">{row.unitPrice === null ? <span className="text-amber-700">Chưa có giá</span> : formatNumber(row.unitPrice)}</td>
+              <td className="proposal-price-column text-right tabular-nums">{row.unitPrice === null ? <span className="text-amber-700">Chưa có giá</span> : formatNumber(row.unitPrice)}</td>
               <td className="proposal-amount-column text-right font-semibold tabular-nums">{row.totalAmount === null ? '—' : formatNumber(row.totalAmount)}</td>
             </tr>)}
           </tbody>
           <tfoot><tr>
             <th scope="row" className="proposal-item-column" colSpan={2}>TỔNG CỘNG</th>
             {departments.map(department => <td key={department.id} className="text-center tabular-nums">{formatNumber(report.totals.departmentQuantities[department.id] || 0)}</td>)}
-            <td className="text-center tabular-nums">{formatNumber(report.totals.totalQuantity)}</td>
-            <td className="text-center">—</td>
-            <td className="text-right tabular-nums">{formatNumber(report.totals.totalAmount)}{report.totals.unpricedRowCount > 0 ? ' *' : ''}</td>
+            <td className="proposal-total-column text-center tabular-nums">{formatNumber(report.totals.totalQuantity)}</td>
+            <td className="proposal-price-column text-center">—</td>
+            <td className="proposal-amount-column text-right tabular-nums">{formatNumber(report.totals.totalAmount)}{report.totals.unpricedRowCount > 0 ? ' *' : ''}</td>
           </tr></tfoot>
         </table>
       </div>
-      <div className="px-5 pt-3 text-[11px] leading-relaxed text-slate-500">
+      <div className="proposal-report-closing">
+      {print && abbreviations.length > 0 && <section className="proposal-department-legend" aria-label="Chú giải tên phòng ban viết tắt">
+        <h3>Chú giải phòng ban</h3>
+        <dl>{abbreviations.map(department => <div key={department.id}><dt>{department.label}</dt><dd>{department.name}</dd></div>)}</dl>
+      </section>}
+      <div className="proposal-report-notes px-5 pt-3 text-[11px] leading-relaxed text-slate-500">
         <p>Đơn giá lưu trên từng phiếu; cùng mặt hàng có nhiều mức giá được tách dòng. Tổng số lượng cộng các đơn vị tính trong bảng.</p>
         {report.totals.unpricedRowCount > 0 && <p className="mt-1 font-medium text-amber-700">* Tổng tiền chưa bao gồm {report.totals.unpricedRowCount} dòng chưa lưu đơn giá. Không dùng giá danh mục hiện tại để thay thế giá lịch sử.</p>}
       </div>
@@ -76,6 +90,7 @@ function ReportDocument({ report, period, reportDate, reporter, departments = re
         <p>Ngày báo cáo: <strong>{formatReportDate(reportDate)}</strong></p>
         <div className="min-w-56 text-center"><p className="font-bold uppercase">Người lập bảng</p><p className="mt-1 text-xs italic text-slate-500">(Ký và ghi rõ họ tên)</p><p className="mt-10 font-semibold">{reporter || '................................'}</p></div>
       </footer>
+      </div>
     </article>
   );
 }
@@ -143,8 +158,6 @@ export default function ProposalBatchReport() {
   };
 
   const canExport = Boolean(report?.rows.length && reportDate && reporter.trim());
-  const printGroups: Department[][] = [];
-  if (report) for (let index = 0; index < report.departments.length; index += 6) printGroups.push(report.departments.slice(index, index + 6));
 
   return (
     <div className="min-w-0 space-y-4">
@@ -162,7 +175,7 @@ export default function ProposalBatchReport() {
         </div>
         {report && <p className="text-xs text-slate-500"><strong className="text-slate-700">{report.requestCount}</strong> phiếu đã duyệt <span className="mx-2">·</span><strong className="text-slate-700">{report.departments.length}</strong> phòng ban <span className="mx-2">·</span><strong className="text-slate-700">{report.itemCount}</strong> mặt hàng</p>}
       </div>
-      <ProposalDateFilter onChange={setFilter} />
+      <ProposalDateFilter onChange={setFilter} itemType={itemType} scopeKey={`${currentUser?.id}:${currentUser?.role}:${currentUser?.departmentId}`} refreshKey={refreshIndex} />
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
         <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">Ngày báo cáo<input type="date" required value={reportDate} onChange={event => setReportDate(event.target.value)} className="rounded-lg border border-slate-200 px-2.5 py-2 font-normal text-slate-700 focus:outline-indigo-500" /></label>
         <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">Người lập bảng<input type="text" required value={reporter} onChange={event => setReporter(event.target.value)} placeholder="Nhập họ và tên" className="w-56 max-w-full rounded-lg border border-slate-200 px-2.5 py-2 font-normal text-slate-700 focus:outline-indigo-500" /></label>
@@ -173,7 +186,7 @@ export default function ProposalBatchReport() {
           : report && !report.rows.length ? <div className="rounded-xl border border-slate-200 bg-white p-12 text-center"><FileSpreadsheet className="mx-auto mb-3 h-8 w-8 text-slate-300" /><p className="text-sm font-semibold text-slate-700">Chưa có số lượng Hành chính duyệt trong thời gian này</p><p className="mt-2 text-xs text-slate-500">Thử chọn ngày/tháng khác hoặc chuyển tab VPP/Vệ sinh. Phiếu nháp, chờ duyệt, đang sửa, từ chối và hủy không được cộng.</p></div>
             : report && <ReportDocument report={report} period={filter.label} reportDate={reportDate} reporter={reporter} />}
       {report && report.rows.length > 0 && createPortal(<div className="proposal-report-print" aria-hidden="true">
-        {printGroups.map((departments, index) => <div key={index} className="proposal-print-page"><ReportDocument report={report} departments={departments} period={filter.label} reportDate={reportDate} reporter={reporter} groupLabel={printGroups.length > 1 ? `Nhóm cột phòng ban ${index + 1}/${printGroups.length}` : ''} /></div>)}
+        <div className="proposal-print-page"><ReportDocument report={report} period={filter.label} reportDate={reportDate} reporter={reporter} print /></div>
       </div>, document.body)}
     </div>
   );

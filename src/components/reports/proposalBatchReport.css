@@ -10,50 +10,89 @@
   cursor: pointer;
 }
 .proposal-report-button:disabled { opacity: .45; cursor: not-allowed; }
+.proposal-calendar-count { position: absolute; top: -5px; right: -5px; display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; padding: 0 3px; border: 1.5px solid white; border-radius: 999px; background: #e11d48; color: white; font-size: 9px; font-weight: 700; line-height: 1; box-shadow: 0 1px 2px #0f172a1a; pointer-events: none; }
 .proposal-report-document { border: 1px solid #e2e8f0; border-radius: 12px; background: white; overflow: hidden; }
 .proposal-report-letterhead { display: flex; justify-content: space-between; gap: 24px; padding: 24px; font-size: 12px; line-height: 1.6; color: #334155; }
 .proposal-report-table-scroll { overflow: auto; max-height: 65vh; border-block: 1px solid #cbd5e1; }
-.proposal-report-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; line-height: 1.45; }
+.proposal-report-table {
+  --proposal-item-width: 230px;
+  --proposal-unit-width: 60px;
+  --proposal-total-width: 100px;
+  --proposal-price-width: 110px;
+  --proposal-amount-width: 130px;
+  width: 100%;
+  min-width: calc(var(--proposal-item-width) + var(--proposal-unit-width) + var(--proposal-department-count) * 130px + var(--proposal-total-width) + var(--proposal-price-width) + var(--proposal-amount-width));
+  table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 12px; line-height: 1.45;
+}
+.proposal-report-table col.proposal-item-column { width: var(--proposal-item-width); }
+.proposal-report-table col.proposal-unit-column { width: var(--proposal-unit-width); }
+.proposal-report-table col.proposal-total-column { width: var(--proposal-total-width); }
+.proposal-report-table col.proposal-price-column { width: var(--proposal-price-width); }
+.proposal-report-table col.proposal-amount-column { width: var(--proposal-amount-width); }
 .proposal-report-table th, .proposal-report-table td { padding: 12px 10px; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
 .proposal-report-table th:last-child, .proposal-report-table td:last-child { border-right: 0; }
-.proposal-report-table thead th { position: sticky; top: 0; z-index: 2; background: #f1f5f9; color: #334155; font-weight: 700; text-align: center; }
-.proposal-report-table .proposal-item-column { position: sticky; left: 0; z-index: 1; min-width: 230px; max-width: 300px; background: white; text-align: left; font-weight: 600; box-shadow: 2px 0 3px #0f172a06; }
-.proposal-report-table thead .proposal-item-column { z-index: 3; background: #f1f5f9; }
+.proposal-report-table thead th { position: sticky; top: 0; z-index: 4; background: #f1f5f9; color: #334155; font-weight: 700; text-align: center; }
+.proposal-report-table th.proposal-item-column { position: sticky; left: 0; z-index: 1; background: white; text-align: left; font-weight: 600; box-shadow: 2px 0 3px #0f172a06; overflow-wrap: anywhere; }
+.proposal-report-table thead .proposal-item-column { z-index: 5; background: #f1f5f9; }
 .proposal-report-table tbody tr:hover td, .proposal-report-table tbody tr:hover th { background: #f8fafc; }
 .proposal-department-column { min-width: 130px; max-width: 170px; }
 .proposal-unit-column { min-width: 60px; }
-.proposal-total-column { min-width: 100px; background: #f8faff; color: #4338ca; }
-.proposal-price-column { min-width: 110px; }
-.proposal-amount-column { min-width: 130px; color: #047857; }
+.proposal-report-table :is(th, td).proposal-total-column { position: sticky; right: calc(var(--proposal-price-width) + var(--proposal-amount-width)); z-index: 2; background: #f8faff; color: #4338ca; box-shadow: -3px 0 4px #0f172a12; }
+.proposal-report-table :is(th, td).proposal-price-column { position: sticky; right: var(--proposal-amount-width); z-index: 2; background: white; }
+.proposal-report-table :is(th, td).proposal-amount-column { position: sticky; right: 0; z-index: 2; background: #f0fdf4; color: #047857; }
+.proposal-report-table thead :is(.proposal-total-column, .proposal-price-column, .proposal-amount-column) { z-index: 6; background: #eef2ff; }
 .proposal-report-table tfoot { font-weight: 700; color: #0f172a; }
-.proposal-report-table tfoot td, .proposal-report-table tfoot .proposal-item-column { background: #eef2ff; border-bottom: 0; border-top: 1px solid #c7d2fe; }
+.proposal-report-table tfoot td, .proposal-report-table tfoot .proposal-item-column { position: sticky; bottom: 0; z-index: 3; background: #eef2ff; border-bottom: 0; border-top: 1px solid #c7d2fe; }
+.proposal-report-table tfoot :is(.proposal-total-column, .proposal-price-column, .proposal-amount-column, .proposal-item-column) { z-index: 4; background: #eef2ff; }
 .proposal-report-signature { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding: 24px; font-size: 12px; }
 .proposal-report-print { display: none; }
 @media (max-width: 767px) {
   .proposal-report-letterhead { flex-direction: column; gap: 16px; padding: 20px; text-align: center; }
   .proposal-report-signature { flex-direction: column; align-items: center; }
-  .proposal-report-table .proposal-item-column { min-width: 180px; max-width: 220px; }
+  .proposal-report-table { --proposal-item-width: 180px; --proposal-unit-width: 50px; --proposal-total-width: 72px; --proposal-price-width: 84px; --proposal-amount-width: 100px; font-size: 11px; }
+  .proposal-report-table th, .proposal-report-table td { padding: 10px 6px; }
+  /* Keep room to scroll through departments beside the pinned summary on phones. */
+  .proposal-report-table th.proposal-item-column { left: auto; box-shadow: none; }
+  .proposal-report-table tbody th.proposal-item-column { position: static; }
 }
 @media print {
-  @page { size: A4 landscape; margin: 10mm; }
   body:has(> .proposal-report-print) > #root { display: none !important; }
-  .proposal-report-print { display: block !important; color: black; }
-  .proposal-print-page + .proposal-print-page { break-before: page; }
+  .proposal-report-print { display: block !important; page: proposal-batch; color: black; }
   .proposal-report-document { border: 0; border-radius: 0; overflow: visible; }
-  .proposal-report-letterhead { display: flex; flex-direction: row; text-align: left; padding: 0 0 16px; font-size: 10px; }
+  .proposal-report-letterhead { display: flex; flex-direction: row; text-align: left; padding: 0 0 10px; font-size: 9px; }
   .proposal-report-letterhead > div:last-child { text-align: center; }
+  .proposal-report-heading { padding: 0 0 10px; }
+  .proposal-report-heading h2 { font-size: 13px; line-height: 1.3; }
+  .proposal-report-heading p { margin-top: 4px; font-size: 9px; }
   .proposal-report-table-scroll { overflow: visible; max-height: none; border: 0; }
-  .proposal-report-table { table-layout: fixed; width: 100%; border-collapse: collapse; font-size: 9px; }
-  .proposal-report-table th, .proposal-report-table td { border: 1px solid #475569 !important; padding: 6px 4px; overflow-wrap: anywhere; }
+  .proposal-report-table { table-layout: fixed; width: 100%; min-width: 0; border-collapse: separate; border-spacing: 0; font-size: var(--proposal-print-font-size, 9px); line-height: 1.25; }
+  /* Separate single-edge borders avoid Chromium clipping cells on later pages. */
+  .proposal-report-table th, .proposal-report-table td { border: 0 solid #475569 !important; border-right-width: .5px !important; border-bottom-width: .5px !important; padding: 1.5px 1px; overflow-wrap: anywhere; }
+  .proposal-report-table thead th { border-top-width: .5px !important; }
+  .proposal-report-table tr > :first-child { border-left-width: .5px !important; }
+  .proposal-report-table .tabular-nums { white-space: nowrap; }
+  .proposal-report-table thead th { padding-block: 5px; }
   .proposal-report-table thead { display: table-header-group; }
   .proposal-report-table tfoot { display: table-row-group; }
   .proposal-report-table tr { break-inside: avoid; }
-  .proposal-report-table th, .proposal-report-table .proposal-item-column { position: static; min-width: 0; max-width: none; }
-  .proposal-report-table .proposal-item-column { width: 19%; }
-  .proposal-report-table .proposal-unit-column { width: 5%; min-width: 0; }
+  .proposal-report-print .proposal-report-table :is(thead, tbody, tfoot) :is(th, td) { position: static; inset: auto; z-index: auto; min-width: 0; max-width: none; box-shadow: none; }
+  .proposal-report-table col.proposal-item-column { width: 15%; }
+  .proposal-report-table col.proposal-unit-column { width: 2.5%; min-width: 0; }
   .proposal-report-table .proposal-department-column { min-width: 0; max-width: none; }
-  .proposal-report-table .proposal-total-column { width: 7%; min-width: 0; }
-  .proposal-report-table .proposal-price-column { width: 9%; min-width: 0; }
-  .proposal-report-table .proposal-amount-column { width: 11%; min-width: 0; }
-  .proposal-report-signature { display: flex; flex-direction: row; align-items: flex-start; break-inside: avoid; padding: 20px 8px 0; font-size: 11px; }
+  .proposal-report-table col.proposal-total-column { width: 3.5%; }
+  .proposal-report-table col.proposal-price-column { width: 5.5%; }
+  .proposal-report-table col.proposal-amount-column { width: 7.5%; }
+  .proposal-report-table .proposal-row-index { margin-right: 3px; font-size: inherit; }
+  .proposal-report-table .proposal-item-code { margin-top: 2px; font-size: inherit; line-height: 1.05; color: #64748b; }
+  .proposal-report-closing { break-inside: avoid; }
+  .proposal-department-legend { margin-top: 10px; color: #334155; font-size: 8.5px; line-height: 1.4; break-inside: avoid; }
+  .proposal-department-legend h3 { margin-bottom: 4px; font-size: 9px; font-weight: 700; break-after: avoid; }
+  .proposal-department-legend dl { columns: 3; column-gap: 16px; }
+  .proposal-department-legend dl > div { margin-bottom: 3px; break-inside: avoid; }
+  .proposal-department-legend dt, .proposal-department-legend dd { display: inline; }
+  .proposal-department-legend dt { font-weight: 700; }
+  .proposal-department-legend dt::after { content: ': '; }
+  .proposal-report-notes { padding: 8px 0 0; font-size: 8px; }
+  .proposal-report-signature { display: flex; flex-direction: row; align-items: flex-start; break-inside: avoid; padding: 14px 0 0; font-size: 10px; }
+  .proposal-report-signature .italic { font-size: 9px; }
 }
