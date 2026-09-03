@@ -9,6 +9,7 @@ import MonthlyApprovalHistoryTooltip from '../../components/MonthlyApprovalHisto
 import ReopenAdminApprovalAction from '../../components/ReopenAdminApprovalAction';
 import type { RequestSupplyType, ViewMode } from '../Requests';
 import { getApprovalActionLabel, getRequestStatusLabel } from '../../lib/statusLabels';
+import { getOriginalRequestLineUnitPrice, getRequestLineAmount, getRequestLineUnitPrice } from '../../lib/requestPricing';
 
 interface Props {
   requests: VPPRequest[];
@@ -405,7 +406,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             const isReplaced = !!line.replacementItemId && !!line.replacementItem;
             const effectiveItem = isReplaced ? line.replacementItem : line.item;
             const effectiveQty = isReplaced ? (line.replacementQty || line.qtyApproved || line.qtyRequested) : (line.qtyApproved ?? line.qtyRequested);
-            const effectivePrice = isReplaced ? (line.replacementPrice || line.unitPrice || line.item?.price || 0) : (line.unitPrice || line.item?.price || 0);
+            const effectivePrice = getRequestLineUnitPrice(line);
 
             if (!effectiveItem) return; // Safeguard against deleted items
 
@@ -454,7 +455,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                 existingDept.replacements.push({
                   name: line.item.name,
                   qty: line.qtyApproved || line.qtyRequested,
-                  price: line.item.price,
+                  price: getOriginalRequestLineUnitPrice(line),
                   reason: line.replacementReason,
                   status: line.status
                 });
@@ -463,7 +464,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             }
 
             const originalQtyForTotal = line.qtyApproved || line.qtyRequested;
-            const originalPriceForTotal = line.unitPrice || line.item?.price || 0;
+            const originalPriceForTotal = getOriginalRequestLineUnitPrice(line);
 
             current.qtyRequested += effectiveQty;
             current.qtyDelivered += (line.qtyDelivered || 0);
@@ -923,8 +924,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
           const actName = getActionName(previewReq);
           const isActionable = actName !== 'Chi tiết';
           const previewTotalAmount = (previewReq.lines || []).reduce((sum: number, line: any) => {
-            const displayItem = line.issue_item || line.item;
-            return sum + Number(line.qtyRequested || 0) * Number(displayItem?.price || 0);
+            return sum + getRequestLineAmount(line, line.qtyRequested);
           }, 0);
           return (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden" style={{width:'45%'}}>
@@ -992,8 +992,8 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                           </MonthlyApprovalHistoryTooltip>
                         </td>
                         <td className="px-4 py-2.5 text-center text-xs font-bold text-slate-500">{displayItem?.unit || '—'}</td>
-                        <td className="px-4 py-2.5 text-right text-xs font-bold text-slate-600">{displayItem?.price ? Number(displayItem.price).toLocaleString('vi-VN') : '—'}</td>
-                        <td className="px-4 py-2.5 text-right text-xs font-black text-slate-800">{displayItem?.price ? (Number(line.qtyRequested || 0) * Number(displayItem.price)).toLocaleString('vi-VN') : '—'}</td>
+                        <td className="px-4 py-2.5 text-right text-xs font-bold text-slate-600">{getRequestLineUnitPrice(line).toLocaleString('vi-VN')}</td>
+                        <td className="px-4 py-2.5 text-right text-xs font-black text-slate-800">{getRequestLineAmount(line, line.qtyRequested).toLocaleString('vi-VN')}</td>
                       </tr>
                     );
                   })}
@@ -1332,10 +1332,10 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                               )}
                             </td>
                             <td className="text-right font-medium" style={{ border: '1px solid #000', padding: '6px 8px', fontSize: '11px' }}>
-                              {(displayItem?.price || 0).toLocaleString('vi-VN')}
+                              {getRequestLineUnitPrice(l).toLocaleString('vi-VN')}
                             </td>
                             <td className="text-right font-bold" style={{ border: '1px solid #000', padding: '6px 8px', fontSize: '11px' }}>
-                              {((displayItem?.price || 0) * (displayQtyApproved ?? displayQtyRequested)).toLocaleString('vi-VN')}
+                              {getRequestLineAmount(l, displayQtyApproved ?? displayQtyRequested).toLocaleString('vi-VN')}
                             </td>
                             <td className="italic text-[10px] leading-tight" style={{ border: '1px solid #000', padding: '6px 8px', fontSize: '11px' }}>{l.note || '—'}</td>
                           </tr>
@@ -1348,9 +1348,8 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                         </td>
                         <td className="text-right font-black" colSpan={2} style={{ border: '1px solid #000', padding: '6px 8px' }}>
                           {filteredLines.reduce((sum: number, line: any) => {
-                            const item = line.replacementItem || line.item;
                             const qty = line.replacementQty ?? line.qtyApproved ?? line.qtyRequested;
-                            return sum + ((item?.price || 0) * qty);
+                            return sum + getRequestLineAmount(line, qty);
                           }, 0).toLocaleString('vi-VN')} VNĐ
                         </td>
                         <td style={{ border: '1px solid #000', padding: '6px 8px' }}></td>
