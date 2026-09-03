@@ -1,0 +1,59 @@
+.proposal-report-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.proposal-report-button:disabled { opacity: .45; cursor: not-allowed; }
+.proposal-report-document { border: 1px solid #e2e8f0; border-radius: 12px; background: white; overflow: hidden; }
+.proposal-report-letterhead { display: flex; justify-content: space-between; gap: 24px; padding: 24px; font-size: 12px; line-height: 1.6; color: #334155; }
+.proposal-report-table-scroll { overflow: auto; max-height: 65vh; border-block: 1px solid #cbd5e1; }
+.proposal-report-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; line-height: 1.45; }
+.proposal-report-table th, .proposal-report-table td { padding: 12px 10px; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
+.proposal-report-table th:last-child, .proposal-report-table td:last-child { border-right: 0; }
+.proposal-report-table thead th { position: sticky; top: 0; z-index: 2; background: #f1f5f9; color: #334155; font-weight: 700; text-align: center; }
+.proposal-report-table .proposal-item-column { position: sticky; left: 0; z-index: 1; min-width: 230px; max-width: 300px; background: white; text-align: left; font-weight: 600; box-shadow: 2px 0 3px #0f172a06; }
+.proposal-report-table thead .proposal-item-column { z-index: 3; background: #f1f5f9; }
+.proposal-report-table tbody tr:hover td, .proposal-report-table tbody tr:hover th { background: #f8fafc; }
+.proposal-department-column { min-width: 130px; max-width: 170px; }
+.proposal-unit-column { min-width: 60px; }
+.proposal-total-column { min-width: 100px; background: #f8faff; color: #4338ca; }
+.proposal-price-column { min-width: 110px; }
+.proposal-amount-column { min-width: 130px; color: #047857; }
+.proposal-report-table tfoot { font-weight: 700; color: #0f172a; }
+.proposal-report-table tfoot td, .proposal-report-table tfoot .proposal-item-column { background: #eef2ff; border-bottom: 0; border-top: 1px solid #c7d2fe; }
+.proposal-report-signature { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding: 24px; font-size: 12px; }
+.proposal-report-print { display: none; }
+@media (max-width: 767px) {
+  .proposal-report-letterhead { flex-direction: column; gap: 16px; padding: 20px; text-align: center; }
+  .proposal-report-signature { flex-direction: column; align-items: center; }
+  .proposal-report-table .proposal-item-column { min-width: 180px; max-width: 220px; }
+}
+@media print {
+  @page { size: A4 landscape; margin: 10mm; }
+  body:has(> .proposal-report-print) > #root { display: none !important; }
+  .proposal-report-print { display: block !important; color: black; }
+  .proposal-print-page + .proposal-print-page { break-before: page; }
+  .proposal-report-document { border: 0; border-radius: 0; overflow: visible; }
+  .proposal-report-letterhead { display: flex; flex-direction: row; text-align: left; padding: 0 0 16px; font-size: 10px; }
+  .proposal-report-letterhead > div:last-child { text-align: center; }
+  .proposal-report-table-scroll { overflow: visible; max-height: none; border: 0; }
+  .proposal-report-table { table-layout: fixed; width: 100%; border-collapse: collapse; font-size: 9px; }
+  .proposal-report-table th, .proposal-report-table td { border: 1px solid #475569 !important; padding: 6px 4px; overflow-wrap: anywhere; }
+  .proposal-report-table thead { display: table-header-group; }
+  .proposal-report-table tfoot { display: table-row-group; }
+  .proposal-report-table tr { break-inside: avoid; }
+  .proposal-report-table th, .proposal-report-table .proposal-item-column { position: static; min-width: 0; max-width: none; }
+  .proposal-report-table .proposal-item-column { width: 19%; }
+  .proposal-report-table .proposal-unit-column { width: 5%; min-width: 0; }
+  .proposal-report-table .proposal-department-column { min-width: 0; max-width: none; }
+  .proposal-report-table .proposal-total-column { width: 7%; min-width: 0; }
+  .proposal-report-table .proposal-price-column { width: 9%; min-width: 0; }
+  .proposal-report-table .proposal-amount-column { width: 11%; min-width: 0; }
+  .proposal-report-signature { display: flex; flex-direction: row; align-items: flex-start; break-inside: avoid; padding: 20px 8px 0; font-size: 11px; }
+}
