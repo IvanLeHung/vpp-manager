@@ -103,6 +103,16 @@ const getEffectiveWarehouseCode = (item: any, defaultWh: string): string => {
   return isVeSinh ? 'VE_SINH' : defaultWh;
 };
 
+const getItemSupplyType = (item: any): 'VPP' | 'VE_SINH' => {
+  if (!item) return 'VPP';
+  const itemType = String(item.itemType || '').toUpperCase();
+  const category = String(item.category || '').toUpperCase();
+  const code = String(item.mvpp || '').toUpperCase();
+  return itemType.includes('VE_SINH') || itemType.includes('VỆ SINH')
+    || category.includes('VE_SINH') || category.includes('VỆ SINH') || category.includes('TẠP HÓA')
+    || code.startsWith('VS') ? 'VE_SINH' : 'VPP';
+};
+
 export default function RequestsDetail({ requestId, navigationIds, onNavigate, setViewMode, setActiveRequest, refreshData, showToast, currentUser }: Props) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -807,6 +817,12 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       )
     }
   ];
+
+  const printLineTypes = new Set<'VPP' | 'VE_SINH'>((data.lines || []).map((line: any) => getItemSupplyType(line.issue_item || line.replacementItem || line.item)));
+  const effectivePrintType: 'ALL' | 'VPP' | 'VE_SINH' = printLineTypes.size === 1
+    ? printLineTypes.values().next().value as 'VPP' | 'VE_SINH'
+    : selectedPrintType !== 'ALL' && printLineTypes.has(selectedPrintType) ? selectedPrintType
+      : printLineTypes.size === 0 && data.warehouseCode === 'VE_SINH' ? 'VE_SINH' : selectedPrintType;
 
   return (
     <>
@@ -2478,8 +2494,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
           <div className="text-center mb-6">
               <h1 className="text-[22px] font-black uppercase tracking-widest break-words leading-tight underline underline-offset-8 decoration-slate-300">
                   {(() => {
-                    if (selectedPrintType === 'VE_SINH') return 'PHIẾU ĐỀ XUẤT VỆ SINH';
-                    if (selectedPrintType === 'VPP') return 'PHIẾU ĐỀ XUẤT VĂN PHÒNG PHẨM';
+                    if (effectivePrintType === 'VE_SINH') return 'PHIẾU ĐỀ XUẤT ĐỒ VỆ SINH';
+                    if (effectivePrintType === 'VPP') return 'PHIẾU ĐỀ XUẤT VĂN PHÒNG PHẨM';
                     return 'PHIẾU ĐỀ XUẤT TỔNG HỢP VĂN PHÒNG PHẨM VÀ ĐỒ VỆ SINH';
                   })()}
               </h1>
@@ -2498,7 +2514,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                   <tr>
                       <th className="border border-black p-2 text-center font-bold uppercase whitespace-nowrap" style={{width: '6%'}}>STT</th>
                       <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '10%'}}>Mã VT</th>
-                      <th className="border border-black p-2 text-left font-bold uppercase" style={{width: '30%'}}>Tên Văn Phòng Phẩm</th>
+                      <th className="border border-black p-2 text-left font-bold uppercase" style={{width: '30%'}}>{effectivePrintType === 'VE_SINH' ? 'Tên Đồ Vệ Sinh' : effectivePrintType === 'VPP' ? 'Tên Văn Phòng Phẩm' : 'Tên Hàng Hóa'}</th>
                       <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '7%'}}>ĐVT</th>
                       <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '6%'}}>SL</th>
                       <th className="border border-black p-2 text-right font-bold uppercase" style={{width: '12%'}}>Đơn giá</th>
@@ -2509,9 +2525,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                               <tbody>
                   {(() => {
                     const filteredLines = sortLinesForPrinting(data.lines).filter((l: any) => {
-                      if (selectedPrintType === 'ALL') return true;
-                      const type = l.item.itemType || (l.item.mvpp.startsWith('VPP') ? 'VPP' : 'VE_SINH');
-                      return type === selectedPrintType;
+                      if (effectivePrintType === 'ALL') return true;
+                      return getItemSupplyType(l.issue_item || l.replacementItem || l.item) === effectivePrintType;
                     });
 
                     return (
