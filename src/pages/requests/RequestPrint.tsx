@@ -55,7 +55,9 @@ const RequestPrint: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const requestedPrintType = searchParams.get('printType') || 'ALL';
-  const selectedPrintType = requestedPrintType === 'VS' ? 'VE_SINH' : requestedPrintType;
+  const selectedPrintType: 'ALL' | 'VPP' | 'VE_SINH' = requestedPrintType === 'VS' || requestedPrintType === 'VE_SINH'
+    ? 'VE_SINH'
+    : requestedPrintType === 'VPP' ? 'VPP' : 'ALL';
   const bulkRequestIdsParam = searchParams.get('ids') || '';
   const bulkRequestIds = bulkRequestIdsParam
     .split(',')
@@ -147,10 +149,19 @@ const RequestPrint: React.FC = () => {
     return 'VPP';
   };
 
-  const getFilteredLines = (requestData: any) => sortLinesForPrinting(requestData.lines || []).filter((l: any) => {
-    if (selectedPrintType === 'ALL') return true;
-    const type = getItemCategoryType(l.item);
-    return type === selectedPrintType;
+  const getLineCategoryType = (line: any) => getItemCategoryType(line.replacementItem || line.item);
+
+  const getEffectivePrintType = (requestData: any): 'ALL' | 'VPP' | 'VE_SINH' => {
+    const availableTypes = new Set<'VPP' | 'VE_SINH'>((requestData.lines || []).map(getLineCategoryType));
+    if (availableTypes.size === 1) return availableTypes.values().next().value as 'VPP' | 'VE_SINH';
+    if (selectedPrintType !== 'ALL' && availableTypes.has(selectedPrintType)) return selectedPrintType;
+    if (availableTypes.size === 0 && requestData.warehouseCode === 'VE_SINH') return 'VE_SINH';
+    return selectedPrintType;
+  };
+
+  const getFilteredLines = (requestData: any, printType: 'ALL' | 'VPP' | 'VE_SINH') => sortLinesForPrinting(requestData.lines || []).filter((line: any) => {
+    if (printType === 'ALL') return true;
+    return getLineCategoryType(line) === printType;
   });
 
   return (
@@ -265,7 +276,8 @@ const RequestPrint: React.FC = () => {
 
       {/* Print content container */}
       {printRequests.map((data, requestIndex) => {
-        const filteredLines = getFilteredLines(data);
+        const effectivePrintType = getEffectivePrintType(data);
+        const filteredLines = getFilteredLines(data, effectivePrintType);
         return (
       <div key={data.id || requestIndex} className="print-page">
         {/* Header */}
@@ -294,8 +306,8 @@ const RequestPrint: React.FC = () => {
         <div className="text-center mb-6">
           <h1 className="text-[22px] font-black uppercase tracking-widest break-words leading-tight underline underline-offset-8 decoration-slate-300">
             {(() => {
-              if (selectedPrintType === 'VE_SINH') return 'PHIẾU ĐỀ XUẤT VỆ SINH';
-              if (selectedPrintType === 'VPP') return 'PHIẾU ĐỀ XUẤT VĂN PHÒNG PHẨM';
+              if (effectivePrintType === 'VE_SINH') return 'PHIẾU ĐỀ XUẤT ĐỒ VỆ SINH';
+              if (effectivePrintType === 'VPP') return 'PHIẾU ĐỀ XUẤT VĂN PHÒNG PHẨM';
               return 'PHIẾU ĐỀ XUẤT VĂN PHÒNG PHẨM VÀ ĐỒ VỆ SINH';
             })()}
           </h1>
@@ -316,7 +328,7 @@ const RequestPrint: React.FC = () => {
             <tr>
               <th style={{ width: '6%' }}>STT</th>
               <th style={{ width: '10%' }}>Mã VT</th>
-              <th style={{ width: '30%' }}>Tên Văn Phòng Phẩm</th>
+              <th style={{ width: '30%' }}>{effectivePrintType === 'VE_SINH' ? 'Tên Đồ Vệ Sinh' : effectivePrintType === 'VPP' ? 'Tên Văn Phòng Phẩm' : 'Tên Hàng Hóa'}</th>
               <th style={{ width: '7%' }}>ĐVT</th>
               <th style={{ width: '6%' }}>SL</th>
               <th style={{ width: '12%' }}>Đơn giá</th>
