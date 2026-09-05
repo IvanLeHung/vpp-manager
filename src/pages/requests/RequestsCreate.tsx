@@ -43,8 +43,16 @@ function buildPeriodicPurpose(supplyType: RequestSupplyType, department?: string
   const nextMonth = new Date();
   nextMonth.setMonth(nextMonth.getMonth() + 1, 1);
   const groupName = supplyType === 'VE_SINH' ? 'đồ vệ sinh' : 'Văn phòng phẩm';
-  const departmentName = department?.trim() || 'phòng ban đề xuất';
+  const departmentName = department?.trim() || 'Đơn vị chưa xác định';
   return `Đề xuất ${groupName} cho ${departmentName} tháng ${nextMonth.getMonth() + 1}/${nextMonth.getFullYear()}`;
+}
+
+function getWarehouseStock(item: VPPItem, supplyType: RequestSupplyType) {
+  const warehouseCode = supplyType === 'VE_SINH' ? 'VE_SINH' : 'MAIN';
+  const warehouseStock = item.stocks?.find(
+    (stock) => String(stock.warehouseCode).toUpperCase() === warehouseCode
+  );
+  return Number(warehouseStock?.quantityOnHand ?? item.stock ?? 0);
 }
 
 function buildFallbackItem(line: any): VPPItem {
@@ -102,12 +110,38 @@ export default function RequestsCreate({
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const [hasUserChanges, setHasUserChanges] = useState(false);
+  const directDepartmentName = currentUser?.department
+    || currentUser?.departmentName
+    || currentUser?.departmentInfo?.name
+    || '';
+  const [requesterDepartment, setRequesterDepartment] = useState(directDepartmentName);
   const hydratedRef = useRef(false);
   const previousRequestTypeRef = useRef(reqType);
 
   const isEditingDraft =
     !!activeRequest &&
     (activeRequest.status === 'DRAFT' || activeRequest.status === 'RETURNED' || activeRequest.status === 'NEED_REVISION');
+
+  useEffect(() => {
+    if (directDepartmentName) {
+      setRequesterDepartment(directDepartmentName);
+      return;
+    }
+
+    if (!currentUser?.departmentId) return;
+    let cancelled = false;
+    api.get('/departments')
+      .then((response) => {
+        const departments = response.data?.data || response.data || [];
+        const department = departments.find((entry: any) => entry.id === currentUser.departmentId);
+        if (!cancelled && department?.name) setRequesterDepartment(department.name);
+      })
+      .catch((error) => console.error('Failed to resolve requester department', error));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.departmentId, directDepartmentName]);
 
   useEffect(() => {
     let cancelled = false;
@@ -154,16 +188,23 @@ export default function RequestsCreate({
           if (fromContext) {
             return {
               itemId: line.itemId,
-              item: fromContext,
+              item: {
+                ...fromContext,
+                stock: getWarehouseStock(fromContext, sourceSupplyType),
+              },
               quantity: Number(line.qtyRequested || 1),
               note: line.note || '',
             };
           }
 
           if (line.item) {
+            const hydratedItem = normalizeHydratedItem(line.item, line);
             return {
               itemId: line.itemId,
-              item: normalizeHydratedItem(line.item, line),
+              item: {
+                ...hydratedItem,
+                stock: getWarehouseStock(hydratedItem, sourceSupplyType),
+              },
               quantity: Number(line.qtyRequested || 1),
               note: line.note || '',
             };
@@ -172,9 +213,13 @@ export default function RequestsCreate({
           try {
             const res = await api.get(`/items/${line.itemId}`);
             const data = res.data?.data || res.data;
+            const hydratedItem = normalizeHydratedItem(data, line);
             return {
               itemId: line.itemId,
-              item: normalizeHydratedItem(data, line),
+              item: {
+                ...hydratedItem,
+                stock: getWarehouseStock(hydratedItem, sourceSupplyType),
+              },
               quantity: Number(line.qtyRequested || 1),
               note: line.note || '',
             };
@@ -208,7 +253,7 @@ export default function RequestsCreate({
     previousRequestTypeRef.current = reqType;
 
     if (reqType === 'Định kỳ') {
-      setPurpose(buildPeriodicPurpose(supplyType, currentUser?.department));
+      setPurpose(buildPeriodicPurpose(supplyType, requesterDepartment));
       return;
     }
 
@@ -218,7 +263,7 @@ export default function RequestsCreate({
     }
 
     if (previousRequestType !== reqType) setPurpose('');
-  }, [reqType, supplyType, currentUser?.department, isEditingDraft]);
+  }, [reqType, supplyType, requesterDepartment, isEditingDraft]);
 
   const searchResults = useMemo(() => {
     const keyword = searchTerm.trim().toLowerCase();
@@ -230,13 +275,17 @@ export default function RequestsCreate({
         const itemSupplyType: RequestSupplyType = String(i.itemType || 'VPP').toUpperCase() === 'VE_SINH' ? 'VE_SINH' : 'VPP';
         if (itemSupplyType !== supplyType) return false;
 
-        if (stockFilter === 'IN_STOCK' && Number(i.stock || 0) <= 0) return false;
+        if (stockFilter === 'IN_STOCK' && getWarehouseStock(i, supplyType) <= 0) return false;
 
         return !keyword || (
           i.name.toLowerCase().includes(keyword) ||
           i.mvpp.toLowerCase().includes(keyword)
         );
       })
+      .map((item: VPPItem) => ({
+        ...item,
+        stock: getWarehouseStock(item, supplyType),
+      }))
       .sort((a: VPPItem, b: VPPItem) => a.name.localeCompare(b.name, 'vi'));
   }, [items, searchTerm, supplyType, stockFilter]);
 
@@ -558,7 +607,7 @@ export default function RequestsCreate({
                       return <tr key={t.itemId} className={`transition-colors ${highlightedItemId === t.itemId ? 'bg-indigo-50' : ''}`}>
                         <td className="p-3"><p className="max-w-[260px] font-bold text-slate-800">{t.item.name}</p><p className="text-xs text-slate-500">{t.item.mvpp} · {t.item.unit}</p></td>
                         <td className="p-3 text-center text-sm font-semibold"><span className={Number(t.item.stock) > 0 ? 'text-emerald-600' : 'text-amber-600'}>{t.item.stock}</span> / <span className="text-indigo-600">{t.item.quota}</span></td>
-                        <td className="p-3"><MonthlyApprovalHistoryTooltip itemId={t.itemId} itemName={t.item.name} department={currentUser?.department} departmentId={currentUser?.departmentId} requestId={activeRequest?.id}><div className="mx-auto flex w-32 items-center rounded-lg border border-slate-200"><button type="button" aria-label={`Giảm số lượng ${t.item.name}`} onClick={() => adjustQuantity(t.itemId, -1)} className="grid h-10 w-9 place-items-center text-slate-500 hover:bg-slate-50"><Minus className="h-4 w-4" /></button><input type="number" min="1" value={t.quantity || ''} onChange={(e) => handleQuantityChange(t.itemId, e.target.value)} aria-label={`Số lượng đề xuất ${t.item.name}`} className={`h-10 min-w-0 flex-1 border-x border-slate-200 text-center font-black outline-none ${isOverQuota ? 'text-rose-600' : 'text-indigo-700'}`} /><button type="button" aria-label={`Tăng số lượng ${t.item.name}`} onClick={() => adjustQuantity(t.itemId, 1)} className="grid h-10 w-9 place-items-center text-slate-500 hover:bg-slate-50"><Plus className="h-4 w-4" /></button></div></MonthlyApprovalHistoryTooltip>{isOverQuota && <p className="mt-1 text-center text-[11px] font-semibold text-amber-600">Vượt định mức</p>}</td>
+                        <td className="p-3"><MonthlyApprovalHistoryTooltip itemId={t.itemId} itemName={t.item.name} department={requesterDepartment} departmentId={currentUser?.departmentId} requestId={activeRequest?.id}><div className="mx-auto flex w-32 items-center rounded-lg border border-slate-200"><button type="button" aria-label={`Giảm số lượng ${t.item.name}`} onClick={() => adjustQuantity(t.itemId, -1)} className="grid h-10 w-9 place-items-center text-slate-500 hover:bg-slate-50"><Minus className="h-4 w-4" /></button><input type="number" min="1" value={t.quantity || ''} onChange={(e) => handleQuantityChange(t.itemId, e.target.value)} aria-label={`Số lượng đề xuất ${t.item.name}`} className={`h-10 min-w-0 flex-1 border-x border-slate-200 text-center font-black outline-none ${isOverQuota ? 'text-rose-600' : 'text-indigo-700'}`} /><button type="button" aria-label={`Tăng số lượng ${t.item.name}`} onClick={() => adjustQuantity(t.itemId, 1)} className="grid h-10 w-9 place-items-center text-slate-500 hover:bg-slate-50"><Plus className="h-4 w-4" /></button></div></MonthlyApprovalHistoryTooltip>{isOverQuota && <p className="mt-1 text-center text-[11px] font-semibold text-amber-600">Vượt định mức</p>}</td>
                         <td className="p-3 text-right text-sm font-black text-slate-800">{(Number(t.item.price || 0) * Number(t.quantity || 0)).toLocaleString('vi-VN')} đ</td>
                         <td className="p-3"><button type="button" aria-label={`Xóa ${t.item.name}`} onClick={() => handleRemoveItem(t.itemId)} className="p-2 text-rose-500 hover:bg-rose-50"><Trash2 className="h-4 w-4" /></button></td>
                       </tr>;
