@@ -133,15 +133,38 @@ export default function RequestsCreate({
     || currentUser?.departmentInfo?.name
     || '';
   const [requesterDepartment, setRequesterDepartment] = useState(directDepartmentName);
+  const pageRootRef = useRef<HTMLDivElement>(null);
+  const pageScrollContainerRef = useRef<HTMLElement | null>(null);
   const hydratedRef = useRef(false);
   const previousRequestTypeRef = useRef(reqType);
 
   useEffect(() => {
-    const updateWorkspaceFocus = () => setIsWorkspaceFocused(window.scrollY > 180);
+    let scrollContainer: HTMLElement | Window = window;
+    let parent = pageRootRef.current?.parentElement;
+    while (parent) {
+      const overflowY = window.getComputedStyle(parent).overflowY;
+      if (overflowY === 'auto' || overflowY === 'scroll') {
+        scrollContainer = parent;
+        pageScrollContainerRef.current = parent;
+        break;
+      }
+      parent = parent.parentElement;
+    }
+
+    const getScrollTop = () => scrollContainer === window
+      ? window.scrollY
+      : (scrollContainer as HTMLElement).scrollTop;
+    const updateWorkspaceFocus = () => setIsWorkspaceFocused(getScrollTop() > 180);
     updateWorkspaceFocus();
-    window.addEventListener('scroll', updateWorkspaceFocus, { passive: true });
-    return () => window.removeEventListener('scroll', updateWorkspaceFocus);
+    scrollContainer.addEventListener('scroll', updateWorkspaceFocus, { passive: true });
+    return () => scrollContainer.removeEventListener('scroll', updateWorkspaceFocus);
   }, []);
+
+  const revealGeneralInformation = () => {
+    const scrollContainer = pageScrollContainerRef.current;
+    if (scrollContainer) scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+    else window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const isEditingDraft =
     !!activeRequest &&
@@ -566,7 +589,7 @@ export default function RequestsCreate({
   );
 
   return (
-    <div className="min-h-full bg-[#F4F6FA] pb-28 text-[#17233D]">
+    <div ref={pageRootRef} className="min-h-full bg-[#F4F6FA] pb-28 text-[#17233D]">
       <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-5 px-4 py-6 md:px-8">
         <header className="flex items-start justify-between gap-4">
           <div>
@@ -580,7 +603,7 @@ export default function RequestsCreate({
         <section className={`rounded-xl border border-slate-200 bg-white transition-all duration-300 ${isWorkspaceFocused ? 'sticky top-2 z-30 p-3 shadow-lg shadow-slate-900/10 md:px-5' : 'p-4 md:p-6'}`}>
           <div className={`flex items-center gap-3 ${isWorkspaceFocused ? 'justify-between' : 'mb-5'}`}>
             <h2 className="flex shrink-0 items-center gap-3 text-lg font-extrabold"><span className="grid h-7 w-7 place-items-center rounded-md bg-indigo-600 text-sm text-white">1</span>Thông tin chung</h2>
-            {isWorkspaceFocused && <div className="flex min-w-0 flex-1 items-center justify-end gap-2 text-xs text-slate-500"><span className="hidden truncate rounded-md bg-slate-100 px-2 py-1 font-semibold sm:inline">{supplyType === 'VE_SINH' ? 'Đồ vệ sinh' : 'Văn phòng phẩm'} · {reqType} · {targetItems.length} mặt hàng</span><button type="button" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="shrink-0 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 font-bold text-indigo-700 hover:bg-indigo-100">Mở thông tin</button></div>}
+            {isWorkspaceFocused && <div className="flex min-w-0 flex-1 items-center justify-end gap-2 text-xs text-slate-500"><span className="hidden truncate rounded-md bg-slate-100 px-2 py-1 font-semibold sm:inline">{supplyType === 'VE_SINH' ? 'Đồ vệ sinh' : 'Văn phòng phẩm'} · {reqType} · {targetItems.length} mặt hàng</span><button type="button" onClick={revealGeneralInformation} className="shrink-0 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 font-bold text-indigo-700 hover:bg-indigo-100">Mở thông tin</button></div>}
           </div>
           {!isWorkspaceFocused && <>
           <fieldset>
