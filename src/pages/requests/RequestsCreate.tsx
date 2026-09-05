@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { Fragment, useState, useEffect, useMemo, useRef } from 'react';
 import {
   Plus,
   Minus,
@@ -10,6 +10,7 @@ import {
   AlertCircle,
   PackageOpen,
   ShoppingCart,
+  NotebookPen,
   X,
 } from 'lucide-react';
 import api from '../../lib/api';
@@ -123,6 +124,7 @@ export default function RequestsCreate({
   const [stockFilter, setStockFilter] = useState<'ALL' | 'IN_STOCK'>('ALL');
   const [mobileCatalogOpen, setMobileCatalogOpen] = useState(false);
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
+  const [expandedNoteIds, setExpandedNoteIds] = useState<Set<string>>(new Set());
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const [hasUserChanges, setHasUserChanges] = useState(false);
   const directDepartmentName = currentUser?.department
@@ -351,6 +353,11 @@ export default function RequestsCreate({
 
   const handleRemoveItem = (itemId: string) => {
     setTargetItems((prev) => prev.filter((t) => t.itemId !== itemId));
+    setExpandedNoteIds((prev) => {
+      const next = new Set(prev);
+      next.delete(itemId);
+      return next;
+    });
     setHasUserChanges(true);
   };
 
@@ -376,6 +383,15 @@ export default function RequestsCreate({
       prev.map((t) => (t.itemId === itemId ? { ...t, note: value } : t))
     );
     setHasUserChanges(true);
+  };
+
+  const setNoteExpanded = (itemId: string, expanded: boolean) => {
+    setExpandedNoteIds((prev) => {
+      const next = new Set(prev);
+      if (expanded) next.add(itemId);
+      else next.delete(itemId);
+      return next;
+    });
   };
 
   const validateBeforeSubmit = (status: 'DRAFT' | 'PENDING'): string | null => {
@@ -614,23 +630,30 @@ export default function RequestsCreate({
               </div>
 
               {targetItems.length === 0 ? <div className="grid min-h-[300px] place-items-center p-8 text-center"><div><PackageOpen className="mx-auto h-11 w-11 text-slate-300" /><p className="mt-3 font-bold text-slate-600">Chưa chọn vật tư</p><p className="mt-1 text-sm text-slate-500">Chọn vật tư từ danh mục bên trái để thêm vào phiếu.</p></div></div> : <>
-                <div className="hidden overflow-x-auto md:block">
+                <div className="hidden max-h-[520px] overflow-auto md:block">
                   <table className="w-full min-w-[720px] text-left">
-                    <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="p-3">Vật tư</th><th className="p-3 text-center">Định mức</th><th className="p-3 text-center">SL đề xuất</th><th className="p-3 text-right">Thành tiền</th><th className="w-12 p-3" /></tr></thead>
+                    <thead className="sticky top-0 z-20 bg-slate-50 text-xs uppercase tracking-wide text-slate-500 shadow-[0_1px_0_#e2e8f0]"><tr><th className="p-3">Vật tư</th><th className="p-3 text-center">Định mức</th><th className="p-3 text-center">SL đề xuất</th><th className="p-3 text-right">Thành tiền</th><th className="w-40 p-3 text-center">Thao tác</th></tr></thead>
                     <tbody className="divide-y divide-slate-100">{targetItems.map((t) => {
                       const isOverQuota = Number(t.quantity) > Number(t.item.quota || 0);
-                      return <tr key={t.itemId} className={`transition-colors ${highlightedItemId === t.itemId ? 'bg-indigo-50' : ''}`}>
-                        <td className="p-3"><p className="max-w-[260px] font-bold text-slate-800">{t.item.name}</p><p className="text-xs text-slate-500">{t.item.mvpp} · {t.item.unit}</p></td>
-                        <td className="p-3 text-center text-sm font-semibold text-indigo-600">{t.item.quota}</td>
-                        <td className="p-3"><MonthlyApprovalHistoryTooltip itemId={t.itemId} itemName={t.item.name} department={requesterDepartment} departmentId={currentUser?.departmentId} requestId={activeRequest?.id}><div className="mx-auto flex w-32 items-center rounded-lg border border-slate-200"><button type="button" aria-label={`Giảm số lượng ${t.item.name}`} onClick={() => adjustQuantity(t.itemId, -1)} className="grid h-10 w-9 place-items-center text-slate-500 hover:bg-slate-50"><Minus className="h-4 w-4" /></button><input type="number" min="1" value={t.quantity || ''} onChange={(e) => handleQuantityChange(t.itemId, e.target.value)} aria-label={`Số lượng đề xuất ${t.item.name}`} className={`h-10 min-w-0 flex-1 border-x border-slate-200 text-center font-black outline-none ${isOverQuota ? 'text-rose-600' : 'text-indigo-700'}`} /><button type="button" aria-label={`Tăng số lượng ${t.item.name}`} onClick={() => adjustQuantity(t.itemId, 1)} className="grid h-10 w-9 place-items-center text-slate-500 hover:bg-slate-50"><Plus className="h-4 w-4" /></button></div></MonthlyApprovalHistoryTooltip>{isOverQuota && <p className="mt-1 text-center text-[11px] font-semibold text-amber-600">Vượt định mức</p>}</td>
-                        <td className="p-3 text-right text-sm font-black text-slate-800">{(Number(t.item.price || 0) * Number(t.quantity || 0)).toLocaleString('vi-VN')} đ</td>
-                        <td className="p-3"><button type="button" aria-label={`Xóa ${t.item.name}`} onClick={() => handleRemoveItem(t.itemId)} className="p-2 text-rose-500 hover:bg-rose-50"><Trash2 className="h-4 w-4" /></button></td>
-                      </tr>;
+                      const noteExpanded = expandedNoteIds.has(t.itemId);
+                      return <Fragment key={t.itemId}>
+                        <tr className={`transition-colors ${highlightedItemId === t.itemId ? 'bg-indigo-50' : ''}`}>
+                          <td className="p-3"><p className="max-w-[260px] font-bold text-slate-800">{t.item.name}</p><p className="text-xs text-slate-500">{t.item.mvpp} · {t.item.unit}</p></td>
+                          <td className="p-3 text-center text-sm font-semibold text-indigo-600">{t.item.quota}</td>
+                          <td className="p-3"><MonthlyApprovalHistoryTooltip itemId={t.itemId} itemName={t.item.name} department={requesterDepartment} departmentId={currentUser?.departmentId} requestId={activeRequest?.id}><div className="mx-auto flex w-32 items-center rounded-lg border border-slate-200"><button type="button" aria-label={`Giảm số lượng ${t.item.name}`} onClick={() => adjustQuantity(t.itemId, -1)} className="grid h-10 w-9 place-items-center text-slate-500 hover:bg-slate-50"><Minus className="h-4 w-4" /></button><input type="number" min="1" value={t.quantity || ''} onChange={(e) => handleQuantityChange(t.itemId, e.target.value)} aria-label={`Số lượng đề xuất ${t.item.name}`} className={`h-10 min-w-0 flex-1 border-x border-slate-200 text-center font-black outline-none ${isOverQuota ? 'text-rose-600' : 'text-indigo-700'}`} /><button type="button" aria-label={`Tăng số lượng ${t.item.name}`} onClick={() => adjustQuantity(t.itemId, 1)} className="grid h-10 w-9 place-items-center text-slate-500 hover:bg-slate-50"><Plus className="h-4 w-4" /></button></div></MonthlyApprovalHistoryTooltip>{isOverQuota && <div className="mt-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-amber-600"><span>Vượt định mức</span><button type="button" onClick={() => setNoteExpanded(t.itemId, true)} className="underline decoration-dotted underline-offset-2 hover:text-amber-700">Bổ sung lý do</button></div>}</td>
+                          <td className="p-3 text-right text-sm font-black text-slate-800">{(Number(t.item.price || 0) * Number(t.quantity || 0)).toLocaleString('vi-VN')} đ</td>
+                          <td className="p-3"><div className="flex items-center justify-end gap-1"><button type="button" aria-label={`Ghi chú ${t.item.name}`} onClick={() => setNoteExpanded(t.itemId, !noteExpanded)} className={`flex items-center gap-1 rounded-md px-2 py-2 text-xs font-bold ${noteExpanded || t.note.trim() ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-100'}`}><NotebookPen className="h-4 w-4" />Ghi chú</button><button type="button" aria-label={`Xóa ${t.item.name}`} onClick={() => handleRemoveItem(t.itemId)} className="rounded-md p-2 text-rose-500 hover:bg-rose-50"><Trash2 className="h-4 w-4" /></button></div></td>
+                        </tr>
+                        {noteExpanded ? <tr className="bg-indigo-50/40"><td colSpan={5} className="px-3 pb-3 pt-2"><div className="rounded-lg border border-indigo-100 bg-white p-3"><div className="mb-2 flex items-center justify-between gap-3"><label htmlFor={`item-note-${t.itemId}`} className="text-xs font-bold text-slate-700">Ghi chú cho {t.item.name}</label><button type="button" onClick={() => setNoteExpanded(t.itemId, false)} className="text-xs font-bold text-indigo-700 hover:text-indigo-900">Xong</button></div><textarea id={`item-note-${t.itemId}`} rows={2} value={t.note} onChange={(e) => handleNoteChange(t.itemId, e.target.value)} placeholder={isOverQuota ? 'Nhập lý do đề xuất vượt định mức...' : 'Thêm ghi chú cho vật tư này...'} className="min-h-16 max-h-40 w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" /></div></td></tr> : t.note.trim() && <tr className="bg-slate-50/70"><td colSpan={5} className="px-3 py-2"><button type="button" onClick={() => setNoteExpanded(t.itemId, true)} className="block w-full truncate text-left text-xs text-slate-600 hover:text-indigo-700"><strong>Ghi chú:</strong> {t.note}</button></td></tr>}
+                      </Fragment>;
                     })}</tbody>
                   </table>
-                  <div className="space-y-2 border-t border-slate-100 p-3">{targetItems.map((t) => <label key={t.itemId} className="grid grid-cols-[minmax(150px,220px)_1fr] items-center gap-3 text-xs font-semibold text-slate-600"><span className="truncate">Ghi chú · {t.item.name}</span><input value={t.note} onChange={(e) => handleNoteChange(t.itemId, e.target.value)} placeholder="Thêm ghi chú..." className="h-9 rounded-lg border border-slate-200 px-3 font-medium outline-none focus:border-indigo-500" /></label>)}</div>
                 </div>
-                <div className="divide-y divide-slate-100 md:hidden">{targetItems.map((t) => <article key={t.itemId} className={`p-4 transition-colors ${highlightedItemId === t.itemId ? 'bg-indigo-50' : ''}`}><div className="flex items-start justify-between gap-3"><div><h4 className="font-bold text-slate-800">{t.item.name}</h4><p className="mt-1 text-xs text-slate-500">{t.item.mvpp} · {t.item.unit} · Định mức {t.item.quota}</p></div><button type="button" onClick={() => handleRemoveItem(t.itemId)} className="p-2 text-rose-500"><Trash2 className="h-4 w-4" /></button></div><div className="mt-3 flex items-center justify-between"><div className="flex items-center rounded-lg border border-slate-200"><button type="button" onClick={() => adjustQuantity(t.itemId, -1)} className="p-2"><Minus className="h-4 w-4" /></button><input type="number" min="1" value={t.quantity || ''} onChange={(e) => handleQuantityChange(t.itemId, e.target.value)} className="h-9 w-12 border-x border-slate-200 text-center font-black text-indigo-700 outline-none" /><button type="button" onClick={() => adjustQuantity(t.itemId, 1)} className="p-2"><Plus className="h-4 w-4" /></button></div><strong>{(Number(t.item.price || 0) * Number(t.quantity || 0)).toLocaleString('vi-VN')} đ</strong></div><input value={t.note} onChange={(e) => handleNoteChange(t.itemId, e.target.value)} placeholder="Thêm ghi chú..." className="mt-3 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500" /></article>)}</div>
+                <div className="max-h-[520px] divide-y divide-slate-100 overflow-y-auto md:hidden">{targetItems.map((t) => {
+                  const isOverQuota = Number(t.quantity) > Number(t.item.quota || 0);
+                  const noteExpanded = expandedNoteIds.has(t.itemId);
+                  return <article key={t.itemId} className={`p-4 transition-colors ${highlightedItemId === t.itemId ? 'bg-indigo-50' : ''}`}><div className="flex items-start justify-between gap-3"><div><h4 className="font-bold text-slate-800">{t.item.name}</h4><p className="mt-1 text-xs text-slate-500">{t.item.mvpp} · {t.item.unit} · Định mức {t.item.quota}</p></div><div className="flex items-center gap-1"><button type="button" aria-label={`Ghi chú ${t.item.name}`} onClick={() => setNoteExpanded(t.itemId, !noteExpanded)} className={`rounded-md p-2 ${noteExpanded || t.note.trim() ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500'}`}><NotebookPen className="h-4 w-4" /></button><button type="button" aria-label={`Xóa ${t.item.name}`} onClick={() => handleRemoveItem(t.itemId)} className="rounded-md p-2 text-rose-500"><Trash2 className="h-4 w-4" /></button></div></div><div className="mt-3 flex items-center justify-between gap-3"><div><div className="flex items-center rounded-lg border border-slate-200"><button type="button" aria-label={`Giảm số lượng ${t.item.name}`} onClick={() => adjustQuantity(t.itemId, -1)} className="p-2"><Minus className="h-4 w-4" /></button><input type="number" min="1" value={t.quantity || ''} onChange={(e) => handleQuantityChange(t.itemId, e.target.value)} aria-label={`Số lượng đề xuất ${t.item.name}`} className={`h-9 w-12 border-x border-slate-200 text-center font-black outline-none ${isOverQuota ? 'text-rose-600' : 'text-indigo-700'}`} /><button type="button" aria-label={`Tăng số lượng ${t.item.name}`} onClick={() => adjustQuantity(t.itemId, 1)} className="p-2"><Plus className="h-4 w-4" /></button></div>{isOverQuota && <div className="mt-1 flex items-center gap-1.5 text-[11px] font-semibold text-amber-600"><span>Vượt định mức</span><button type="button" onClick={() => setNoteExpanded(t.itemId, true)} className="underline decoration-dotted underline-offset-2">Bổ sung lý do</button></div>}</div><strong className="shrink-0">{(Number(t.item.price || 0) * Number(t.quantity || 0)).toLocaleString('vi-VN')} đ</strong></div>{noteExpanded ? <div className="mt-3 rounded-lg border border-indigo-100 bg-indigo-50/40 p-3"><div className="mb-2 flex items-center justify-between gap-3"><label htmlFor={`mobile-item-note-${t.itemId}`} className="text-xs font-bold text-slate-700">Ghi chú</label><button type="button" onClick={() => setNoteExpanded(t.itemId, false)} className="text-xs font-bold text-indigo-700">Xong</button></div><textarea id={`mobile-item-note-${t.itemId}`} rows={2} value={t.note} onChange={(e) => handleNoteChange(t.itemId, e.target.value)} placeholder={isOverQuota ? 'Nhập lý do đề xuất vượt định mức...' : 'Thêm ghi chú cho vật tư này...'} className="min-h-16 max-h-40 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500" /></div> : t.note.trim() && <button type="button" onClick={() => setNoteExpanded(t.itemId, true)} className="mt-3 block w-full truncate rounded-md bg-slate-50 px-3 py-2 text-left text-xs text-slate-600"><strong>Ghi chú:</strong> {t.note}</button>}</article>;
+                })}</div>
               </>}
               {warningsCount > 0 && <p className="flex items-center gap-2 border-t border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-700"><AlertTriangle className="h-4 w-4" />{warningsCount} mặt hàng đang vượt định mức.</p>}
             </div>
