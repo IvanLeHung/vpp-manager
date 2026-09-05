@@ -135,6 +135,7 @@ export default function RequestsCreate({
   const [requesterDepartment, setRequesterDepartment] = useState(directDepartmentName);
   const pageRootRef = useRef<HTMLDivElement>(null);
   const pageScrollContainerRef = useRef<HTMLElement | null>(null);
+  const workspaceFocusedRef = useRef(false);
   const hydratedRef = useRef(false);
   const previousRequestTypeRef = useRef(reqType);
 
@@ -154,7 +155,16 @@ export default function RequestsCreate({
     const getScrollTop = () => scrollContainer === window
       ? window.scrollY
       : (scrollContainer as HTMLElement).scrollTop;
-    const updateWorkspaceFocus = () => setIsWorkspaceFocused(getScrollTop() > 180);
+    const updateWorkspaceFocus = () => {
+      const scrollTop = getScrollTop();
+      const nextFocused = workspaceFocusedRef.current
+        ? scrollTop > 60
+        : scrollTop > 180;
+      if (nextFocused !== workspaceFocusedRef.current) {
+        workspaceFocusedRef.current = nextFocused;
+        setIsWorkspaceFocused(nextFocused);
+      }
+    };
     updateWorkspaceFocus();
     scrollContainer.addEventListener('scroll', updateWorkspaceFocus, { passive: true });
     return () => scrollContainer.removeEventListener('scroll', updateWorkspaceFocus);
@@ -574,7 +584,7 @@ export default function RequestsCreate({
           <button type="button" onClick={() => setStockFilter('IN_STOCK')} className={`rounded-lg px-4 py-2 text-xs font-bold transition ${stockFilter === 'IN_STOCK' ? 'bg-indigo-600 text-white' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Còn hàng</button>
         </div>
       </div>
-      <div className={`${isWorkspaceFocused ? 'max-h-[calc(100vh-17rem)] lg:min-h-[calc(100vh-17rem)]' : 'max-h-[490px] min-h-[300px]'} flex-1 divide-y divide-slate-100 overflow-y-auto transition-[max-height,min-height] duration-300`}>
+      <div className={`${isWorkspaceFocused ? 'max-h-[calc(100vh-17rem)] lg:min-h-[calc(100vh-17rem)]' : 'max-h-[490px] min-h-[300px]'} flex-1 divide-y divide-slate-100 overflow-y-auto transition-[max-height,min-height] duration-700 ease-in-out`}>
         {searchResults.length === 0 ? <div className="p-8 text-center text-sm text-slate-500">Không tìm thấy vật tư phù hợp.</div> : searchResults.map((item: VPPItem) => (
           <div key={item.id} className="flex items-center justify-between gap-3 p-3 hover:bg-slate-50">
             <div className="min-w-0">
@@ -600,12 +610,13 @@ export default function RequestsCreate({
           <span className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700">● Bản nháp</span>
         </header>
 
-        <section className={`rounded-xl border border-slate-200 bg-white transition-all duration-300 ${isWorkspaceFocused ? 'sticky top-2 z-30 p-3 shadow-lg shadow-slate-900/10 md:px-5' : 'p-4 md:p-6'}`}>
-          <div className={`flex items-center gap-3 ${isWorkspaceFocused ? 'justify-between' : 'mb-5'}`}>
+        <section className={`rounded-xl border border-slate-200 bg-white transition-all duration-700 ease-in-out ${isWorkspaceFocused ? 'sticky top-2 z-30 p-3 shadow-lg shadow-slate-900/10 md:px-5' : 'p-4 md:p-6'}`}>
+          <div className={`flex items-center gap-3 transition-[margin] duration-700 ease-in-out ${isWorkspaceFocused ? 'justify-between' : 'mb-5'}`}>
             <h2 className="flex shrink-0 items-center gap-3 text-lg font-extrabold"><span className="grid h-7 w-7 place-items-center rounded-md bg-indigo-600 text-sm text-white">1</span>Thông tin chung</h2>
-            {isWorkspaceFocused && <div className="flex min-w-0 flex-1 items-center justify-end gap-2 text-xs text-slate-500"><span className="hidden truncate rounded-md bg-slate-100 px-2 py-1 font-semibold sm:inline">{supplyType === 'VE_SINH' ? 'Đồ vệ sinh' : 'Văn phòng phẩm'} · {reqType} · {targetItems.length} mặt hàng</span><button type="button" onClick={revealGeneralInformation} className="shrink-0 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 font-bold text-indigo-700 hover:bg-indigo-100">Mở thông tin</button></div>}
+            <div aria-hidden={!isWorkspaceFocused} className={`flex min-w-0 items-center justify-end gap-2 overflow-hidden text-xs text-slate-500 transition-all duration-500 ease-out ${isWorkspaceFocused ? 'max-w-[720px] flex-1 translate-y-0 opacity-100' : 'pointer-events-none max-w-0 -translate-y-1 opacity-0'}`}><span className="hidden truncate rounded-md bg-slate-100 px-2 py-1 font-semibold sm:inline">{supplyType === 'VE_SINH' ? 'Đồ vệ sinh' : 'Văn phòng phẩm'} · {reqType} · {targetItems.length} mặt hàng</span><button type="button" tabIndex={isWorkspaceFocused ? 0 : -1} onClick={revealGeneralInformation} className="shrink-0 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 font-bold text-indigo-700 hover:bg-indigo-100">Mở thông tin</button></div>
           </div>
-          {!isWorkspaceFocused && <>
+          <div aria-hidden={isWorkspaceFocused} className={`grid transition-[grid-template-rows,opacity] duration-700 ease-in-out ${isWorkspaceFocused ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'}`}>
+          <div className="min-h-0 overflow-hidden">
           <fieldset>
             <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">Nhóm hàng <span className="text-rose-500">*</span></legend>
             <div className="grid gap-3 sm:grid-cols-2 lg:max-w-[980px]">
@@ -644,10 +655,11 @@ export default function RequestsCreate({
           </label>
           {validationErrors.purpose && <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-rose-600"><AlertCircle className="h-4 w-4" />{validationErrors.purpose}</p>}
           {reqType === 'Định kỳ' && <p className="mt-2 text-xs text-indigo-600">Nội dung được tự động xác định theo nhóm hàng, phòng ban và tháng kế tiếp. Bạn vẫn có thể chỉnh sửa.</p>}
-          </>}
+          </div>
+          </div>
         </section>
 
-        <section className={`rounded-xl border border-slate-200 bg-white p-4 transition-all duration-300 md:p-6 ${isWorkspaceFocused ? 'lg:min-h-[calc(100vh-6rem)]' : ''}`}>
+        <section className={`rounded-xl border border-slate-200 bg-white p-4 transition-all duration-700 ease-in-out md:p-6 ${isWorkspaceFocused ? 'lg:min-h-[calc(100vh-6rem)]' : ''}`}>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="flex items-center gap-3 text-lg font-extrabold"><span className="grid h-7 w-7 place-items-center rounded-md bg-indigo-600 text-sm text-white">2</span>Chọn vật tư đề xuất</h2>
@@ -665,8 +677,8 @@ export default function RequestsCreate({
                 <span className="rounded-md bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-700">{targetItems.length} mặt hàng</span>
               </div>
 
-              {targetItems.length === 0 ? <div className={`grid place-items-center p-8 text-center transition-[min-height] duration-300 ${isWorkspaceFocused ? 'min-h-[calc(100vh-15rem)]' : 'min-h-[300px]'}`}><div><PackageOpen className="mx-auto h-11 w-11 text-slate-300" /><p className="mt-3 font-bold text-slate-600">Chưa chọn vật tư</p><p className="mt-1 text-sm text-slate-500">Chọn vật tư từ danh mục bên trái để thêm vào phiếu.</p></div></div> : <>
-                <div className={`hidden overflow-auto transition-[max-height] duration-300 md:block ${isWorkspaceFocused ? 'max-h-[calc(100vh-15rem)]' : 'max-h-[520px]'}`}>
+              {targetItems.length === 0 ? <div className={`grid place-items-center p-8 text-center transition-[min-height] duration-700 ease-in-out ${isWorkspaceFocused ? 'min-h-[calc(100vh-15rem)]' : 'min-h-[300px]'}`}><div><PackageOpen className="mx-auto h-11 w-11 text-slate-300" /><p className="mt-3 font-bold text-slate-600">Chưa chọn vật tư</p><p className="mt-1 text-sm text-slate-500">Chọn vật tư từ danh mục bên trái để thêm vào phiếu.</p></div></div> : <>
+                <div className={`hidden overflow-auto transition-[max-height] duration-700 ease-in-out md:block ${isWorkspaceFocused ? 'max-h-[calc(100vh-15rem)]' : 'max-h-[520px]'}`}>
                   <table className="w-full min-w-[720px] text-left">
                     <thead className="sticky top-0 z-20 bg-slate-50 text-xs uppercase tracking-wide text-slate-500 shadow-[0_1px_0_#e2e8f0]"><tr><th className="p-3">Vật tư</th><th className="p-3 text-center">Định mức</th><th className="p-3 text-center">SL đề xuất</th><th className="p-3 text-right">Thành tiền</th><th className="w-40 p-3 text-center">Thao tác</th></tr></thead>
                     <tbody className="divide-y divide-slate-100">{targetItems.map((t) => {
@@ -685,7 +697,7 @@ export default function RequestsCreate({
                     })}</tbody>
                   </table>
                 </div>
-                <div className={`divide-y divide-slate-100 overflow-y-auto transition-[max-height] duration-300 md:hidden ${isWorkspaceFocused ? 'max-h-[calc(100vh-15rem)]' : 'max-h-[520px]'}`}>{targetItems.map((t) => {
+                <div className={`divide-y divide-slate-100 overflow-y-auto transition-[max-height] duration-700 ease-in-out md:hidden ${isWorkspaceFocused ? 'max-h-[calc(100vh-15rem)]' : 'max-h-[520px]'}`}>{targetItems.map((t) => {
                   const isOverQuota = Number(t.quantity) > Number(t.item.quota || 0);
                   const noteExpanded = expandedNoteIds.has(t.itemId);
                   return <article key={t.itemId} className={`p-4 transition-colors ${highlightedItemId === t.itemId ? 'bg-indigo-50' : ''}`}><div className="flex items-start justify-between gap-3"><div><h4 className="font-bold text-slate-800">{t.item.name}</h4><p className="mt-1 text-xs text-slate-500">{t.item.mvpp} · {t.item.unit} · Định mức {t.item.quota}</p></div><div className="flex items-center gap-1"><button type="button" aria-label={`Ghi chú ${t.item.name}`} onClick={() => setNoteExpanded(t.itemId, !noteExpanded)} className={`rounded-md p-2 ${noteExpanded || t.note.trim() ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500'}`}><NotebookPen className="h-4 w-4" /></button><button type="button" aria-label={`Xóa ${t.item.name}`} onClick={() => handleRemoveItem(t.itemId)} className="rounded-md p-2 text-rose-500"><Trash2 className="h-4 w-4" /></button></div></div><div className="mt-3 flex items-center justify-between gap-3"><div><div className="flex items-center rounded-lg border border-slate-200"><button type="button" aria-label={`Giảm số lượng ${t.item.name}`} onClick={() => adjustQuantity(t.itemId, -1)} className="p-2"><Minus className="h-4 w-4" /></button><input type="number" min="1" value={t.quantity || ''} onChange={(e) => handleQuantityChange(t.itemId, e.target.value)} aria-label={`Số lượng đề xuất ${t.item.name}`} className={`h-9 w-12 border-x border-slate-200 text-center font-black outline-none ${isOverQuota ? 'text-rose-600' : 'text-indigo-700'}`} /><button type="button" aria-label={`Tăng số lượng ${t.item.name}`} onClick={() => adjustQuantity(t.itemId, 1)} className="p-2"><Plus className="h-4 w-4" /></button></div>{isOverQuota && <div className="mt-1 flex items-center gap-1.5 text-[11px] font-semibold text-amber-600"><span>Vượt định mức</span><button type="button" onClick={() => setNoteExpanded(t.itemId, true)} className="underline decoration-dotted underline-offset-2">Bổ sung lý do</button></div>}</div><strong className="shrink-0">{(Number(t.item.price || 0) * Number(t.quantity || 0)).toLocaleString('vi-VN')} đ</strong></div>{noteExpanded ? <div className="mt-3 rounded-lg border border-indigo-100 bg-indigo-50/40 p-3"><div className="mb-2 flex items-center justify-between gap-3"><label htmlFor={`mobile-item-note-${t.itemId}`} className="text-xs font-bold text-slate-700">Ghi chú</label><button type="button" onClick={() => setNoteExpanded(t.itemId, false)} className="text-xs font-bold text-indigo-700">Xong</button></div><textarea id={`mobile-item-note-${t.itemId}`} rows={2} value={t.note} onChange={(e) => handleNoteChange(t.itemId, e.target.value)} placeholder={isOverQuota ? 'Nhập lý do đề xuất vượt định mức...' : 'Thêm ghi chú cho vật tư này...'} className="min-h-16 max-h-40 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500" /></div> : t.note.trim() && <button type="button" onClick={() => setNoteExpanded(t.itemId, true)} className="mt-3 block w-full truncate rounded-md bg-slate-50 px-3 py-2 text-left text-xs text-slate-600"><strong>Ghi chú:</strong> {t.note}</button>}</article>;
