@@ -47,12 +47,27 @@ function buildPeriodicPurpose(supplyType: RequestSupplyType, department?: string
   return `Đề xuất ${groupName} cho ${departmentName} tháng ${nextMonth.getMonth() + 1}/${nextMonth.getFullYear()}`;
 }
 
+function getItemSupplyType(item?: Partial<VPPItem> | null): RequestSupplyType {
+  const itemType = String(item?.itemType || '').trim().toUpperCase();
+  const itemCode = String(item?.mvpp || '').trim().toUpperCase();
+  const category = String(item?.category || '').trim().toUpperCase();
+  const isJanitorial = itemType === 'VE_SINH'
+    || itemType === 'VS'
+    || /^VS[-_\s]?\d/.test(itemCode)
+    || category === 'VE_SINH'
+    || category === 'VỆ SINH';
+  return isJanitorial ? 'VE_SINH' : 'VPP';
+}
+
 function getWarehouseStock(item: VPPItem, supplyType: RequestSupplyType) {
   const warehouseCode = supplyType === 'VE_SINH' ? 'VE_SINH' : 'MAIN';
   const warehouseStock = item.stocks?.find(
     (stock) => String(stock.warehouseCode).toUpperCase() === warehouseCode
   );
-  return Number(warehouseStock?.quantityOnHand ?? item.stock ?? 0);
+  if (Array.isArray(item.stocks)) {
+    return Number(warehouseStock?.quantityOnHand ?? 0);
+  }
+  return Number(item.stock ?? 0);
 }
 
 function buildFallbackItem(line: any): VPPItem {
@@ -170,7 +185,7 @@ export default function RequestsCreate({
 
       setReqType(sourceRequest.requestType || 'Định kỳ');
       const sourceSupplyType: RequestSupplyType = sourceRequest.warehouseCode === 'VE_SINH'
-        || sourceRequest.lines?.some((line: any) => line.item?.itemType === 'VE_SINH')
+        || sourceRequest.lines?.some((line: any) => getItemSupplyType(line.item) === 'VE_SINH')
         ? 'VE_SINH'
         : 'VPP';
       setSupplyType(sourceSupplyType);
@@ -272,7 +287,7 @@ export default function RequestsCreate({
       .filter((i: VPPItem) => {
         // Only show active items
         if (i.isActive === false) return false;
-        const itemSupplyType: RequestSupplyType = String(i.itemType || 'VPP').toUpperCase() === 'VE_SINH' ? 'VE_SINH' : 'VPP';
+        const itemSupplyType = getItemSupplyType(i);
         if (itemSupplyType !== supplyType) return false;
 
         if (stockFilter === 'IN_STOCK' && getWarehouseStock(i, supplyType) <= 0) return false;
