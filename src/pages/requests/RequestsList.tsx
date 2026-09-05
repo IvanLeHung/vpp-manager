@@ -94,15 +94,14 @@ function getRequestSupplyGroup(request: VPPRequest): RequestSupplyGroup {
 function RequestSupplyGroupBadge({ request }: { request: VPPRequest }) {
   const group = getRequestSupplyGroup(request);
   const config = group === 'VS'
-    ? { Icon: Droplets, label: 'VS', title: 'Đồ vệ sinh', classes: 'from-lime-400 via-emerald-500 to-emerald-700 border-emerald-300 shadow-emerald-200/70' }
+    ? { Icon: Droplets, label: 'VS', title: 'Đồ vệ sinh', classes: 'border-emerald-200 bg-emerald-50 text-emerald-700' }
     : group === 'VPP+VS'
-      ? { Icon: Boxes, label: 'VPP+VS', title: 'Phiếu hỗn hợp Văn phòng phẩm và Đồ vệ sinh', classes: 'from-rose-400 via-rose-500 to-red-700 border-rose-300 shadow-rose-200/70' }
-      : { Icon: PackageOpen, label: 'VPP', title: 'Văn phòng phẩm', classes: 'from-sky-400 via-blue-500 to-indigo-700 border-sky-300 shadow-blue-200/70' };
+      ? { Icon: Boxes, label: 'VPP+VS', title: 'Phiếu hỗn hợp Văn phòng phẩm và Đồ vệ sinh', classes: 'border-rose-200 bg-rose-50 text-rose-700' }
+      : { Icon: PackageOpen, label: 'VPP', title: 'Văn phòng phẩm', classes: 'border-blue-200 bg-blue-50 text-blue-700' };
   return (
-    <span aria-label={`Nhóm hàng: ${config.label}`} title={config.title} className={`relative inline-flex min-w-[74px] items-center justify-center gap-1.5 overflow-hidden rounded-full border bg-gradient-to-b px-3 py-1 text-[10px] font-black tracking-wide text-white shadow-md ${config.classes}`}>
-      <span aria-hidden="true" className="absolute inset-x-2 top-0 h-1/2 rounded-full bg-gradient-to-b from-white/45 to-transparent" />
-      <config.Icon aria-hidden="true" className="relative h-3.5 w-3.5 drop-shadow-sm" />
-      <span className="relative drop-shadow-sm">{config.label}</span>
+    <span aria-label={`Nhóm hàng: ${config.label}`} title={config.title} className={`inline-flex min-w-[74px] items-center justify-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-black tracking-wide ${config.classes}`}>
+      <config.Icon aria-hidden="true" className="h-3.5 w-3.5" />
+      <span>{config.label}</span>
     </span>
   );
 }

@@ -50,7 +50,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     fs.mkdirSync(output, { recursive: true });
     await page.screenshot({ path: path.join(output, 'request-supply-group.png'), fullPage: true });
     assert.deepEqual(errors, []);
-    console.log('PASS: request list shows VPP, VS, mixed, and empty-request fallback supply groups with accessible glossy badges.');
+    console.log('PASS: request list shows VPP, VS, mixed, and empty-request fallback supply groups with accessible flat badges.');
   } finally {
     if (browser) await browser.close();
     await server.close();
