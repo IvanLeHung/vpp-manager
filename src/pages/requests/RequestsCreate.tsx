@@ -1,13 +1,16 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Plus,
-  XCircle,
+  Minus,
   Save,
   Send,
   Search,
   Trash2,
   AlertTriangle,
   AlertCircle,
+  PackageOpen,
+  ShoppingCart,
+  X,
 } from 'lucide-react';
 import api from '../../lib/api';
 import { useAppContext } from '../../context/AppContext';
@@ -29,6 +32,20 @@ type TargetItem = {
   quantity: number;
   note: string;
 };
+
+type ValidationErrors = {
+  purpose?: string;
+  items?: string;
+  neededByDate?: string;
+};
+
+function buildPeriodicPurpose(supplyType: RequestSupplyType, department?: string) {
+  const nextMonth = new Date();
+  nextMonth.setMonth(nextMonth.getMonth() + 1, 1);
+  const groupName = supplyType === 'VE_SINH' ? 'đồ vệ sinh' : 'Văn phòng phẩm';
+  const departmentName = department?.trim() || 'phòng ban đề xuất';
+  return `Đề xuất ${groupName} cho ${departmentName} tháng ${nextMonth.getMonth() + 1}/${nextMonth.getFullYear()}`;
+}
 
 function buildFallbackItem(line: any): VPPItem {
   return {
@@ -80,6 +97,13 @@ export default function RequestsCreate({
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [stockFilter, setStockFilter] = useState<'ALL' | 'IN_STOCK'>('ALL');
+  const [mobileCatalogOpen, setMobileCatalogOpen] = useState(false);
+  const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+  const [hasUserChanges, setHasUserChanges] = useState(false);
+  const hydratedRef = useRef(false);
+  const previousRequestTypeRef = useRef(reqType);
 
   const isEditingDraft =
     !!activeRequest &&
@@ -90,12 +114,14 @@ export default function RequestsCreate({
 
     const hydrateDraft = async () => {
       if (!activeRequest || !isEditingDraft) {
+        if (hydratedRef.current) return;
         setSupplyType(initialSupplyType);
         setReqType('Định kỳ');
         setPriority('Thường');
         setPurpose('');
         setNeededByDate('');
         setTargetItems([]);
+        hydratedRef.current = true;
         return;
       }
 
@@ -165,6 +191,7 @@ export default function RequestsCreate({
 
       if (!cancelled) {
         setTargetItems(prefilled);
+        hydratedRef.current = true;
       }
     };
 
@@ -174,6 +201,24 @@ export default function RequestsCreate({
       cancelled = true;
     };
   }, [activeRequest, initialSupplyType, isEditingDraft, items]);
+
+  useEffect(() => {
+    if (!hydratedRef.current || isEditingDraft) return;
+    const previousRequestType = previousRequestTypeRef.current;
+    previousRequestTypeRef.current = reqType;
+
+    if (reqType === 'Định kỳ') {
+      setPurpose(buildPeriodicPurpose(supplyType, currentUser?.department));
+      return;
+    }
+
+    if (reqType === 'Bổ sung đột xuất') {
+      setPurpose('');
+      return;
+    }
+
+    if (previousRequestType !== reqType) setPurpose('');
+  }, [reqType, supplyType, currentUser?.department, isEditingDraft]);
 
   const searchResults = useMemo(() => {
     const keyword = searchTerm.trim().toLowerCase();
@@ -185,13 +230,15 @@ export default function RequestsCreate({
         const itemSupplyType: RequestSupplyType = String(i.itemType || 'VPP').toUpperCase() === 'VE_SINH' ? 'VE_SINH' : 'VPP';
         if (itemSupplyType !== supplyType) return false;
 
+        if (stockFilter === 'IN_STOCK' && Number(i.stock || 0) <= 0) return false;
+
         return !keyword || (
           i.name.toLowerCase().includes(keyword) ||
           i.mvpp.toLowerCase().includes(keyword)
         );
       })
       .sort((a: VPPItem, b: VPPItem) => a.name.localeCompare(b.name, 'vi'));
-  }, [items, searchTerm, supplyType]);
+  }, [items, searchTerm, supplyType, stockFilter]);
 
   const handleSupplyTypeChange = (nextType: RequestSupplyType) => {
     if (nextType === supplyType) return;
@@ -202,6 +249,8 @@ export default function RequestsCreate({
     }
     setSupplyType(nextType);
     setSearchTerm('');
+    setHasUserChanges(true);
+    setValidationErrors((prev) => ({ ...prev, items: undefined }));
   };
 
   const handleAddItem = (item: VPPItem) => {
@@ -230,12 +279,15 @@ export default function RequestsCreate({
         },
       ];
     });
-
-    setSearchTerm('');
+    setHighlightedItemId(item.id);
+    setHasUserChanges(true);
+    setValidationErrors((prev) => ({ ...prev, items: undefined }));
+    window.setTimeout(() => setHighlightedItemId((current) => current === item.id ? null : current), 900);
   };
 
   const handleRemoveItem = (itemId: string) => {
     setTargetItems((prev) => prev.filter((t) => t.itemId !== itemId));
+    setHasUserChanges(true);
   };
 
   const handleQuantityChange = (itemId: string, value: string) => {
@@ -245,23 +297,44 @@ export default function RequestsCreate({
         t.itemId === itemId ? { ...t, quantity: normalized } : t
       )
     );
+    setHasUserChanges(true);
+  };
+
+  const adjustQuantity = (itemId: string, amount: number) => {
+    setTargetItems((prev) => prev.map((t) =>
+      t.itemId === itemId ? { ...t, quantity: Math.max(1, Number(t.quantity || 0) + amount) } : t
+    ));
+    setHasUserChanges(true);
   };
 
   const handleNoteChange = (itemId: string, value: string) => {
     setTargetItems((prev) =>
       prev.map((t) => (t.itemId === itemId ? { ...t, note: value } : t))
     );
+    setHasUserChanges(true);
   };
 
-  const validateBeforeSubmit = (): string | null => {
-    if (targetItems.length === 0) {
-      return supplyType === 'VE_SINH'
+  const validateBeforeSubmit = (status: 'DRAFT' | 'PENDING'): string | null => {
+    const nextErrors: ValidationErrors = {};
+    if (status === 'PENDING' && targetItems.length === 0) {
+      const message = supplyType === 'VE_SINH'
         ? 'Chưa có mặt hàng Đồ vệ sinh nào trong danh sách'
         : 'Chưa có mặt hàng Văn phòng phẩm nào trong danh sách';
+      nextErrors.items = message;
+      setValidationErrors(nextErrors);
+      return message;
     }
 
-    if (!purpose.trim()) {
-      return 'Bắt buộc nhập Lý do sử dụng';
+    if (status === 'PENDING' && reqType !== 'Bổ sung đột xuất' && !purpose.trim()) {
+      nextErrors.purpose = 'Vui lòng nhập mục đích hoặc lý do sử dụng.';
+      setValidationErrors(nextErrors);
+      return nextErrors.purpose;
+    }
+
+    if (status === 'PENDING' && !neededByDate) {
+      nextErrors.neededByDate = 'Vui lòng chọn ngày cần cấp.';
+      setValidationErrors(nextErrors);
+      return nextErrors.neededByDate;
     }
 
     for (let i = 0; i < targetItems.length; i++) {
@@ -277,11 +350,12 @@ export default function RequestsCreate({
       }
     }
 
+    setValidationErrors({});
     return null;
   };
 
   const submitForm = async (status: 'DRAFT' | 'PENDING') => {
-    const validationError = validateBeforeSubmit();
+    const validationError = validateBeforeSubmit(status);
     if (validationError) {
       showToast(validationError, 'error');
       return;
@@ -365,406 +439,149 @@ export default function RequestsCreate({
     ).length;
   }, [targetItems]);
 
+  const handleCancel = () => {
+    if (hasUserChanges && !window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn hủy?')) return;
+    setViewMode('LIST');
+  };
+
+  const catalog = (
+    <div className="flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white">
+      <div className="border-b border-slate-200 p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h4 className="font-extrabold text-slate-800">Danh mục vật tư</h4>
+            <p className="text-xs text-slate-500">{searchResults.length} vật tư phù hợp</p>
+          </div>
+          <span className="rounded-md bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-700">{searchResults.length}</span>
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Tìm mã hoặc tên vật tư..." className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm font-medium outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" />
+        </div>
+        <div className="mt-3 flex gap-2">
+          <button type="button" onClick={() => setStockFilter('ALL')} className={`rounded-lg px-4 py-2 text-xs font-bold transition ${stockFilter === 'ALL' ? 'bg-indigo-600 text-white' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Tất cả</button>
+          <button type="button" onClick={() => setStockFilter('IN_STOCK')} className={`rounded-lg px-4 py-2 text-xs font-bold transition ${stockFilter === 'IN_STOCK' ? 'bg-indigo-600 text-white' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Còn hàng</button>
+        </div>
+      </div>
+      <div className="max-h-[490px] min-h-[300px] flex-1 divide-y divide-slate-100 overflow-y-auto">
+        {searchResults.length === 0 ? <div className="p-8 text-center text-sm text-slate-500">Không tìm thấy vật tư phù hợp.</div> : searchResults.map((item: VPPItem) => (
+          <div key={item.id} className="flex items-center justify-between gap-3 p-3 hover:bg-slate-50">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-slate-800">{item.name}</p>
+              <p className="mt-1 text-xs text-slate-500"><span className="font-semibold">{item.mvpp}</span> · {item.unit} · <span className={Number(item.stock) > 0 ? 'text-emerald-600' : 'text-amber-600'}>Tồn {item.stock}</span></p>
+            </div>
+            <button type="button" onClick={() => handleAddItem(item)} aria-label={`Thêm ${item.name} vào phiếu`} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50"><Plus className="h-5 w-5" /></button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="min-h-full bg-slate-100 relative print:bg-white">
-      <div className="sticky top-0 min-h-16 bg-white border-b border-slate-200 flex flex-wrap justify-between items-center gap-3 px-4 md:px-8 py-3 z-30 shadow-sm print:hidden">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setViewMode('LIST')}
-            className="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition"
-          >
-            <XCircle className="w-6 h-6" />
-          </button>
-          <h2 className="text-xl font-black text-slate-800 tracking-tight">
-            {isEditingDraft ? 'Cập nhật Phiếu' : 'Lập Phiếu Đề Xuất'}{' '}
-            <span className={supplyType === 'VE_SINH' ? 'text-cyan-700' : 'text-indigo-700'}>
-              {supplyType === 'VE_SINH' ? 'Đồ vệ sinh' : 'Văn phòng phẩm'}
-            </span>
-          </h2>
-        </div>
+    <div className="min-h-full bg-[#F4F6FA] pb-28 text-[#17233D]">
+      <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-5 px-4 py-6 md:px-8">
+        <header className="flex items-start justify-between gap-4">
+          <div>
+            <p className="mb-2 text-sm font-medium text-indigo-600">Phiếu đề xuất <span className="px-1 text-slate-400">/</span> {isEditingDraft ? 'Cập nhật' : 'Tạo mới'}</p>
+            <h1 className="text-2xl font-black tracking-tight text-slate-900 md:text-[28px]">{isEditingDraft ? 'Cập nhật phiếu đề xuất' : 'Lập phiếu đề xuất'}</h1>
+            <p className="mt-1 text-sm text-slate-500">Bổ sung thông tin và chọn vật tư cần cấp</p>
+          </div>
+          <span className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700">● Bản nháp</span>
+        </header>
 
-        <div className="flex items-center gap-3">
-          <button
-            disabled={isSubmitting}
-            onClick={() => submitForm('DRAFT')}
-            className="flex items-center px-4 py-2 border-2 border-slate-300 text-slate-700 bg-white hover:bg-slate-50 rounded-xl font-bold transition shadow-sm disabled:opacity-50"
-          >
-            <Save className="w-4 h-4 mr-2 text-slate-500" />
-            Lưu Nháp
-          </button>
+        <section className="rounded-xl border border-slate-200 bg-white p-4 md:p-6">
+          <h2 className="mb-5 flex items-center gap-3 text-lg font-extrabold"><span className="grid h-7 w-7 place-items-center rounded-md bg-indigo-600 text-sm text-white">1</span>Thông tin chung</h2>
+          <fieldset>
+            <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">Nhóm hàng <span className="text-rose-500">*</span></legend>
+            <div className="grid gap-3 sm:grid-cols-2 lg:max-w-[980px]">
+              {([['VPP', 'Văn phòng phẩm', 'Chỉ hiện danh mục VPP'], ['VE_SINH', 'Đồ vệ sinh', 'Chỉ hiện danh mục vệ sinh']] as const).map(([value, title, subtitle]) => {
+                const selected = supplyType === value;
+                return <button key={value} type="button" onClick={() => handleSupplyTypeChange(value)} className={`flex min-h-16 items-center gap-3 rounded-xl border-2 px-4 text-left transition ${selected ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 bg-white hover:border-indigo-200'}`}>
+                  <span className={`grid h-5 w-5 place-items-center rounded-full border-2 ${selected ? 'border-indigo-600' : 'border-slate-300'}`}>{selected && <span className="h-2 w-2 rounded-full bg-indigo-600" />}</span>
+                  <span><strong className="block text-sm text-slate-800">{title}</strong><small className="text-slate-500">{subtitle}</small></span>
+                </button>;
+              })}
+            </div>
+          </fieldset>
 
-          <button
-            disabled={isSubmitting}
-            onClick={() => submitForm('PENDING')}
-            className="flex items-center px-5 py-2 border-2 border-indigo-700 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl font-bold transition shadow-md shadow-indigo-500/30 disabled:opacity-50"
-          >
-            <Send className="w-4 h-4 mr-2" />
-            Gửi trình duyệt
-          </button>
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <label className="text-xs font-bold uppercase tracking-wide text-slate-600">Mã phiếu
+              <input value={activeRequest?.id || 'Tự động tạo'} disabled className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-400" />
+            </label>
+            <label className="text-xs font-bold uppercase tracking-wide text-slate-600">Loại hình xin cấp
+              <select value={reqType} onChange={(e) => { setReqType(e.target.value); setHasUserChanges(true); }} className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold normal-case text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100">
+                <option>Định kỳ</option><option>Bổ sung đột xuất</option><option>Dự án mới</option><option>Văn phòng mới</option>
+              </select>
+            </label>
+            <label className="text-xs font-bold uppercase tracking-wide text-slate-600">Mức độ ưu tiên
+              <select value={priority} onChange={(e) => { setPriority(e.target.value); setHasUserChanges(true); }} className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold normal-case text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100">
+                <option value="Thường">Thường · Xử lý trong 24 giờ</option><option value="Cao">Cao · Xử lý trong 8 giờ</option><option value="Khẩn cấp">Khẩn cấp · ASAP</option>
+              </select>
+            </label>
+            <label className="text-xs font-bold uppercase tracking-wide text-slate-600">Ngày cần cấp <span className="text-rose-500">*</span>
+              <input type="date" value={neededByDate} onChange={(e) => { setNeededByDate(e.target.value); setHasUserChanges(true); setValidationErrors((prev) => ({ ...prev, neededByDate: undefined })); }} className={`mt-2 h-11 w-full rounded-lg border bg-white px-3 text-sm font-bold normal-case text-slate-700 outline-none focus:ring-2 ${validationErrors.neededByDate ? 'border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-100'}`} />
+              {validationErrors.neededByDate && <span className="mt-1 block text-xs font-semibold normal-case text-rose-600">{validationErrors.neededByDate}</span>}
+            </label>
+          </div>
+
+          <label className="mt-5 block text-xs font-bold uppercase tracking-wide text-slate-600">Mục đích / Lý do sử dụng {reqType !== 'Bổ sung đột xuất' && <span className="text-rose-500">*</span>}
+            <textarea value={purpose} onChange={(e) => { setPurpose(e.target.value); setHasUserChanges(true); setValidationErrors((prev) => ({ ...prev, purpose: undefined })); }} placeholder={reqType === 'Bổ sung đột xuất' ? 'Không bắt buộc nhập nội dung' : 'Nhập mục đích hoặc lý do sử dụng...'} className={`mt-2 min-h-24 w-full resize-y rounded-lg border bg-white p-3 text-sm font-medium normal-case text-slate-800 outline-none focus:ring-2 ${validationErrors.purpose ? 'border-rose-400 focus:ring-rose-100' : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-100'}`} />
+          </label>
+          {validationErrors.purpose && <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-rose-600"><AlertCircle className="h-4 w-4" />{validationErrors.purpose}</p>}
+          {reqType === 'Định kỳ' && <p className="mt-2 text-xs text-indigo-600">Nội dung được tự động xác định theo nhóm hàng, phòng ban và tháng kế tiếp. Bạn vẫn có thể chỉnh sửa.</p>}
+        </section>
+
+        <section className="rounded-xl border border-slate-200 bg-white p-4 md:p-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-3 text-lg font-extrabold"><span className="grid h-7 w-7 place-items-center rounded-md bg-indigo-600 text-sm text-white">2</span>Chọn vật tư đề xuất</h2>
+              <p className="mt-1 pl-10 text-xs text-slate-500">Chọn vật tư bên trái, kiểm tra số lượng và ghi chú bên phải.</p>
+            </div>
+            <button type="button" onClick={() => setMobileCatalogOpen(true)} className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white lg:hidden"><Plus className="h-4 w-4" />Thêm vật tư</button>
+          </div>
+          {validationErrors.items && <p className="mb-3 flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-600"><AlertCircle className="h-4 w-4" />{validationErrors.items}</p>}
+
+          <div className="grid gap-4 lg:grid-cols-[minmax(300px,38fr)_minmax(0,62fr)]">
+            <div className="hidden lg:block">{catalog}</div>
+            <div className="min-w-0 rounded-xl border border-slate-200 bg-white">
+              <div className="flex items-center justify-between border-b border-slate-200 p-4">
+                <div><h3 className="font-extrabold text-slate-800">Vật tư đã chọn</h3><p className="text-xs text-slate-500">Kiểm tra số lượng và bổ sung ghi chú trước khi gửi.</p></div>
+                <span className="rounded-md bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-700">{targetItems.length} mặt hàng</span>
+              </div>
+
+              {targetItems.length === 0 ? <div className="grid min-h-[300px] place-items-center p-8 text-center"><div><PackageOpen className="mx-auto h-11 w-11 text-slate-300" /><p className="mt-3 font-bold text-slate-600">Chưa chọn vật tư</p><p className="mt-1 text-sm text-slate-500">Chọn vật tư từ danh mục bên trái để thêm vào phiếu.</p></div></div> : <>
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full min-w-[720px] text-left">
+                    <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="p-3">Vật tư</th><th className="p-3 text-center">Tồn / Định mức</th><th className="p-3 text-center">SL đề xuất</th><th className="p-3 text-right">Thành tiền</th><th className="w-12 p-3" /></tr></thead>
+                    <tbody className="divide-y divide-slate-100">{targetItems.map((t) => {
+                      const isOverQuota = Number(t.quantity) > Number(t.item.quota || 0);
+                      return <tr key={t.itemId} className={`transition-colors ${highlightedItemId === t.itemId ? 'bg-indigo-50' : ''}`}>
+                        <td className="p-3"><p className="max-w-[260px] font-bold text-slate-800">{t.item.name}</p><p className="text-xs text-slate-500">{t.item.mvpp} · {t.item.unit}</p></td>
+                        <td className="p-3 text-center text-sm font-semibold"><span className={Number(t.item.stock) > 0 ? 'text-emerald-600' : 'text-amber-600'}>{t.item.stock}</span> / <span className="text-indigo-600">{t.item.quota}</span></td>
+                        <td className="p-3"><MonthlyApprovalHistoryTooltip itemId={t.itemId} itemName={t.item.name} department={currentUser?.department} departmentId={currentUser?.departmentId} requestId={activeRequest?.id}><div className="mx-auto flex w-32 items-center rounded-lg border border-slate-200"><button type="button" aria-label={`Giảm số lượng ${t.item.name}`} onClick={() => adjustQuantity(t.itemId, -1)} className="grid h-10 w-9 place-items-center text-slate-500 hover:bg-slate-50"><Minus className="h-4 w-4" /></button><input type="number" min="1" value={t.quantity || ''} onChange={(e) => handleQuantityChange(t.itemId, e.target.value)} aria-label={`Số lượng đề xuất ${t.item.name}`} className={`h-10 min-w-0 flex-1 border-x border-slate-200 text-center font-black outline-none ${isOverQuota ? 'text-rose-600' : 'text-indigo-700'}`} /><button type="button" aria-label={`Tăng số lượng ${t.item.name}`} onClick={() => adjustQuantity(t.itemId, 1)} className="grid h-10 w-9 place-items-center text-slate-500 hover:bg-slate-50"><Plus className="h-4 w-4" /></button></div></MonthlyApprovalHistoryTooltip>{isOverQuota && <p className="mt-1 text-center text-[11px] font-semibold text-amber-600">Vượt định mức</p>}</td>
+                        <td className="p-3 text-right text-sm font-black text-slate-800">{(Number(t.item.price || 0) * Number(t.quantity || 0)).toLocaleString('vi-VN')} đ</td>
+                        <td className="p-3"><button type="button" aria-label={`Xóa ${t.item.name}`} onClick={() => handleRemoveItem(t.itemId)} className="p-2 text-rose-500 hover:bg-rose-50"><Trash2 className="h-4 w-4" /></button></td>
+                      </tr>;
+                    })}</tbody>
+                  </table>
+                  <div className="space-y-2 border-t border-slate-100 p-3">{targetItems.map((t) => <label key={t.itemId} className="grid grid-cols-[minmax(150px,220px)_1fr] items-center gap-3 text-xs font-semibold text-slate-600"><span className="truncate">Ghi chú · {t.item.name}</span><input value={t.note} onChange={(e) => handleNoteChange(t.itemId, e.target.value)} placeholder="Thêm ghi chú..." className="h-9 rounded-lg border border-slate-200 px-3 font-medium outline-none focus:border-indigo-500" /></label>)}</div>
+                </div>
+                <div className="divide-y divide-slate-100 md:hidden">{targetItems.map((t) => <article key={t.itemId} className={`p-4 transition-colors ${highlightedItemId === t.itemId ? 'bg-indigo-50' : ''}`}><div className="flex items-start justify-between gap-3"><div><h4 className="font-bold text-slate-800">{t.item.name}</h4><p className="mt-1 text-xs text-slate-500">{t.item.mvpp} · {t.item.unit} · Tồn {t.item.stock}</p></div><button type="button" onClick={() => handleRemoveItem(t.itemId)} className="p-2 text-rose-500"><Trash2 className="h-4 w-4" /></button></div><div className="mt-3 flex items-center justify-between"><div className="flex items-center rounded-lg border border-slate-200"><button type="button" onClick={() => adjustQuantity(t.itemId, -1)} className="p-2"><Minus className="h-4 w-4" /></button><input type="number" min="1" value={t.quantity || ''} onChange={(e) => handleQuantityChange(t.itemId, e.target.value)} className="h-9 w-12 border-x border-slate-200 text-center font-black text-indigo-700 outline-none" /><button type="button" onClick={() => adjustQuantity(t.itemId, 1)} className="p-2"><Plus className="h-4 w-4" /></button></div><strong>{(Number(t.item.price || 0) * Number(t.quantity || 0)).toLocaleString('vi-VN')} đ</strong></div><input value={t.note} onChange={(e) => handleNoteChange(t.itemId, e.target.value)} placeholder="Thêm ghi chú..." className="mt-3 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500" /></article>)}</div>
+              </>}
+              {warningsCount > 0 && <p className="flex items-center gap-2 border-t border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-700"><AlertTriangle className="h-4 w-4" />{warningsCount} mặt hàng đang vượt định mức.</p>}
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <div className="request-create-actions fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-6px_20px_rgba(15,23,42,0.08)] backdrop-blur md:px-8">
+        <div className="mx-auto flex max-w-[1600px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4"><span className="grid h-10 w-10 place-items-center rounded-lg bg-indigo-50 text-indigo-700"><ShoppingCart className="h-5 w-5" /></span><div><p className="text-xs font-semibold text-slate-500">{targetItems.length} mặt hàng · Tổng ngân sách tạm tính</p><p className="text-xl font-black text-slate-900">{totalAmount.toLocaleString('vi-VN')} đ</p></div></div>
+          <div className="grid grid-cols-3 gap-2 sm:flex"><button type="button" onClick={handleCancel} disabled={isSubmitting} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50">Hủy</button><button type="button" onClick={() => submitForm('DRAFT')} disabled={isSubmitting} className="flex items-center justify-center gap-2 rounded-lg border border-indigo-400 px-4 py-2.5 text-sm font-bold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"><Save className="h-4 w-4" />Lưu nháp</button><button type="button" onClick={() => submitForm('PENDING')} disabled={isSubmitting} className="flex min-w-36 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"><Send className="h-4 w-4" />{isSubmitting ? 'Đang gửi…' : 'Gửi trình duyệt'}</button></div>
         </div>
       </div>
 
-      <div className="p-4 md:p-8 flex flex-col gap-6 w-full max-w-6xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
-          <h3 className="text-[11px] font-black text-indigo-700 uppercase tracking-widest flex items-center mb-6">
-            <div className="w-6 h-6 rounded bg-indigo-100 text-indigo-700 flex items-center justify-center mr-2">
-              1
-            </div>
-            Thông tin chung & Pháp lý
-          </h3>
-
-          <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-            <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-500">Nhóm hàng của phiếu</p>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => handleSupplyTypeChange('VPP')}
-                className={`rounded-xl border-2 px-4 py-3 text-left transition ${supplyType === 'VPP' ? 'border-indigo-500 bg-indigo-50 text-indigo-800 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200'}`}
-              >
-                <span className="block text-sm font-black">Văn phòng phẩm</span>
-                <span className="text-[10px] font-semibold">Chỉ hiện danh mục VPP</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSupplyTypeChange('VE_SINH')}
-                className={`rounded-xl border-2 px-4 py-3 text-left transition ${supplyType === 'VE_SINH' ? 'border-cyan-500 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-cyan-200'}`}
-              >
-                <span className="block text-sm font-black">Đồ vệ sinh</span>
-                <span className="text-[10px] font-semibold">Chỉ hiện danh mục vệ sinh</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div>
-              <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">
-                Mã phiếu (tự động tạo)
-              </label>
-              <input
-                type="text"
-                value={activeRequest?.id || 'PDX-Tự động tạo'}
-                disabled
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-400 font-extrabold cursor-not-allowed"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">
-                Loại hình xin cấp
-              </label>
-              <select
-                value={reqType}
-                onChange={(e) => setReqType(e.target.value)}
-                className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none font-bold text-slate-700 transition"
-              >
-                <option>Định kỳ</option>
-                <option>Bổ sung đột xuất</option>
-                <option>Dự án mới</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">
-                Mức độ ưu tiên (SLA)
-              </label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value)}
-                className={`w-full p-3 bg-white border-2 rounded-xl outline-none font-bold transition focus:ring-4 ${
-                  priority === 'Khẩn cấp'
-                    ? 'text-rose-600 border-rose-300 ring-rose-100'
-                    : priority === 'Cao'
-                    ? 'text-amber-600 border-amber-300 ring-amber-100'
-                    : 'text-slate-700 border-slate-200 focus:border-indigo-400 focus:ring-indigo-100'
-                }`}
-              >
-                <option value="Thường">Thường (Xử lý 24h)</option>
-                <option value="Cao">Cao (Xử lý 8h)</option>
-                <option value="Khẩn cấp">Khẩn cấp (ASAP)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">
-                Ngày Cần Cấp
-              </label>
-              <input
-                type="date"
-                value={neededByDate}
-                onChange={(e) => setNeededByDate(e.target.value)}
-                className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none font-bold text-slate-700 transition"
-              />
-            </div>
-
-            <div className="md:col-span-4">
-              <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider flex items-center justify-between">
-                <span>
-                  Mục đích/Lý do sử dụng <span className="text-rose-500">*</span>
-                </span>
-                {(priority === 'Khẩn cấp' || warningsCount > 0) && (
-                  <span className="text-rose-600 animate-pulse text-[10px] bg-rose-50 px-2 py-1 rounded-md border border-rose-200 flex items-center">
-                    <AlertTriangle className="w-3 h-3 mr-1" />
-                    Bắt buộc giải trình vì ưu tiên Khẩn hoặc Vượt mức
-                  </span>
-                )}
-              </label>
-
-              <textarea
-                value={purpose}
-                onChange={(e) => setPurpose(e.target.value)}
-                placeholder="Nhập lý do xuất kho chi tiết..."
-                className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none min-h-[100px] font-medium resize-y transition shadow-inner"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col">
-          <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between rounded-t-2xl">
-            <h3 className="text-[11px] font-black text-indigo-700 uppercase tracking-widest flex items-center">
-              <div className="w-6 h-6 rounded bg-indigo-100 text-indigo-700 flex items-center justify-center mr-2">
-                2
-              </div>
-              Chọn vật tư cần đề xuất
-            </h3>
-
-            <div className="text-xs font-bold flex gap-4 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
-              <span className="text-slate-500">
-                Mục: <strong className="text-indigo-600 text-[14px]">{targetItems.length}</strong>
-              </span>
-              <div className="w-px h-auto bg-slate-200"></div>
-              <span className="text-slate-500">
-                Cảnh báo: <strong className="text-rose-500 text-[14px]">{warningsCount}</strong>
-              </span>
-            </div>
-          </div>
-
-          <div className="p-4 border-b border-slate-100">
-            <div>
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-400" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder={`Nhập mã hoặc tên ${supplyType === 'VE_SINH' ? 'Đồ vệ sinh' : 'VPP'} để thêm vào phiếu...`}
-                  className="w-full pl-12 pr-4 py-3.5 bg-indigo-50 border-2 border-indigo-100 rounded-xl focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 outline-none font-bold text-indigo-900 transition-all shadow-inner"
-                />
-              </div>
-
-              <div className="mt-3 bg-white border border-slate-200 rounded-xl overflow-hidden">
-                <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] font-black text-slate-700 uppercase tracking-wider">Danh mục vật tư</p>
-                    <p className="text-[10px] font-medium text-slate-500">Bấm dấu + để thêm vào phiếu</p>
-                  </div>
-                  <span className="shrink-0 px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-[11px] font-black">
-                    {searchResults.length} vật tư
-                  </span>
-                </div>
-                <div className="max-h-52 md:max-h-60 overflow-y-auto divide-y divide-slate-100 p-1">
-                  {searchResults.length === 0 ? (
-                    <div className="p-4 text-slate-500 text-center text-sm font-medium">
-                      Không tìm thấy vật tư "{searchTerm}".
-                    </div>
-                  ) : (
-                    searchResults.map((item: any) => (
-                      <div
-                        key={item.id}
-                        className="p-3 hover:bg-slate-50 rounded-lg transition flex items-center justify-between gap-3 group"
-                      >
-                        <div>
-                          <p className="font-extrabold text-slate-800 text-sm group-hover:text-indigo-700">
-                            {item.name}
-                          </p>
-                          <div className="flex gap-2 mt-1 -ml-0.5">
-                            <span className="bg-slate-100 border border-slate-200 text-slate-500 px-1.5 py-0.5 rounded text-[10px] font-bold">
-                              {item.mvpp}
-                            </span>
-                            <span
-                              className={`${
-                                item.stock === 0
-                                  ? 'bg-rose-50 text-rose-600 border border-rose-200'
-                                  : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                              } px-1.5 py-0.5 rounded text-[10px] font-bold`}
-                            >
-                              Tồn: {item.stock} {item.unit}
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleAddItem(item)}
-                          aria-label={`Thêm ${item.name} vào phiếu`}
-                          className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 active:scale-95 transition shadow-sm shrink-0"
-                        >
-                          <Plus className="w-5 h-5" />
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="px-4 pt-4 flex items-center justify-between gap-3">
-            <div>
-              <h4 className="text-sm font-black text-slate-800">Vật tư đã chọn</h4>
-              <p className="text-xs text-slate-500">Điều chỉnh số lượng và ghi chú trước khi gửi duyệt</p>
-            </div>
-            <span className="shrink-0 text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1.5 rounded-lg">
-              {targetItems.length} mục
-            </span>
-          </div>
-
-          <div className="overflow-x-auto mt-3">
-            <table className="w-full text-left whitespace-nowrap min-w-max">
-              <thead className="bg-slate-50 border-b border-slate-200 relative">
-                <tr className="text-[10px] uppercase font-black text-slate-400 tracking-widest">
-                  <th className="p-3 w-12 text-center border-r border-slate-100">STT</th>
-                  <th className="p-3">{supplyType === 'VE_SINH' ? 'Đồ vệ sinh' : 'Văn phòng phẩm'}</th>
-                  <th className="p-3 text-center border-l border-slate-100 hidden md:table-cell">
-                    Tồn kho / Định mức
-                  </th>
-                  <th className="p-3 text-center w-40 border-x-2 border-indigo-100 bg-indigo-50/50">
-                    SL ĐỀ XUẤT
-                  </th>
-                  <th className="p-3 max-w-[200px]">Ghi chú & Thuyết minh</th>
-                  <th className="p-3 text-center w-12">Xóa</th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-slate-100">
-                {targetItems.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="p-10 text-center text-slate-400 font-medium bg-slate-50/50">
-                      <Plus className="w-10 h-10 text-slate-300 mx-auto mb-3 opacity-60" />
-                      Chưa có vật tư nào. Chọn vật tư trong danh mục phía trên và bấm dấu +.
-                    </td>
-                  </tr>
-                )}
-
-                {targetItems.map((t, idx) => {
-                  const isOverQuota = Number(t.quantity) > Number(t.item.quota || 0);
-                  const isOutStock = Number(t.item.stock || 0) === 0;
-
-                  return (
-                    <tr
-                      key={t.itemId}
-                      className={`hover:bg-slate-50 transition group ${isOverQuota ? 'bg-rose-50/30' : ''}`}
-                    >
-                      <td className="p-3 text-center font-bold text-slate-400 border-r border-slate-100">
-                        {idx + 1}
-                      </td>
-
-                      <td className="p-3">
-                        <p className="font-bold text-slate-800 text-sm max-w-[250px] whitespace-normal leading-tight">
-                          {t.item.name}
-                        </p>
-                        <p className="text-[10px] font-black tracking-widest text-slate-400 mt-1">
-                          {t.item.mvpp}
-                        </p>
-                      </td>
-
-                      <td className="p-3 text-center border-l border-slate-100 hidden md:table-cell">
-                        <div className="flex gap-1 justify-center">
-                          <div className="text-center px-2 py-1 bg-slate-50 rounded border border-slate-100 flex-1">
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                              Tồn Kho
-                            </p>
-                            <p className={`text-xs font-black ${isOutStock ? 'text-rose-500' : 'text-emerald-600'}`}>
-                              {t.item.stock}
-                            </p>
-                          </div>
-
-                          <div className="text-center px-2 py-1 bg-slate-50 rounded border border-slate-100 flex-1">
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                              Định mức
-                            </p>
-                            <p className="text-xs font-black text-indigo-600">{t.item.quota}</p>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="p-3 border-x-2 border-indigo-100 relative bg-white group-hover:bg-slate-50 transition-colors align-middle">
-                        <MonthlyApprovalHistoryTooltip
-                          itemId={t.itemId}
-                          itemName={t.item.name}
-                          department={currentUser?.department}
-                          departmentId={currentUser?.departmentId}
-                          requestId={activeRequest?.id}
-                        >
-                          <input
-                            type="number"
-                            min="1"
-                            value={t.quantity || ''}
-                            onChange={(e) => handleQuantityChange(t.itemId, e.target.value)}
-                            aria-label={`Số lượng đề xuất ${t.item.name}; trỏ chuột để xem lịch sử duyệt`}
-                            className={`w-full text-center py-2.5 bg-slate-100/50 border outline-none rounded-lg focus:ring-4 focus:ring-indigo-100 focus:bg-white font-black text-lg transition ${
-                              isOverQuota
-                                ? 'text-rose-600 border-rose-300 ring-4 ring-rose-50'
-                                : 'text-indigo-700 border-slate-200 focus:border-indigo-400'
-                            }`}
-                          />
-                        </MonthlyApprovalHistoryTooltip>
-                        {isOverQuota && (
-                          <div
-                            className="absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2"
-                            title="Vượt định mức kỷ luật"
-                          >
-                            <AlertTriangle className="w-5 h-5 text-rose-500 animate-pulse bg-white border border-rose-200 rounded-full p-0.5" />
-                          </div>
-                        )}
-                      </td>
-
-                      <td className="p-3 align-middle">
-                        <input
-                          type="text"
-                          value={t.note}
-                          onChange={(e) => handleNoteChange(t.itemId, e.target.value)}
-                          placeholder="Ghi chú thêm..."
-                          className="w-full bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 hover:border-slate-300 transition text-sm text-slate-700 p-2.5 font-medium"
-                        />
-                      </td>
-
-                      <td className="p-3 text-center align-middle">
-                        <button
-                          onClick={() => handleRemoveItem(t.itemId)}
-                          className="p-2 border border-slate-200 bg-white hover:bg-rose-500 hover:border-rose-500 hover:text-white text-slate-400 rounded-xl transition shadow-sm"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl shadow-xl p-6 flex flex-col md:flex-row justify-between items-center shrink-0 border border-slate-700 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500 rounded-full blur-[100px] opacity-20 transform translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
-
-          <div className="text-slate-300 font-medium mb-4 md:mb-0 relative z-10 flex items-center">
-            <span className="text-sm font-bold opacity-80 uppercase tracking-widest mr-4">
-              Tổng ngân sách tạm tính
-            </span>
-            <strong className="text-3xl text-white font-black tracking-tight">
-              {totalAmount.toLocaleString('vi-VN')}
-              <span className="text-sm text-slate-400 font-bold ml-1"> VND</span>
-            </strong>
-          </div>
-
-          {warningsCount > 0 && (
-            <div className="bg-rose-500/10 text-rose-300 border border-rose-500/30 px-5 py-3 rounded-xl font-bold flex items-center text-sm shadow-inner relative z-10">
-              <AlertCircle className="w-5 h-5 mr-3 flex-shrink-0 animate-pulse text-rose-400" />
-              Quá <span className="text-white mx-1 bg-rose-500 px-1.5 rounded">{warningsCount}</span> mặt hàng VƯỢT ĐỊNH MỨC QUOTA
-            </div>
-          )}
-        </div>
-      </div>
+      {mobileCatalogOpen && <div className="fixed inset-0 z-50 bg-slate-900/40 p-3 lg:hidden"><div className="mx-auto flex h-full max-w-lg flex-col rounded-xl bg-white"><div className="flex items-center justify-between border-b border-slate-200 p-4"><h3 className="font-extrabold">Thêm vật tư</h3><button type="button" onClick={() => setMobileCatalogOpen(false)} className="p-2 text-slate-500"><X className="h-5 w-5" /></button></div><div className="min-h-0 flex-1 p-3">{catalog}</div><div className="border-t border-slate-200 p-3"><button type="button" onClick={() => setMobileCatalogOpen(false)} className="w-full rounded-lg bg-indigo-600 py-3 text-sm font-bold text-white">Xong · Đã chọn {targetItems.length} mặt hàng</button></div></div></div>}
     </div>
   );
 }

@@ -31,6 +31,10 @@
 }
 
 @media (min-width: 1280px) {
+  .app-shell[data-desktop-sidebar="visible"] .request-create-actions {
+    left: 250px;
+  }
+
   .app-shell[data-desktop-sidebar="hidden"] .app-sidebar {
     display: none;
   }
@@ -46,6 +50,10 @@
 }
 
 @media (min-width: 1024px) and (max-width: 1279px) {
+  .app-shell[data-laptop-sidebar="visible"] .request-create-actions {
+    left: 220px;
+  }
+
   .app-sidebar {
     width: 220px;
   }
@@ -74,6 +82,10 @@
 }
 
 @media (min-width: 768px) and (max-width: 1023px) {
+  .request-create-actions {
+    left: 64px;
+  }
+
   .app-sidebar {
     display: none;
   }
