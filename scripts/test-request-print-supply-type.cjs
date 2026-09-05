@@ -38,12 +38,21 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto('http://127.0.0.1:4180/requests/PDX-VS-TEST/print?printType=VPP');
+    await page.getByRole('heading', { name: 'PHIẾU ĐỀ XUẤT VĂN PHÒNG PHẨM', exact: true }).waitFor();
+    await page.getByRole('columnheader', { name: 'Tên Văn Phòng Phẩm', exact: true }).waitFor();
+    assert.equal(await page.getByText('Nước Tẩy nhà vệ sinh Gift 3.8kg', { exact: true }).count(), 0);
+
+    await page.goto('http://127.0.0.1:4180/requests/PDX-VS-TEST/print?printType=VE_SINH');
     await page.getByRole('heading', { name: 'PHIẾU ĐỀ XUẤT ĐỒ VỆ SINH', exact: true }).waitFor();
     await page.getByRole('columnheader', { name: 'Tên Đồ Vệ Sinh', exact: true }).waitFor();
     await page.getByText('Nước Tẩy nhà vệ sinh Gift 3.8kg', { exact: true }).waitFor();
     assert.equal(await page.getByRole('heading', { name: 'PHIẾU ĐỀ XUẤT VĂN PHÒNG PHẨM', exact: true }).count(), 0);
+
+    await page.goto('http://127.0.0.1:4180/requests/PDX-VS-TEST/print?printType=ALL');
+    await page.getByRole('heading', { name: 'PHIẾU ĐỀ XUẤT ĐỒ VỆ SINH', exact: true }).waitFor();
+    await page.getByText('Nước Tẩy nhà vệ sinh Gift 3.8kg', { exact: true }).waitFor();
     assert.deepEqual(errors, []);
-    console.log('PASS: a VS replacement is classified from the displayed item and prints with sanitation title/column even when the incoming print type is VPP.');
+    console.log('PASS: VPP and sanitation buttons filter strictly; full-request printing auto-detects a sanitation-only request.');
   } finally {
     if (browser) await browser.close();
     await server.close();
