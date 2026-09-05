@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, type MouseEvent } from 'react';
-import { Plus, Download, Search, FileText, CheckCircle, Clock, XCircle, ChevronLeft, ChevronRight, Eye, CheckSquare, GitBranch, Printer, ListChecks, ChevronDown, RotateCcw, FileSpreadsheet, CornerUpLeft, ArrowUpDown, ArrowUp, ArrowDown, CalendarDays } from 'lucide-react';
+import { Plus, Download, Search, FileText, CheckCircle, Clock, XCircle, ChevronLeft, ChevronRight, Eye, CheckSquare, GitBranch, Printer, ListChecks, ChevronDown, RotateCcw, FileSpreadsheet, CornerUpLeft, ArrowUpDown, ArrowUp, ArrowDown, CalendarDays, PackageOpen, Droplets, Boxes } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { VPPRequest, User } from '../../context/AppContext';
 import { useAppContext } from '../../context/AppContext';
@@ -66,6 +66,47 @@ function normalizeSearchText(value: any) {
     .toLowerCase();
 }
 
+type RequestSupplyGroup = 'VPP' | 'VS' | 'VPP+VS';
+type RequestSortKey = 'id' | 'requester' | 'items' | 'supplyGroup' | 'status';
+
+function getItemSupplyGroup(item: any): 'VPP' | 'VS' {
+  if (!item) return 'VPP';
+  const itemType = String(item.itemType || '').toUpperCase();
+  const category = String(item.category || '').toUpperCase();
+  const code = String(item.mvpp || '').toUpperCase();
+  return itemType.includes('VE_SINH') || itemType === 'VS'
+    || category.includes('VE_SINH') || category.includes('VỆ SINH') || category.includes('TẠP HÓA')
+    || code.startsWith('VS') ? 'VS' : 'VPP';
+}
+
+function getRequestSupplyGroup(request: VPPRequest): RequestSupplyGroup {
+  const lineTypes = new Set((request.lines || []).map((line: any) => {
+    const effectiveItem = line.replacementItemId && line.replacementItem
+      ? line.replacementItem
+      : line.issue_item || line.item;
+    return getItemSupplyGroup(effectiveItem);
+  }));
+  if (lineTypes.size > 1) return 'VPP+VS';
+  if (lineTypes.size === 1) return lineTypes.values().next().value as 'VPP' | 'VS';
+  return String(request.warehouseCode || '').toUpperCase() === 'VE_SINH' ? 'VS' : 'VPP';
+}
+
+function RequestSupplyGroupBadge({ request }: { request: VPPRequest }) {
+  const group = getRequestSupplyGroup(request);
+  const config = group === 'VS'
+    ? { Icon: Droplets, label: 'VS', title: 'Đồ vệ sinh', classes: 'from-lime-400 via-emerald-500 to-emerald-700 border-emerald-300 shadow-emerald-200/70' }
+    : group === 'VPP+VS'
+      ? { Icon: Boxes, label: 'VPP+VS', title: 'Phiếu hỗn hợp Văn phòng phẩm và Đồ vệ sinh', classes: 'from-rose-400 via-rose-500 to-red-700 border-rose-300 shadow-rose-200/70' }
+      : { Icon: PackageOpen, label: 'VPP', title: 'Văn phòng phẩm', classes: 'from-sky-400 via-blue-500 to-indigo-700 border-sky-300 shadow-blue-200/70' };
+  return (
+    <span aria-label={`Nhóm hàng: ${config.label}`} title={config.title} className={`relative inline-flex min-w-[74px] items-center justify-center gap-1.5 overflow-hidden rounded-full border bg-gradient-to-b px-3 py-1 text-[10px] font-black tracking-wide text-white shadow-md ${config.classes}`}>
+      <span aria-hidden="true" className="absolute inset-x-2 top-0 h-1/2 rounded-full bg-gradient-to-b from-white/45 to-transparent" />
+      <config.Icon aria-hidden="true" className="relative h-3.5 w-3.5 drop-shadow-sm" />
+      <span className="relative drop-shadow-sm">{config.label}</span>
+    </span>
+  );
+}
+
 function toLocalDateKey(value: string | Date) {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return '';
@@ -88,7 +129,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [sortConfig, setSortConfig] = useState<{ key: 'id' | 'requester' | 'items' | 'status'; direction: 'asc' | 'desc' }>({ key: 'id', direction: 'desc' });
+  const [sortConfig, setSortConfig] = useState<{ key: RequestSortKey; direction: 'asc' | 'desc' }>({ key: 'id', direction: 'desc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedMode, setSelectedMode] = useState<'NONE' | 'MANUAL' | 'ALL_FILTERED'>('NONE');
@@ -214,6 +255,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     const getSortValue = (request: any) => {
       if (sortConfig.key === 'requester') return `${request.requester?.fullName || ''} ${request.department || ''}`;
       if (sortConfig.key === 'items') return Number(request.lines?.length || 0);
+      if (sortConfig.key === 'supplyGroup') return getRequestSupplyGroup(request);
       if (sortConfig.key === 'status') return request.status || '';
       return request.id || '';
     };
@@ -228,14 +270,14 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     });
   }, [requestsFilteredExceptCreatedDate, createdDateMode, createdDateFilter, createdDateRangeStart, createdDateRangeEnd, sortConfig]);
 
-  const toggleSort = (key: 'id' | 'requester' | 'items' | 'status') => {
+  const toggleSort = (key: RequestSortKey) => {
     setSortConfig(prev => prev.key === key
       ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
       : { key, direction: 'asc' });
     setCurrentPage(1);
   };
 
-  const SortIcon = ({ column }: { column: 'id' | 'requester' | 'items' | 'status' }) => {
+  const SortIcon = ({ column }: { column: RequestSortKey }) => {
     if (sortConfig.key !== column) return <ArrowUpDown className="w-3.5 h-3.5 text-slate-300" />;
     return sortConfig.direction === 'asc'
       ? <ArrowUp className="w-3.5 h-3.5 text-indigo-600" />
@@ -945,6 +987,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                           )}
                           <th className={`p-3 ${!isBulkMode ? 'pl-6' : ''}`}><button type="button" onClick={() => toggleSort('id')} className="inline-flex items-center gap-1.5 hover:text-indigo-700">Mã phiếu <SortIcon column="id" /></button></th>
                           <th className="p-3"><button type="button" onClick={() => toggleSort('requester')} className="inline-flex items-center gap-1.5 hover:text-indigo-700">Người đề xuất <SortIcon column="requester" /></button></th>
+                          <th className="p-3 text-center"><button type="button" onClick={() => toggleSort('supplyGroup')} className="inline-flex items-center justify-center gap-1.5 hover:text-indigo-700">Nhóm hàng của phiếu <SortIcon column="supplyGroup" /></button></th>
                           <th className="p-3 text-center w-14"><button type="button" onClick={() => toggleSort('items')} className="inline-flex items-center justify-center gap-1 hover:text-indigo-700">Mục <SortIcon column="items" /></button></th>
                           <th className="p-3 text-center"><button type="button" onClick={() => toggleSort('status')} className="inline-flex items-center justify-center gap-1.5 hover:text-indigo-700">Trạng thái <SortIcon column="status" /></button></th>
                           <th className="p-3 text-right pr-4 w-28">Thao tác</th>
@@ -952,7 +995,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                       {currentData.length === 0 ? (
-                          <tr><td colSpan={6} className="p-10 text-center text-slate-400 font-medium text-sm">Không tìm thấy yêu cầu nào.</td></tr>
+                          <tr><td colSpan={isBulkMode ? 7 : 6} className="p-10 text-center text-slate-400 font-medium text-sm">Không tìm thấy yêu cầu nào.</td></tr>
                       ) : currentData.map(req => {
                           const actName = getActionName(req);
                           const isActionable = actName !== 'Chi tiết';
@@ -988,6 +1031,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                                   <p className="font-bold text-slate-800 text-xs">{req.requester?.fullName}</p>
                                   <p className="text-[10px] text-slate-400 font-semibold">{req.department}</p>
                               </td>
+                              <td className="p-3 text-center"><RequestSupplyGroupBadge request={req} /></td>
                               <td className="p-3 text-center"><span className="text-xs font-black text-slate-600">{req.lines?.length || 0}</span></td>
                               <td className="p-3 text-center"><span className={`px-2 py-0.5 rounded text-[9px] font-bold border uppercase ${getStatusColor(req.status)}`}>{getRequestStatusLabel(req.status)}</span></td>
                               <td className="p-3 pr-4 text-right" onClick={e => e.stopPropagation()}>
