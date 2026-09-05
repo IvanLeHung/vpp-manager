@@ -10,7 +10,9 @@ export type User = {
   fullName: string;
   username: string;
   role: UserRole;
-  department: string;
+  department?: string;
+  departmentName?: string | null;
+  departmentInfo?: { name?: string | null } | null;
   departmentId: string | null;
   managerId: string | null;
   avatar?: string | null;
@@ -27,6 +29,11 @@ export type VPPItem = {
   quota: number;
   price: number;
   stock: number;
+  stocks?: Array<{
+    warehouseCode: string;
+    quantityOnHand: number;
+    quantityReserved?: number;
+  }>;
   itemType?: string;
   isActive?: boolean;
   printSortGroup?: string | null;
@@ -144,6 +151,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         quota: i.quota,
         price: Number(i.price),
         stock: i.stocks?.[0]?.quantityOnHand || 0,
+        stocks: Array.isArray(i.stocks) ? i.stocks : [],
         itemType: i.itemType,
         isActive: i.isActive
       }));
