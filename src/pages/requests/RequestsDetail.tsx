@@ -819,10 +819,10 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
   ];
 
   const printLineTypes = new Set<'VPP' | 'VE_SINH'>((data.lines || []).map((line: any) => getItemSupplyType(line.issue_item || line.replacementItem || line.item)));
-  const effectivePrintType: 'ALL' | 'VPP' | 'VE_SINH' = printLineTypes.size === 1
-    ? printLineTypes.values().next().value as 'VPP' | 'VE_SINH'
-    : selectedPrintType !== 'ALL' && printLineTypes.has(selectedPrintType) ? selectedPrintType
-      : printLineTypes.size === 0 && data.warehouseCode === 'VE_SINH' ? 'VE_SINH' : selectedPrintType;
+  const effectivePrintType: 'ALL' | 'VPP' | 'VE_SINH' = selectedPrintType !== 'ALL'
+    ? selectedPrintType
+    : printLineTypes.size === 1 ? printLineTypes.values().next().value as 'VPP' | 'VE_SINH'
+      : printLineTypes.size === 0 && data.warehouseCode === 'VE_SINH' ? 'VE_SINH' : 'ALL';
 
   return (
     <>

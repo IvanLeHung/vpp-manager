@@ -152,11 +152,11 @@ const RequestPrint: React.FC = () => {
   const getLineCategoryType = (line: any) => getItemCategoryType(line.replacementItem || line.item);
 
   const getEffectivePrintType = (requestData: any): 'ALL' | 'VPP' | 'VE_SINH' => {
+    if (selectedPrintType !== 'ALL') return selectedPrintType;
     const availableTypes = new Set<'VPP' | 'VE_SINH'>((requestData.lines || []).map(getLineCategoryType));
     if (availableTypes.size === 1) return availableTypes.values().next().value as 'VPP' | 'VE_SINH';
-    if (selectedPrintType !== 'ALL' && availableTypes.has(selectedPrintType)) return selectedPrintType;
     if (availableTypes.size === 0 && requestData.warehouseCode === 'VE_SINH') return 'VE_SINH';
-    return selectedPrintType;
+    return 'ALL';
   };
 
   const getFilteredLines = (requestData: any, printType: 'ALL' | 'VPP' | 'VE_SINH') => sortLinesForPrinting(requestData.lines || []).filter((line: any) => {
