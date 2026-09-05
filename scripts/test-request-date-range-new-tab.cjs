@@ -20,7 +20,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
       id, status: 'DRAFT', requesterId: 'user', requester: { id: 'user', fullName: 'Người đề xuất' },
       department: 'Phòng kiểm thử', priority: 'Thường', createdAt: `2026-09-${String(day).padStart(2, '0')}T03:00:00Z`, lines: [],
     });
-    const requests = [makeRequest('PDX-DAY-1', 1), makeRequest('PDX-DAY-3', 3), makeRequest('PDX-DAY-4', 4)];
+    const requests = [makeRequest('PDX-DAY-1', 1), makeRequest('PDX-DAY-1-B', 1), makeRequest('PDX-DAY-3', 3), makeRequest('PDX-DAY-4', 4)];
     await context.route('**/api/**', route => {
       const path = new URL(route.request().url()).pathname;
       if (path === '/api/requests') return route.fulfill({ json: requests });
@@ -35,7 +35,14 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     await page.getByText('PDX-DAY-1', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'Bộ lọc', exact: true }).click();
     await page.getByRole('button', { name: 'Tất cả ngày', exact: true }).click();
+    const dayOne = page.getByRole('button', { name: '1', exact: true });
+    assert.equal(await dayOne.getAttribute('title'), '2 phiếu được tạo');
+    assert.equal(await page.getByRole('button', { name: '3', exact: true }).getAttribute('title'), '1 phiếu được tạo');
+    await dayOne.click();
+    await page.getByText('PDX-DAY-3', { exact: true }).waitFor({ state: 'hidden' });
+    await page.getByRole('button', { name: /1\/9\/2026/ }).click();
     await page.getByRole('button', { name: 'Khoảng ngày', exact: true }).click();
+    assert.equal(await page.getByRole('button', { name: '1', exact: true }).getAttribute('title'), '2 phiếu được tạo');
     await page.getByRole('button', { name: '1', exact: true }).click();
     await page.getByText('PDX-DAY-3', { exact: true }).waitFor({ state: 'hidden' });
     await page.getByRole('button', { name: '3', exact: true }).click();
@@ -54,7 +61,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     assert.equal(page.url(), listUrl);
     assert.match(newPage.url(), /\/requests\/PDX-DAY-1$/);
     assert.deepEqual(pageErrors, []);
-    console.log('PASS: request date range is inclusive and middle-click opens detail in a new tab without leaving the list.');
+    console.log('PASS: calendar counts persist in single/range modes, date range is inclusive, and middle-click opens detail in a new tab without leaving the list.');
   } finally {
     if (browser) await browser.close();
     await server.close();

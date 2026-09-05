@@ -134,7 +134,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     handleOpenDetail(req, targetMode);
   };
 
-  const filteredRequests = useMemo(() => {
+  const requestsFilteredExceptCreatedDate = useMemo(() => {
     let filtered = requests;
     if (currentUser.role === 'EMPLOYEE') {
         filtered = filtered.filter(req => req.requesterId === currentUid || req.requester?.fullName === currentUser.name);
@@ -170,16 +170,6 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         filtered = filtered.filter(r => r.priority === priorityFilter);
     }
 
-    if (createdDateMode === 'SINGLE' && createdDateFilter) {
-      filtered = filtered.filter(r => toLocalDateKey(r.createdAt) === createdDateFilter);
-    } else if (createdDateMode === 'RANGE' && createdDateRangeStart) {
-      const rangeEnd = createdDateRangeEnd || createdDateRangeStart;
-      filtered = filtered.filter(r => {
-        const dateKey = toLocalDateKey(r.createdAt);
-        return dateKey >= createdDateRangeStart && dateKey <= rangeEnd;
-      });
-    }
-
     if (searchTerm.trim()) {
       const terms = normalizeSearchText(searchTerm).split(/\s+/).filter(Boolean);
       filtered = filtered.filter((r: any) => {
@@ -206,6 +196,21 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
       });
     }
 
+    return filtered;
+  }, [requests, statusFilters, deptFilter, priorityFilter, searchTerm, currentUser]);
+
+  const filteredRequests = useMemo(() => {
+    let filtered = requestsFilteredExceptCreatedDate;
+    if (createdDateMode === 'SINGLE' && createdDateFilter) {
+      filtered = filtered.filter(r => toLocalDateKey(r.createdAt) === createdDateFilter);
+    } else if (createdDateMode === 'RANGE' && createdDateRangeStart) {
+      const rangeEnd = createdDateRangeEnd || createdDateRangeStart;
+      filtered = filtered.filter(r => {
+        const dateKey = toLocalDateKey(r.createdAt);
+        return dateKey >= createdDateRangeStart && dateKey <= rangeEnd;
+      });
+    }
+
     const getSortValue = (request: any) => {
       if (sortConfig.key === 'requester') return `${request.requester?.fullName || ''} ${request.department || ''}`;
       if (sortConfig.key === 'items') return Number(request.lines?.length || 0);
@@ -221,7 +226,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         : String(aValue).localeCompare(String(bValue), 'vi', { numeric: true, sensitivity: 'base' });
       return sortConfig.direction === 'asc' ? comparison : -comparison;
     });
-  }, [requests, statusFilters, deptFilter, priorityFilter, createdDateMode, createdDateFilter, createdDateRangeStart, createdDateRangeEnd, searchTerm, currentUser, sortConfig]);
+  }, [requestsFilteredExceptCreatedDate, createdDateMode, createdDateFilter, createdDateRangeStart, createdDateRangeEnd, sortConfig]);
 
   const toggleSort = (key: 'id' | 'requester' | 'items' | 'status') => {
     setSortConfig(prev => prev.key === key
@@ -264,6 +269,11 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
       ...Array.from({ length: daysInMonth }, (_, index) => new Date(year, month, index + 1)),
     ];
   }, [calendarMonth]);
+  const calendarRequestCounts = useMemo(() => requestsFilteredExceptCreatedDate.reduce<Record<string, number>>((counts, request) => {
+    const dateKey = toLocalDateKey(request.createdAt);
+    if (dateKey) counts[dateKey] = (counts[dateKey] || 0) + 1;
+    return counts;
+  }, {}), [requestsFilteredExceptCreatedDate]);
   const hasCreatedDateFilter = createdDateMode === 'SINGLE'
     ? Boolean(createdDateFilter)
     : Boolean(createdDateRangeStart);
@@ -815,7 +825,8 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                          <button
                            key={toLocalDateKey(date)}
                            onClick={() => selectCalendarDate(date)}
-                           className={`aspect-square rounded-lg border text-xs font-bold transition ${
+                           title={`${calendarRequestCounts[toLocalDateKey(date)] || 0} phiếu được tạo`}
+                           className={`relative aspect-square rounded-lg border text-xs font-bold transition ${
                              (createdDateMode === 'SINGLE' && createdDateFilter === toLocalDateKey(date))
                              || (createdDateMode === 'RANGE' && createdDateRangeStart && toLocalDateKey(date) >= createdDateRangeStart && toLocalDateKey(date) <= (createdDateRangeEnd || createdDateRangeStart))
                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
@@ -823,6 +834,14 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                            }`}
                          >
                            {date.getDate()}
+                           {calendarRequestCounts[toLocalDateKey(date)] === 1 && (
+                             <span aria-hidden="true" className="absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-emerald-500" />
+                           )}
+                           {(calendarRequestCounts[toLocalDateKey(date)] || 0) > 1 && (
+                             <span aria-hidden="true" className="absolute -right-1.5 -top-1.5 z-10 flex min-w-4 h-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[8px] font-black leading-none text-white shadow-sm">
+                               {calendarRequestCounts[toLocalDateKey(date)] > 99 ? '99+' : calendarRequestCounts[toLocalDateKey(date)]}
+                             </span>
+                           )}
                          </button>
                        ) : <span key={`blank-${index}`} />)}
                      </div>
