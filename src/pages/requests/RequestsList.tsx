@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, type MouseEvent } from 'react';
 import { Plus, Download, Search, FileText, CheckCircle, Clock, XCircle, ChevronLeft, ChevronRight, Eye, CheckSquare, GitBranch, Printer, ListChecks, ChevronDown, RotateCcw, FileSpreadsheet, CornerUpLeft, ArrowUpDown, ArrowUp, ArrowDown, CalendarDays } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { VPPRequest, User } from '../../context/AppContext';
@@ -78,7 +78,10 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [deptFilter, setDeptFilter] = useState<string>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
+  const [createdDateMode, setCreatedDateMode] = useState<'SINGLE' | 'RANGE'>('SINGLE');
   const [createdDateFilter, setCreatedDateFilter] = useState('');
+  const [createdDateRangeStart, setCreatedDateRangeStart] = useState('');
+  const [createdDateRangeEnd, setCreatedDateRangeEnd] = useState('');
   const [showDateCalendar, setShowDateCalendar] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const now = new Date();
@@ -124,6 +127,13 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     setViewMode(targetMode);
   };
 
+  const handleRequestLinkClick = (event: MouseEvent<HTMLAnchorElement>, req: VPPRequest, targetMode: ViewMode = 'VIEW') => {
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    event.stopPropagation();
+    handleOpenDetail(req, targetMode);
+  };
+
   const filteredRequests = useMemo(() => {
     let filtered = requests;
     if (currentUser.role === 'EMPLOYEE') {
@@ -160,8 +170,14 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         filtered = filtered.filter(r => r.priority === priorityFilter);
     }
 
-    if (createdDateFilter) {
-        filtered = filtered.filter(r => toLocalDateKey(r.createdAt) === createdDateFilter);
+    if (createdDateMode === 'SINGLE' && createdDateFilter) {
+      filtered = filtered.filter(r => toLocalDateKey(r.createdAt) === createdDateFilter);
+    } else if (createdDateMode === 'RANGE' && createdDateRangeStart) {
+      const rangeEnd = createdDateRangeEnd || createdDateRangeStart;
+      filtered = filtered.filter(r => {
+        const dateKey = toLocalDateKey(r.createdAt);
+        return dateKey >= createdDateRangeStart && dateKey <= rangeEnd;
+      });
     }
 
     if (searchTerm.trim()) {
@@ -205,7 +221,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         : String(aValue).localeCompare(String(bValue), 'vi', { numeric: true, sensitivity: 'base' });
       return sortConfig.direction === 'asc' ? comparison : -comparison;
     });
-  }, [requests, statusFilters, deptFilter, priorityFilter, createdDateFilter, searchTerm, currentUser, sortConfig]);
+  }, [requests, statusFilters, deptFilter, priorityFilter, createdDateMode, createdDateFilter, createdDateRangeStart, createdDateRangeEnd, searchTerm, currentUser, sortConfig]);
 
   const toggleSort = (key: 'id' | 'requester' | 'items' | 'status') => {
     setSortConfig(prev => prev.key === key
@@ -225,7 +241,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   useEffect(() => {
     setSelectedIds([]);
     setSelectedMode('NONE');
-  }, [statusFilters, searchTerm, deptFilter, priorityFilter, createdDateFilter]);
+  }, [statusFilters, searchTerm, deptFilter, priorityFilter, createdDateMode, createdDateFilter, createdDateRangeStart, createdDateRangeEnd]);
 
   const stats = useMemo(() => {
     return {
@@ -248,6 +264,43 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
       ...Array.from({ length: daysInMonth }, (_, index) => new Date(year, month, index + 1)),
     ];
   }, [calendarMonth]);
+  const hasCreatedDateFilter = createdDateMode === 'SINGLE'
+    ? Boolean(createdDateFilter)
+    : Boolean(createdDateRangeStart);
+  const createdDateLabel = createdDateMode === 'SINGLE'
+    ? (createdDateFilter ? new Date(`${createdDateFilter}T00:00:00`).toLocaleDateString('vi-VN') : 'Tất cả ngày')
+    : createdDateRangeStart
+      ? `${new Date(`${createdDateRangeStart}T00:00:00`).toLocaleDateString('vi-VN')} — ${createdDateRangeEnd ? new Date(`${createdDateRangeEnd}T00:00:00`).toLocaleDateString('vi-VN') : 'Chọn ngày kết thúc'}`
+      : 'Chọn khoảng ngày';
+
+  const clearCreatedDateFilter = () => {
+    setCreatedDateFilter('');
+    setCreatedDateRangeStart('');
+    setCreatedDateRangeEnd('');
+    setCurrentPage(1);
+  };
+
+  const selectCalendarDate = (date: Date) => {
+    const dateKey = toLocalDateKey(date);
+    setCurrentPage(1);
+    if (createdDateMode === 'SINGLE') {
+      setCreatedDateFilter(dateKey);
+      setShowDateCalendar(false);
+      return;
+    }
+    if (!createdDateRangeStart || createdDateRangeEnd) {
+      setCreatedDateRangeStart(dateKey);
+      setCreatedDateRangeEnd('');
+      return;
+    }
+    if (dateKey < createdDateRangeStart) {
+      setCreatedDateRangeEnd(createdDateRangeStart);
+      setCreatedDateRangeStart(dateKey);
+    } else {
+      setCreatedDateRangeEnd(dateKey);
+    }
+    setShowDateCalendar(false);
+  };
 
 
   const getActionName = (req: VPPRequest) => {
@@ -720,19 +773,19 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                     <div className="flex flex-col gap-1">
                         <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Ngày tạo phiếu</label>
                         <div className="flex items-center gap-1.5">
-                          <button onClick={() => setShowDateCalendar(prev => !prev)} className={`min-w-[150px] px-2 py-1.5 rounded-lg border text-xs font-bold flex items-center justify-between gap-2 transition ${createdDateFilter ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'}`}>
-                            <span>{createdDateFilter ? new Date(`${createdDateFilter}T00:00:00`).toLocaleDateString('vi-VN') : 'Tất cả ngày'}</span>
+                          <button onClick={() => setShowDateCalendar(prev => !prev)} className={`min-w-[180px] px-2 py-1.5 rounded-lg border text-xs font-bold flex items-center justify-between gap-2 transition ${hasCreatedDateFilter ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'}`}>
+                            <span>{createdDateLabel}</span>
                             <CalendarDays className="w-3.5 h-3.5" />
                           </button>
-                          {createdDateFilter && (
-                            <button onClick={() => { setCreatedDateFilter(''); setShowDateCalendar(false); setCurrentPage(1); }} className="w-7 h-7 rounded-lg text-rose-500 hover:bg-rose-50 flex items-center justify-center" title="Xóa ngày">
+                          {hasCreatedDateFilter && (
+                            <button onClick={() => { clearCreatedDateFilter(); setShowDateCalendar(false); }} className="w-7 h-7 rounded-lg text-rose-500 hover:bg-rose-50 flex items-center justify-center" title="Xóa ngày">
                               <XCircle className="w-4 h-4" />
                             </button>
                           )}
                         </div>
                     </div>
                     <div className="flex items-end pb-0.5 ml-auto">
-                        <button onClick={() => { setDeptFilter('ALL'); setPriorityFilter('ALL'); setCreatedDateFilter(''); setShowDateCalendar(false); setSearchTerm(''); setStatusFilters([]); setCurrentPage(1); }} className="text-[10px] font-black text-rose-500 uppercase hover:text-rose-600 flex items-center gap-1">
+                        <button onClick={() => { setDeptFilter('ALL'); setPriorityFilter('ALL'); clearCreatedDateFilter(); setShowDateCalendar(false); setSearchTerm(''); setStatusFilters([]); }} className="text-[10px] font-black text-rose-500 uppercase hover:text-rose-600 flex items-center gap-1">
                           <RotateCcw className="w-3.5 h-3.5"/> Đặt lại tất cả
                         </button>
                     </div>
@@ -740,7 +793,11 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
 
                  {showDateCalendar && (
                  <div className="border-t border-slate-100 pt-3">
-                   <div className="w-[280px] max-w-full rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                   <div className="w-[320px] max-w-full rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                     <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 mb-3">
+                       <button type="button" onClick={() => { setCreatedDateMode('SINGLE'); clearCreatedDateFilter(); }} className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase transition ${createdDateMode === 'SINGLE' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-white'}`}>Một ngày</button>
+                       <button type="button" onClick={() => { setCreatedDateMode('RANGE'); clearCreatedDateFilter(); }} className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase transition ${createdDateMode === 'RANGE' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-white'}`}>Khoảng ngày</button>
+                     </div>
                      <div className="flex items-center justify-between mb-3">
                        <button onClick={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Tháng trước">
                          <ChevronLeft className="w-4 h-4" />
@@ -757,13 +814,23 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                        {calendarDays.map((date, index) => date ? (
                          <button
                            key={toLocalDateKey(date)}
-                           onClick={() => { setCreatedDateFilter(toLocalDateKey(date)); setShowDateCalendar(false); setCurrentPage(1); }}
-                           className={`aspect-square rounded-lg border text-xs font-bold transition ${createdDateFilter === toLocalDateKey(date) ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : toLocalDateKey(date) === toLocalDateKey(new Date()) ? 'border-indigo-300 text-indigo-600 bg-indigo-50' : 'border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50'}`}
+                           onClick={() => selectCalendarDate(date)}
+                           className={`aspect-square rounded-lg border text-xs font-bold transition ${
+                             (createdDateMode === 'SINGLE' && createdDateFilter === toLocalDateKey(date))
+                             || (createdDateMode === 'RANGE' && createdDateRangeStart && toLocalDateKey(date) >= createdDateRangeStart && toLocalDateKey(date) <= (createdDateRangeEnd || createdDateRangeStart))
+                               ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                               : toLocalDateKey(date) === toLocalDateKey(new Date()) ? 'border-indigo-300 text-indigo-600 bg-indigo-50' : 'border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50'
+                           }`}
                          >
                            {date.getDate()}
                          </button>
                        ) : <span key={`blank-${index}`} />)}
                      </div>
+                     {createdDateMode === 'RANGE' && (
+                       <p className="mt-2 text-[10px] font-bold text-slate-500">
+                         {createdDateRangeStart ? (createdDateRangeEnd ? 'Đã chọn khoảng ngày.' : 'Chọn ngày kết thúc.') : 'Chọn ngày bắt đầu.'}
+                       </p>
+                     )}
                    </div>
                  </div>
                  )}
@@ -887,7 +954,14 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                                  </td>
                               )}
                               <td className={`p-3 ${!isBulkMode ? 'pl-6' : ''}`}>
-                                  <button onClick={e => { e.stopPropagation(); handleOpenDetail(req); }} className="font-extrabold text-indigo-700 hover:text-indigo-900 hover:underline text-xs text-left">{req.id}</button>
+                                  <a
+                                    href={`/requests/${encodeURIComponent(req.id)}`}
+                                    onClick={e => handleRequestLinkClick(e, req)}
+                                    className="font-extrabold text-indigo-700 hover:text-indigo-900 hover:underline text-xs text-left"
+                                    title="Chuột giữa để mở phiếu trong tab mới"
+                                  >
+                                    {req.id}
+                                  </a>
                                   {req.priority === 'Khẩn cấp' && <span className="ml-1 inline-flex animate-pulse px-1 py-0.5 rounded text-[8px] font-bold bg-rose-500 text-white uppercase">Khẩn</span>}
                                   <p className="text-[10px] text-slate-400 mt-0.5">{new Date(req.createdAt).toLocaleDateString('vi-VN')} {new Date(req.createdAt).toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit'})}</p>
                               </td>
@@ -898,10 +972,10 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                               <td className="p-3 text-center"><span className="text-xs font-black text-slate-600">{req.lines?.length || 0}</span></td>
                               <td className="p-3 text-center"><span className={`px-2 py-0.5 rounded text-[9px] font-bold border uppercase ${getStatusColor(req.status)}`}>{getRequestStatusLabel(req.status)}</span></td>
                               <td className="p-3 pr-4 text-right" onClick={e => e.stopPropagation()}>
-                                  <button onClick={() => handleOpenDetail(req, actName === 'Chỉnh sửa' ? 'CREATE' : 'VIEW')}
+                                  <a href={`/requests/${encodeURIComponent(req.id)}`} onClick={e => handleRequestLinkClick(e, req, actName === 'Chỉnh sửa' ? 'CREATE' : 'VIEW')}
                                     className={`px-2 py-1 rounded-lg font-bold text-[11px] inline-flex items-center ${isActionable ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
                                     {isActionable ? <span className="w-1.5 h-1.5 bg-white rounded-full mr-1 animate-pulse"></span> : <Eye className="w-3 h-3 mr-1"/>}{actName}
-                                  </button>
+                                  </a>
                               </td>
                           </tr>);
                       })}
@@ -1019,13 +1093,13 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                   }}
                 />
                 {isActionable && (
-                  <button onClick={() => handleOpenDetail(previewReq, actName === 'Chỉnh sửa' ? 'CREATE' : 'VIEW')}
+                  <a href={`/requests/${encodeURIComponent(previewReq.id)}`} onClick={e => handleRequestLinkClick(e, previewReq, actName === 'Chỉnh sửa' ? 'CREATE' : 'VIEW')}
                     className={`px-4 py-2 rounded-xl font-bold text-xs transition shadow-md flex items-center gap-1.5 ${actName.includes('Duyệt') || actName.includes('Xuất') ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-500/20' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-500/20'}`}>
                     <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
                     {actName}
-                  </button>
+                  </a>
                 )}
-                <button onClick={() => handleOpenDetail(previewReq)} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-200 transition flex items-center gap-1.5"><Eye className="w-4 h-4" /> Chi tiết</button>
+                <a href={`/requests/${encodeURIComponent(previewReq.id)}`} onClick={e => handleRequestLinkClick(e, previewReq)} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-200 transition flex items-center gap-1.5"><Eye className="w-4 h-4" /> Chi tiết</a>
               </div>
             </div>
           </div>
