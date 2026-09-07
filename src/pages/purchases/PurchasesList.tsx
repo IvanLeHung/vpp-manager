@@ -486,6 +486,23 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   const [loadError, setLoadError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('ALL');
+  const [compactProgress, setCompactProgress] = useState(0);
+  const compactDistanceRef = useRef(0);
+  const compactFrameRef = useRef<number | null>(null);
+  const handleCompactWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)
+      || (event.target as HTMLElement).closest('input, select, textarea, [role="dialog"], [role="listbox"]')) return;
+    const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 180 : 1);
+    compactDistanceRef.current = Math.max(0, Math.min(180, compactDistanceRef.current + delta));
+    if (compactFrameRef.current !== null) return;
+    compactFrameRef.current = requestAnimationFrame(() => {
+      setCompactProgress(compactDistanceRef.current / 180);
+      compactFrameRef.current = null;
+    });
+  };
+  useEffect(() => () => {
+    if (compactFrameRef.current !== null) cancelAnimationFrame(compactFrameRef.current);
+  }, []);
   const [showDataFilters, setShowDataFilters] = useState(false);
   const [departmentFilter, setDepartmentFilter] = useState('ALL');
   const [supplierFilter, setSupplierFilter] = useState('ALL');
@@ -2102,7 +2119,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
     setSelectedIds([]);
     setPreviewPO(null);
   };
-  const totalAmount = data.filter(d => ['ORDERED', 'DELIVERING', 'PARTIALLY_DELIVERED', 'COMPLETED'].includes(d.status)).reduce((sum, d) => sum + Number(d.actualTotal || d.totalAmount || 0), 0);
+  const totalAmount = filteredData.filter(d => ['ORDERED', 'DELIVERING', 'PARTIALLY_DELIVERED', 'COMPLETED'].includes(d.status)).reduce((sum, d) => sum + Number(d.actualTotal ?? d.totalAmount ?? 0), 0);
 
   // Dashboard Print Helpers
   const dashboardDiffLabel =
@@ -2134,12 +2151,16 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
         : 'TÓM TẮT HIỆU QUẢ MUA SẮM';
 
   return (
-    <div className="flex flex-col h-full bg-slate-50/50 print:bg-white print:h-auto print:block">
+    <div onWheel={handleCompactWheel} className="flex flex-col h-full bg-slate-50/50 print:bg-white print:h-auto print:block">
         {/* TOP KPI CARDS */}
-        <div className="p-4 md:p-6 shrink-0 no-print">
+        <div className="grid shrink-0 no-print transition-[grid-template-rows,opacity] duration-500 ease-out motion-reduce:transition-none"
+          style={{ gridTemplateRows: `${1 - compactProgress}fr`, opacity: 1 - compactProgress }}
+          inert={compactProgress === 1}>
+        <div className="min-h-0 overflow-hidden">
+        <div className="p-4 md:p-6">
             <h1 className="text-2xl font-black text-slate-800 tracking-tight mb-4">Quản lý Mua sắm (Purchasing)</h1>
             
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="flex flex-nowrap gap-3 overflow-x-auto pb-2 [&>*]:min-w-[200px] [&>*]:flex-1 [&>*]:shrink-0">
                 <button type="button" onClick={() => showStatusOrders()} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 text-left hover:border-indigo-400 transition focus-visible:outline-2 focus-visible:outline-indigo-600">
                     <div className="flex justify-between items-start mb-2">
                         <div className="p-2.5 bg-slate-100 text-slate-600 rounded-lg"><ShoppingCart className="w-5 h-5" /></div>
@@ -2169,6 +2190,8 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
             </div>
         </div>
 
+        </div>
+        </div>
         {/* MAIN LIST SECTION */}
         <div className="flex-1 overflow-hidden flex gap-4 px-4 md:px-6 pb-6 no-print">
             {/* LEFT: Purchase List */}
@@ -2242,25 +2265,19 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                     )}
 
                     <div className="flex flex-wrap gap-3 justify-between items-center">
-                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
-                        {[
-                          { id: 'ALL', label: 'Tất Cả' },
-                          { id: 'DRAFT', label: 'Nháp' },
-                          { id: 'PENDING', label: 'Chờ Duyệt' },
-                          { id: 'APPROVED', label: 'Chờ Mua Sắm' },
-                          { id: 'ORDERED', label: 'Chờ Giao' },
-                          { id: 'DELIVERING', label: 'Đang Giao' },
-                          { id: 'COMPLETED', label: 'Hoàn Tất' }
-                        ].map(t => (
-                            <button 
-                               key={t.id} 
-                               onClick={() => setActiveTab(t.id)}
-                               className={`px-4 py-2 rounded-xl text-[9px] uppercase tracking-widest font-black transition-all ${activeTab === t.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/40 translate-y-[-1px]' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100'}`}
-                            >
-                                {t.label}
-                            </button>
-                        ))}
-                    </div>
+                    <select aria-label="Trạng thái mua sắm" value={activeTab}
+                      onChange={event => { setActiveTab(event.target.value); setSelectedIds([]); setPreviewPO(null); }}
+                      className="h-10 min-w-[210px] rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500">
+                      <option value="ALL">Tất cả trạng thái</option>
+                      {Array.from(new Set(['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'ORDERED', 'DELIVERING', 'COMPLETED', ...statusCounts.map(([status]) => status)])).map(status => (
+                        <option key={status} value={`STATUS:${status}`}>
+                          {({ DRAFT: 'Nháp', PENDING_APPROVAL: 'Chờ duyệt', PARTIALLY_APPROVED: 'Duyệt một phần',
+                            APPROVED: 'Chờ mua sắm', ORDERED: 'Chờ giao', DELIVERING: 'Đang giao',
+                            PARTIALLY_DELIVERED: 'Giao một phần', COMPLETED: 'Hoàn tất',
+                            REJECTED: 'Từ chối', CANCELLED: 'Đã hủy' } as Record<string, string>)[status] || status}
+                        </option>
+                      ))}
+                    </select>
 
                     <div className="flex items-center gap-2 w-full md:w-auto mt-1.5 md:mt-0">
                                  {/* UNIFIED REPORT PRINT & EXPORT BUTTON */}
