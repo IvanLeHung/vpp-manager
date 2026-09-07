@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef, type MouseEvent, type UIEvent } from 'react';
 import { Plus, Download, Search, FileText, CheckCircle, Clock, XCircle, ChevronLeft, ChevronRight, Eye, CheckSquare, GitBranch, Printer, ListChecks, ChevronDown, RotateCcw, FileSpreadsheet, CornerUpLeft, ArrowUpDown, ArrowUp, ArrowDown, CalendarDays, PackageOpen, Droplets, Boxes } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { Select } from 'antd';
 import type { VPPRequest, User } from '../../context/AppContext';
 import { useAppContext } from '../../context/AppContext';
 import api from '../../lib/api';
@@ -841,10 +842,20 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
           </div>
           {showAdvancedFilters && (
              <div className="px-4 py-3 bg-white border-b border-slate-200 flex flex-col gap-4 animate-in slide-in-from-top-2 duration-200">
-                 <div className="flex flex-col gap-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Lọc theo trạng thái phiếu (Chọn nhiều)</label>
-                    <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1">
-                      {[
+                 <div className="flex flex-wrap items-end gap-3">
+                    <div className="flex w-full flex-col gap-1 sm:w-[220px]">
+                      <label htmlFor="request-status-filter" className="text-[9px] font-black uppercase tracking-widest text-slate-400">Trạng thái phiếu</label>
+                      <Select
+                        id="request-status-filter"
+                        aria-label="Trạng thái phiếu"
+                        mode="multiple"
+                        allowClear
+                        maxTagCount={1}
+                        maxTagPlaceholder={values => `+${values.length}`}
+                        placeholder="Tất cả trạng thái"
+                        value={statusFilters}
+                        onChange={values => { setStatusFilters(values); setCurrentPage(1); }}
+                        options={[
                         { val: 'MY_ACTION', lab: '🚩 Cần xử lý', color: 'amber' },
                         { val: 'BACKORDER', lab: '📦 Chờ mua bổ sung', color: 'slate' },
                         { val: 'PENDING_MANAGER', lab: '⏳ Chờ Trưởng bộ phận', color: 'amber' },
@@ -858,37 +869,12 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                         { val: 'CANCELLED', lab: '🚫 Đã hủy', color: 'rose' },
                         { val: 'RETURNED', lab: '↩️ Trả lại', color: 'orange' },
                         { val: 'DRAFT', lab: '📝 Bản nháp', color: 'slate' }
-                      ].map(st => (
-                        <button 
-                          key={st.val}
-                          onClick={() => {
-                            setStatusFilters(prev => 
-                              prev.includes(st.val) ? prev.filter(v => v !== st.val) : [...prev, st.val]
-                            );
-                            setCurrentPage(1);
-                          }}
-                          className={`px-3 py-1.5 rounded-xl border text-[11px] font-bold transition flex items-center gap-1.5 ${
-                            statusFilters.includes(st.val) 
-                              ? `bg-${st.color}-600 border-${st.color}-600 text-white shadow-md` 
-                              : `bg-white border-slate-200 text-slate-600 hover:bg-slate-50`
-                          }`}
-                        >
-                          {statusFilters.includes(st.val) && <CheckSquare className="w-3.5 h-3.5" />}
-                          {st.lab}
-                        </button>
-                      ))}
-                      {statusFilters.length > 0 && (
-                        <button 
-                          onClick={() => setStatusFilters([])}
-                          className="px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 text-[11px] font-black uppercase hover:bg-rose-100 transition"
-                        >
-                          Xóa chọn
-                        </button>
-                      )}
+                      ].map(st => ({ value: st.val, label: st.lab }))}
+                        className="w-full"
+                        popupMatchSelectWidth={280}
+                        optionFilterProp="label"
+                      />
                     </div>
-                 </div>
-                 
-                 <div className="flex flex-wrap gap-6 border-t border-slate-100 pt-3">
                     <div className="flex flex-col gap-1">
                         <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Phòng ban</label>
                         <select value={deptFilter} onChange={e => { setDeptFilter(e.target.value); setCurrentPage(1); }} className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-700 outline-none min-w-[200px] hover:bg-slate-100 transition"><option value="ALL">Tất cả phòng ban</option>{Array.from(new Set(requests.map(r => r.department).filter(Boolean))).sort().map(d => <option key={d} value={d}>{d}</option>)}</select>
