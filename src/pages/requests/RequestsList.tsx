@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, type MouseEvent } from 'react';
+import { useState, useMemo, useEffect, useRef, type MouseEvent, type UIEvent } from 'react';
 import { Plus, Download, Search, FileText, CheckCircle, Clock, XCircle, ChevronLeft, ChevronRight, Eye, CheckSquare, GitBranch, Printer, ListChecks, ChevronDown, RotateCcw, FileSpreadsheet, CornerUpLeft, ArrowUpDown, ArrowUp, ArrowDown, CalendarDays, PackageOpen, Droplets, Boxes } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { VPPRequest, User } from '../../context/AppContext';
@@ -138,7 +138,22 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [isSubmittingBatch, setIsSubmittingBatch] = useState(false);
   const [previewReq, setPreviewReq] = useState<VPPRequest | null>(null);
+  const [listCompactProgress, setListCompactProgress] = useState(0);
+  const listScrollFrameRef = useRef<number | null>(null);
   const itemsPerPage = 15;
+
+  const handleListScroll = (event: UIEvent<HTMLDivElement>) => {
+    const scrollTop = event.currentTarget.scrollTop;
+    if (listScrollFrameRef.current !== null) cancelAnimationFrame(listScrollFrameRef.current);
+    listScrollFrameRef.current = requestAnimationFrame(() => {
+      setListCompactProgress(Math.min(scrollTop / 180, 1));
+      listScrollFrameRef.current = null;
+    });
+  };
+
+  useEffect(() => () => {
+    if (listScrollFrameRef.current !== null) cancelAnimationFrame(listScrollFrameRef.current);
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch(status) {
@@ -473,26 +488,60 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     }
   };
 
-  const handleExportExcel = async () => {
+  const handleExportExcel = () => {
     try {
-      const payload = {
-        selectedMode: selectedMode === 'ALL_FILTERED' ? 'ALL_FILTERED' : (selectedIds.length > 0 ? 'MANUAL' : 'ALL_FILTERED'),
-        requestIds: selectedIds,
-        filterConfig: {
-           status: statusFilters.length > 0 ? statusFilters[0] : 'ALL',
-           department: deptFilter,
-           search: searchTerm
-        },
-        format: 'XLSX',
-        detailMode: 'LIST'
-      };
-      showToast('Đang tạo báo cáo, vui lòng đợi...');
-      const res = await api.post('/requests/export', payload);
-      if (res.data.fileUrl) {
-         window.open(api.defaults.baseURL?.replace('/api', '') + res.data.fileUrl, '_blank');
+      const targetRequests = selectedIds.length > 0
+        ? requests.filter(request => selectedIds.includes(request.id))
+        : filteredRequests;
+      const rowsByGroup: Record<'VPP' | 'VS', any[]> = { VPP: [], VS: [] };
+
+      targetRequests.forEach(request => {
+        sortLinesForPrinting(request.lines || []).forEach((line: any) => {
+          const item = line.replacementItemId && line.replacementItem
+            ? line.replacementItem
+            : line.issue_item || line.item;
+          if (!item) return;
+          const group = getItemSupplyGroup(item);
+          const quantity = line.replacementQty ?? line.qtyApproved ?? line.qtyRequested ?? 0;
+          const unitPrice = getRequestLineUnitPrice(line);
+          rowsByGroup[group].push({
+            'Mã phiếu': request.id,
+            'Ngày tạo': new Date(request.createdAt).toLocaleDateString('vi-VN'),
+            'Người đề xuất': request.requester?.fullName || '',
+            'Phòng ban': request.department || '',
+            'Loại yêu cầu': request.requestType || '',
+            'Mã vật tư': item.mvpp || '',
+            'Tên vật tư / hàng hóa': item.name || '',
+            'Đơn vị tính': item.unit || '',
+            'Số lượng': quantity,
+            'Đơn giá': unitPrice,
+            'Thành tiền': getRequestLineAmount(line, quantity),
+            'Ghi chú': line.note || '',
+            'Trạng thái': getRequestStatusLabel(request.status),
+          });
+        });
+      });
+
+      if (rowsByGroup.VPP.length === 0 && rowsByGroup.VS.length === 0) {
+        showToast('Không có dữ liệu vật tư để xuất Excel', 'warning');
+        return;
       }
+
+      const workbook = XLSX.utils.book_new();
+      ([['VPP', 'Đề xuất VPP'], ['VS', 'Đề xuất Vệ sinh']] as const).forEach(([group, sheetName]) => {
+        if (rowsByGroup[group].length === 0) return;
+        const worksheet = XLSX.utils.json_to_sheet(rowsByGroup[group]);
+        worksheet['!cols'] = [
+          { wch: 23 }, { wch: 12 }, { wch: 24 }, { wch: 28 }, { wch: 18 },
+          { wch: 15 }, { wch: 38 }, { wch: 12 }, { wch: 11 }, { wch: 15 },
+          { wch: 17 }, { wch: 32 }, { wch: 20 },
+        ];
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+      });
+      XLSX.writeFile(workbook, `Phieu-de-xuat-tach-nhom-${toLocalDateKey(new Date())}.xlsx`);
+      showToast('Đã xuất Excel và tự tách sheet VPP / Vệ sinh', 'success');
     } catch (err: any) {
-       showToast(err.response?.data?.error || 'Lỗi xuất Excel', 'error');
+       showToast(err.message || 'Lỗi xuất Excel', 'error');
     }
   };
 
@@ -607,6 +656,21 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     };
   }, [requests, filteredRequests, selectedIds, masterItems]);
 
+  const individualPrintSheets = useMemo(() => requests
+    .filter(request => selectedIds.includes(request.id))
+    .flatMap(request => {
+      const linesByGroup: Record<'VPP' | 'VS', any[]> = { VPP: [], VS: [] };
+      sortLinesForPrinting(request.lines || []).forEach((line: any) => {
+        const item = line.replacementItemId && line.replacementItem
+          ? line.replacementItem
+          : line.issue_item || line.item;
+        if (item) linesByGroup[getItemSupplyGroup(item)].push(line);
+      });
+      return (['VPP', 'VS'] as const)
+        .filter(group => linesByGroup[group].length > 0)
+        .map(group => ({ request, group, lines: linesByGroup[group] }));
+    }), [requests, selectedIds]);
+
   const handlePrintSummary = (type: 'ALL' | 'VPP' | 'VE_SINH' = 'ALL') => {
     setPrintMode('SUMMARY');
     setSelectedPrintType(type);
@@ -642,6 +706,16 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
 
   return (
     <div className="flex flex-col h-full p-4 md:p-8 relative print:p-0 print:h-auto print:block RequestsList">
+      <div
+        aria-hidden={listCompactProgress >= 1}
+        className="no-print grid shrink-0 overflow-hidden"
+        style={{
+          gridTemplateRows: `${Math.max(0, 1 - listCompactProgress)}fr`,
+          opacity: 1 - listCompactProgress,
+          transform: `translateY(-${listCompactProgress * 12}px)`,
+        }}
+      >
+      <div className="min-h-0 overflow-hidden">
       <div className="no-print flex justify-between items-center mb-6 shrink-0">
         <div>
            <h2 className="text-2xl font-bold text-slate-800">
@@ -656,8 +730,8 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         <div className="flex gap-3">
             {currentUser.role !== 'EMPLOYEE' && (
               <div className="flex gap-2">
-                  <button onClick={handleExportExcel} className="flex items-center px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition font-bold shadow-sm">
-                    <Download className="w-5 h-5 mr-1.5 text-slate-400"/> Tải Excel
+                  <button onClick={handleExportExcel} className="flex items-center px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition font-bold shadow-sm" title="Tự tách thành sheet VPP và Vệ sinh">
+                    <Download className="w-5 h-5 mr-1.5 text-slate-400"/> Excel VPP / VS
                   </button>
                   <button onClick={handleExportSummaryExcel} className="flex items-center px-4 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl hover:bg-emerald-100 transition font-bold shadow-sm">
                     <FileText className="w-5 h-5 mr-1.5 text-emerald-500"/> Excel Tổng Hợp (Owed)
@@ -721,6 +795,8 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                <h3 className="text-2xl font-black text-rose-600">{stats.rejected}</h3>
             </div>
          </div>
+      </div>
+      </div>
       </div>
 
       {/* SPLIT PANEL */}
@@ -919,8 +995,8 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                 <button disabled={isSubmittingBatch} onClick={handleBatchReject} className="px-3 py-1.5 bg-rose-500 hover:bg-rose-400 text-white font-black rounded-lg text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition shadow-sm">
                   <XCircle className="w-3.5 h-3.5"/> Từ chối
                 </button>
-                <button onClick={handleExportExcel} className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white font-black rounded-lg text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition">
-                  <FileSpreadsheet className="w-3.5 h-3.5"/> Xuất Excel
+                <button onClick={handleExportExcel} className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white font-black rounded-lg text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition" title="Tự tách thành sheet VPP và Vệ sinh">
+                  <FileSpreadsheet className="w-3.5 h-3.5"/> Excel VPP / VS
                 </button>
                 <button 
                   onClick={() => {
@@ -931,7 +1007,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                   }} 
                   className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white font-black rounded-lg text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition"
                 >
-                  <Printer className="w-3.5 h-3.5"/> In PDF Phiếu Đề xuất
+                  <Printer className="w-3.5 h-3.5"/> In PDF VPP / VS
                 </button>
                 <div className="h-4 w-[1px] bg-white/20 mx-1"></div>
                 <button onClick={toggleBulkMode} className="p-1.5 hover:bg-white/10 rounded-lg transition" title="Ẩn ô chọn">
@@ -941,7 +1017,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             </div>
           )}
           {/* Table */}
-          <div className="flex-1 overflow-auto custom-scrollbar">
+          <div onScroll={handleListScroll} className="flex-1 overflow-auto custom-scrollbar">
               <table className="w-full text-left whitespace-nowrap">
                   <thead className="bg-white border-b border-slate-200 sticky top-0 z-10">
                       <tr className="text-[10px] uppercase font-bold text-slate-400 tracking-widest bg-slate-50/80">
@@ -1373,12 +1449,10 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
           </div>
           ))
         ) : (
-          requests
-            .filter(r => selectedIds.includes(r.id))
-            .map((req, rIdx) => {
-              const filteredLines = sortLinesForPrinting(req.lines || []);
+          individualPrintSheets
+            .map(({ request: req, group, lines: filteredLines }, rIdx) => {
               return (
-                <div key={req.id} className={`print-page text-black leading-tight bg-white ${rIdx > 0 ? 'page-break' : ''}`} style={{ width: '210mm', minHeight: '297mm', padding: '10mm 15mm', boxSizing: 'border-box', margin: '0 auto', fontFamily: '"Times New Roman", Times, serif' }}>
+                <div key={`${req.id}-${group}`} className={`print-page text-black leading-tight bg-white ${rIdx > 0 ? 'page-break' : ''}`} style={{ width: '210mm', minHeight: '297mm', padding: '10mm 15mm', boxSizing: 'border-box', margin: '0 auto', fontFamily: '"Times New Roman", Times, serif' }}>
                   {/* Header */}
                   <div className="print-header flex justify-between border-b-2 border-black pb-2 mb-5">
                     <div className="w-[35%] text-left">
@@ -1404,7 +1478,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                   {/* Title */}
                   <div className="text-center mb-6">
                     <h1 className="text-[20px] font-black uppercase tracking-widest break-words leading-tight underline underline-offset-8 decoration-slate-300">
-                      PHIẾU ĐỀ XUẤT VĂN PHÒNG PHẨM VÀ ĐỒ VỆ SINH
+                      {group === 'VS' ? 'PHIẾU ĐỀ XUẤT ĐỒ VỆ SINH' : 'PHIẾU ĐỀ XUẤT VĂN PHÒNG PHẨM'}
                     </h1>
                   </div>
 
@@ -1423,7 +1497,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                       <tr className="bg-gray-100">
                         <th style={{ width: '6%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>STT</th>
                         <th style={{ width: '12%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>Mã VT</th>
-                        <th style={{ width: '32%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>Tên Văn Phòng Phẩm / Đồ vệ sinh</th>
+                        <th style={{ width: '32%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>{group === 'VS' ? 'Tên Đồ vệ sinh' : 'Tên Văn phòng phẩm'}</th>
                         <th style={{ width: '7%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>ĐVT</th>
                         <th style={{ width: '7%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>SL</th>
                         <th style={{ width: '13%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>Đơn giá</th>
