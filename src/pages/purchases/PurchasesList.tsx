@@ -764,6 +764,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       if (activeTab === 'ORDERED') matchTab = d.status === 'ORDERED';
       if (activeTab === 'DELIVERING') matchTab = ['DELIVERING', 'PARTIALLY_DELIVERED'].includes(d.status);
       if (activeTab === 'COMPLETED') matchTab = d.status === 'COMPLETED';
+      if (activeTab.startsWith('STATUS:')) matchTab = d.status === activeTab.slice(7);
 
       let matchMonth = true;
       if (selectedMonth) {
@@ -2084,9 +2085,23 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   };
 
   // KPI Cards logic
-  const kpiPending = data.filter(d => d.status === 'PENDING_APPROVAL').length;
-  const kpiOrdered = data.filter(d => d.status === 'ORDERED').length;
-  const kpiDelivering = data.filter(d => ['DELIVERING', 'PARTIALLY_DELIVERED'].includes(d.status)).length;
+  const statusCounts = useMemo(() => {
+    const counts = data.reduce<Record<string, number>>((result, order) => {
+      result[order.status] = (result[order.status] || 0) + 1;
+      return result;
+    }, {});
+    return Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }, [data]);
+
+  const showStatusOrders = (status?: string) => {
+    setActiveTab(status ? `STATUS:${status}` : 'ALL');
+    setSearchTerm('');
+    setDepartmentFilter('ALL');
+    setSupplierFilter('ALL');
+    setSelectedMonth('');
+    setSelectedIds([]);
+    setPreviewPO(null);
+  };
   const totalAmount = data.filter(d => ['ORDERED', 'DELIVERING', 'PARTIALLY_DELIVERED', 'COMPLETED'].includes(d.status)).reduce((sum, d) => sum + Number(d.actualTotal || d.totalAmount || 0), 0);
 
   // Dashboard Print Helpers
@@ -2125,29 +2140,23 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
             <h1 className="text-2xl font-black text-slate-800 tracking-tight mb-4">Quản lý Mua sắm (Purchasing)</h1>
             
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition group" onClick={()=>setActiveTab('PENDING')}>
+                <button type="button" onClick={() => showStatusOrders()} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 text-left hover:border-indigo-400 transition focus-visible:outline-2 focus-visible:outline-indigo-600">
                     <div className="flex justify-between items-start mb-2">
-                        <div className="p-2.5 bg-amber-50 text-amber-500 rounded-lg group-hover:scale-110 transition shrink-0"><Clock className="w-5 h-5"/></div>
-                        <h3 className="text-2xl font-black text-slate-800">{kpiPending}</h3>
+                        <div className="p-2.5 bg-slate-100 text-slate-600 rounded-lg"><ShoppingCart className="w-5 h-5" /></div>
+                        <strong className="text-2xl font-black text-slate-800">{data.length}</strong>
                     </div>
-                    <p className="font-bold text-slate-500 text-[9px] uppercase tracking-widest">Chờ Duyệt Mua</p>
-                </div>
-
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition group" onClick={()=>setActiveTab('ORDERED')}>
-                    <div className="flex justify-between items-start mb-2">
-                        <div className="p-2.5 bg-indigo-50 text-indigo-500 rounded-lg group-hover:scale-110 transition shrink-0"><ShoppingCart className="w-5 h-5"/></div>
-                        <h3 className="text-2xl font-black text-slate-800">{kpiOrdered}</h3>
-                    </div>
-                    <p className="font-bold text-slate-500 text-[9px] uppercase tracking-widest">Chờ NCC Xác Nhận</p>
-                </div>
-
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition group" onClick={()=>setActiveTab('DELIVERING')}>
-                    <div className="flex justify-between items-start mb-2">
-                        <div className="p-2.5 bg-blue-50 text-blue-500 rounded-lg group-hover:scale-110 transition shrink-0"><Truck className="w-5 h-5"/></div>
-                        <h3 className="text-2xl font-black text-slate-800">{kpiDelivering}</h3>
-                    </div>
-                    <p className="font-bold text-slate-500 text-[9px] uppercase tracking-widest">Đang Giao Hàng</p>
-                </div>
+                    <span className="font-bold text-slate-500 text-[9px] uppercase tracking-widest">Tổng số phiếu mua sắm</span>
+                </button>
+                {statusCounts.map(([status, count]) => (
+                    <button key={status} type="button" aria-pressed={activeTab === `STATUS:${status}`} onClick={() => showStatusOrders(status)}
+                        className={`bg-white p-4 rounded-xl shadow-sm border text-left hover:border-indigo-400 transition focus-visible:outline-2 focus-visible:outline-indigo-600 ${activeTab === `STATUS:${status}` ? 'border-indigo-500 ring-2 ring-indigo-100' : 'border-slate-200'}`}>
+                        <div className="flex justify-between items-start mb-2">
+                            <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg"><ShoppingCart className="w-5 h-5" /></div>
+                            <strong className="text-2xl font-black text-slate-800">{count}</strong>
+                        </div>
+                        <div className="flex">{getStatusBadge(status)}</div>
+                    </button>
+                ))}
 
                 <div className="bg-gradient-to-br from-indigo-600 to-violet-700 p-4 rounded-xl shadow-lg shadow-indigo-500/30 text-white relative overflow-hidden">
                     <div className="absolute -right-4 -top-4 w-20 h-20 bg-white/10 rounded-full blur-xl"></div>
