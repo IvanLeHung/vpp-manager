@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect, useRef, type MouseEvent, type UIEvent } from 'react';
-import { Plus, Download, Search, FileText, CheckCircle, Clock, XCircle, ChevronLeft, ChevronRight, Eye, CheckSquare, GitBranch, Printer, ListChecks, ChevronDown, RotateCcw, FileSpreadsheet, CornerUpLeft, ArrowUpDown, ArrowUp, ArrowDown, CalendarDays, PackageOpen, Droplets, Boxes } from 'lucide-react';
+import { Plus, Download, Search, FileText, XCircle, ChevronLeft, ChevronRight, Eye, CheckSquare, GitBranch, Printer, ListChecks, ChevronDown, RotateCcw, FileSpreadsheet, CornerUpLeft, ArrowUpDown, ArrowUp, ArrowDown, CalendarDays, PackageOpen, Droplets, Boxes } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { Select } from 'antd';
+import { Dropdown, Select } from 'antd';
+import { flushSync } from 'react-dom';
 import type { VPPRequest, User } from '../../context/AppContext';
 import { useAppContext } from '../../context/AppContext';
 import api from '../../lib/api';
@@ -68,6 +69,7 @@ function normalizeSearchText(value: any) {
 }
 
 type RequestSupplyGroup = 'VPP' | 'VS' | 'VPP+VS';
+type PrintableRequest = VPPRequest & { approvalHistories: any[] };
 type RequestSortKey = 'id' | 'requester' | 'items' | 'supplyGroup' | 'status';
 
 function getItemSupplyGroup(item: any): 'VPP' | 'VS' {
@@ -136,6 +138,10 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH'>('ALL');
   const [printMode, setPrintMode] = useState<'SUMMARY' | 'INDIVIDUAL'>('SUMMARY');
+  const [printRequests, setPrintRequests] = useState<PrintableRequest[]>([]);
+  const [individualPrintType, setIndividualPrintType] = useState<'ALL' | 'VPP' | 'VS'>('ALL');
+  const [preparingPrint, setPreparingPrint] = useState(false);
+  const preparingPrintRef = useRef(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [isSubmittingBatch, setIsSubmittingBatch] = useState(false);
   const [previewReq, setPreviewReq] = useState<VPPRequest | null>(null);
@@ -675,9 +681,11 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     };
   }, [requests, filteredRequests, selectedIds, masterItems]);
 
-  const individualPrintSheets = useMemo(() => requests
-    .filter(request => selectedIds.includes(request.id))
+  const individualPrintSheets = useMemo(() => printRequests
     .flatMap(request => {
+      if (individualPrintType === 'ALL') {
+        return [{ request, group: 'ALL', lines: sortLinesForPrinting(request.lines || []) }];
+      }
       const linesByGroup: Record<'VPP' | 'VS', any[]> = { VPP: [], VS: [] };
       sortLinesForPrinting(request.lines || []).forEach((line: any) => {
         const item = line.replacementItemId && line.replacementItem
@@ -686,9 +694,51 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         if (item) linesByGroup[getItemSupplyGroup(item)].push(line);
       });
       return (['VPP', 'VS'] as const)
-        .filter(group => linesByGroup[group].length > 0)
+        .filter(group => group === individualPrintType && linesByGroup[group].length > 0)
         .map(group => ({ request, group, lines: linesByGroup[group] }));
-    }), [requests, selectedIds]);
+    }), [printRequests, individualPrintType]);
+
+  const handlePrintIndividuals = async (type: 'ALL' | 'VPP' | 'VS') => {
+    if (preparingPrintRef.current || !selectedIds.length) return;
+    preparingPrintRef.current = true;
+    setPreparingPrint(true);
+    try {
+      const ids = [...selectedIds];
+      const details: PrintableRequest[] = new Array(ids.length);
+      let next = 0;
+      await Promise.all(Array.from({ length: Math.min(4, ids.length) }, async () => {
+        while (next < ids.length) {
+          const index = next++;
+          const response = await api.get(`/requests/${encodeURIComponent(ids[index])}`);
+          const detail = response.data?.data || response.data;
+          if (!detail?.id || !Array.isArray(detail.lines) || !Array.isArray(detail.approvalHistories)) {
+            throw new Error(`Không tải đủ chi tiết và lịch sử phiếu ${ids[index]}`);
+          }
+          details[index] = { ...detail, approvalHistories: [...detail.approvalHistories]
+            .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) };
+        }
+      }));
+      const hasItems = details.some(request => request.lines?.some((line: any) =>
+        type === 'ALL' || getItemSupplyGroup(line.replacementItemId && line.replacementItem
+          ? line.replacementItem : line.issue_item || line.item) === type));
+      if (!hasItems) {
+        showToast('Các phiếu đã chọn không có vật tư thuộc nhóm cần in.', 'warning');
+        return;
+      }
+      flushSync(() => {
+        setPrintRequests(details);
+        setIndividualPrintType(type);
+        setPrintMode('INDIVIDUAL');
+      });
+      await document.fonts.ready;
+      window.print();
+    } catch (error: any) {
+      showToast(error.message || 'Không tải được đầy đủ lịch sử để in. Vui lòng thử lại.', 'error');
+    } finally {
+      preparingPrintRef.current = false;
+      setPreparingPrint(false);
+    }
+  };
 
   const handlePrintSummary = (type: 'ALL' | 'VPP' | 'VE_SINH' = 'ALL') => {
     setPrintMode('SUMMARY');
@@ -986,17 +1036,18 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                 <button onClick={handleExportExcel} className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white font-black rounded-lg text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition" title="Tự tách thành sheet VPP và Vệ sinh">
                   <FileSpreadsheet className="w-3.5 h-3.5"/> Excel VPP / VS
                 </button>
-                <button 
-                  onClick={() => {
-                    setPrintMode('INDIVIDUAL');
-                    setTimeout(() => {
-                      window.print();
-                    }, 100);
-                  }} 
-                  className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white font-black rounded-lg text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition"
-                >
-                  <Printer className="w-3.5 h-3.5"/> In PDF VPP / VS
-                </button>
+                <Dropdown trigger={['click']} disabled={preparingPrint} menu={{
+                  items: [
+                    { key: 'VPP', label: 'In VPP' },
+                    { key: 'VS', label: 'In VS' },
+                    { key: 'ALL', label: 'In tổng hợp (VPP + VS)' },
+                  ],
+                  onClick: ({ key }) => { void handlePrintIndividuals(key as 'ALL' | 'VPP' | 'VS'); },
+                }}>
+                  <button type="button" disabled={preparingPrint} className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white font-black rounded-lg text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition disabled:opacity-60">
+                    <Printer className="w-3.5 h-3.5"/> {preparingPrint ? 'Đang tải lịch sử…' : 'In PDF'} <ChevronDown className="w-3.5 h-3.5" />
+                  </button>
+                </Dropdown>
                 <div className="h-4 w-[1px] bg-white/20 mx-1"></div>
                 <button onClick={toggleBulkMode} className="p-1.5 hover:bg-white/10 rounded-lg transition" title="Ẩn ô chọn">
                   <XCircle className="w-4 h-4"/>
@@ -1297,6 +1348,9 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
               color: #000 !important;
               background: #fff !important;
             }
+            .print-page thead { display: table-header-group; }
+            .print-page tr { break-inside: avoid; page-break-inside: avoid; }
+            .print-page td { overflow-wrap: anywhere; white-space: pre-wrap; }
           }
         `}} />
         {printMode === 'SUMMARY' ? (
@@ -1466,7 +1520,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                   {/* Title */}
                   <div className="text-center mb-6">
                     <h1 className="text-[20px] font-black uppercase tracking-widest break-words leading-tight underline underline-offset-8 decoration-slate-300">
-                      {group === 'VS' ? 'PHIẾU ĐỀ XUẤT ĐỒ VỆ SINH' : 'PHIẾU ĐỀ XUẤT VĂN PHÒNG PHẨM'}
+                      {group === 'ALL' ? 'PHIẾU ĐỀ XUẤT VĂN PHÒNG PHẨM VÀ ĐỒ VỆ SINH' : group === 'VS' ? 'PHIẾU ĐỀ XUẤT ĐỒ VỆ SINH' : 'PHIẾU ĐỀ XUẤT VĂN PHÒNG PHẨM'}
                     </h1>
                   </div>
 
@@ -1485,7 +1539,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                       <tr className="bg-gray-100">
                         <th style={{ width: '6%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>STT</th>
                         <th style={{ width: '12%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>Mã VT</th>
-                        <th style={{ width: '32%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>{group === 'VS' ? 'Tên Đồ vệ sinh' : 'Tên Văn phòng phẩm'}</th>
+                        <th style={{ width: '32%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>{group === 'ALL' ? 'Tên Vật tư / Hàng hóa' : group === 'VS' ? 'Tên Đồ vệ sinh' : 'Tên Văn phòng phẩm'}</th>
                         <th style={{ width: '7%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>ĐVT</th>
                         <th style={{ width: '7%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>SL</th>
                         <th style={{ width: '13%', border: '1.5px solid #000', padding: '6px 8px', fontSize: '11px', fontWeight: 'bold', textAlign: 'center' }}>Đơn giá</th>
@@ -1495,7 +1549,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                     </thead>
                     <tbody>
                       {filteredLines.map((l: any, idx: number) => {
-                        const displayItem = l.replacementItem || l.item;
+                        const displayItem = l.replacementItemId && l.replacementItem ? l.replacementItem : l.issue_item || l.item;
                         const isReplaced = !!l.replacementItemId;
                         const displayQtyRequested = l.qtyRequested;
                         const displayQtyApproved = l.replacementQty ?? l.qtyApproved;
@@ -1557,7 +1611,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                   </table>
 
                   {/* Signatures */}
-                  <div className="print-signatures grid grid-cols-5 gap-1 mt-4" style={{ display: 'grid', gridTemplateCols: 'repeat(5, 1fr)', pageBreakInside: 'avoid' }}>
+                  <div className="print-signatures grid grid-cols-5 gap-1 mt-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', pageBreakInside: 'avoid' }}>
                     <div className="text-center text-[9.5px]">
                       <p className="mb-1 uppercase font-bold text-black">Người đề xuất</p>
                       <p className="text-[9px] font-normal italic mb-4 text-black">(Ký và ghi họ tên)</p>
@@ -1653,7 +1707,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                   </div>
 
                   {/* Audit Trail Section for Print */}
-                  <div className="mt-8 border-t border-slate-300 pt-4" style={{ pageBreakInside: 'avoid' }}>
+                  <div className="mt-8 border-t border-slate-300 pt-4">
                     <h3 className="text-[10px] font-black uppercase mb-2 text-slate-800 tracking-wider flex items-center">
                       <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full mr-2"></span>
                       Lịch sử Xử lý (Audit Trail)
@@ -1697,7 +1751,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                               <RequestHistoryActor history={h} requester={req.requester} showAdminSuffix />
                             </td>
                             <td style={{ border: '0.7px solid #000', padding: '3px 4px', fontSize: '9px' }}>
-                              <span className="font-bold">{getApprovalActionLabel(h.action)}</span>
+                              <span className="font-bold">{getApprovalActionLabel(h.action) === 'Cập nhật quy trình' ? h.action : getApprovalActionLabel(h.action)}</span>
                             </td>
                             <td style={{ border: '0.7px solid #000', padding: '3px 4px', fontStyle: 'italic', fontSize: '9px' }}>
                               {h.reason || '—'}
@@ -1710,7 +1764,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
 
                   <div className="mt-8 pt-4 border-t border-slate-200 text-[10px] text-[#555] flex justify-between print-info" style={{ pageBreakInside: 'avoid' }}>
                     <p>Ngày in: {new Date().toLocaleString('vi-VN')} • Mã tra cứu: {req.id}</p>
-                    <p>Hệ thống Quản lý VPP - {req.id} • Trang 1/1</p>
+                    <p>Hệ thống Quản lý VPP - {req.id}</p>
                   </div>
                 </div>
               );
