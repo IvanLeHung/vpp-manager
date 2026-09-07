@@ -29,6 +29,7 @@ import {
 import { useAppContext } from '../context/AppContext';
 import ProfileDialog from '../components/ProfileDialog';
 import NotificationBell from '../components/NotificationBell';
+import LookupAssistant from '../components/LookupAssistant';
 
 type SidebarState = 'visible' | 'hidden';
 type NavMode = 'full' | 'rail';
@@ -374,6 +375,7 @@ export default function MainLayout() {
         </header>
 
         <ProfileDialog isOpen={showProfileDialog} onClose={() => setShowProfileDialog(false)} initialTab={dialogTab} />
+        {currentUser && <LookupAssistant key={`${currentUser.id}-${currentUser.role}`} role={currentUser.role} />}
 
         <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50 flex flex-col print:h-auto print:overflow-visible print:bg-white min-w-0">
           <Outlet />
