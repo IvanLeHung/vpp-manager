@@ -6,6 +6,7 @@ import { flushSync } from 'react-dom';
 import type { VPPRequest, User } from '../../context/AppContext';
 import { useAppContext } from '../../context/AppContext';
 import api from '../../lib/api';
+import { togglePageSelection } from '../../lib/pageSelection';
 import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
 import MonthlyApprovalHistoryTooltip from '../../components/MonthlyApprovalHistoryTooltip';
 import ReopenAdminApprovalAction from '../../components/ReopenAdminApprovalAction';
@@ -411,39 +412,25 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
 
 
   const toggleSelectAll = () => {
-    if (selectedMode === 'ALL_FILTERED') {
-      setSelectedMode('NONE');
-      setSelectedIds([]);
-    } else if (selectedIds.length === currentData.length && currentData.length !== 0) {
-      setSelectedMode('NONE');
-      setSelectedIds([]);
-    } else {
-      setSelectedMode('MANUAL');
-      setSelectedIds(currentData.map(r => r.id));
-    }
+    setSelectedMode('MANUAL');
+    setSelectedIds(prev => togglePageSelection(prev, currentData.map(r => r.id)));
   };
 
   const selectAllFiltered = () => {
-    setSelectedMode('ALL_FILTERED');
-    setSelectedIds([]); // Clear manual ids since ALL_FILTERED overrides
+    setSelectedMode('MANUAL');
+    setSelectedIds(filteredRequests.map(r => r.id));
     setShowHeaderMenu(false);
   };
 
   const selectByStatus = (status: string) => {
+    setSelectedMode('MANUAL');
     setSelectedIds(filteredRequests.filter(r => r.status === status).map(r => r.id));
     setShowHeaderMenu(false);
   };
 
   const toggleSelect = (id: string) => {
-     if (selectedMode === 'ALL_FILTERED') {
-         // If they were in ALL_FILTERED and uncheck one, we fall back to MANUAL (which is hard to calculate exactly without all IDs, so we just reset)
-         setSelectedMode('MANUAL');
-         const allIds = filteredRequests.map(r => r.id);
-         setSelectedIds(allIds.filter(x => x !== id));
-     } else {
-         setSelectedMode('MANUAL');
-         setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-     }
+     setSelectedMode('MANUAL');
+     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
   const toggleBulkMode = () => {
@@ -1066,7 +1053,11 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                                   <input 
                                     type="checkbox" 
                                     disabled={currentData.length === 0} 
-                                    checked={selectedIds.length > 0 && currentData.every(r => selectedIds.includes(r.id))} 
+                                    checked={currentData.length > 0 && currentData.every(r => selectedIds.includes(r.id))}
+                                    ref={element => {
+                                      if (element) element.indeterminate = currentData.some(r => selectedIds.includes(r.id))
+                                        && !currentData.every(r => selectedIds.includes(r.id));
+                                    }}
                                     onChange={toggleSelectAll} 
                                     className="w-4 h-4 rounded border-slate-300 text-indigo-600 cursor-pointer" 
                                   />
