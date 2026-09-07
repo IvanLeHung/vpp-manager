@@ -306,13 +306,31 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   }, [statusFilters, searchTerm, deptFilter, priorityFilter, createdDateMode, createdDateFilter, createdDateRangeStart, createdDateRangeEnd]);
 
   const stats = useMemo(() => {
+    const visibleRequests = currentUser.role === 'EMPLOYEE'
+      ? requests.filter(req => req.requesterId === currentUid || req.requester?.fullName === currentUser.name)
+      : requests;
+    const counts = visibleRequests.reduce<Record<string, number>>((result, request) => {
+      result[request.status] = (result[request.status] || 0) + 1;
+      return result;
+    }, {});
     return {
-      total: requests.length,
-      pending: requests.filter(r => r.status.startsWith('PENDING')).length,
-      approved: requests.filter(r => r.status === 'APPROVED' || r.status === 'READY_TO_ISSUE').length,
-      rejected: requests.filter(r => r.status === 'REJECTED').length
-    }
-  }, [requests]);
+      total: visibleRequests.length,
+      statuses: Object.entries(counts)
+        .map(([status, count]) => ({ status, count, label: getRequestStatusLabel(status) }))
+        .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'vi')),
+    };
+  }, [requests, currentUser.role, currentUser.name, currentUid]);
+
+  const showStatusRequests = (status?: string) => {
+    setStatusFilters(status ? [status] : []);
+    setSearchTerm('');
+    setDeptFilter('ALL');
+    setPriorityFilter('ALL');
+    clearCreatedDateFilter();
+    setShowDateCalendar(false);
+    setCurrentPage(1);
+    setPreviewReq(null);
+  };
 
   const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
   const currentData = filteredRequests.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -764,38 +782,22 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         </div>
       </div>
 
-      <div className="no-print grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 shrink-0">
-         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center">
-            <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mr-4"><FileText className="w-6 h-6 text-slate-600"/></div>
-            <div>
-               <p className="text-sm font-bold text-slate-500">Tổng số phiếu</p>
-               <h3 className="text-2xl font-black text-slate-800">{stats.total}</h3>
-            </div>
-         </div>
-         <div className="bg-white p-5 rounded-2xl shadow-sm border border-amber-200 relative overflow-hidden flex items-center">
-            <div className="absolute top-0 left-0 w-1 h-full bg-amber-400"></div>
-            <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center mr-4"><Clock className="w-6 h-6 text-amber-500"/></div>
-            <div>
-               <p className="text-sm font-bold text-amber-700">Đang chờ duyệt</p>
-               <h3 className="text-2xl font-black text-amber-600">{stats.pending}</h3>
-            </div>
-         </div>
-         <div className="bg-white p-5 rounded-2xl shadow-sm border border-emerald-200 flex items-center relative overflow-hidden">
-             <div className="absolute top-0 left-0 w-1 h-full bg-emerald-400"></div>
-            <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center mr-4"><CheckCircle className="w-6 h-6 text-emerald-500"/></div>
-            <div>
-               <p className="text-sm font-bold text-emerald-700">Kho sẵn sàng cấp</p>
-               <h3 className="text-2xl font-black text-emerald-600">{stats.approved}</h3>
-            </div>
-         </div>
-         <div className="bg-white p-5 rounded-2xl shadow-sm border border-rose-200 flex items-center relative overflow-hidden">
-             <div className="absolute top-0 left-0 w-1 h-full bg-rose-400"></div>
-            <div className="w-12 h-12 rounded-xl bg-rose-50 flex items-center justify-center mr-4"><XCircle className="w-6 h-6 text-rose-500"/></div>
-            <div>
-               <p className="text-sm font-bold text-rose-700">Phiếu bị từ chối</p>
-               <h3 className="text-2xl font-black text-rose-600">{stats.rejected}</h3>
-            </div>
-         </div>
+      <div className="no-print grid grid-cols-1 gap-3 mb-6 shrink-0 sm:grid-cols-2 xl:grid-cols-4">
+        <button type="button" onClick={() => showStatusRequests()} className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-indigo-400 focus-visible:outline-2 focus-visible:outline-indigo-600">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-slate-100"><FileText className="h-5 w-5 text-slate-600" /></span>
+          <span><span className="block text-sm font-bold text-slate-500">Tổng số phiếu</span><strong className="block text-2xl font-black text-slate-800">{stats.total}</strong></span>
+        </button>
+        {stats.statuses.map(({ status, count, label }) => {
+          const active = statusFilters.length === 1 && statusFilters[0] === status;
+          return (
+            <button key={status} type="button" aria-pressed={active} onClick={() => showStatusRequests(status)}
+              className={`flex items-center gap-4 rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:border-indigo-400 focus-visible:outline-2 focus-visible:outline-indigo-600 ${active ? 'border-indigo-500 ring-2 ring-indigo-100' : 'border-slate-200'}`}
+              title={`Xem ${count} phiếu: ${label}`}>
+              <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${getStatusColor(status)}`}><FileText className="h-5 w-5" /></span>
+              <span className="min-w-0"><span className="block text-sm font-bold text-slate-600">{label}</span><strong className="block text-2xl font-black text-slate-800">{count}</strong></span>
+            </button>
+          );
+        })}
       </div>
       </div>
       </div>
