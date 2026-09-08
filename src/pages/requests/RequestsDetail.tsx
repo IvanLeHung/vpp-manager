@@ -197,11 +197,29 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
   const [quantityCorrection, setQuantityCorrection] = useState<null | {
     lineId: string;
     itemName: string;
+    mode: 'quantity' | 'details';
+    itemId: string;
+    rowVersion: number;
+    unitPrice: string;
     qtyAdminApproved: number;
     qtyDelivered: number;
     reason: string;
   }>(null);
   const [savingQuantityCorrection, setSavingQuantityCorrection] = useState(false);
+  const [correctionSearch, setCorrectionSearch] = useState('');
+  const [correctionItems, setCorrectionItems] = useState<any[]>([]);
+  const [correctionSearchError, setCorrectionSearchError] = useState('');
+  useEffect(() => {
+    if (quantityCorrection?.mode !== 'details' || !correctionSearch.trim()) { setCorrectionItems([]); return; }
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      setCorrectionSearchError('');
+      api.get('/items', { params: { q: correctionSearch.trim() }, signal: controller.signal })
+        .then(response => { if (!controller.signal.aborted) setCorrectionItems(Array.isArray(response.data) ? response.data : []); })
+        .catch(() => { if (!controller.signal.aborted) setCorrectionSearchError('Không tải được danh mục. Vui lòng thử lại.'); });
+    }, 300);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [correctionSearch, quantityCorrection?.mode]);
   const [showAddLineModal, setShowAddLineModal] = useState(false);
   const [addLineSearch, setAddLineSearch] = useState('');
   const [addLineResults, setAddLineResults] = useState<any[]>([]);
@@ -316,8 +334,11 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
   };
 
   const saveQuantityCorrection = async () => {
-    if (!quantityCorrection) return;
-    if (quantityCorrection.qtyDelivered > quantityCorrection.qtyAdminApproved) {
+    if (!quantityCorrection || savingQuantityCorrection) return;
+    if (quantityCorrection.mode === 'details' && (!quantityCorrection.unitPrice.trim() || !Number.isFinite(Number(quantityCorrection.unitPrice)) || Number(quantityCorrection.unitPrice) < 0)) {
+      showToast('Nhập đơn giá hợp lệ, không âm.', 'error'); return;
+    }
+    if (quantityCorrection.mode === 'quantity' && quantityCorrection.qtyDelivered > quantityCorrection.qtyAdminApproved) {
       showToast('Số lượng thực giao không được lớn hơn số lượng Admin duyệt', 'error');
       return;
     }
@@ -327,12 +348,16 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
     }
     try {
       setSavingQuantityCorrection(true);
-      await api.patch(`/requests/${requestId}/lines/${quantityCorrection.lineId}/correct-quantities`, {
+      if (quantityCorrection.mode === 'details') {
+        await api.patch(`/requests/${requestId}/lines/${quantityCorrection.lineId}/correct-details`, {
+          itemId: quantityCorrection.itemId, unitPrice: Number(quantityCorrection.unitPrice), rowVersion: quantityCorrection.rowVersion, reason: quantityCorrection.reason.trim(),
+        });
+      } else await api.patch(`/requests/${requestId}/lines/${quantityCorrection.lineId}/correct-quantities`, {
         qtyAdminApproved: Number(quantityCorrection.qtyAdminApproved),
         qtyDelivered: Number(quantityCorrection.qtyDelivered),
         reason: quantityCorrection.reason.trim(),
       });
-      showToast(`Đã hiệu chỉnh số lượng “${quantityCorrection.itemName}”`, 'success');
+      showToast(`Đã hiệu chỉnh “${quantityCorrection.itemName}”`, 'success');
       setQuantityCorrection(null);
       await fetchDetail();
       await refreshData();
@@ -748,7 +773,11 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                 type="button"
                 onClick={() => setQuantityCorrection({
                   lineId: l.id,
-                  itemName: (l.issue_item || l.item).name,
+                  itemName: (l.replacementItem || l.item).name,
+                  mode: 'quantity',
+                  itemId: l.replacementItemId || l.itemId || l.item.id,
+                  rowVersion: l.rowVersion,
+                  unitPrice: String(getRequestLineUnitPrice(l)),
                   qtyAdminApproved: Number(l.qtyAdminApproved ?? l.qtyApproved ?? 0),
                   qtyDelivered: Number(l.qtyDelivered ?? 0),
                   reason: '',
@@ -2860,17 +2889,32 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
        
        {quantityCorrection && (
          <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+           <div role="dialog" aria-label="Hiệu chỉnh vật tư" className="max-h-[90dvh] overflow-y-auto w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
              <div className="mb-5 flex items-start justify-between gap-4">
                <div>
-                 <h3 className="text-lg font-black text-slate-900">Hiệu chỉnh số lượng</h3>
+                 <h3 className="text-lg font-black text-slate-900">Hiệu chỉnh vật tư</h3>
                  <p className="mt-1 text-xs font-bold text-slate-500">{quantityCorrection.itemName}</p>
                </div>
-               <button type="button" onClick={() => setQuantityCorrection(null)} className="text-slate-400 hover:text-slate-700">
+               <button type="button" disabled={savingQuantityCorrection} onClick={() => setQuantityCorrection(null)} className="text-slate-400 hover:text-slate-700">
                  <XCircle className="h-6 w-6" />
                </button>
              </div>
-             <div className="grid grid-cols-2 gap-4">
+             <div className="mb-4 flex gap-2">
+               {(['quantity', 'details'] as const).map(mode => <button type="button" key={mode} disabled={savingQuantityCorrection} onClick={() => { setCorrectionSearch(''); setCorrectionItems([]); setQuantityCorrection({ ...quantityCorrection, mode }); }} className={`rounded-lg px-3 py-2 text-xs font-bold ${quantityCorrection.mode === mode ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{mode === 'quantity' ? 'Số lượng' : 'Đơn giá / Đổi vật tư'}</button>)}
+             </div>
+             <p className="mb-3 text-xs text-slate-500">Mỗi lần lưu chỉ áp dụng cho thẻ đang chọn.</p>
+             {quantityCorrection.mode === 'details' ? <div className="space-y-3">
+               <p className="text-xs text-slate-500">Hiệu chỉnh trên phiếu đề xuất, không đổi giá danh mục, tồn kho hay chứng từ mua/giao hàng đã lập. Đổi vật tư chỉ khi chưa phát sinh mua sắm/giữ hàng/xuất kho, cùng nhóm và đơn vị tính.</p>
+               <label className="block text-xs font-bold text-slate-600">Tìm vật tư thay thế
+                 <input value={correctionSearch} disabled={savingQuantityCorrection} onChange={e => setCorrectionSearch(e.target.value)} placeholder="Nhập mã hoặc tên vật tư…" className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2" />
+               </label>
+               {correctionSearchError && <p role="alert" className="text-xs text-rose-600">{correctionSearchError}</p>}
+               <div className="max-h-32 overflow-y-auto space-y-1">{correctionItems.slice(0, 30).map(item => <button type="button" disabled={savingQuantityCorrection} key={item.id} onClick={() => { setQuantityCorrection({ ...quantityCorrection, itemId: item.id, itemName: item.name, unitPrice: String(item.price ?? 0) }); setCorrectionSearch(''); setCorrectionItems([]); }} className="w-full rounded-lg border border-slate-200 p-2 text-left text-xs hover:bg-indigo-50">{item.mvpp} · {item.name} ({item.unit})</button>)}</div>
+               <p className="text-xs font-semibold text-indigo-700">Đang chọn: {quantityCorrection.itemName}</p>
+               <label className="block text-xs font-bold text-slate-600">Đơn giá trên phiếu (đ) *
+                 <input type="number" min="0" step="0.01" disabled={savingQuantityCorrection} value={quantityCorrection.unitPrice} onChange={e => setQuantityCorrection({ ...quantityCorrection, unitPrice: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2" />
+               </label>
+             </div> : <div className="grid grid-cols-2 gap-4">
                <label className="text-xs font-black text-slate-600">
                  Admin duyệt
                  <input
@@ -2894,6 +2938,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                  />
                </label>
              </div>
+             }
              <label className="mt-4 block text-xs font-black text-slate-600">
                Lý do hiệu chỉnh
                <textarea
@@ -2904,7 +2949,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                />
              </label>
              <div className="mt-6 flex justify-end gap-3">
-               <button type="button" onClick={() => setQuantityCorrection(null)} className="rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-black text-slate-600">Hủy</button>
+               <button type="button" disabled={savingQuantityCorrection} onClick={() => setQuantityCorrection(null)} className="rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-black text-slate-600">Hủy</button>
                <button type="button" disabled={savingQuantityCorrection} onClick={saveQuantityCorrection} className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-black text-white disabled:opacity-50">
                  {savingQuantityCorrection ? 'Đang lưu...' : 'Lưu hiệu chỉnh'}
                </button>
