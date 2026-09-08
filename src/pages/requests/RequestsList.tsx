@@ -153,16 +153,21 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     setPreviewReq(previous => previous ? requests.find(request => request.id === previous.id) || null : null);
   }, [requests]);
   const [isHeaderCompact, setIsHeaderCompact] = useState(false);
+  const [isListAtBottom, setIsListAtBottom] = useState(false);
   const listScrollFrameRef = useRef<number | null>(null);
   const itemsPerPage = 15;
 
   const handleListScroll = (event: UIEvent<HTMLDivElement>) => {
-    const scrollTop = event.currentTarget.scrollTop;
+    const list = event.currentTarget;
+    const scrollTop = list.scrollTop;
+    const maxScrollTop = Math.max(0, list.scrollHeight - list.clientHeight);
+    const atBottom = maxScrollTop > 0 && scrollTop >= maxScrollTop - 8;
     if (listScrollFrameRef.current !== null) cancelAnimationFrame(listScrollFrameRef.current);
     listScrollFrameRef.current = requestAnimationFrame(() => {
       // Use hysteresis and a binary state: continuously resizing the flex/grid
       // header on every pixel changes the scroll height and causes visible jitter.
-      const nextCompact = scrollTop >= 96 ? true : scrollTop <= 24 ? false : null;
+      setIsListAtBottom(previous => previous === atBottom ? previous : atBottom);
+      const nextCompact = atBottom || scrollTop >= 96 ? true : scrollTop <= 24 ? false : null;
       if (nextCompact !== null) {
         setIsHeaderCompact(previous => previous === nextCompact ? previous : nextCompact);
       }
@@ -788,7 +793,9 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
           transform: isHeaderCompact ? 'translateY(-12px)' : 'translateY(0)',
           pointerEvents: isHeaderCompact ? 'none' : 'auto',
           willChange: 'grid-template-rows, opacity, transform',
-          transition: 'grid-template-rows 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease, transform 420ms cubic-bezier(0.22, 1, 0.36, 1)',
+          transition: isListAtBottom
+            ? 'none'
+            : 'grid-template-rows 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease, transform 420ms cubic-bezier(0.22, 1, 0.36, 1)',
         }}
       >
       <div className="min-h-0 overflow-hidden">
