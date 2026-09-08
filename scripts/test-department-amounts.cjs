@@ -36,6 +36,19 @@ test('empty selection and fractional money', () => {
   assert.deepEqual(summarize([]), { rows: [], requestCount: 0, totalAmount: 0 });
   assert.equal(summarize([{ id: 'p', lines: [{ qtyDelivered: 1, unitPrice: 0.1 }, { qtyDelivered: 1, unitPrice: 0.2 }] }]).totalAmount, 0.3);
 });
+test('sorts departments by descending amount, retaining their receipt counts', () => {
+  const report = summarize([
+    { id: '1', department: 'A', lines: [{ qtyDelivered: 1, unitPrice: 10 }] },
+    { id: '2', department: 'Z', lines: [{ qtyDelivered: 1, unitPrice: 90 }] },
+    { id: '3', department: 'Z', lines: [{ qtyDelivered: 1, unitPrice: 10 }] },
+    { id: '4', department: 'B', lines: [{ qtyDelivered: 1, unitPrice: 10 }] },
+    { id: '5', department: 'C', lines: [] },
+  ]);
+  assert.deepEqual(report.rows.map(row => [row.department, row.amount, row.requestCount]), [
+    ['Z', 100, 2], ['A', 10, 1], ['B', 10, 1], ['C', 0, 1],
+  ]);
+  assert.equal(report.totalAmount, 120);
+});
 test('menu invokes hydrated selected-id print path and separate report', () => {
   const source = fs.readFileSync(path.resolve(__dirname, '../src/pages/requests/RequestsList.tsx'), 'utf8');
   assert.ok(source.includes("{ key: 'DEPARTMENT', label: 'Tổng hợp phòng ban – số tiền' }"));

@@ -17,6 +17,6 @@ export function summarizeDepartmentAmounts(requests: any[]) {
     groups.set(key, group);
   }
   const rows = [...groups.values()].map(row => ({ ...row, amount: row.amount / 100 }))
-    .sort((a, b) => a.department.localeCompare(b.department, 'vi'));
+    .sort((a, b) => b.amount - a.amount || a.department.localeCompare(b.department, 'vi'));
   return { rows, requestCount: seen.size, totalAmount: Math.round(rows.reduce((sum, row) => sum + Math.round(row.amount * 100), 0)) / 100 };
 }
