@@ -1068,7 +1068,11 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             </div>
           )}
           {/* Table */}
-          <div onScroll={handleListScroll} className="flex-1 overflow-auto custom-scrollbar">
+          <div
+            onScroll={handleListScroll}
+            className="flex-1 overflow-auto custom-scrollbar"
+            style={{ overflowAnchor: 'none' }}
+          >
               <table className="w-full text-left whitespace-nowrap">
                   <thead className="bg-white border-b border-slate-200 sticky top-0 z-10">
                       <tr className="text-[10px] uppercase font-bold text-slate-400 tracking-widest bg-slate-50/80">

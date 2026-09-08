@@ -56,5 +56,6 @@ test('request list header uses hysteresis and a binary transition instead of per
   assert.ok(source.includes('scrollTop >= 96 ? true : scrollTop <= 24 ? false : null'));
   assert.ok(source.includes("gridTemplateRows: isHeaderCompact ? '0fr' : '1fr'"));
   assert.ok(source.includes('transition: \'grid-template-rows 420ms'));
+  assert.ok(source.includes("overflowAnchor: 'none'"));
   assert.ok(!source.includes('setListCompactProgress'));
 });
