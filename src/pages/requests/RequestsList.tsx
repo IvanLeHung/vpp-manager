@@ -11,6 +11,7 @@ import { GoodsNameWithPreview } from '../../components/GoodsNameWithPreview';
 import MonthlyApprovalHistoryTooltip from '../../components/MonthlyApprovalHistoryTooltip';
 import ReopenAdminApprovalAction from '../../components/ReopenAdminApprovalAction';
 import RequestHistoryActor from '../../components/RequestHistoryActor';
+import DepartmentAmountPrint from '../../components/DepartmentAmountPrint';
 import type { RequestSupplyType, ViewMode } from '../Requests';
 import { getApprovalActionLabel, getRequestStatusLabel } from '../../lib/statusLabels';
 import { getOriginalRequestLineUnitPrice, getRequestLineAmount, getRequestLineUnitPrice, getRequestLineDeliveredQuantity } from '../../lib/requestPricing';
@@ -138,7 +139,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   const [selectedMode, setSelectedMode] = useState<'NONE' | 'MANUAL' | 'ALL_FILTERED'>('NONE');
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH'>('ALL');
-  const [printMode, setPrintMode] = useState<'SUMMARY' | 'INDIVIDUAL'>('SUMMARY');
+  const [printMode, setPrintMode] = useState<'SUMMARY' | 'INDIVIDUAL' | 'DEPARTMENT'>('SUMMARY');
   const [printRequests, setPrintRequests] = useState<PrintableRequest[]>([]);
   const [individualPrintType, setIndividualPrintType] = useState<'ALL' | 'VPP' | 'VS'>('ALL');
   const [preparingPrint, setPreparingPrint] = useState(false);
@@ -688,7 +689,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         .map(group => ({ request, group, lines: linesByGroup[group] }));
     }), [printRequests, individualPrintType]);
 
-  const handlePrintIndividuals = async (type: 'ALL' | 'VPP' | 'VS') => {
+  const handlePrintIndividuals = async (type: 'ALL' | 'VPP' | 'VS' | 'DEPARTMENT') => {
     if (preparingPrintRef.current || !selectedIds.length) return;
     preparingPrintRef.current = true;
     setPreparingPrint(true);
@@ -711,14 +712,14 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
       const hasItems = details.some(request => request.lines?.some((line: any) =>
         type === 'ALL' || getItemSupplyGroup(line.replacementItemId && line.replacementItem
           ? line.replacementItem : line.issue_item || line.item) === type));
-      if (!hasItems) {
+      if (!hasItems && type !== 'DEPARTMENT') {
         showToast('Các phiếu đã chọn không có vật tư thuộc nhóm cần in.', 'warning');
         return;
       }
       flushSync(() => {
         setPrintRequests(details);
-        setIndividualPrintType(type);
-        setPrintMode('INDIVIDUAL');
+        setIndividualPrintType(type === 'DEPARTMENT' ? 'ALL' : type);
+        setPrintMode(type === 'DEPARTMENT' ? 'DEPARTMENT' : 'INDIVIDUAL');
       });
       await document.fonts.ready;
       window.print();
@@ -1031,8 +1032,9 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                     { key: 'VPP', label: 'In VPP' },
                     { key: 'VS', label: 'In VS' },
                     { key: 'ALL', label: 'In tổng hợp (VPP + VS)' },
+                    { key: 'DEPARTMENT', label: 'Tổng hợp phòng ban – số tiền' },
                   ],
-                  onClick: ({ key }) => { void handlePrintIndividuals(key as 'ALL' | 'VPP' | 'VS'); },
+                  onClick: ({ key }) => { void handlePrintIndividuals(key as 'ALL' | 'VPP' | 'VS' | 'DEPARTMENT'); },
                 }}>
                   <button type="button" disabled={preparingPrint} className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white font-black rounded-lg text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition disabled:opacity-60">
                     <Printer className="w-3.5 h-3.5"/> {preparingPrint ? 'Đang tải lịch sử…' : 'In PDF'} <ChevronDown className="w-3.5 h-3.5" />
@@ -1347,7 +1349,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             .print-page td { overflow-wrap: anywhere; white-space: pre-wrap; }
           }
         `}} />
-        {printMode === 'SUMMARY' ? (
+        {printMode === 'DEPARTMENT' ? <DepartmentAmountPrint requests={printRequests} /> : printMode === 'SUMMARY' ? (
           summaryGroups.groups
             .filter(g => selectedPrintType === 'ALL' || g.type === selectedPrintType)
             .map((group, gIdx) => (
