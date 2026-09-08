@@ -40,6 +40,17 @@ export function getRequestLineDeliveredQuantity(line: any): number {
   return Math.max(0, firstFiniteNumber(line?.qtyDelivered));
 }
 
+/** Quantity used by the approved request document after administrative corrections. */
+export function getRequestLineCorrectedQuantity(line: any): number {
+  return Math.max(0, firstFiniteNumber(
+    line?.replacementQty,
+    line?.qtyApproved,
+    line?.qtyAdminApproved,
+    line?.qtyManagerApproved,
+    line?.qtyRequested,
+  ));
+}
+
 export function getRequestLineAmount(line: any, quantity?: number | null): number {
   const effectiveQuantity = quantity
     ?? line?.replacementQty

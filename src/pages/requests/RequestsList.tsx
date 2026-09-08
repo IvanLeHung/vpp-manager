@@ -15,7 +15,7 @@ import DepartmentAmountPrint from '../../components/DepartmentAmountPrint';
 import { summarizeDepartmentAmounts, type DepartmentSupplyGroup } from '../../lib/departmentAmounts';
 import type { RequestSupplyType, ViewMode } from '../Requests';
 import { getApprovalActionLabel, getRequestStatusLabel } from '../../lib/statusLabels';
-import { getOriginalRequestLineUnitPrice, getRequestLineAmount, getRequestLineUnitPrice, getRequestLineDeliveredQuantity } from '../../lib/requestPricing';
+import { getOriginalRequestLineUnitPrice, getRequestLineAmount, getRequestLineUnitPrice, getRequestLineDeliveredQuantity, getRequestLineCorrectedQuantity } from '../../lib/requestPricing';
 
 interface Props {
   requests: VPPRequest[];
@@ -1184,7 +1184,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
           const actName = getActionName(previewReq);
           const isActionable = actName !== 'Chi tiết';
           const previewTotalAmount = (previewReq.lines || []).reduce((sum: number, line: any) => {
-            return sum + getRequestLineAmount(line, getRequestLineDeliveredQuantity(line));
+            return sum + getRequestLineAmount(line, getRequestLineCorrectedQuantity(line));
           }, 0);
           return (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden" style={{width:'45%'}}>
@@ -1253,7 +1253,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                         </td>
                         <td className="px-4 py-2.5 text-center text-xs font-bold text-slate-500">{displayItem?.unit || '—'}</td>
                         <td className="px-4 py-2.5 text-right text-xs font-bold text-slate-600">{getRequestLineUnitPrice(line).toLocaleString('vi-VN')}</td>
-                        <td className="px-4 py-2.5 text-right text-xs font-black text-slate-800">{getRequestLineAmount(line, getRequestLineDeliveredQuantity(line)).toLocaleString('vi-VN')}</td>
+                        <td className="px-4 py-2.5 text-right text-xs font-black text-slate-800">{getRequestLineAmount(line, getRequestLineCorrectedQuantity(line)).toLocaleString('vi-VN')}</td>
                       </tr>
                     );
                   })}
@@ -1264,7 +1264,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
               <div className="flex gap-5">
                 <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Hạng mục</p><p className="text-lg font-black text-slate-800">{previewReq.lines?.length || 0}</p></div>
                 <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tổng SL thực giao</p><p className="text-lg font-black text-indigo-600">{(previewReq.lines||[]).reduce((s:number,l:any)=>s+getRequestLineDeliveredQuantity(l),0)}</p></div>
-                <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Thành tiền thực giao</p><p className="text-lg font-black text-emerald-600 whitespace-nowrap">{previewTotalAmount.toLocaleString('vi-VN')} đ</p></div>
+                <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Thành tiền sau hiệu chỉnh</p><p className="text-lg font-black text-emerald-600 whitespace-nowrap">{previewTotalAmount.toLocaleString('vi-VN')} đ</p></div>
               </div>
               <div className="flex gap-3">
                 <ReopenAdminApprovalAction

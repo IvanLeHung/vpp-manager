@@ -1,4 +1,4 @@
-import { getRequestLineAmount, getRequestLineDeliveredQuantity } from './requestPricing';
+import { getRequestLineAmount, getRequestLineCorrectedQuantity } from './requestPricing';
 
 export type DepartmentSupplyGroup = 'ALL' | 'VPP' | 'VS';
 export function departmentLineSupplyGroup(line: any): 'VPP' | 'VS' {
@@ -23,7 +23,7 @@ export function summarizeDepartmentAmounts(requests: any[], supplyGroup: Departm
     group.requestCount++;
     // Sum minor currency units to avoid accumulating binary floating-point noise.
     for (const line of lines) {
-      group.amount += Math.round(getRequestLineAmount(line, getRequestLineDeliveredQuantity(line)) * 100);
+      group.amount += Math.round(getRequestLineAmount(line, getRequestLineCorrectedQuantity(line)) * 100);
     }
     groups.set(key, group);
   }
