@@ -15,6 +15,7 @@ export default function LookupAssistant({ role }: { role?: string }) {
   const [messages, setMessages] = useState<Message[]>([welcome]);
   const [question, setQuestion] = useState('');
   const [pending, setPending] = useState(false);
+  const [showExamples, setShowExamples] = useState(false);
   const controller = useRef<AbortController | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const end = useRef<HTMLDivElement>(null);
@@ -73,6 +74,12 @@ export default function LookupAssistant({ role }: { role?: string }) {
         <div ref={end} />
       </div>
       <div className="border-t border-slate-200 p-3">
+        <button type="button" onClick={() => setShowExamples(!showExamples)} aria-expanded={showExamples} className="mb-2 text-xs font-semibold text-indigo-700 underline">{showExamples ? 'Thu gọn thoại mẫu' : 'Xem các thoại mẫu / Hướng dẫn'}</button>
+        {showExamples && <div className="mb-3 max-h-40 overflow-y-auto rounded-lg bg-slate-50 p-2 text-xs">
+          <p className="mb-2 text-slate-500">Chọn mẫu để điền vào ô nhập; bạn có thể sửa trước khi gửi.</p>
+          {['Các câu hỏi mẫu', 'Cách tạo đề xuất', 'Cách hiệu chỉnh giá', 'Cách đổi vật tư', 'Cách in VPP / VS', 'Tồn kho: ', ...(privileged ? ['Tổng chi tháng 9/2026'] : [])].map(sample => <button type="button" key={sample} onClick={() => { setQuestion(sample); input.current?.focus(); }} className="mb-1 mr-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-left hover:bg-indigo-50">{sample}</button>)}
+          <p className="mt-1 text-slate-500">Tra phiếu: nhập mã PDX/PO/PR thực tế của bạn. Chatbot chỉ hướng dẫn, không tự hiệu chỉnh dữ liệu.</p>
+        </div>}
         <div className="mb-3 flex flex-wrap gap-2">{suggestions.map(value => <button key={value} type="button" disabled={pending} onClick={() => void send(value)} className="rounded-lg border border-indigo-200 px-2 py-1 text-xs text-indigo-700 hover:bg-indigo-50 disabled:opacity-50">{value}</button>)}</div>
         <form onSubmit={e => { e.preventDefault(); void send(question); }} className="flex gap-2">
           <input ref={input} aria-label="Câu hỏi tra cứu" value={question} onChange={e => setQuestion(e.target.value)} maxLength={300} placeholder="Nhập mã PDX/PO hoặc câu hỏi…" className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
