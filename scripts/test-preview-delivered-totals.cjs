@@ -51,3 +51,10 @@ test('preview labels distinguish delivered quantity from corrected amount, and r
   assert.ok(preview.includes('getRequestLineCorrectedQuantity(line)'));
   assert.ok(source.includes('requests.find(request => request.id === previous.id)'));
 });
+test('request list header uses hysteresis and a binary transition instead of per-pixel resizing', () => {
+  const source = fs.readFileSync(path.resolve(__dirname, '../src/pages/requests/RequestsList.tsx'), 'utf8');
+  assert.ok(source.includes('scrollTop >= 96 ? true : scrollTop <= 24 ? false : null'));
+  assert.ok(source.includes("gridTemplateRows: isHeaderCompact ? '0fr' : '1fr'"));
+  assert.ok(source.includes('transition: \'grid-template-rows 420ms'));
+  assert.ok(!source.includes('setListCompactProgress'));
+});

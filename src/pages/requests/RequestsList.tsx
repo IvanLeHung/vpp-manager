@@ -152,7 +152,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   useEffect(() => {
     setPreviewReq(previous => previous ? requests.find(request => request.id === previous.id) || null : null);
   }, [requests]);
-  const [listCompactProgress, setListCompactProgress] = useState(0);
+  const [isHeaderCompact, setIsHeaderCompact] = useState(false);
   const listScrollFrameRef = useRef<number | null>(null);
   const itemsPerPage = 15;
 
@@ -160,7 +160,12 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     const scrollTop = event.currentTarget.scrollTop;
     if (listScrollFrameRef.current !== null) cancelAnimationFrame(listScrollFrameRef.current);
     listScrollFrameRef.current = requestAnimationFrame(() => {
-      setListCompactProgress(Math.min(scrollTop / 180, 1));
+      // Use hysteresis and a binary state: continuously resizing the flex/grid
+      // header on every pixel changes the scroll height and causes visible jitter.
+      const nextCompact = scrollTop >= 96 ? true : scrollTop <= 24 ? false : null;
+      if (nextCompact !== null) {
+        setIsHeaderCompact(previous => previous === nextCompact ? previous : nextCompact);
+      }
       listScrollFrameRef.current = null;
     });
   };
@@ -775,12 +780,15 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   return (
     <div className="flex flex-col h-full p-4 md:p-8 relative print:p-0 print:h-auto print:block RequestsList">
       <div
-        aria-hidden={listCompactProgress >= 1}
+        aria-hidden={isHeaderCompact}
         className="no-print grid shrink-0 overflow-hidden"
         style={{
-          gridTemplateRows: `${Math.max(0, 1 - listCompactProgress)}fr`,
-          opacity: 1 - listCompactProgress,
-          transform: `translateY(-${listCompactProgress * 12}px)`,
+          gridTemplateRows: isHeaderCompact ? '0fr' : '1fr',
+          opacity: isHeaderCompact ? 0 : 1,
+          transform: isHeaderCompact ? 'translateY(-12px)' : 'translateY(0)',
+          pointerEvents: isHeaderCompact ? 'none' : 'auto',
+          willChange: 'grid-template-rows, opacity, transform',
+          transition: 'grid-template-rows 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease, transform 420ms cubic-bezier(0.22, 1, 0.36, 1)',
         }}
       >
       <div className="min-h-0 overflow-hidden">
