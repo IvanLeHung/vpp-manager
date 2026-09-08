@@ -12,6 +12,7 @@ import MonthlyApprovalHistoryTooltip from '../../components/MonthlyApprovalHisto
 import ReopenAdminApprovalAction from '../../components/ReopenAdminApprovalAction';
 import RequestHistoryActor from '../../components/RequestHistoryActor';
 import DepartmentAmountPrint from '../../components/DepartmentAmountPrint';
+import { summarizeDepartmentAmounts, type DepartmentSupplyGroup } from '../../lib/departmentAmounts';
 import type { RequestSupplyType, ViewMode } from '../Requests';
 import { getApprovalActionLabel, getRequestStatusLabel } from '../../lib/statusLabels';
 import { getOriginalRequestLineUnitPrice, getRequestLineAmount, getRequestLineUnitPrice, getRequestLineDeliveredQuantity } from '../../lib/requestPricing';
@@ -140,6 +141,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH'>('ALL');
   const [printMode, setPrintMode] = useState<'SUMMARY' | 'INDIVIDUAL' | 'DEPARTMENT'>('SUMMARY');
+  const [departmentPrintGroup, setDepartmentPrintGroup] = useState<DepartmentSupplyGroup>('ALL');
   const [printRequests, setPrintRequests] = useState<PrintableRequest[]>([]);
   const [individualPrintType, setIndividualPrintType] = useState<'ALL' | 'VPP' | 'VS'>('ALL');
   const [preparingPrint, setPreparingPrint] = useState(false);
@@ -689,7 +691,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         .map(group => ({ request, group, lines: linesByGroup[group] }));
     }), [printRequests, individualPrintType]);
 
-  const handlePrintIndividuals = async (type: 'ALL' | 'VPP' | 'VS' | 'DEPARTMENT') => {
+  const handlePrintIndividuals = async (type: 'ALL' | 'VPP' | 'VS' | 'DEPARTMENT' | 'DEPARTMENT_VPP' | 'DEPARTMENT_VS') => {
     if (preparingPrintRef.current || !selectedIds.length) return;
     preparingPrintRef.current = true;
     setPreparingPrint(true);
@@ -712,14 +714,20 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
       const hasItems = details.some(request => request.lines?.some((line: any) =>
         type === 'ALL' || getItemSupplyGroup(line.replacementItemId && line.replacementItem
           ? line.replacementItem : line.issue_item || line.item) === type));
-      if (!hasItems && type !== 'DEPARTMENT') {
+      const isDepartment = type === 'DEPARTMENT' || type === 'DEPARTMENT_VPP' || type === 'DEPARTMENT_VS';
+      const departmentGroup = type === 'DEPARTMENT_VPP' ? 'VPP' : type === 'DEPARTMENT_VS' ? 'VS' : 'ALL';
+      if (isDepartment && !summarizeDepartmentAmounts(details, departmentGroup).requestCount) {
+        showToast('Các phiếu đã chọn không có vật tư thuộc nhóm cần in.', 'warning'); return;
+      }
+      if (!hasItems && !isDepartment) {
         showToast('Các phiếu đã chọn không có vật tư thuộc nhóm cần in.', 'warning');
         return;
       }
       flushSync(() => {
         setPrintRequests(details);
-        setIndividualPrintType(type === 'DEPARTMENT' ? 'ALL' : type);
-        setPrintMode(type === 'DEPARTMENT' ? 'DEPARTMENT' : 'INDIVIDUAL');
+        setIndividualPrintType(type === 'VPP' || type === 'VS' ? type : 'ALL');
+        setDepartmentPrintGroup(departmentGroup);
+        setPrintMode(isDepartment ? 'DEPARTMENT' : 'INDIVIDUAL');
       });
       await document.fonts.ready;
       window.print();
@@ -1032,9 +1040,13 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                     { key: 'VPP', label: 'In VPP' },
                     { key: 'VS', label: 'In VS' },
                     { key: 'ALL', label: 'In tổng hợp (VPP + VS)' },
-                    { key: 'DEPARTMENT', label: 'Tổng hợp phòng ban – số tiền' },
+                    { key: 'DEPARTMENT_OPTIONS', label: 'Tổng hợp phòng ban – số tiền', children: [
+                      { key: 'DEPARTMENT_VPP', label: 'VPP riêng' },
+                      { key: 'DEPARTMENT_VS', label: 'VS riêng' },
+                      { key: 'DEPARTMENT', label: 'Hỗn hợp (VPP + VS)' },
+                    ] },
                   ],
-                  onClick: ({ key }) => { void handlePrintIndividuals(key as 'ALL' | 'VPP' | 'VS' | 'DEPARTMENT'); },
+                  onClick: ({ key }) => { void handlePrintIndividuals(key as 'ALL' | 'VPP' | 'VS' | 'DEPARTMENT' | 'DEPARTMENT_VPP' | 'DEPARTMENT_VS'); },
                 }}>
                   <button type="button" disabled={preparingPrint} className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white font-black rounded-lg text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition disabled:opacity-60">
                     <Printer className="w-3.5 h-3.5"/> {preparingPrint ? 'Đang tải lịch sử…' : 'In PDF'} <ChevronDown className="w-3.5 h-3.5" />
@@ -1349,7 +1361,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             .print-page td { overflow-wrap: anywhere; white-space: pre-wrap; }
           }
         `}} />
-        {printMode === 'DEPARTMENT' ? <DepartmentAmountPrint requests={printRequests} /> : printMode === 'SUMMARY' ? (
+        {printMode === 'DEPARTMENT' ? <DepartmentAmountPrint requests={printRequests} supplyGroup={departmentPrintGroup} preparer={currentUser.fullName || currentUser.name} /> : printMode === 'SUMMARY' ? (
           summaryGroups.groups
             .filter(g => selectedPrintType === 'ALL' || g.type === selectedPrintType)
             .map((group, gIdx) => (

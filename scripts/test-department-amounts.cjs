@@ -51,7 +51,26 @@ test('sorts departments by descending amount, retaining their receipt counts', (
 });
 test('menu invokes hydrated selected-id print path and separate report', () => {
   const source = fs.readFileSync(path.resolve(__dirname, '../src/pages/requests/RequestsList.tsx'), 'utf8');
-  assert.ok(source.includes("{ key: 'DEPARTMENT', label: 'Tổng hợp phòng ban – số tiền' }"));
+  assert.ok(source.includes("key: 'DEPARTMENT_OPTIONS', label: 'Tổng hợp phòng ban – số tiền'"));
   assert.ok(source.includes('const ids = [...selectedIds]'));
-  assert.ok(source.includes('<DepartmentAmountPrint requests={printRequests} />'));
+  assert.ok(source.includes('<DepartmentAmountPrint requests={printRequests} supplyGroup={departmentPrintGroup}'));
+});
+test('VPP and VS split mixed lines, receipt counts and amounts; ALL sums both', () => {
+  const requests = [
+    { id: 'mixed', department: 'A', lines: [{ qtyDelivered: 2, unitPrice: 10, item: { itemType: 'VPP' } }, { qtyDelivered: 3, unitPrice: 20, item: { mvpp: 'VS001', itemType: 'VPP' } }] },
+    { id: 'only-vpp', department: 'B', lines: [{ qtyDelivered: 1, unitPrice: 100, item: { itemType: 'VPP' } }] },
+  ];
+  const vpp = summarize(requests, 'VPP'), vs = summarize(requests, 'VS'), all = summarize(requests, 'ALL');
+  assert.equal(vpp.totalAmount, 120); assert.equal(vpp.requestCount, 2);
+  assert.equal(vs.totalAmount, 60); assert.equal(vs.requestCount, 1); assert.equal(vs.rows.length, 1);
+  assert.equal(all.totalAmount, 180); assert.equal(all.requestCount, 2);
+  assert.equal(vpp.rows[0].department, 'B');
+  assert.equal(summarize([{ id: 'replacement', lines: [{ qtyDelivered: 1, replacementItemId: 'new', replacementPrice: 40, item: { itemType: 'VPP' }, replacementItem: { itemType: 'VE_SINH' } }] }], 'VS').totalAmount, 40);
+});
+test('formal layout removes requested explanatory text and keeps unsigned signature fields', () => {
+  const source = fs.readFileSync(path.resolve(__dirname, '../src/components/DepartmentAmountPrint.tsx'), 'utf8');
+  assert.ok(!source.includes('Thành tiền ='));
+  assert.ok(!source.includes('Chỉ tổng hợp các phiếu đã chọn'));
+  assert.ok(source.includes('CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM'));
+  assert.ok(source.includes('NGƯỜI LẬP BIỂU'));
 });
