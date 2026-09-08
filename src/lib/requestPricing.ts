@@ -35,6 +35,11 @@ export function getOriginalRequestLineUnitPrice(line: any): number {
   return firstFiniteNumber(line?.unitPrice, line?.item?.price);
 }
 
+/** Actual delivery must never fall back to requested/approved quantities. */
+export function getRequestLineDeliveredQuantity(line: any): number {
+  return Math.max(0, firstFiniteNumber(line?.qtyDelivered));
+}
+
 export function getRequestLineAmount(line: any, quantity?: number | null): number {
   const effectiveQuantity = quantity
     ?? line?.replacementQty

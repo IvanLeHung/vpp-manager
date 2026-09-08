@@ -13,7 +13,7 @@ import ReopenAdminApprovalAction from '../../components/ReopenAdminApprovalActio
 import RequestHistoryActor from '../../components/RequestHistoryActor';
 import type { RequestSupplyType, ViewMode } from '../Requests';
 import { getApprovalActionLabel, getRequestStatusLabel } from '../../lib/statusLabels';
-import { getOriginalRequestLineUnitPrice, getRequestLineAmount, getRequestLineUnitPrice } from '../../lib/requestPricing';
+import { getOriginalRequestLineUnitPrice, getRequestLineAmount, getRequestLineUnitPrice, getRequestLineDeliveredQuantity } from '../../lib/requestPricing';
 
 interface Props {
   requests: VPPRequest[];
@@ -146,6 +146,9 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [isSubmittingBatch, setIsSubmittingBatch] = useState(false);
   const [previewReq, setPreviewReq] = useState<VPPRequest | null>(null);
+  useEffect(() => {
+    setPreviewReq(previous => previous ? requests.find(request => request.id === previous.id) || null : null);
+  }, [requests]);
   const [listCompactProgress, setListCompactProgress] = useState(0);
   const listScrollFrameRef = useRef<number | null>(null);
   const itemsPerPage = 15;
@@ -1167,7 +1170,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
           const actName = getActionName(previewReq);
           const isActionable = actName !== 'Chi tiết';
           const previewTotalAmount = (previewReq.lines || []).reduce((sum: number, line: any) => {
-            return sum + getRequestLineAmount(line, line.qtyRequested);
+            return sum + getRequestLineAmount(line, getRequestLineDeliveredQuantity(line));
           }, 0);
           return (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden" style={{width:'45%'}}>
@@ -1188,7 +1191,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                   <tr className="text-[9px] uppercase font-black text-slate-400 tracking-widest">
                     <th className="px-4 py-2.5 text-center w-10">STT</th>
                     <th className="px-4 py-2.5">Tên Vật tư / Hàng hóa</th>
-                    <th className="px-4 py-2.5 text-center w-20">SL đề xuất</th>
+                    <th className="px-4 py-2.5 text-center w-20">SL thực giao</th>
                     <th className="px-4 py-2.5 text-center w-14">ĐVT</th>
                     <th className="px-4 py-2.5 text-right w-24">Đơn giá</th>
                     <th className="px-4 py-2.5 text-right w-28">Thành tiền</th>
@@ -1196,7 +1199,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {(previewReq.lines || []).map((line: any, idx: number) => {
-                    const displayItem = line.issue_item || line.item;
+                    const displayItem = line.issue_item || line.replacementItem || line.item;
                     const isReplaced = line.issue_item && line.item && line.issue_item.id !== line.item.id;
                     return (
                       <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
@@ -1231,12 +1234,12 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                             department={previewReq.department}
                             requestId={previewReq.id}
                           >
-                            <span className="font-black text-base text-indigo-600">{line.qtyRequested}</span>
+                            <span className="font-black text-base text-indigo-600">{getRequestLineDeliveredQuantity(line)}</span>
                           </MonthlyApprovalHistoryTooltip>
                         </td>
                         <td className="px-4 py-2.5 text-center text-xs font-bold text-slate-500">{displayItem?.unit || '—'}</td>
                         <td className="px-4 py-2.5 text-right text-xs font-bold text-slate-600">{getRequestLineUnitPrice(line).toLocaleString('vi-VN')}</td>
-                        <td className="px-4 py-2.5 text-right text-xs font-black text-slate-800">{getRequestLineAmount(line, line.qtyRequested).toLocaleString('vi-VN')}</td>
+                        <td className="px-4 py-2.5 text-right text-xs font-black text-slate-800">{getRequestLineAmount(line, getRequestLineDeliveredQuantity(line)).toLocaleString('vi-VN')}</td>
                       </tr>
                     );
                   })}
@@ -1246,8 +1249,8 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             <div className="p-4 border-t border-slate-200 bg-slate-50 shrink-0 flex justify-between items-center">
               <div className="flex gap-5">
                 <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Hạng mục</p><p className="text-lg font-black text-slate-800">{previewReq.lines?.length || 0}</p></div>
-                <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tổng SL</p><p className="text-lg font-black text-indigo-600">{(previewReq.lines||[]).reduce((s:number,l:any)=>s+(l.qtyRequested||0),0)}</p></div>
-                <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tổng thành tiền</p><p className="text-lg font-black text-emerald-600 whitespace-nowrap">{previewTotalAmount.toLocaleString('vi-VN')} đ</p></div>
+                <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tổng SL thực giao</p><p className="text-lg font-black text-indigo-600">{(previewReq.lines||[]).reduce((s:number,l:any)=>s+getRequestLineDeliveredQuantity(l),0)}</p></div>
+                <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Thành tiền thực giao</p><p className="text-lg font-black text-emerald-600 whitespace-nowrap">{previewTotalAmount.toLocaleString('vi-VN')} đ</p></div>
               </div>
               <div className="flex gap-3">
                 <ReopenAdminApprovalAction
