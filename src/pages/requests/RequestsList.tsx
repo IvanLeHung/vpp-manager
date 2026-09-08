@@ -152,15 +152,25 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   useEffect(() => {
     setPreviewReq(previous => previous ? requests.find(request => request.id === previous.id) || null : null);
   }, [requests]);
-  const [listCompactProgress, setListCompactProgress] = useState(0);
+  const [isHeaderCompact, setIsHeaderCompact] = useState(false);
+  const [isListAtBottom, setIsListAtBottom] = useState(false);
   const listScrollFrameRef = useRef<number | null>(null);
   const itemsPerPage = 15;
 
   const handleListScroll = (event: UIEvent<HTMLDivElement>) => {
-    const scrollTop = event.currentTarget.scrollTop;
+    const list = event.currentTarget;
+    const scrollTop = list.scrollTop;
+    const maxScrollTop = Math.max(0, list.scrollHeight - list.clientHeight);
+    const atBottom = maxScrollTop > 0 && scrollTop >= maxScrollTop - 8;
     if (listScrollFrameRef.current !== null) cancelAnimationFrame(listScrollFrameRef.current);
     listScrollFrameRef.current = requestAnimationFrame(() => {
-      setListCompactProgress(Math.min(scrollTop / 180, 1));
+      // Use hysteresis and a binary state: continuously resizing the flex/grid
+      // header on every pixel changes the scroll height and causes visible jitter.
+      setIsListAtBottom(previous => previous === atBottom ? previous : atBottom);
+      const nextCompact = atBottom || scrollTop >= 96 ? true : scrollTop <= 24 ? false : null;
+      if (nextCompact !== null) {
+        setIsHeaderCompact(previous => previous === nextCompact ? previous : nextCompact);
+      }
       listScrollFrameRef.current = null;
     });
   };
@@ -775,12 +785,17 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   return (
     <div className="flex flex-col h-full p-4 md:p-8 relative print:p-0 print:h-auto print:block RequestsList">
       <div
-        aria-hidden={listCompactProgress >= 1}
+        aria-hidden={isHeaderCompact}
         className="no-print grid shrink-0 overflow-hidden"
         style={{
-          gridTemplateRows: `${Math.max(0, 1 - listCompactProgress)}fr`,
-          opacity: 1 - listCompactProgress,
-          transform: `translateY(-${listCompactProgress * 12}px)`,
+          gridTemplateRows: isHeaderCompact ? '0fr' : '1fr',
+          opacity: isHeaderCompact ? 0 : 1,
+          transform: isHeaderCompact ? 'translateY(-12px)' : 'translateY(0)',
+          pointerEvents: isHeaderCompact ? 'none' : 'auto',
+          willChange: 'grid-template-rows, opacity, transform',
+          transition: isListAtBottom
+            ? 'none'
+            : 'grid-template-rows 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease, transform 420ms cubic-bezier(0.22, 1, 0.36, 1)',
         }}
       >
       <div className="min-h-0 overflow-hidden">
@@ -1060,7 +1075,11 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             </div>
           )}
           {/* Table */}
-          <div onScroll={handleListScroll} className="flex-1 overflow-auto custom-scrollbar">
+          <div
+            onScroll={handleListScroll}
+            className="flex-1 overflow-auto custom-scrollbar"
+            style={{ overflowAnchor: 'none' }}
+          >
               <table className="w-full text-left whitespace-nowrap">
                   <thead className="bg-white border-b border-slate-200 sticky top-0 z-10">
                       <tr className="text-[10px] uppercase font-bold text-slate-400 tracking-widest bg-slate-50/80">
