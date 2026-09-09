@@ -140,13 +140,16 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   const [selectedMode, setSelectedMode] = useState<'NONE' | 'MANUAL' | 'ALL_FILTERED'>('NONE');
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH'>('ALL');
-  const [printMode, setPrintMode] = useState<'SUMMARY' | 'INDIVIDUAL' | 'DEPARTMENT'>('SUMMARY');
+  const [printMode, setPrintMode] = useState<'SUMMARY' | 'INDIVIDUAL' | 'DEPARTMENT' | 'ITEM_REPORT'>('SUMMARY');
   const [departmentPrintGroup, setDepartmentPrintGroup] = useState<DepartmentSupplyGroup>('ALL');
   const [printRequests, setPrintRequests] = useState<PrintableRequest[]>([]);
   const [individualPrintType, setIndividualPrintType] = useState<'ALL' | 'VPP' | 'VS'>('ALL');
   const [preparingPrint, setPreparingPrint] = useState(false);
   const preparingPrintRef = useRef(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const [showItemReport, setShowItemReport] = useState(false);
+  const [reportItemMvpp, setReportItemMvpp] = useState('');
+  const [reportDepartment, setReportDepartment] = useState('ALL');
   const [isSubmittingBatch, setIsSubmittingBatch] = useState(false);
   const [previewReq, setPreviewReq] = useState<VPPRequest | null>(null);
   useEffect(() => {
@@ -307,6 +310,32 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
       return sortConfig.direction === 'asc' ? comparison : -comparison;
     });
   }, [requestsFilteredExceptCreatedDate, createdDateMode, createdDateFilter, createdDateRangeStart, createdDateRangeEnd, sortConfig]);
+
+  const reportItemOptions = useMemo(() => {
+    const items = new Map<string, { mvpp: string; name: string; unit: string }>();
+    requests.forEach(request => (request.lines || []).forEach((line: any) => {
+      const item = line.replacementItemId && line.replacementItem ? line.replacementItem : line.issue_item || line.item;
+      if (item?.mvpp && !items.has(item.mvpp)) items.set(item.mvpp, { mvpp: item.mvpp, name: item.name || '', unit: item.unit || '' });
+    }));
+    return Array.from(items.values()).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+  }, [requests]);
+
+  const reportDepartments = useMemo(() => Array.from(new Set(requests.map(request => request.department).filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b), 'vi')), [requests]);
+
+  const itemReportRows = useMemo(() => {
+    if (!reportItemMvpp) return [];
+    return requests.flatMap(request => {
+      if (reportDepartment !== 'ALL' && request.department !== reportDepartment) return [];
+      return (request.lines || []).flatMap((line: any) => {
+        const item = line.replacementItemId && line.replacementItem ? line.replacementItem : line.issue_item || line.item;
+        if (!item || item.mvpp !== reportItemMvpp) return [];
+        const approvedQty = Number(line.replacementQty ?? line.qtyApproved ?? line.qtyRequested ?? 0);
+        const requestedQty = Number(line.qtyRequested ?? approvedQty);
+        const approvedHistory = (request.approvalHistories || []).slice().reverse().find((history: any) => /APPROV|DUYỆT/i.test(history.action || history.reason || ''));
+        return [{ request, line, item, approvedQty, requestedQty, approvedAt: approvedHistory?.createdAt || request.updatedAt || request.createdAt, amount: getRequestLineAmount(line, approvedQty) }];
+      });
+    }).sort((a, b) => Number(b.amount) - Number(a.amount) || String(a.request.id).localeCompare(String(b.request.id), 'vi', { numeric: true }));
+  }, [requests, reportItemMvpp, reportDepartment]);
 
   const toggleSort = (key: RequestSortKey) => {
     setSortConfig(prev => prev.key === key
@@ -710,6 +739,15 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
       return sum + getRequestLineAmount(line, getRequestLineCorrectedQuantity(line));
     }, 0);
 
+  const handlePrintItemReport = () => {
+    if (!reportItemMvpp || itemReportRows.length === 0) {
+      showToast('Hãy chọn vật tư và phòng ban có dữ liệu trước khi in.', 'warning');
+      return;
+    }
+    setPrintMode('ITEM_REPORT');
+    setTimeout(() => window.print(), 100);
+  };
+
   const handlePrintIndividuals = async (type: 'ALL' | 'VPP' | 'VS' | 'DEPARTMENT' | 'DEPARTMENT_VPP' | 'DEPARTMENT_VS') => {
     if (preparingPrintRef.current || !selectedIds.length) return;
     preparingPrintRef.current = true;
@@ -884,6 +922,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                <button onClick={() => setStatusFilters(['COMPLETED'])} className={`px-3 py-1.5 rounded-lg font-bold text-xs transition ${statusFilters.includes('COMPLETED') && statusFilters.length === 1 ? 'bg-emerald-600 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>Hoàn tất</button>
                <button onClick={() => setStatusFilters(['DRAFT'])} className={`px-3 py-1.5 rounded-lg font-bold text-xs transition ${statusFilters.includes('DRAFT') && statusFilters.length === 1 ? 'bg-slate-700 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}>Nháp</button>
                <button onClick={() => setViewMode('WORKFLOW')} className="px-3 py-1.5 rounded-lg font-bold text-xs transition bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 flex items-center gap-1"><GitBranch className="w-3.5 h-3.5" /> QUY TRÌNH</button>
+               <button onClick={() => setShowItemReport(prev => !prev)} className={`px-3 py-1.5 rounded-lg font-bold text-xs whitespace-nowrap transition flex items-center gap-1 ${showItemReport ? 'bg-indigo-600 text-white shadow-md' : 'bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50'}`}><PackageOpen className="w-3.5 h-3.5" /> Báo cáo theo vật tư</button>
             </div>
             <div className="flex items-center gap-2 w-full xl:w-auto">
                 <div className="relative flex-1 xl:w-[420px]">
@@ -1030,6 +1069,16 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                  </div>
                  )}
              </div>
+          )}
+          {showItemReport && (
+            <div className="px-4 py-3 border-b border-indigo-100 bg-indigo-50/40">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="flex flex-col gap-1 min-w-[280px] flex-1"><label className="text-[9px] font-black uppercase tracking-widest text-slate-500">Vật tư cần xuất</label><select value={reportItemMvpp} onChange={e => setReportItemMvpp(e.target.value)} className="h-9 px-3 rounded-lg border border-indigo-200 bg-white text-xs font-bold text-slate-700"><option value="">Chọn một vật tư</option>{reportItemOptions.map(item => <option key={item.mvpp} value={item.mvpp}>{item.name} ({item.mvpp})</option>)}</select></div>
+                <div className="flex flex-col gap-1 min-w-[240px] flex-1"><label className="text-[9px] font-black uppercase tracking-widest text-slate-500">Phòng ban</label><select value={reportDepartment} onChange={e => setReportDepartment(e.target.value)} className="h-9 px-3 rounded-lg border border-indigo-200 bg-white text-xs font-bold text-slate-700"><option value="ALL">Tất cả phòng ban</option>{reportDepartments.map(department => <option key={department} value={department}>{department}</option>)}</select></div>
+                <button type="button" onClick={handlePrintItemReport} className="h-9 px-4 rounded-lg bg-indigo-600 text-white text-[10px] font-black uppercase flex items-center gap-2 hover:bg-indigo-700 disabled:opacity-50" disabled={!reportItemMvpp || itemReportRows.length === 0}><Printer className="w-3.5 h-3.5" /> In phiếu + báo cáo A4</button>
+              </div>
+              <div className="mt-2 text-[11px] font-bold text-indigo-700">Tìm thấy {itemReportRows.length} phiếu có vật tư này • Tổng SL duyệt: {itemReportRows.reduce((sum: number, row: any) => sum + row.approvedQty, 0)}</div>
+            </div>
           )}
           {/* Batch actions redesigned */}
           {(currentUser.role === 'MANAGER' || currentUser.role === 'ADMIN') && selectedIds.length > 0 && isBulkMode && (
@@ -1387,7 +1436,18 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             .print-page td { overflow-wrap: anywhere; white-space: pre-wrap; }
           }
         `}} />
-        {printMode === 'DEPARTMENT' ? <DepartmentAmountPrint requests={printRequests} supplyGroup={departmentPrintGroup} preparer={currentUser.fullName || currentUser.name} /> : printMode === 'SUMMARY' ? (
+        {printMode === 'ITEM_REPORT' ? (
+          <div className="print-page text-black bg-white p-8" style={{ width: '210mm', minHeight: '297mm', margin: '0 auto', fontFamily: '"Times New Roman", Times, serif' }}>
+            <h1 className="text-center text-xl font-bold uppercase mb-2">BÁO CÁO VẬT TƯ THEO PHÒNG BAN</h1>
+            <p className="text-center text-sm mb-5">Vật tư: <strong>{reportItemOptions.find(item => item.mvpp === reportItemMvpp)?.name || reportItemMvpp}</strong> • Phòng ban: <strong>{reportDepartment === 'ALL' ? 'Tất cả' : reportDepartment}</strong></p>
+            <table className="w-full border-collapse text-xs print-table">
+              <thead><tr><th className="border border-black p-2">STT</th><th className="border border-black p-2 text-left">Mã phiếu</th><th className="border border-black p-2">Ngày được duyệt</th><th className="border border-black p-2">SL đề xuất</th><th className="border border-black p-2">SL được duyệt</th><th className="border border-black p-2">Thành tiền</th></tr></thead>
+              <tbody>{itemReportRows.map((row: any, index: number) => <tr key={`${row.request.id}-${row.line.id || index}`}><td className="border border-black p-2 text-center">{index + 1}</td><td className="border border-black p-2">{row.request.id}</td><td className="border border-black p-2 text-center">{new Date(row.approvedAt).toLocaleDateString('vi-VN')}</td><td className="border border-black p-2 text-center">{row.requestedQty}</td><td className="border border-black p-2 text-center">{row.approvedQty}</td><td className="border border-black p-2 text-right">{row.amount.toLocaleString('vi-VN')} VNĐ</td></tr>)}</tbody>
+              <tfoot><tr className="font-bold"><td colSpan={3} className="border border-black p-2 text-right">TỔNG CỘNG</td><td className="border border-black p-2 text-center">{itemReportRows.reduce((sum: number, row: any) => sum + row.requestedQty, 0)}</td><td className="border border-black p-2 text-center">{itemReportRows.reduce((sum: number, row: any) => sum + row.approvedQty, 0)}</td><td className="border border-black p-2 text-right">{itemReportRows.reduce((sum: number, row: any) => sum + row.amount, 0).toLocaleString('vi-VN')} VNĐ</td></tr></tfoot>
+            </table>
+            <p className="mt-5 text-xs italic">Báo cáo được lọc theo đúng một vật tư và phòng ban đã chọn.</p>
+          </div>
+        ) : printMode === 'DEPARTMENT' ? <DepartmentAmountPrint requests={printRequests} supplyGroup={departmentPrintGroup} preparer={currentUser.fullName || currentUser.name} /> : printMode === 'SUMMARY' ? (
           summaryGroups.groups
             .filter(g => selectedPrintType === 'ALL' || g.type === selectedPrintType)
             .map((group, gIdx) => (
