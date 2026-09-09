@@ -516,6 +516,11 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
   const [showPrintMenu, setShowPrintMenu] = useState(false);
   // const [showExportMenu, setShowExportMenu] = useState(false);
   const [showPrintConfirm, setShowPrintConfirm] = useState(false);
+  const [dateFilterMode, setDateFilterMode] = useState<'DAY' | 'RANGE'>('DAY');
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [dateRangeStart, setDateRangeStart] = useState<string>('');
+  const [dateRangeEnd, setDateRangeEnd] = useState<string>('');
+  // Retained for report templates that still support month-based labels.
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [previewPO, setPreviewPO] = useState<any | null>(null);
 
@@ -783,17 +788,22 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
       if (activeTab === 'COMPLETED') matchTab = d.status === 'COMPLETED';
       if (activeTab.startsWith('STATUS:')) matchTab = d.status === activeTab.slice(7);
 
-      let matchMonth = true;
-      if (selectedMonth) {
-          const poDate = new Date(d.createdAt || d.orderDate);
-          const poMonth = `${poDate.getFullYear()}-${String(poDate.getMonth() + 1).padStart(2, '0')}`;
-          matchMonth = poMonth === selectedMonth;
+      const poDate = new Date(d.createdAt || d.orderDate);
+      const poDateKey = Number.isNaN(poDate.getTime()) ? '' : [poDate.getFullYear(), poDate.getMonth() + 1, poDate.getDate()]
+        .map((value, index) => index === 0 ? String(value) : String(value).padStart(2, '0')).join('-');
+      let matchDate = true;
+      if (dateFilterMode === 'DAY' && selectedDate) matchDate = poDateKey === selectedDate;
+      if (dateFilterMode === 'RANGE' && (dateRangeStart || dateRangeEnd)) {
+        const start = dateRangeStart || dateRangeEnd;
+        const end = dateRangeEnd || dateRangeStart;
+        const [lo, hi] = start <= end ? [start, end] : [end, start];
+        matchDate = !!poDateKey && poDateKey >= lo && poDateKey <= hi;
       }
 
       const matchDepartment = departmentFilter === 'ALL' || (d.depts || [d.department, d.departmentName]).includes(departmentFilter);
       const matchSupplier = supplierFilter === 'ALL' || (d.supplier || d.supplierName) === supplierFilter;
 
-      return matchSearch && matchTab && matchMonth && matchDepartment && matchSupplier;
+      return matchSearch && matchTab && matchDate && matchDepartment && matchSupplier;
   }).sort((a: any, b: any) => {
       const getValue = (po: any) => {
         if (sortConfig.key === 'item') return po.topItems?.join(' ') || '';
@@ -2115,7 +2125,9 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
     setSearchTerm('');
     setDepartmentFilter('ALL');
     setSupplierFilter('ALL');
-    setSelectedMonth('');
+    setSelectedDate('');
+    setDateRangeStart('');
+    setDateRangeEnd('');
     setSelectedIds([]);
     setPreviewPO(null);
   };
@@ -2230,9 +2242,9 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                             className={`shrink-0 h-10 px-3 rounded-xl border text-[10px] font-black uppercase tracking-wider flex items-center gap-2 transition ${showDataFilters ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                         >
                             <ListFilter className="w-4 h-4" /> Bộ lọc
-                            {(departmentFilter !== 'ALL' || supplierFilter !== 'ALL' || selectedMonth) && (
+            {(departmentFilter !== 'ALL' || supplierFilter !== 'ALL' || selectedDate || dateRangeStart || dateRangeEnd) && (
                               <span className="min-w-5 h-5 px-1 rounded-full bg-indigo-600 text-white flex items-center justify-center">
-                                {[departmentFilter !== 'ALL', supplierFilter !== 'ALL', !!selectedMonth].filter(Boolean).length}
+                                {[departmentFilter !== 'ALL', supplierFilter !== 'ALL', !!(selectedDate || dateRangeStart || dateRangeEnd)].filter(Boolean).length}
                               </span>
                             )}
                         </button>
@@ -2254,11 +2266,25 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                             {supplierOptions.map((supplier: any) => <option key={supplier} value={supplier}>{supplier}</option>)}
                           </select>
                         </div>
-                        <div className="flex flex-col gap-1 min-w-[170px]">
-                          <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Tháng</label>
-                          <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-indigo-400" />
+                        <div className="flex flex-col gap-1 min-w-[270px]">
+                          <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Ngày tạo phiếu</label>
+                          <div className="flex items-center gap-2">
+                            <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+                              <button type="button" onClick={() => setDateFilterMode('DAY')} className={`px-2.5 py-1.5 rounded-md text-[10px] font-black ${dateFilterMode === 'DAY' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}>Một ngày</button>
+                              <button type="button" onClick={() => setDateFilterMode('RANGE')} className={`px-2.5 py-1.5 rounded-md text-[10px] font-black ${dateFilterMode === 'RANGE' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}>Khoảng ngày</button>
+                            </div>
+                            {dateFilterMode === 'DAY' ? (
+                              <input type="date" value={selectedDate} onChange={e => { const value = e.target.value; setSelectedDate(value); setSelectedMonth(value ? value.slice(0, 7) : ''); }} className="h-9 min-w-0 flex-1 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-indigo-400" />
+                            ) : (
+                              <div className="flex items-center gap-1 min-w-0">
+                                <input type="date" aria-label="Từ ngày" value={dateRangeStart} onChange={e => setDateRangeStart(e.target.value)} className="h-9 w-[125px] px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-indigo-400" />
+                                <span className="text-slate-400">–</span>
+                                <input type="date" aria-label="Đến ngày" value={dateRangeEnd} onChange={e => setDateRangeEnd(e.target.value)} className="h-9 w-[125px] px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-indigo-400" />
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <button type="button" onClick={() => { setDepartmentFilter('ALL'); setSupplierFilter('ALL'); setSelectedMonth(''); }} className="h-9 px-3 rounded-lg border border-rose-200 bg-rose-50 text-rose-600 text-[10px] font-black uppercase hover:bg-rose-100 transition">
+                        <button type="button" onClick={() => { setDepartmentFilter('ALL'); setSupplierFilter('ALL'); setSelectedDate(''); setDateRangeStart(''); setDateRangeEnd(''); setSelectedMonth(''); }} className="h-9 px-3 rounded-lg border border-rose-200 bg-rose-50 text-rose-600 text-[10px] font-black uppercase hover:bg-rose-100 transition">
                           Xóa lọc
                         </button>
                       </div>
