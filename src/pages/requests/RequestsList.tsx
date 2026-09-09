@@ -701,6 +701,15 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         .map(group => ({ request, group, lines: linesByGroup[group] }));
     }), [printRequests, individualPrintType]);
 
+  const getRequestPrintTotal = (request: PrintableRequest, type: 'ALL' | 'VPP' | 'VS') =>
+    (request.lines || []).reduce((sum: number, line: any) => {
+      const item = line.replacementItemId && line.replacementItem
+        ? line.replacementItem
+        : line.issue_item || line.item;
+      if (type !== 'ALL' && getItemSupplyGroup(item) !== type) return sum;
+      return sum + getRequestLineAmount(line, getRequestLineCorrectedQuantity(line));
+    }, 0);
+
   const handlePrintIndividuals = async (type: 'ALL' | 'VPP' | 'VS' | 'DEPARTMENT' | 'DEPARTMENT_VPP' | 'DEPARTMENT_VS') => {
     if (preparingPrintRef.current || !selectedIds.length) return;
     preparingPrintRef.current = true;
@@ -721,6 +730,8 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) };
         }
       }));
+      const printGroup = type === 'VPP' || type === 'VS' ? type : 'ALL';
+      details.sort((a, b) => getRequestPrintTotal(b, printGroup) - getRequestPrintTotal(a, printGroup));
       const hasItems = details.some(request => request.lines?.some((line: any) =>
         type === 'ALL' || getItemSupplyGroup(line.replacementItemId && line.replacementItem
           ? line.replacementItem : line.issue_item || line.item) === type));
@@ -819,22 +830,18 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                   <button onClick={handleExportSummaryExcel} className="flex items-center px-4 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl hover:bg-emerald-100 transition font-bold shadow-sm">
                     <FileText className="w-5 h-5 mr-1.5 text-emerald-500"/> Excel Tổng Hợp (Owed)
                   </button>
-                   <div className="flex bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                      <button 
-                        onClick={() => handlePrintSummary('VPP')} 
-                        className="flex items-center px-4 py-2.5 text-indigo-700 hover:bg-indigo-50 border-r border-slate-100 transition font-bold"
-                        title="In tổng hợp đồ Văn phòng phẩm"
-                      >
-                        <Printer className="w-5 h-5 mr-1.5 text-indigo-400"/> In VPP
-                      </button>
-                      <button 
-                        onClick={() => handlePrintSummary('VE_SINH')} 
-                        className="flex items-center px-4 py-2.5 text-cyan-700 hover:bg-cyan-50 transition font-bold"
-                        title="In tổng hợp đồ Vệ sinh"
-                      >
-                        <Printer className="w-5 h-5 mr-1.5 text-cyan-400"/> In Vệ sinh
-                      </button>
-                   </div>
+                   <Dropdown trigger={['click']} menu={{
+                     items: [
+                       { key: 'VPP', label: 'In VPP' },
+                       { key: 'VE_SINH', label: 'In VS' },
+                       { key: 'ALL', label: 'In tổng hợp (VPP + VS)' },
+                     ],
+                     onClick: ({ key }) => handlePrintSummary(key as 'ALL' | 'VPP' | 'VE_SINH'),
+                   }}>
+                     <button type="button" className="flex items-center px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-indigo-700 hover:bg-indigo-50 transition font-bold shadow-sm">
+                       <Printer className="w-5 h-5 mr-1.5 text-indigo-400"/> In Phiếu Đề xuất <ChevronDown className="w-4 h-4 ml-1"/>
+                     </button>
+                   </Dropdown>
               </div>
             )}
             <button
@@ -1064,7 +1071,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                   onClick: ({ key }) => { void handlePrintIndividuals(key as 'ALL' | 'VPP' | 'VS' | 'DEPARTMENT' | 'DEPARTMENT_VPP' | 'DEPARTMENT_VS'); },
                 }}>
                   <button type="button" disabled={preparingPrint} className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white font-black rounded-lg text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition disabled:opacity-60">
-                    <Printer className="w-3.5 h-3.5"/> {preparingPrint ? 'Đang tải lịch sử…' : 'In PDF'} <ChevronDown className="w-3.5 h-3.5" />
+                    <Printer className="w-3.5 h-3.5"/> {preparingPrint ? 'Đang tải lịch sử…' : 'In Phiếu Đề xuất'} <ChevronDown className="w-3.5 h-3.5" />
                   </button>
                 </Dropdown>
                 <div className="h-4 w-[1px] bg-white/20 mx-1"></div>
