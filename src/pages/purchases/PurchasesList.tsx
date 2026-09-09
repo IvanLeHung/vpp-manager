@@ -2271,7 +2271,7 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                           <div className="flex items-center gap-2">
                             <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
                               <button type="button" onClick={() => setDateFilterMode('DAY')} className={`px-2.5 py-1.5 rounded-md text-[10px] font-black ${dateFilterMode === 'DAY' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}>Một ngày</button>
-                              <button type="button" onClick={() => setDateFilterMode('RANGE')} className={`px-2.5 py-1.5 rounded-md text-[10px] font-black ${dateFilterMode === 'RANGE' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}>Khoảng ngày</button>
+                              <button type="button" onClick={() => { setDateFilterMode('RANGE'); setSelectedMonth(''); }} className={`px-2.5 py-1.5 rounded-md text-[10px] font-black ${dateFilterMode === 'RANGE' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}>Khoảng ngày</button>
                             </div>
                             {dateFilterMode === 'DAY' ? (
                               <input type="date" value={selectedDate} onChange={e => { const value = e.target.value; setSelectedDate(value); setSelectedMonth(value ? value.slice(0, 7) : ''); }} className="h-9 min-w-0 flex-1 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-indigo-400" />
