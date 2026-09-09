@@ -148,7 +148,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   const preparingPrintRef = useRef(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [showItemReport, setShowItemReport] = useState(false);
-  const [reportItemMvpp, setReportItemMvpp] = useState('');
+  const [reportItemMvpp, setReportItemMvpp] = useState<string[]>([]);
   const [reportDepartment, setReportDepartment] = useState('ALL');
   const [isSubmittingBatch, setIsSubmittingBatch] = useState(false);
   const [previewReq, setPreviewReq] = useState<VPPRequest | null>(null);
@@ -323,12 +323,12 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   const reportDepartments = useMemo(() => Array.from(new Set(requests.map(request => request.department).filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b), 'vi')), [requests]);
 
   const itemReportRows = useMemo(() => {
-    if (!reportItemMvpp) return [];
+    if (reportItemMvpp.length === 0) return [];
     return requests.flatMap(request => {
       if (reportDepartment !== 'ALL' && request.department !== reportDepartment) return [];
       return (request.lines || []).flatMap((line: any) => {
         const item = line.replacementItemId && line.replacementItem ? line.replacementItem : line.issue_item || line.item;
-        if (!item || item.mvpp !== reportItemMvpp) return [];
+        if (!item || !reportItemMvpp.includes(item.mvpp)) return [];
         const approvedQty = Number(line.replacementQty ?? line.qtyApproved ?? line.qtyRequested ?? 0);
         const requestedQty = Number(line.qtyRequested ?? approvedQty);
         const approvedHistory = (request.approvalHistories || []).slice().reverse().find((history: any) => /APPROV|DUYỆT/i.test(history.action || history.reason || ''));
@@ -740,7 +740,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     }, 0);
 
   const handlePrintItemReport = () => {
-    if (!reportItemMvpp || itemReportRows.length === 0) {
+    if (reportItemMvpp.length === 0 || itemReportRows.length === 0) {
       showToast('Hãy chọn vật tư và phòng ban có dữ liệu trước khi in.', 'warning');
       return;
     }
@@ -1073,12 +1073,12 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
           {showItemReport && (
             <div className="px-4 py-3 border-b border-indigo-100 bg-indigo-50/40">
               <div className="flex flex-wrap items-end gap-3">
-                <div className="flex flex-col gap-1 min-w-[280px] flex-1"><label className="text-[9px] font-black uppercase tracking-widest text-slate-500">Vật tư cần xuất</label><select value={reportItemMvpp} onChange={e => setReportItemMvpp(e.target.value)} className="h-9 px-3 rounded-lg border border-indigo-200 bg-white text-xs font-bold text-slate-700"><option value="">Chọn một vật tư</option>{reportItemOptions.map(item => <option key={item.mvpp} value={item.mvpp}>{item.name} ({item.mvpp})</option>)}</select></div>
+                <div className="flex flex-col gap-1 min-w-[280px] flex-1"><label className="text-[9px] font-black uppercase tracking-widest text-slate-500">Vật tư cần xuất (chọn nhiều)</label><Select mode="multiple" allowClear value={reportItemMvpp} onChange={values => setReportItemMvpp(values)} placeholder="Chọn một hoặc nhiều vật tư" options={reportItemOptions.map(item => ({ value: item.mvpp, label: `${item.name} (${item.mvpp})` }))} maxTagCount={2} popupMatchSelectWidth={360} className="w-full" /></div>
                 <div className="flex flex-col gap-1 min-w-[240px] flex-1"><label className="text-[9px] font-black uppercase tracking-widest text-slate-500">Phòng ban</label><select value={reportDepartment} onChange={e => setReportDepartment(e.target.value)} className="h-9 px-3 rounded-lg border border-indigo-200 bg-white text-xs font-bold text-slate-700"><option value="ALL">Tất cả phòng ban</option>{reportDepartments.map(department => <option key={department} value={department}>{department}</option>)}</select></div>
-                <button type="button" onClick={() => { setSelectedIds(Array.from(new Set(itemReportRows.map((row: any) => row.request.id)))); setIsBulkMode(true); showToast(`Đã chọn ${new Set(itemReportRows.map((row: any) => row.request.id)).size} phiếu theo bộ lọc.`, 'success'); }} className="h-9 px-4 rounded-lg border border-indigo-300 bg-white text-indigo-700 text-[10px] font-black uppercase flex items-center gap-2 hover:bg-indigo-50 disabled:opacity-50" disabled={!reportItemMvpp || itemReportRows.length === 0}><CheckSquare className="w-3.5 h-3.5" /> Chọn các phiếu lọc</button>
-                <button type="button" onClick={handlePrintItemReport} className="h-9 px-4 rounded-lg bg-indigo-600 text-white text-[10px] font-black uppercase flex items-center gap-2 hover:bg-indigo-700 disabled:opacity-50" disabled={!reportItemMvpp || itemReportRows.length === 0}><Printer className="w-3.5 h-3.5" /> In báo cáo A4</button>
+                <button type="button" onClick={() => { setSelectedIds(Array.from(new Set(itemReportRows.map((row: any) => row.request.id)))); setIsBulkMode(true); showToast(`Đã chọn ${new Set(itemReportRows.map((row: any) => row.request.id)).size} phiếu theo bộ lọc.`, 'success'); }} className="h-9 px-4 rounded-lg border border-indigo-300 bg-white text-indigo-700 text-[10px] font-black uppercase flex items-center gap-2 hover:bg-indigo-50 disabled:opacity-50" disabled={reportItemMvpp.length === 0 || itemReportRows.length === 0}><CheckSquare className="w-3.5 h-3.5" /> Chọn các phiếu lọc</button>
+                <button type="button" onClick={handlePrintItemReport} className="h-9 px-4 rounded-lg bg-indigo-600 text-white text-[10px] font-black uppercase flex items-center gap-2 hover:bg-indigo-700 disabled:opacity-50" disabled={reportItemMvpp.length === 0 || itemReportRows.length === 0}><Printer className="w-3.5 h-3.5" /> In báo cáo A4</button>
               </div>
-              <div className="mt-2 text-[11px] font-bold text-indigo-700">Tìm thấy {itemReportRows.length} phiếu có vật tư này • Tổng SL duyệt: {itemReportRows.reduce((sum: number, row: any) => sum + row.approvedQty, 0)}</div>
+              <div className="mt-2 text-[11px] font-bold text-indigo-700">Tìm thấy {itemReportRows.length} phiếu có {reportItemMvpp.length} vật tư • Tổng SL duyệt: {itemReportRows.reduce((sum: number, row: any) => sum + row.approvedQty, 0)}</div>
             </div>
           )}
           {/* Batch actions redesigned */}
@@ -1440,13 +1440,13 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         {printMode === 'ITEM_REPORT' ? (
           <div className="print-page text-black bg-white p-8" style={{ width: '210mm', minHeight: '297mm', margin: '0 auto', fontFamily: '"Times New Roman", Times, serif' }}>
             <h1 className="text-center text-xl font-bold uppercase mb-2">BÁO CÁO VẬT TƯ THEO PHÒNG BAN</h1>
-            <p className="text-center text-sm mb-5">Vật tư: <strong>{reportItemOptions.find(item => item.mvpp === reportItemMvpp)?.name || reportItemMvpp}</strong> • Phòng ban: <strong>{reportDepartment === 'ALL' ? 'Tất cả' : reportDepartment}</strong></p>
+            <p className="text-center text-sm mb-5">Vật tư: <strong>{reportItemOptions.filter(item => reportItemMvpp.includes(item.mvpp)).map(item => item.name).join(', ') || reportItemMvpp.join(', ')}</strong> • Phòng ban: <strong>{reportDepartment === 'ALL' ? 'Tất cả' : reportDepartment}</strong></p>
             <table className="w-full border-collapse text-xs print-table">
               <thead><tr><th className="border border-black p-2">STT</th><th className="border border-black p-2 text-left">Mã phiếu</th><th className="border border-black p-2">Ngày được duyệt</th><th className="border border-black p-2">SL đề xuất</th><th className="border border-black p-2">SL được duyệt</th><th className="border border-black p-2">Thành tiền</th></tr></thead>
               <tbody>{itemReportRows.map((row: any, index: number) => <tr key={`${row.request.id}-${row.line.id || index}`}><td className="border border-black p-2 text-center">{index + 1}</td><td className="border border-black p-2">{row.request.id}</td><td className="border border-black p-2 text-center">{new Date(row.approvedAt).toLocaleDateString('vi-VN')}</td><td className="border border-black p-2 text-center">{row.requestedQty}</td><td className="border border-black p-2 text-center">{row.approvedQty}</td><td className="border border-black p-2 text-right">{row.amount.toLocaleString('vi-VN')} VNĐ</td></tr>)}</tbody>
               <tfoot><tr className="font-bold"><td colSpan={3} className="border border-black p-2 text-right">TỔNG CỘNG</td><td className="border border-black p-2 text-center">{itemReportRows.reduce((sum: number, row: any) => sum + row.requestedQty, 0)}</td><td className="border border-black p-2 text-center">{itemReportRows.reduce((sum: number, row: any) => sum + row.approvedQty, 0)}</td><td className="border border-black p-2 text-right">{itemReportRows.reduce((sum: number, row: any) => sum + row.amount, 0).toLocaleString('vi-VN')} VNĐ</td></tr></tfoot>
             </table>
-            <p className="mt-5 text-xs italic">Báo cáo được lọc theo đúng một vật tư và phòng ban đã chọn.</p>
+            <p className="mt-5 text-xs italic">Báo cáo được lọc theo các vật tư và phòng ban đã chọn.</p>
           </div>
         ) : printMode === 'DEPARTMENT' ? <DepartmentAmountPrint requests={printRequests} supplyGroup={departmentPrintGroup} preparer={currentUser.fullName || currentUser.name} /> : printMode === 'SUMMARY' ? (
           summaryGroups.groups
