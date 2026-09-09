@@ -2251,22 +2251,22 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                     </div>
 
                     {showDataFilters && (
-                      <div className="mb-3 p-3 bg-white border border-slate-200 rounded-xl flex flex-wrap items-end gap-3 shadow-sm">
-                        <div className="flex flex-col gap-1 min-w-[210px] flex-1">
+                      <div className="mb-3 p-3 bg-white border border-slate-200 rounded-xl flex flex-nowrap items-end gap-3 shadow-sm overflow-x-auto">
+                        <div className="flex flex-col gap-1 w-[210px] shrink-0">
                           <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Phòng ban</label>
                           <select value={departmentFilter} onChange={e => setDepartmentFilter(e.target.value)} className="h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-indigo-400">
                             <option value="ALL">Tất cả phòng ban</option>
                             {departmentOptions.map((department: any) => <option key={department} value={department}>{department}</option>)}
                           </select>
                         </div>
-                        <div className="flex flex-col gap-1 min-w-[210px] flex-1">
+                        <div className="flex flex-col gap-1 w-[210px] shrink-0">
                           <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Nhà cung cấp</label>
                           <select value={supplierFilter} onChange={e => setSupplierFilter(e.target.value)} className="h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-indigo-400">
                             <option value="ALL">Tất cả nhà cung cấp</option>
                             {supplierOptions.map((supplier: any) => <option key={supplier} value={supplier}>{supplier}</option>)}
                           </select>
                         </div>
-                        <div className="flex flex-col gap-1 min-w-[270px]">
+                        <div className="flex flex-col gap-1 min-w-[430px] shrink-0">
                           <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Ngày tạo phiếu</label>
                           <div className="flex items-center gap-2">
                             <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
@@ -2274,12 +2274,12 @@ const PurchasesList: React.FC<PurchasesListProps> = ({ onCreateNew, onViewDetail
                               <button type="button" onClick={() => { setDateFilterMode('RANGE'); setSelectedMonth(''); }} className={`px-2.5 py-1.5 rounded-md text-[10px] font-black ${dateFilterMode === 'RANGE' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}>Khoảng ngày</button>
                             </div>
                             {dateFilterMode === 'DAY' ? (
-                              <input type="date" value={selectedDate} onChange={e => { const value = e.target.value; setSelectedDate(value); setSelectedMonth(value ? value.slice(0, 7) : ''); }} className="h-9 min-w-0 flex-1 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-indigo-400" />
+                              <input type="date" aria-label="Ngày tạo phiếu" value={selectedDate} onChange={e => { const value = e.target.value; setSelectedDate(value); setSelectedMonth(value ? value.slice(0, 7) : ''); }} className="h-9 w-[170px] px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-indigo-400" />
                             ) : (
                               <div className="flex items-center gap-1 min-w-0">
-                                <input type="date" aria-label="Từ ngày" value={dateRangeStart} onChange={e => setDateRangeStart(e.target.value)} className="h-9 w-[125px] px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-indigo-400" />
+                                <input type="date" aria-label="Từ ngày" value={dateRangeStart} onChange={e => setDateRangeStart(e.target.value)} className="h-9 w-[150px] px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-indigo-400" />
                                 <span className="text-slate-400">–</span>
-                                <input type="date" aria-label="Đến ngày" value={dateRangeEnd} onChange={e => setDateRangeEnd(e.target.value)} className="h-9 w-[125px] px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-indigo-400" />
+                                <input type="date" aria-label="Đến ngày" value={dateRangeEnd} onChange={e => setDateRangeEnd(e.target.value)} className="h-9 w-[150px] px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-indigo-400" />
                               </div>
                             )}
                           </div>
