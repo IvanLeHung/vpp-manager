@@ -52,7 +52,7 @@ export default function LookupAssistant({ role }: { role?: string }) {
     }
   }
 
-  return <div className="fixed bottom-4 right-4 z-[60] print:hidden">
+  return <div className="fixed bottom-4 right-4 z-[60] print:hidden lg:left-4 lg:right-auto">
     {open && <section role="dialog" aria-label="Trợ lý tra cứu" onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } }}
       className="absolute bottom-16 right-0 flex h-[min(620px,calc(100dvh-110px))] w-[min(420px,calc(100vw-32px))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg text-sm text-slate-800">
       <header className="flex items-center justify-between border-b border-slate-200 bg-indigo-50 p-4">
