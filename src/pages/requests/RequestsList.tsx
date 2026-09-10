@@ -1440,13 +1440,24 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         {printMode === 'ITEM_REPORT' ? (
           <div className="print-page text-black bg-white p-8" style={{ width: '210mm', minHeight: '297mm', margin: '0 auto', fontFamily: '"Times New Roman", Times, serif' }}>
             <h1 className="text-center text-xl font-bold uppercase mb-2">BÁO CÁO VẬT TƯ THEO PHÒNG BAN</h1>
-            <p className="text-center text-sm mb-5">Vật tư: <strong>{reportItemOptions.filter(item => reportItemMvpp.includes(item.mvpp)).map(item => item.name).join(', ') || reportItemMvpp.join(', ')}</strong> • Phòng ban: <strong>{reportDepartment === 'ALL' ? 'Tất cả' : reportDepartment}</strong></p>
-            <table className="w-full border-collapse text-xs print-table">
-              <thead><tr><th className="border border-black p-2">STT</th><th className="border border-black p-2 text-left">Mã phiếu</th><th className="border border-black p-2">Ngày được duyệt</th><th className="border border-black p-2">SL đề xuất</th><th className="border border-black p-2">SL được duyệt</th><th className="border border-black p-2">Thành tiền</th></tr></thead>
-              <tbody>{itemReportRows.map((row: any, index: number) => <tr key={`${row.request.id}-${row.line.id || index}`}><td className="border border-black p-2 text-center">{index + 1}</td><td className="border border-black p-2">{row.request.id}</td><td className="border border-black p-2 text-center">{new Date(row.approvedAt).toLocaleDateString('vi-VN')}</td><td className="border border-black p-2 text-center">{row.requestedQty}</td><td className="border border-black p-2 text-center">{row.approvedQty}</td><td className="border border-black p-2 text-right">{row.amount.toLocaleString('vi-VN')} VNĐ</td></tr>)}</tbody>
-              <tfoot><tr className="font-bold"><td colSpan={3} className="border border-black p-2 text-right">TỔNG CỘNG</td><td className="border border-black p-2 text-center">{itemReportRows.reduce((sum: number, row: any) => sum + row.requestedQty, 0)}</td><td className="border border-black p-2 text-center">{itemReportRows.reduce((sum: number, row: any) => sum + row.approvedQty, 0)}</td><td className="border border-black p-2 text-right">{itemReportRows.reduce((sum: number, row: any) => sum + row.amount, 0).toLocaleString('vi-VN')} VNĐ</td></tr></tfoot>
-            </table>
-            <p className="mt-5 text-xs italic">Báo cáo được lọc theo các vật tư và phòng ban đã chọn.</p>
+            <p className="text-center text-sm mb-5">Phòng ban: <strong>{reportDepartment === 'ALL' ? 'Tất cả' : reportDepartment}</strong></p>
+            {reportItemOptions.filter(item => reportItemMvpp.includes(item.mvpp)).map(reportItem => {
+              const rows = itemReportRows.filter((row: any) => row.item.mvpp === reportItem.mvpp);
+              const requestedTotal = rows.reduce((sum: number, row: any) => sum + row.requestedQty, 0);
+              const approvedTotal = rows.reduce((sum: number, row: any) => sum + row.approvedQty, 0);
+              const amountTotal = rows.reduce((sum: number, row: any) => sum + row.amount, 0);
+              return (
+                <section key={reportItem.mvpp} className="mb-6 break-inside-avoid">
+                  <h2 className="text-center text-base font-bold uppercase mb-2">{reportItem.name} ({reportItem.mvpp})</h2>
+                  <table className="w-full border-collapse text-xs print-table">
+                    <thead><tr><th className="border border-black p-2">STT</th><th className="border border-black p-2 text-left">Mã phiếu</th><th className="border border-black p-2">Ngày được duyệt</th><th className="border border-black p-2">SL đề xuất</th><th className="border border-black p-2">SL được duyệt</th><th className="border border-black p-2">Thành tiền</th></tr></thead>
+                    <tbody>{rows.map((row: any, index: number) => <tr key={`${row.request.id}-${row.line.id || index}`}><td className="border border-black p-2 text-center">{index + 1}</td><td className="border border-black p-2">{row.request.id}</td><td className="border border-black p-2 text-center">{new Date(row.approvedAt).toLocaleDateString('vi-VN')}</td><td className="border border-black p-2 text-center">{row.requestedQty}</td><td className="border border-black p-2 text-center">{row.approvedQty}</td><td className="border border-black p-2 text-right">{row.amount.toLocaleString('vi-VN')} VNĐ</td></tr>)}</tbody>
+                    <tfoot><tr className="font-bold"><td colSpan={3} className="border border-black p-2 text-right">TỔNG CỘNG</td><td className="border border-black p-2 text-center">{requestedTotal}</td><td className="border border-black p-2 text-center">{approvedTotal}</td><td className="border border-black p-2 text-right">{amountTotal.toLocaleString('vi-VN')} VNĐ</td></tr></tfoot>
+                  </table>
+                </section>
+              );
+            })}
+            <p className="mt-5 text-xs italic">Báo cáo được tách thành từng bảng theo vật tư và phòng ban đã chọn.</p>
           </div>
         ) : printMode === 'DEPARTMENT' ? <DepartmentAmountPrint requests={printRequests} supplyGroup={departmentPrintGroup} preparer={currentUser.fullName || currentUser.name} /> : printMode === 'SUMMARY' ? (
           summaryGroups.groups
