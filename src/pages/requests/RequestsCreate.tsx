@@ -155,19 +155,30 @@ export default function RequestsCreate({
     const getScrollTop = () => scrollContainer === window
       ? window.scrollY
       : (scrollContainer as HTMLElement).scrollTop;
+    let scrollFrame = 0;
     const updateWorkspaceFocus = () => {
       const scrollTop = getScrollTop();
       const nextFocused = workspaceFocusedRef.current
-        ? scrollTop > 60
+        ? scrollTop > 24
         : scrollTop > 180;
       if (nextFocused !== workspaceFocusedRef.current) {
         workspaceFocusedRef.current = nextFocused;
         setIsWorkspaceFocused(nextFocused);
       }
     };
+    const handleScroll = () => {
+      if (scrollFrame) return;
+      scrollFrame = window.requestAnimationFrame(() => {
+        scrollFrame = 0;
+        updateWorkspaceFocus();
+      });
+    };
     updateWorkspaceFocus();
-    scrollContainer.addEventListener('scroll', updateWorkspaceFocus, { passive: true });
-    return () => scrollContainer.removeEventListener('scroll', updateWorkspaceFocus);
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      scrollContainer.removeEventListener('scroll', handleScroll);
+      if (scrollFrame) window.cancelAnimationFrame(scrollFrame);
+    };
   }, []);
 
   const revealGeneralInformation = () => {
@@ -599,7 +610,7 @@ export default function RequestsCreate({
   );
 
   return (
-    <div ref={pageRootRef} className="min-h-full bg-[#F4F6FA] pb-28 text-[#17233D]">
+    <div ref={pageRootRef} className="min-h-full bg-[#F4F6FA] pb-28 text-[#17233D]" style={{ overflowAnchor: 'none' }}>
       <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-5 px-4 py-6 md:px-8">
         <header className="flex items-start justify-between gap-4">
           <div>

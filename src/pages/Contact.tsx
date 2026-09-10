@@ -2,10 +2,10 @@ import { Phone, Mail, MapPin, Globe, ExternalLink } from 'lucide-react';
 
 export default function Contact() {
   const contactInfo = {
-    name: 'LÊ THANH HÙNG',
+    name: 'LÊ MAI PHƯƠNG',
     position: 'Chuyên viên Quản lý Tài sản',
-    phone: '0968.294.592',
-    email: 'Hung.lt@dankogroup.com.vn',
+    phone: '+84847968234',
+    email: 'Phuong.lm@dankogroup.com.vn',
     address: 'Tòa nhà C6, Đường Trần Hữu Dực, KĐT Mỹ Đình 1, Quận Nam Từ Liêm, Hà Nội',
     officePhone: '19003135',
     fax: '024 6666 3639',
