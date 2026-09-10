@@ -52,9 +52,9 @@ export default function LookupAssistant({ role }: { role?: string }) {
     }
   }
 
-  return <div className="fixed bottom-4 right-4 z-[60] print:hidden lg:left-4 lg:right-auto">
+  return <div className="fixed bottom-4 right-4 z-[60] print:hidden lg:bottom-20 lg:left-4 lg:right-auto">
     {open && <section role="dialog" aria-label="Trợ lý tra cứu" onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } }}
-      className="absolute bottom-16 right-0 flex h-[min(620px,calc(100dvh-110px))] w-[min(420px,calc(100vw-32px))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg text-sm text-slate-800">
+      className="absolute bottom-16 right-0 flex h-[min(620px,calc(100dvh-110px))] w-[min(420px,calc(100vw-32px))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg text-sm text-slate-800 lg:left-0 lg:right-auto">
       <header className="flex items-center justify-between border-b border-slate-200 bg-indigo-50 p-4">
         <div><h2 className="font-bold text-indigo-700">Trợ lý tra cứu</h2><p className="mt-1 text-xs text-slate-500">Theo mẫu · Dữ liệu theo quyền tài khoản</p></div>
         <button type="button" onClick={close} aria-label="Đóng trợ lý" className="rounded-lg p-2 hover:bg-indigo-100"><X size={18} /></button>
