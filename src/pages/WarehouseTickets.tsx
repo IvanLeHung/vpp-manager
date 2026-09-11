@@ -362,6 +362,7 @@ export default function WarehouseTickets({ warehouseCode: initialWarehouseCode =
                 <th className="p-4">Phiếu (Loại / Thời gian)</th>
                 <th className="p-4">Người tạo</th>
                 <th className="p-4">Người nhận</th>
+                <th className="p-4 text-center">Số lượng</th>
                 <th className="p-4 text-center">Trạng thái</th>
                 <th className="p-4">Lý do</th>
                 <th className="p-4 text-right pr-6">Thao tác</th>
@@ -379,6 +380,7 @@ export default function WarehouseTickets({ warehouseCode: initialWarehouseCode =
                 const tc = TYPE_CONFIG[t.ticketType] || TYPE_CONFIG.RECEIVE;
                 const TypeIcon = tc.icon;
                 const StatusIcon = sc.icon;
+                const totalQuantity = (t.lines || []).reduce((sum, line) => sum + Number(line.qtyApproved ?? line.qty ?? 0), 0);
                 return (
                   <tr key={t.id} className="hover:bg-indigo-50/30 transition-colors group cursor-pointer" onClick={() => navigate(`${basePath}/${t.id}`)}>
                     <td className="p-4 text-center" onClick={e => e.stopPropagation()}>
@@ -408,6 +410,7 @@ export default function WarehouseTickets({ warehouseCode: initialWarehouseCode =
                       <span className="font-bold text-slate-700">{t.receiverName || '—'}</span>
                       <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t.receiverDept || '—'}</span>
                     </td>
+                    <td className="p-4 text-center"><span className="font-black text-indigo-700">{totalQuantity.toLocaleString('vi-VN')}</span><span className="block text-[10px] text-slate-400 font-bold">{t.lines?.length || 0} mặt hàng</span></td>
                     <td className="p-4 text-center">
                       <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-[10px] uppercase tracking-wider font-black rounded-full border ${sc.cls}`}>
                         <StatusIcon className="w-3 h-3" /> {sc.label}
@@ -416,7 +419,7 @@ export default function WarehouseTickets({ warehouseCode: initialWarehouseCode =
                     <td className="p-4 text-sm text-slate-500 font-medium max-w-[200px] truncate">{t.reason || '—'}</td>
                     <td className="p-4 text-right pr-6">
                       <div className="flex items-center gap-1 justify-end" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => navigate(`${basePath}/${t.id}`)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Xem chi tiết">
+                        <button onClick={() => navigate(`${basePath}/${t.id}`)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Xem preview">
                           <Eye className="w-4 h-4" />
                         </button>
                         {/* WAREHOUSE: submit draft */}
