@@ -24,15 +24,35 @@ type SummaryReport = {
 const numberFormat = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
 const formatNumber = (value: number) => numberFormat.format(value);
 const reportTitle = (type: string) => `Báo cáo tổng hợp đồ ${type === 'VPP' ? 'Văn phòng phẩm' : 'Vệ sinh'} theo đợt đề xuất`;
+const provinceByDepartment: Record<string, string> = {
+  'b. quan ly du an thanh hoa 2': 'Thanh Hóa',
+  'van phong ban hang thanh hoa 2': 'Thanh Hóa',
+  'b. quan ly du an danko royal': 'Thanh Hóa',
+  'van phong ban hang danko royal': 'Thanh Hóa',
+  'b. quan ly du an danko riverside': 'Bắc Ninh',
+  'van phong ban hang danko riverside': 'Bắc Ninh',
+  'b. cay xanh': 'Thái Nguyên',
+  'b. quan ly du an danko sun river': 'Thái Nguyên',
+  'van phong ban hang danko sun river': 'Thái Nguyên',
+  'b. quan ly du an danko avenue': 'Thái Nguyên',
+  'van phong ban hang danko avenue': 'Thái Nguyên',
+  'b. quan ly du an danko city': 'Thái Nguyên',
+  'trung tam thuong mai danko city': 'Thái Nguyên',
+  'b. quan ly du an kim phu': 'Tuyên Quang',
+  'van phong ban hang kim phu': 'Tuyên Quang',
+};
+const normalizeDepartment = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLocaleLowerCase('vi').trim().replace(/\s+/g, ' ');
+const departmentProvince = (department: Department) => department.province || provinceByDepartment[normalizeDepartment(department.name)] || 'Hà Nội';
 
 function ReportDocument({ report, period, reportDate, reporter, print = false }: {
   report: SummaryReport; period: string; reportDate: string; reporter: string;
   print?: boolean;
 }) {
-  const departments = print ? printDepartmentLabels(report.departments) : report.departments.map(department => ({ ...department, label: department.name }));
+  const departments = (print ? printDepartmentLabels(report.departments) : report.departments.map(department => ({ ...department, label: department.name })))
+    .sort((a, b) => departmentProvince(a).localeCompare(departmentProvince(b), 'vi') || a.name.localeCompare(b.name, 'vi'));
   const abbreviations = departments.filter(department => department.label !== department.name);
   const provinceGroups = departments.reduce<{ province: string; count: number }[]>((groups, department) => {
-    const province = department.province || 'Hà Nội';
+    const province = departmentProvince(department);
     const current = groups[groups.length - 1];
     if (current?.province === province) current.count += 1;
     else groups.push({ province, count: 1 });
@@ -60,7 +80,7 @@ function ReportDocument({ report, period, reportDate, reporter, print = false }:
         <table className="proposal-report-table" style={{ '--proposal-department-count': departments.length, '--proposal-print-font-size': printFontSize } as CSSProperties}>
           <colgroup>
             <col className="proposal-item-column" /><col className="proposal-unit-column" />
-            {departments.map(department => <col key={department.id} data-province={department.province || 'Hà Nội'} />)}
+            {departments.map(department => <col key={department.id} data-province={departmentProvince(department)} />)}
             <col className="proposal-total-column" /><col className="proposal-price-column" /><col className="proposal-amount-column" />
           </colgroup>
           <thead><tr className="proposal-province-row">
@@ -70,7 +90,7 @@ function ReportDocument({ report, period, reportDate, reporter, print = false }:
           </tr><tr>
             <th scope="col" className="proposal-item-column">Danh mục {report.itemType === 'VPP' ? 'VPP' : 'Vệ sinh'}</th>
             <th scope="col" className="proposal-unit-column">ĐVT</th>
-            {departments.map(department => <th key={department.id} scope="col" data-province={department.province || 'Hà Nội'} className="proposal-department-column" title={department.name}>{department.label}</th>)}
+            {departments.map(department => <th key={department.id} scope="col" data-province={departmentProvince(department)} className="proposal-department-column" title={department.name}>{department.label}</th>)}
             <th scope="col" className="proposal-total-column">Tổng số lượng</th>
             <th scope="col" className="proposal-price-column">Đơn giá<br /><span className="font-normal">(VNĐ)</span></th>
             <th scope="col" className="proposal-amount-column">Thành tiền<br /><span className="font-normal">(VNĐ)</span></th>
@@ -79,7 +99,7 @@ function ReportDocument({ report, period, reportDate, reporter, print = false }:
             {report.rows.map((row, index) => <tr key={row.key}>
               <th scope="row" className="proposal-item-column"><span className="proposal-row-index mr-2 text-[10px] font-normal text-slate-400">{index + 1}.</span>{row.name}<span className="proposal-item-code mt-1 block text-[10px] font-normal text-slate-400">{row.mvpp}</span></th>
               <td className="text-center text-slate-500">{row.unit}</td>
-              {departments.map(department => <td key={department.id} data-province={department.province || 'Hà Nội'} className="text-center tabular-nums">{row.departmentQuantities[department.id] ? formatNumber(row.departmentQuantities[department.id]) : <span className="text-slate-300">—</span>}</td>)}
+              {departments.map(department => <td key={department.id} data-province={departmentProvince(department)} className="text-center tabular-nums">{row.departmentQuantities[department.id] ? formatNumber(row.departmentQuantities[department.id]) : <span className="text-slate-300">—</span>}</td>)}
               <td className="proposal-total-column text-center font-bold tabular-nums">{formatNumber(row.totalQuantity)}</td>
               <td className="proposal-price-column text-right tabular-nums">{row.unitPrice === null ? <span className="text-amber-700">Chưa có giá</span> : formatNumber(row.unitPrice)}</td>
               <td className="proposal-amount-column text-right font-semibold tabular-nums">{row.totalAmount === null ? '—' : formatNumber(row.totalAmount)}</td>
@@ -87,7 +107,7 @@ function ReportDocument({ report, period, reportDate, reporter, print = false }:
           </tbody>
           <tfoot><tr>
             <th scope="row" className="proposal-item-column" colSpan={2}>TỔNG CỘNG</th>
-            {departments.map(department => <td key={department.id} data-province={department.province || 'Hà Nội'} className="text-center tabular-nums">{formatNumber(report.totals.departmentQuantities[department.id] || 0)}</td>)}
+            {departments.map(department => <td key={department.id} data-province={departmentProvince(department)} className="text-center tabular-nums">{formatNumber(report.totals.departmentQuantities[department.id] || 0)}</td>)}
             <td className="proposal-total-column text-center tabular-nums">{formatNumber(report.totals.totalQuantity)}</td>
             <td className="proposal-price-column text-center">—</td>
             <td className="proposal-amount-column text-right tabular-nums">{formatNumber(report.totals.totalAmount)}{report.totals.unpricedRowCount > 0 ? ' *' : ''}</td>
@@ -153,19 +173,20 @@ export default function ProposalBatchReport() {
     if (!report) return;
     setExporting(true); setExportError('');
     try {
-      const headings = [`Danh mục ${itemType === 'VPP' ? 'VPP' : 'Vệ sinh'}`, 'Mã hàng', 'ĐVT', ...report.departments.map(department => department.name), 'Tổng số lượng', 'Đơn giá (VNĐ)', 'Thành tiền (VNĐ)'];
+      const exportDepartments = [...report.departments].sort((a, b) => departmentProvince(a).localeCompare(departmentProvince(b), 'vi') || a.name.localeCompare(b.name, 'vi'));
+      const headings = [`Danh mục ${itemType === 'VPP' ? 'VPP' : 'Vệ sinh'}`, 'Mã hàng', 'ĐVT', ...exportDepartments.map(department => department.name), 'Tổng số lượng', 'Đơn giá (VNĐ)', 'Thành tiền (VNĐ)'];
       const data = [
         ['CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO'], ['MST: 3702070613'],
         ['CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM'], ['Độc lập - Tự do - Hạnh phúc'], [],
-        [reportTitle(itemType)], [`Kỳ tổng hợp: ${filter.label}`], [`Mã tổng hợp: THĐX-${reportDate.replace(/-/g, '')}-${itemType}`, `Người lập: ${reporter}`], [`Kho áp dụng: ${itemType === 'VPP' ? 'Kho Văn phòng phẩm' : 'Kho Vệ sinh'}`, `Ngày in: ${formatReportDate(reportDate)}`], ['Số lượng Hành chính duyệt'], [], ['Danh mục', 'Mã hàng', 'ĐVT', ...report.departments.map(department => department.province || 'Hà Nội'), 'Tổng số lượng', 'Đơn giá (VNĐ)', 'Thành tiền (VNĐ)'], headings,
-        ...report.rows.map(row => [row.name, row.mvpp, row.unit, ...report.departments.map(department => row.departmentQuantities[department.id] || 0), row.totalQuantity, row.unitPrice, row.totalAmount]),
-        ['TỔNG CỘNG', '', '', ...report.departments.map(department => report.totals.departmentQuantities[department.id] || 0), report.totals.totalQuantity, '', report.totals.totalAmount],
+        [reportTitle(itemType)], [`Kỳ tổng hợp: ${filter.label}`], [`Mã tổng hợp: THĐX-${reportDate.replace(/-/g, '')}-${itemType}`, `Người lập: ${reporter}`], [`Kho áp dụng: ${itemType === 'VPP' ? 'Kho Văn phòng phẩm' : 'Kho Vệ sinh'}`, `Ngày in: ${formatReportDate(reportDate)}`], ['Số lượng Hành chính duyệt'], [], ['Danh mục', 'Mã hàng', 'ĐVT', ...exportDepartments.map(departmentProvince), 'Tổng số lượng', 'Đơn giá (VNĐ)', 'Thành tiền (VNĐ)'], headings,
+        ...report.rows.map(row => [row.name, row.mvpp, row.unit, ...exportDepartments.map(department => row.departmentQuantities[department.id] || 0), row.totalQuantity, row.unitPrice, row.totalAmount]),
+        ['TỔNG CỘNG', '', '', ...exportDepartments.map(department => report.totals.departmentQuantities[department.id] || 0), report.totals.totalQuantity, '', report.totals.totalAmount],
         [], [`Ngày báo cáo: ${formatReportDate(reportDate)}`], [`Người lập bảng: ${reporter}`],
         ['Đơn giá lưu trên phiếu. Các mức giá khác nhau của cùng mặt hàng được tách dòng.'],
         ...(report.totals.unpricedRowCount ? [[`Tổng tiền chưa bao gồm ${report.totals.unpricedRowCount} dòng chưa lưu đơn giá.`]] : []),
       ];
       const sheet = XLSX.utils.aoa_to_sheet(data);
-      sheet['!cols'] = [{ wch: 36 }, { wch: 18 }, { wch: 9 }, ...report.departments.map(() => ({ wch: 22 })), { wch: 16 }, { wch: 18 }, { wch: 20 }];
+      sheet['!cols'] = [{ wch: 36 }, { wch: 18 }, { wch: 9 }, ...exportDepartments.map(() => ({ wch: 22 })), { wch: 16 }, { wch: 18 }, { wch: 20 }];
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, sheet, itemType === 'VPP' ? 'Tong hop VPP' : 'Tong hop Ve sinh');
       XLSX.writeFile(workbook, `Bao_cao_de_xuat_${itemType}_${reportDate}.xlsx`);
