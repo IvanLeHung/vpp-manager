@@ -10,7 +10,7 @@ import type { ProposalDateSelection } from './ProposalDateFilter';
 import { printDepartmentLabels } from './proposalPrintLayout';
 import './proposalBatchReport.css';
 
-type Department = { id: string; name: string };
+type Department = { id: string; name: string; province?: string };
 type SummaryRow = {
   key: string; itemId: string; name: string; mvpp: string; unit: string;
   unitPrice: number | null; totalQuantity: number; totalAmount: number | null;
@@ -31,6 +31,13 @@ function ReportDocument({ report, period, reportDate, reporter, print = false }:
 }) {
   const departments = print ? printDepartmentLabels(report.departments) : report.departments.map(department => ({ ...department, label: department.name }));
   const abbreviations = departments.filter(department => department.label !== department.name);
+  const provinceGroups = departments.reduce<{ province: string; count: number }[]>((groups, department) => {
+    const province = department.province || 'Hà Nội';
+    const current = groups[groups.length - 1];
+    if (current?.province === province) current.count += 1;
+    else groups.push({ province, count: 1 });
+    return groups;
+  }, []);
   const printFontSize = departments.length > 24 ? '7.5px' : departments.length > 16 ? '8px' : departments.length > 8 ? '9px' : '10px';
   return (
     <article className="proposal-report-document">
@@ -50,7 +57,11 @@ function ReportDocument({ report, period, reportDate, reporter, print = false }:
             {departments.map(department => <col key={department.id} />)}
             <col className="proposal-total-column" /><col className="proposal-price-column" /><col className="proposal-amount-column" />
           </colgroup>
-          <thead><tr>
+          <thead><tr className="proposal-province-row">
+            <th colSpan={2} />
+            {provinceGroups.map(group => <th key={group.province} colSpan={group.count} className="proposal-province-column">{group.province}</th>)}
+            <th colSpan={3} />
+          </tr><tr>
             <th scope="col" className="proposal-item-column">Danh mục {report.itemType === 'VPP' ? 'VPP' : 'Vệ sinh'}</th>
             <th scope="col" className="proposal-unit-column">ĐVT</th>
             {departments.map(department => <th key={department.id} scope="col" className="proposal-department-column" title={department.name}>{department.label}</th>)}
@@ -140,7 +151,7 @@ export default function ProposalBatchReport() {
       const data = [
         ['CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO'], ['MST: 3702070613'],
         ['CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM'], ['Độc lập - Tự do - Hạnh phúc'], [],
-        [reportTitle(itemType)], [`Ngày tạo phiếu: ${filter.label}`], ['Số lượng Hành chính duyệt'], [], headings,
+        [reportTitle(itemType)], [`Ngày tạo phiếu: ${filter.label}`], ['Số lượng Hành chính duyệt'], [], ['Danh mục', 'Mã hàng', 'ĐVT', ...report.departments.map(department => department.province || 'Hà Nội'), 'Tổng số lượng', 'Đơn giá (VNĐ)', 'Thành tiền (VNĐ)'], headings,
         ...report.rows.map(row => [row.name, row.mvpp, row.unit, ...report.departments.map(department => row.departmentQuantities[department.id] || 0), row.totalQuantity, row.unitPrice, row.totalAmount]),
         ['TỔNG CỘNG', '', '', ...report.departments.map(department => report.totals.departmentQuantities[department.id] || 0), report.totals.totalQuantity, '', report.totals.totalAmount],
         [], [`Ngày báo cáo: ${formatReportDate(reportDate)}`], [`Người lập bảng: ${reporter}`],

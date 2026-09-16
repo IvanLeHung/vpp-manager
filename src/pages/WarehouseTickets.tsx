@@ -98,6 +98,7 @@ export default function WarehouseTickets({ warehouseCode: initialWarehouseCode =
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [selectedTickets, setSelectedTickets] = useState<string[]>([]);
+  const [previewTicket, setPreviewTicket] = useState<Ticket | null>(null);
 
   // Create modal
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -382,7 +383,7 @@ export default function WarehouseTickets({ warehouseCode: initialWarehouseCode =
                 const StatusIcon = sc.icon;
                 const totalQuantity = (t.lines || []).reduce((sum, line) => sum + Number(line.qtyApproved ?? line.qty ?? 0), 0);
                 return (
-                  <tr key={t.id} className="hover:bg-indigo-50/30 transition-colors group cursor-pointer" onClick={() => navigate(`${basePath}/${t.id}`)}>
+                  <tr key={t.id} className={`hover:bg-indigo-50/30 transition-colors group cursor-pointer ${previewTicket?.id === t.id ? 'bg-indigo-50/60' : ''}`} onClick={() => setPreviewTicket(t)}>
                     <td className="p-4 text-center" onClick={e => e.stopPropagation()}>
                        <input type="checkbox" className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                          checked={selectedTickets.includes(t.id)}
@@ -419,7 +420,7 @@ export default function WarehouseTickets({ warehouseCode: initialWarehouseCode =
                     <td className="p-4 text-sm text-slate-500 font-medium max-w-[200px] truncate">{t.reason || '—'}</td>
                     <td className="p-4 text-right pr-6">
                       <div className="flex items-center gap-1 justify-end" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => navigate(`${basePath}/${t.id}`)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Xem preview">
+                        <button onClick={() => setPreviewTicket(t)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Xem preview">
                           <Eye className="w-4 h-4" />
                         </button>
                         {/* WAREHOUSE: submit draft */}
@@ -441,9 +442,23 @@ export default function WarehouseTickets({ warehouseCode: initialWarehouseCode =
               })}
             </tbody>
           </table>
-        </div>
+      </div>
 
-        {/* Pagination */}
+      {previewTicket && (
+        <div className="fixed inset-y-4 right-4 z-[80] flex w-[min(720px,calc(100vw-32px))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+          <div className="flex items-start justify-between border-b border-slate-200 bg-slate-50 p-5">
+            <div><p className="text-lg font-black text-indigo-700">{previewTicket.ticketCode}</p><p className="mt-1 text-xs font-semibold text-slate-500">{TYPE_CONFIG[previewTicket.ticketType]?.label || previewTicket.ticketType} · {new Date(previewTicket.createdAt).toLocaleString('vi-VN')}</p><p className="mt-1 text-xs text-slate-500">{previewTicket.createdBy.fullName} · {previewTicket.receiverName || 'Chưa có người nhận'}</p></div>
+            <button type="button" onClick={() => setPreviewTicket(null)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-700" aria-label="Đóng preview"><X className="h-5 w-5" /></button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-5">
+            <div className="mb-4 grid grid-cols-2 gap-3 text-xs"><div className="rounded-lg bg-indigo-50 p-3"><span className="block font-bold uppercase text-indigo-500">Trạng thái</span><strong className="mt-1 block text-slate-800">{STATUS_CONFIG[previewTicket.status]?.label || previewTicket.status}</strong></div><div className="rounded-lg bg-slate-50 p-3"><span className="block font-bold uppercase text-slate-400">Lý do</span><strong className="mt-1 block text-slate-800">{previewTicket.reason || '—'}</strong></div></div>
+            <table className="w-full border-collapse text-sm"><thead><tr className="border-b border-slate-200 text-left text-[10px] uppercase tracking-wide text-slate-500"><th className="p-3">STT</th><th className="p-3">Vật tư / Hàng hóa</th><th className="p-3 text-center">Số lượng</th><th className="p-3">ĐVT</th></tr></thead><tbody className="divide-y divide-slate-100">{(previewTicket.lines || []).map((line, index) => <tr key={line.id}><td className="p-3 text-slate-400">{index + 1}</td><td className="p-3"><p className="font-bold text-slate-800">{line.item.name}</p><p className="mt-1 text-[10px] text-slate-400">{line.item.mvpp}</p></td><td className="p-3 text-center font-black text-indigo-700">{Number(line.qtyApproved ?? line.qty ?? 0).toLocaleString('vi-VN')}</td><td className="p-3 text-slate-600">{line.item.unit}</td></tr>)}</tbody></table>
+          </div>
+          <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 p-4"><span className="text-xs font-bold text-slate-500">{previewTicket.lines?.length || 0} mặt hàng</span><button type="button" onClick={() => navigate(`${basePath}/${previewTicket.id}`)} className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700">Mở chi tiết đầy đủ</button></div>
+        </div>
+      )}
+
+      {/* Pagination */}
         <div className="bg-slate-50 p-3 border-t border-slate-200 text-xs font-bold text-slate-500 shrink-0 flex items-center justify-between px-6">
           <span>Hiển thị {filteredTickets.length > 0 ? (safePage - 1) * PAGE_SIZE + 1 : 0}–{Math.min(safePage * PAGE_SIZE, filteredTickets.length)} / {filteredTickets.length} phiếu</span>
           <div className="flex items-center gap-2">
