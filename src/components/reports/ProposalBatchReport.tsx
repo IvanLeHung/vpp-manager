@@ -47,8 +47,14 @@ function ReportDocument({ report, period, reportDate, reporter, print = false }:
       </header>
       <div className="proposal-report-heading px-5 pb-5 text-center">
         <h2 className="text-lg font-bold uppercase leading-relaxed text-slate-900">{reportTitle(report.itemType)}</h2>
-        <p className="mt-2 text-xs text-slate-600">Ngày tạo phiếu: <span className="font-medium">{period}</span></p>
+        <p className="mt-2 text-xs text-slate-600">Kỳ tổng hợp: <span className="font-medium">{period}</span></p>
         <p className="mt-1 text-xs text-slate-500">{report.requestCount} phiếu • {report.itemCount} mặt hàng • Số lượng Hành chính duyệt</p>
+        <div className="proposal-report-meta mt-3 mx-auto grid max-w-3xl grid-cols-2 gap-x-8 gap-y-1 text-left text-[11px] text-slate-600">
+          <p><strong>Mã tổng hợp:</strong> THĐX-{reportDate.replace(/-/g, '')}-{report.itemType}</p>
+          <p><strong>Người lập:</strong> {reporter || '—'}</p>
+          <p><strong>Kho áp dụng:</strong> {report.itemType === 'VPP' ? 'Kho Văn phòng phẩm' : 'Kho Vệ sinh'}</p>
+          <p><strong>Ngày in:</strong> {formatReportDate(reportDate)}</p>
+        </div>
       </div>
       <div className="proposal-report-table-scroll" tabIndex={0} role="region" aria-label="Bảng tổng hợp theo phòng ban, cuộn ngang để xem thêm cột">
         <table className="proposal-report-table" style={{ '--proposal-department-count': departments.length, '--proposal-print-font-size': printFontSize } as CSSProperties}>
@@ -151,7 +157,7 @@ export default function ProposalBatchReport() {
       const data = [
         ['CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO'], ['MST: 3702070613'],
         ['CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM'], ['Độc lập - Tự do - Hạnh phúc'], [],
-        [reportTitle(itemType)], [`Ngày tạo phiếu: ${filter.label}`], ['Số lượng Hành chính duyệt'], [], ['Danh mục', 'Mã hàng', 'ĐVT', ...report.departments.map(department => department.province || 'Hà Nội'), 'Tổng số lượng', 'Đơn giá (VNĐ)', 'Thành tiền (VNĐ)'], headings,
+        [reportTitle(itemType)], [`Kỳ tổng hợp: ${filter.label}`], [`Mã tổng hợp: THĐX-${reportDate.replace(/-/g, '')}-${itemType}`, `Người lập: ${reporter}`], [`Kho áp dụng: ${itemType === 'VPP' ? 'Kho Văn phòng phẩm' : 'Kho Vệ sinh'}`, `Ngày in: ${formatReportDate(reportDate)}`], ['Số lượng Hành chính duyệt'], [], ['Danh mục', 'Mã hàng', 'ĐVT', ...report.departments.map(department => department.province || 'Hà Nội'), 'Tổng số lượng', 'Đơn giá (VNĐ)', 'Thành tiền (VNĐ)'], headings,
         ...report.rows.map(row => [row.name, row.mvpp, row.unit, ...report.departments.map(department => row.departmentQuantities[department.id] || 0), row.totalQuantity, row.unitPrice, row.totalAmount]),
         ['TỔNG CỘNG', '', '', ...report.departments.map(department => report.totals.departmentQuantities[department.id] || 0), report.totals.totalQuantity, '', report.totals.totalAmount],
         [], [`Ngày báo cáo: ${formatReportDate(reportDate)}`], [`Người lập bảng: ${reporter}`],
