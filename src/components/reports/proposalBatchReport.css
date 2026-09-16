@@ -32,6 +32,9 @@
 .proposal-report-table th, .proposal-report-table td { padding: 12px 10px; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
 .proposal-report-table th:last-child, .proposal-report-table td:last-child { border-right: 0; }
 .proposal-report-table thead th { position: sticky; top: 0; z-index: 4; background: #f1f5f9; color: #334155; font-weight: 700; text-align: center; }
+.proposal-report-table thead .proposal-province-row th { top: 0; background: #e0e7ff; color: #4338ca; font-size: 11px; letter-spacing: .04em; }
+.proposal-report-table thead tr:nth-child(2) th { top: 33px; }
+.proposal-report-table thead .proposal-province-column { background: #ede9fe; color: #5b21b6; }
 .proposal-report-table th.proposal-item-column { position: sticky; left: 0; z-index: 1; background: white; text-align: left; font-weight: 600; box-shadow: 2px 0 3px #0f172a06; overflow-wrap: anywhere; }
 .proposal-report-table thead .proposal-item-column { z-index: 5; background: #f1f5f9; }
 .proposal-report-table tbody tr:hover td, .proposal-report-table tbody tr:hover th { background: #f8fafc; }
@@ -72,6 +75,8 @@
   .proposal-report-table tr > :first-child { border-left-width: .5px !important; }
   .proposal-report-table .tabular-nums { white-space: nowrap; }
   .proposal-report-table thead th { padding-block: 5px; }
+  .proposal-report-table thead .proposal-province-row th { top: 0; }
+  .proposal-report-table thead tr:nth-child(2) th { top: 20px; }
   .proposal-report-table thead { display: table-header-group; }
   .proposal-report-table tfoot { display: table-row-group; }
   .proposal-report-table tr { break-inside: avoid; }
