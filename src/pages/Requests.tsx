@@ -7,6 +7,8 @@ import RequestsList from './requests/RequestsList';
 import RequestsCreate from './requests/RequestsCreate';
 import RequestsDetail from './requests/RequestsDetail';
 import RequestsWorkflow from './requests/RequestsWorkflow';
+import VppCreationLockedModal from '../components/VppCreationLockedModal';
+import { useVppCreationPermission } from '../hooks/useVppCreationPermission';
 
 import type { VPPRequest } from '../context/AppContext';
 
@@ -15,7 +17,7 @@ export type RequestSupplyType = 'VPP' | 'VE_SINH';
 
 export default function Requests() {
   const { currentUser } = useAppContext();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { id } = useParams();
   
   const [viewMode, setViewMode] = useState<ViewMode>('LIST');
@@ -25,6 +27,8 @@ export default function Requests() {
   const [navigationIds, setNavigationIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'warning'} | null>(null);
+  const [creationLockOpen, setCreationLockOpen] = useState(false);
+  const creationPermission = useVppCreationPermission();
 
   const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     setToast({ message, type });
@@ -47,13 +51,38 @@ export default function Requests() {
     fetchRequests();
   }, []);
 
-  // Handle direct navigation via search params if needed (optional)
+  // Route every menu/shortcut/direct-link entry through the same server-side
+  // permission check as the in-page "Tạo đề xuất" button.
   useEffect(() => {
     const mode = searchParams.get('mode') as ViewMode;
-    if (mode && ['LIST', 'CREATE', 'VIEW', 'WORKFLOW'].includes(mode)) {
+    if (!mode || !['LIST', 'CREATE', 'VIEW', 'WORKFLOW'].includes(mode)) return;
+
+    if (mode !== 'CREATE') {
       setViewMode(mode);
+      return;
     }
-  }, [searchParams]);
+
+    let cancelled = false;
+    void creationPermission.check().then(permission => {
+      if (cancelled) return;
+
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('mode');
+      setSearchParams(nextParams, { replace: true });
+
+      if (permission?.allowed) {
+        setActiveRequest(null);
+        setCreateSupplyType('VPP');
+        setViewMode('CREATE');
+        return;
+      }
+
+      setViewMode('LIST');
+      setCreationLockOpen(true);
+    });
+
+    return () => { cancelled = true; };
+  }, [searchParams, setSearchParams, creationPermission.check]);
 
   // Handle direct navigation via URL parameter (e.g. /requests/PDX-...)
   useEffect(() => {
@@ -82,6 +111,13 @@ export default function Requests() {
           {toast.message}
         </div>
       )}
+      <VppCreationLockedModal
+        open={creationLockOpen}
+        permission={creationPermission.permission}
+        serverNow={creationPermission.serverNow}
+        error={creationPermission.error}
+        onClose={() => setCreationLockOpen(false)}
+      />
       {viewMode === 'LIST' && (
         <RequestsList 
           requests={requests}
