@@ -35,6 +35,14 @@
 .proposal-report-table thead .proposal-province-row th { top: 0; background: #e0e7ff; color: #4338ca; font-size: 11px; letter-spacing: .04em; }
 .proposal-report-table thead tr:nth-child(2) th { top: 33px; }
 .proposal-report-table thead .proposal-province-column { background: #ede9fe; color: #5b21b6; }
+/* Shade the complete department columns by province. */
+.proposal-report-table [data-province="Hà Nội"] { background: #f8fafc; }
+.proposal-report-table [data-province="Bắc Ninh"] { background: #eff6ff; }
+.proposal-report-table [data-province="Thái Nguyên"] { background: #f0fdf4; }
+.proposal-report-table [data-province="Thanh Hóa"] { background: #fff7ed; }
+.proposal-report-table [data-province="Tuyên Quang"] { background: #fdf4ff; }
+.proposal-report-table thead [data-province] { font-weight: 800; }
+.proposal-report-table tfoot [data-province] { font-weight: 700; }
 .proposal-report-table th.proposal-item-column { position: sticky; left: 0; z-index: 1; background: white; text-align: left; font-weight: 600; box-shadow: 2px 0 3px #0f172a06; overflow-wrap: anywhere; }
 .proposal-report-table thead .proposal-item-column { z-index: 5; background: #f1f5f9; }
 .proposal-report-table tbody tr:hover td, .proposal-report-table tbody tr:hover th { background: #f8fafc; }
