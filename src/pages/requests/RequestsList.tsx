@@ -806,6 +806,12 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     }, 100);
   };
 
+  const allocationSummaryPeriod = createdDateMode === 'RANGE' && createdDateRangeStart
+    ? `Từ ngày ${createdDateRangeStart.split('-').reverse().join('/')} đến ngày ${(createdDateRangeEnd || createdDateRangeStart).split('-').reverse().join('/')}`
+    : createdDateFilter
+      ? `Ngày ${createdDateFilter.split('-').reverse().join('/')}`
+      : 'Toàn bộ thời gian đang lọc';
+
   const handleExportSummaryExcel = async () => {
     try {
       const payload = {
@@ -1493,6 +1499,12 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                      ? `Tổng hợp từ ${selectedIds.length} phiếu đã chọn` 
                      : `Tổng hợp từ ${filteredRequests.length} phiếu đang lọc`})
                  </p>
+                 <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-left text-[8.5pt] mt-3 mx-auto max-w-3xl">
+                   <p><strong>Kỳ tổng hợp:</strong> {allocationSummaryPeriod}</p>
+                   <p><strong>Người lập:</strong> {currentUser.fullName || currentUser.name || '—'}</p>
+                   <p><strong>Kho áp dụng:</strong> {group.type === 'VS' ? 'Kho Vệ sinh' : group.type === 'VPP' ? 'Kho Văn phòng phẩm' : 'Kho VPP và Vệ sinh'}</p>
+                   <p><strong>Số phiếu:</strong> {group.requestCount || selectedIds.length || filteredRequests.length}</p>
+                 </div>
              </div>
 
              <table className="print-table mb-8 bg-white">
