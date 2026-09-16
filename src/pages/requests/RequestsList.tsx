@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, type MouseEvent, type UIEvent } from 'react';
-import { Plus, Download, Search, FileText, XCircle, ChevronLeft, ChevronRight, Eye, CheckSquare, GitBranch, Printer, ListChecks, ChevronDown, RotateCcw, FileSpreadsheet, CornerUpLeft, ArrowUpDown, ArrowUp, ArrowDown, CalendarDays, PackageOpen, Droplets, Boxes } from 'lucide-react';
+import { Plus, Download, Search, FileText, XCircle, ChevronLeft, ChevronRight, Eye, CheckSquare, GitBranch, Printer, ListChecks, ChevronDown, RotateCcw, FileSpreadsheet, CornerUpLeft, ArrowUpDown, ArrowUp, ArrowDown, CalendarDays, PackageOpen, Droplets, Boxes, LoaderCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Dropdown, Select } from 'antd';
 import { flushSync } from 'react-dom';
@@ -16,6 +16,8 @@ import { summarizeDepartmentAmounts, type DepartmentSupplyGroup } from '../../li
 import type { RequestSupplyType, ViewMode } from '../Requests';
 import { getApprovalActionLabel, getRequestStatusLabel } from '../../lib/statusLabels';
 import { getOriginalRequestLineUnitPrice, getRequestLineAmount, getRequestLineUnitPrice, getRequestLineDeliveredQuantity, getRequestLineCorrectedQuantity } from '../../lib/requestPricing';
+import { useVppCreationPermission } from '../../hooks/useVppCreationPermission';
+import VppCreationLockedModal from '../../components/VppCreationLockedModal';
 
 interface Props {
   requests: VPPRequest[];
@@ -152,6 +154,8 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   const [reportDepartment, setReportDepartment] = useState('ALL');
   const [isSubmittingBatch, setIsSubmittingBatch] = useState(false);
   const [previewReq, setPreviewReq] = useState<VPPRequest | null>(null);
+  const [creationLockOpen, setCreationLockOpen] = useState(false);
+  const creationPermission = useVppCreationPermission();
   useEffect(() => {
     setPreviewReq(previous => previous ? requests.find(request => request.id === previous.id) || null : null);
   }, [requests]);
@@ -748,6 +752,17 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     setTimeout(() => window.print(), 100);
   };
 
+  const handleCreateRequest = async () => {
+    const permission = await creationPermission.check();
+    if (!permission?.allowed) {
+      setCreationLockOpen(true);
+      return;
+    }
+    setActiveRequest(null);
+    setCreateSupplyType('VPP');
+    setViewMode('CREATE');
+  };
+
   const handlePrintIndividuals = async (type: 'ALL' | 'VPP' | 'VS' | 'DEPARTMENT' | 'DEPARTMENT_VPP' | 'DEPARTMENT_VS') => {
     if (preparingPrintRef.current || !selectedIds.length) return;
     preparingPrintRef.current = true;
@@ -889,13 +904,15 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
               </div>
             )}
             <button
-              onClick={() => { setActiveRequest(null); setCreateSupplyType('VPP'); setViewMode('CREATE'); }}
+              onClick={() => { void handleCreateRequest(); }}
+              disabled={creationPermission.checking}
               className="flex items-center rounded-xl bg-indigo-600 px-5 py-2.5 font-bold text-white shadow-lg shadow-indigo-500/30 transition hover:bg-indigo-700"
             >
-              <Plus className="mr-2 h-5 w-5"/> Tạo đề xuất
+              {creationPermission.checking ? <LoaderCircle className="mr-2 h-5 w-5 animate-spin" /> : <Plus className="mr-2 h-5 w-5"/>} {creationPermission.checking ? 'Đang kiểm tra...' : 'Tạo đề xuất'}
             </button>
         </div>
       </div>
+      <VppCreationLockedModal open={creationLockOpen} permission={creationPermission.permission} serverNow={creationPermission.serverNow} error={creationPermission.error} onClose={() => setCreationLockOpen(false)} />
 
       <div className="no-print grid grid-cols-1 gap-3 mb-6 shrink-0 sm:grid-cols-2 xl:grid-cols-4">
         <button type="button" onClick={() => showStatusRequests()} className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-indigo-400 focus-visible:outline-2 focus-visible:outline-indigo-600">

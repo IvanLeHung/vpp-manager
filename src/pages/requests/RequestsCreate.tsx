@@ -18,6 +18,8 @@ import { useAppContext } from '../../context/AppContext';
 import type { VPPRequest, VPPItem } from '../../context/AppContext';
 import type { RequestSupplyType, ViewMode } from '../Requests';
 import MonthlyApprovalHistoryTooltip from '../../components/MonthlyApprovalHistoryTooltip';
+import VppCreationLockedModal from '../../components/VppCreationLockedModal';
+import { useVppCreationPermission } from '../../hooks/useVppCreationPermission';
 
 interface Props {
   setViewMode: (mode: ViewMode) => void;
@@ -127,6 +129,8 @@ export default function RequestsCreate({
   const [expandedNoteIds, setExpandedNoteIds] = useState<Set<string>>(new Set());
   const [isWorkspaceFocused, setIsWorkspaceFocused] = useState(false);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+  const [creationLockOpen, setCreationLockOpen] = useState(false);
+  const creationPermission = useVppCreationPermission();
   const [hasUserChanges, setHasUserChanges] = useState(false);
   const directDepartmentName = currentUser?.department
     || currentUser?.departmentName
@@ -548,6 +552,10 @@ export default function RequestsCreate({
       await refreshData();
       setViewMode('LIST');
     } catch (e: any) {
+      if (e.response?.status === 403 && e.response?.data?.code === 'VPP_CREATION_WINDOW_CLOSED') {
+        await creationPermission.check();
+        setCreationLockOpen(true);
+      }
       showToast(
         e.response?.data?.error || e.message || 'Lỗi khi lưu phiếu',
         'error'
@@ -728,6 +736,7 @@ export default function RequestsCreate({
       </div>
 
       {mobileCatalogOpen && <div className="fixed inset-0 z-50 bg-slate-900/40 p-3 lg:hidden"><div className="mx-auto flex h-full max-w-lg flex-col rounded-xl bg-white"><div className="flex items-center justify-between border-b border-slate-200 p-4"><h3 className="font-extrabold">Thêm vật tư</h3><button type="button" onClick={() => setMobileCatalogOpen(false)} className="p-2 text-slate-500"><X className="h-5 w-5" /></button></div><div className="min-h-0 flex-1 p-3">{catalog}</div><div className="border-t border-slate-200 p-3"><button type="button" onClick={() => setMobileCatalogOpen(false)} className="w-full rounded-lg bg-indigo-600 py-3 text-sm font-bold text-white">Xong · Đã chọn {targetItems.length} mặt hàng</button></div></div></div>}
+      <VppCreationLockedModal open={creationLockOpen} permission={creationPermission.permission} serverNow={creationPermission.serverNow} error={creationPermission.error} onClose={() => setCreationLockOpen(false)} />
     </div>
   );
 }
