@@ -54,7 +54,7 @@ function ReportDocument({ report, period, reportDate, reporter, print = false }:
         <table className="proposal-report-table" style={{ '--proposal-department-count': departments.length, '--proposal-print-font-size': printFontSize } as CSSProperties}>
           <colgroup>
             <col className="proposal-item-column" /><col className="proposal-unit-column" />
-            {departments.map(department => <col key={department.id} />)}
+            {departments.map(department => <col key={department.id} data-province={department.province || 'Hà Nội'} />)}
             <col className="proposal-total-column" /><col className="proposal-price-column" /><col className="proposal-amount-column" />
           </colgroup>
           <thead><tr className="proposal-province-row">
@@ -64,7 +64,7 @@ function ReportDocument({ report, period, reportDate, reporter, print = false }:
           </tr><tr>
             <th scope="col" className="proposal-item-column">Danh mục {report.itemType === 'VPP' ? 'VPP' : 'Vệ sinh'}</th>
             <th scope="col" className="proposal-unit-column">ĐVT</th>
-            {departments.map(department => <th key={department.id} scope="col" className="proposal-department-column" title={department.name}>{department.label}</th>)}
+            {departments.map(department => <th key={department.id} scope="col" data-province={department.province || 'Hà Nội'} className="proposal-department-column" title={department.name}>{department.label}</th>)}
             <th scope="col" className="proposal-total-column">Tổng số lượng</th>
             <th scope="col" className="proposal-price-column">Đơn giá<br /><span className="font-normal">(VNĐ)</span></th>
             <th scope="col" className="proposal-amount-column">Thành tiền<br /><span className="font-normal">(VNĐ)</span></th>
@@ -73,7 +73,7 @@ function ReportDocument({ report, period, reportDate, reporter, print = false }:
             {report.rows.map((row, index) => <tr key={row.key}>
               <th scope="row" className="proposal-item-column"><span className="proposal-row-index mr-2 text-[10px] font-normal text-slate-400">{index + 1}.</span>{row.name}<span className="proposal-item-code mt-1 block text-[10px] font-normal text-slate-400">{row.mvpp}</span></th>
               <td className="text-center text-slate-500">{row.unit}</td>
-              {departments.map(department => <td key={department.id} className="text-center tabular-nums">{row.departmentQuantities[department.id] ? formatNumber(row.departmentQuantities[department.id]) : <span className="text-slate-300">—</span>}</td>)}
+              {departments.map(department => <td key={department.id} data-province={department.province || 'Hà Nội'} className="text-center tabular-nums">{row.departmentQuantities[department.id] ? formatNumber(row.departmentQuantities[department.id]) : <span className="text-slate-300">—</span>}</td>)}
               <td className="proposal-total-column text-center font-bold tabular-nums">{formatNumber(row.totalQuantity)}</td>
               <td className="proposal-price-column text-right tabular-nums">{row.unitPrice === null ? <span className="text-amber-700">Chưa có giá</span> : formatNumber(row.unitPrice)}</td>
               <td className="proposal-amount-column text-right font-semibold tabular-nums">{row.totalAmount === null ? '—' : formatNumber(row.totalAmount)}</td>
@@ -81,7 +81,7 @@ function ReportDocument({ report, period, reportDate, reporter, print = false }:
           </tbody>
           <tfoot><tr>
             <th scope="row" className="proposal-item-column" colSpan={2}>TỔNG CỘNG</th>
-            {departments.map(department => <td key={department.id} className="text-center tabular-nums">{formatNumber(report.totals.departmentQuantities[department.id] || 0)}</td>)}
+            {departments.map(department => <td key={department.id} data-province={department.province || 'Hà Nội'} className="text-center tabular-nums">{formatNumber(report.totals.departmentQuantities[department.id] || 0)}</td>)}
             <td className="proposal-total-column text-center tabular-nums">{formatNumber(report.totals.totalQuantity)}</td>
             <td className="proposal-price-column text-center">—</td>
             <td className="proposal-amount-column text-right tabular-nums">{formatNumber(report.totals.totalAmount)}{report.totals.unpricedRowCount > 0 ? ' *' : ''}</td>
