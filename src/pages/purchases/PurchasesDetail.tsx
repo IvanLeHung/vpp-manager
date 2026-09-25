@@ -115,6 +115,8 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
   const [discount, setDiscount] = useState(0);
 
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [showFastTrackModal, setShowFastTrackModal] = useState(false);
+  const [fastTracking, setFastTracking] = useState(false);
   const [selectedWarehouse, setSelectedWarehouse] = useState('MAIN');
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
@@ -202,6 +204,32 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
     }
   };
 
+  const handleFastTrack = async () => {
+    if (!orderSupplier.trim()) {
+      showToast('Vui lòng nhập nhà cung cấp', 'warning');
+      return;
+    }
+    if (!orderExpectedDate) {
+      showToast('Vui lòng chọn ngày dự kiến giao', 'warning');
+      return;
+    }
+    try {
+      setFastTracking(true);
+      const response = await api.post(`/purchases/${poId}/fast-track`, {
+        supplier: orderSupplier.trim(),
+        expectedDate: orderExpectedDate,
+        warehouseCode: selectedWarehouse,
+      });
+      setShowFastTrackModal(false);
+      showToast(`Đã chuyển chờ nhập kho và tạo phiếu ${response.data.receiptId}`, 'success');
+      await refreshData();
+    } catch (err: any) {
+      showToast(err.response?.data?.error || 'Không thể xử lý nhanh phiếu mua sắm', 'error');
+    } finally {
+      setFastTracking(false);
+    }
+  };
+
   const printDocument = async (printType: 'ALL' | 'VPP' | 'VE_SINH' = 'ALL') => {
       const hasPendingReplacement = data?.lines?.some((l: any) => l.requestLine?.status === 'REPLACEMENT_PENDING_ADMIN');
       if (hasPendingReplacement) {
@@ -280,6 +308,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
   const isManager = currentUser.role === 'MANAGER';
 
   const canSubmit = (currentUid === data.requesterId || isAdmin) && isDRAFT;
+  const canFastTrack = isAdmin && isDRAFT && isBackorderPO;
   const canApprove = (isManager || isAdmin) && isPENDING;
   const canOrder = (isManager || isAdmin) && (isAPPROVED || (isDRAFT && data.type === 'PO'));
   const canConfirmDelivery = (isManager || isAdmin) && isORDERED;
@@ -1008,6 +1037,16 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                       )}
 
                       {/* Submit PR */}
+                      {canFastTrack && (
+                        <button
+                          onClick={() => setShowFastTrackModal(true)}
+                          className="w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-3 text-white shadow-lg shadow-indigo-500/25 transition hover:from-violet-700 hover:to-indigo-700"
+                        >
+                          <span className="flex items-center justify-center gap-1.5 text-xs font-black uppercase tracking-wider"><RefreshCw className="h-4 w-4"/> Xử lý nhanh đến chờ nhập kho</span>
+                          <span className="mt-0.5 block text-[8px] font-bold uppercase tracking-widest text-indigo-100">Dành cho phiếu mua bổ sung tự động</span>
+                        </button>
+                      )}
+
                       {canSubmit && (
                         <div className="group">
                            <button onClick={() => handleAction('/submit', {}, 'Đã trình duyệt thành công!')} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-black hover:bg-indigo-700 transition shadow-lg shadow-indigo-600/30 flex flex-col items-center gap-0.5 group-active:scale-95 transform">
@@ -1462,6 +1501,32 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
                   </div>
               </div>
           </div>
+      )}
+
+      {/* MODAL XỬ LÝ NHANH */}
+      {showFastTrackModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-[2rem] bg-white shadow-2xl animate-slide-up">
+            <div className="bg-gradient-to-r from-violet-600 to-indigo-600 p-7 text-white">
+              <div className="flex items-center gap-4">
+                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/20"><RefreshCw className="h-6 w-6"/></div>
+                <div><h4 className="text-xl font-black">Xác nhận xử lý nhanh</h4><p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-indigo-100">Từ phiếu nháp đến chờ nhập kho</p></div>
+              </div>
+            </div>
+            <div className="space-y-5 overflow-y-auto p-7">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2"><label className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-400">Nhà cung cấp *</label><input value={orderSupplier} onChange={e => setOrderSupplier(e.target.value)} placeholder="Tên nhà cung cấp" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-400"/></div>
+                <div><label className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-400">Ngày dự kiến giao *</label><input type="date" value={orderExpectedDate} onChange={e => setOrderExpectedDate(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-400"/></div>
+                <div><label className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-400">Kho nhận *</label><select value={selectedWarehouse} onChange={e => setSelectedWarehouse(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-indigo-400"><option value="MAIN">Kho VPP (MAIN)</option><option value="VE_SINH">Kho Vệ sinh</option></select></div>
+              </div>
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+                {['Trình phê duyệt', 'Phê duyệt toàn bộ vật tư', 'Phát hành PO', 'Tạo phiếu nhập kho chờ kiểm hàng'].map(step => <div key={step} className="flex items-center gap-2.5 py-1.5 text-xs font-bold text-slate-700"><CheckCircle2 className="h-4 w-4 text-emerald-600"/>{step}</div>)}
+              </div>
+              <div className="flex gap-3 rounded-2xl border border-amber-100 bg-amber-50 p-4 text-[11px] font-semibold leading-relaxed text-amber-800"><AlertTriangle className="h-5 w-5 shrink-0"/><p>Chỉ xác nhận khi số lượng, đơn giá và nhà cung cấp đã chính xác. Hệ thống vẫn ghi đầy đủ từng bước trong lịch sử.</p></div>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-slate-100 p-6"><button disabled={fastTracking} onClick={() => setShowFastTrackModal(false)} className="rounded-xl px-6 py-3 text-xs font-black uppercase tracking-wider text-slate-500 hover:bg-slate-100">Hủy</button><button disabled={fastTracking} onClick={() => void handleFastTrack()} className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-indigo-500/25 hover:bg-indigo-700 disabled:opacity-60">{fastTracking && <RefreshCw className="h-4 w-4 animate-spin"/>}{fastTracking ? 'Đang xử lý...' : 'Xác nhận & thực hiện'}</button></div>
+          </div>
+        </div>
       )}
 
       {/* MODAL PHÁT HÀNH PO */}
