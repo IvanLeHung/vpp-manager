@@ -15,6 +15,7 @@ const AUDIT_ACTION_MAP: Record<string, { label: string, impact: string, color: s
   'CREATE': { label: 'Khởi tạo phiếu', impact: 'Hệ thống', color: 'bg-slate-50 text-slate-400 border-slate-100' },
   'SAVE_DRAFT': { label: 'Lưu nháp đối chiếu', impact: 'Không đổi tồn', color: 'bg-blue-50 text-blue-500 border-blue-100' },
   'CONFIRM': { label: 'Xác nhận nhập kho', impact: 'Cập nhật tồn', color: 'bg-emerald-50 text-emerald-500 border-emerald-100' },
+  'FAST_COMPLETE': { label: 'Nhập đủ & hoàn tất', impact: 'Cập nhật tồn', color: 'bg-emerald-600 text-white border-emerald-600' },
   'CANCEL': { label: 'Hủy phiếu', impact: 'Không đổi tồn', color: 'bg-rose-50 text-rose-500 border-rose-100' },
   'CANCEL_AND_RESTORE': { label: 'Hủy & hoàn tồn', impact: 'Hoàn tồn', color: 'bg-rose-600 text-white border-rose-600' },
   'ADJUST': { label: 'Điều chỉnh tồn', impact: 'Cập nhật tồn', color: 'bg-amber-50 text-amber-500 border-amber-100' },
@@ -43,6 +44,8 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
     reason: 'Nhà cung cấp không giao đủ',
     note: ''
   });
+  const [quickCompleteOpen, setQuickCompleteOpen] = useState(false);
+  const [quickCompleting, setQuickCompleting] = useState(false);
 
   const handleBack = () => {
     if (from && ref) {
@@ -177,20 +180,6 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
     showToast(`Đã thêm hàng phát sinh: ${item.name}`);
   };
 
-  const handleApplyRemainingAll = () => {
-    if (!data) return;
-    const updated = reconcileValues.map((v: any) => {
-      const l = data.lines.find((x: any) => x.id === v.lineId);
-      if (l && l.qtyOrdered > 0) {
-        const remaining = Math.max(0, l.qtyOrdered - (l.qtyConfirmed || 0));
-        return { ...v, actualQty: remaining };
-      }
-      return v;
-    });
-    setReconcileValues(updated);
-    showToast('Đã áp dụng nhập đủ phần còn lại cho tất cả các dòng hàng!', 'success');
-  };
-
   const handleSaveDraft = async () => {
     try {
       const draftPayload = reconcileValues.map((v: any) => {
@@ -262,6 +251,24 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
       }
     } catch (err: any) {
       showToast(err.response?.data?.error || 'Lỗi hệ thống', 'error');
+    }
+  };
+
+  const handleQuickComplete = async () => {
+    try {
+      setQuickCompleting(true);
+      await api.post(`/receipts/${currentId}/confirm`, { mode: 'FULL', fillRemaining: true });
+      setQuickCompleteOpen(false);
+      showToast('Đã nhập đủ số lượng còn lại và hoàn tất phiếu!', 'success');
+      if (canGoNext) {
+        setTimeout(() => goNext(), 500);
+      } else {
+        await refreshData();
+      }
+    } catch (err: any) {
+      showToast(err.response?.data?.error || 'Không thể hoàn tất kiểm kho tự động', 'error');
+    } finally {
+      setQuickCompleting(false);
     }
   };
 
@@ -408,6 +415,12 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
   const unexpectedReceivedTotal = data.lines.reduce((s: number, l: any) => s + (l.qtyOrdered === 0 ? l.qtyConfirmed : 0), 0);
   const totalDiscrepancy = totalDefective + unexpectedReceivedTotal;
   const completionRate = totalExpected > 0 ? Math.round((totalHandled / totalExpected) * 100) : 0;
+  const hasUnexpectedLines = data.lines.some((line: any) => line.qtyOrdered === 0);
+  const quickCompleteBlockReason = totalReplacementsPending > 0
+    ? 'Có vật tư thay thế đang chờ xử lý.'
+    : totalDiscrepancy > 0 || hasUnexpectedLines
+      ? 'Phiếu có hàng phát sinh, hỏng hoặc chênh lệch; cần kiểm kho thủ công.'
+      : '';
 
   return (
     <div className="flex flex-col h-full bg-[#F8FAFC] relative overflow-hidden font-sans text-slate-900">
@@ -486,9 +499,11 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
                 <button onClick={() => setCancelModal({ open: true, reason: '' })} className="h-9 px-4 text-[11px] font-bold text-slate-500 hover:bg-slate-50 border border-slate-200 rounded-lg transition uppercase tracking-wide">
                   Hủy phiếu
                 </button>
-                <button onClick={handleApplyRemainingAll} className="h-9 px-4 text-[11px] font-bold text-teal-600 hover:bg-teal-50 border border-teal-200 rounded-lg transition uppercase tracking-wide">
-                  Áp dụng nhập đủ
-                </button>
+                {isWarehouseOrAdmin && remainingQty > 0 && (
+                  <button onClick={() => setQuickCompleteOpen(true)} className="h-9 px-4 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 border border-emerald-600 rounded-lg transition uppercase tracking-wide shadow-sm">
+                    Nhập đủ & hoàn tất
+                  </button>
+                )}
                 {remainingQty > 0 ? (
                   <>
                     <button onClick={() => handleConfirm('PARTIAL')} className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg transition uppercase tracking-wide shadow-sm">
@@ -1088,6 +1103,21 @@ const ReceiptsDetail: React.FC<ReceiptsDetailProps> = ({ receiptId, navigationId
       </div>
 
       {/* REFINED CANCEL MODAL */}
+      {quickCompleteOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/45 p-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95">
+            <div className="border-b border-slate-100 p-6">
+              <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-emerald-100 text-emerald-700"><CheckCircle2 className="h-6 w-6"/></span><div><h3 className="text-lg font-black text-slate-800">Nhập đủ & hoàn tất</h3><p className="text-xs font-semibold text-slate-500">Phiếu {data.id}</p></div></div>
+            </div>
+            <div className="space-y-4 p-6">
+              <div className="rounded-xl bg-slate-50 p-4 text-sm"><div className="flex justify-between py-1 text-slate-500"><span>Số dòng vật tư</span><strong className="text-slate-800">{data.lines.filter((line: any) => line.qtyOrdered > 0).length}</strong></div><div className="flex justify-between py-1 text-slate-500"><span>Số lượng còn lại</span><strong className="text-emerald-700">{remainingQty}</strong></div><div className="flex justify-between py-1 text-slate-500"><span>Kho nhận</span><strong className="text-slate-800">{data.warehouseCode}</strong></div></div>
+              {quickCompleteBlockReason ? <div className="flex gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs font-bold leading-relaxed text-rose-700"><AlertTriangle className="h-5 w-5 shrink-0"/>{quickCompleteBlockReason}</div> : <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs font-semibold leading-relaxed text-amber-800"><AlertTriangle className="h-5 w-5 shrink-0"/>Chỉ thực hiện khi hàng thực tế đã nhận đủ. Thao tác sẽ tăng tồn kho và hoàn tất PO.</div>}
+              <div className="flex gap-3"><button disabled={quickCompleting} onClick={() => setQuickCompleteOpen(false)} className="flex-1 rounded-xl bg-slate-100 py-3 text-xs font-black uppercase tracking-wide text-slate-600 hover:bg-slate-200">Hủy</button><button disabled={quickCompleting || Boolean(quickCompleteBlockReason)} onClick={() => void handleQuickComplete()} className="flex-1 rounded-xl bg-emerald-600 py-3 text-xs font-black uppercase tracking-wide text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">{quickCompleting ? 'Đang xử lý...' : 'Xác nhận hoàn tất'}</button></div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {cancelModal.open && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
