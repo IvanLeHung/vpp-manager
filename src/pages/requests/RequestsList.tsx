@@ -66,11 +66,14 @@ function sortLinesForPrinting(lines: any[]) {
 
 function normalizeSearchText(value: any) {
   return String(value ?? '')
+    .replace(/[\u00A0\u2007\u202F]/g, ' ')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/đ/g, 'd')
     .replace(/Đ/g, 'D')
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 type RequestSupplyGroup = 'VPP' | 'VS' | 'VPP+VS';
@@ -252,7 +255,16 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     if (searchTerm.trim()) {
       const normalizedQuery = normalizeSearchText(searchTerm);
       const terms = normalizedQuery.split(/\s+/).filter(Boolean);
+      const exactDepartmentSearch = requests.some((request: any) =>
+        normalizeSearchText(String(request.department || '')) === normalizedQuery
+      );
       filtered = filtered.filter((r: any) => {
+        // An exact department name is an unambiguous user intent. Do not let
+        // matching words in item names, notes, or purposes leak other
+        // departments into the result set.
+        if (exactDepartmentSearch) {
+          return normalizeSearchText(String(r.department || '')) === normalizedQuery;
+        }
         const lineValues = (r.lines || []).flatMap((line: any) => [
           line.note,
           line.issueNote,
