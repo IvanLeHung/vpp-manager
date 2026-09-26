@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, type MouseEvent } from 'react';
+import { useState, useMemo, useEffect, useRef, type MouseEvent, type UIEvent, type WheelEvent } from 'react';
 import { Plus, Download, Search, FileText, XCircle, ChevronLeft, ChevronRight, Eye, CheckSquare, GitBranch, Printer, ListChecks, ChevronDown, RotateCcw, FileSpreadsheet, CornerUpLeft, ArrowUpDown, ArrowUp, ArrowDown, CalendarDays, PackageOpen, Droplets, Boxes, LoaderCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Dropdown, Select } from 'antd';
@@ -159,7 +159,25 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   useEffect(() => {
     setPreviewReq(previous => previous ? requests.find(request => request.id === previous.id) || null : null);
   }, [requests]);
+  const [isHeaderCompact, setIsHeaderCompact] = useState(false);
   const itemsPerPage = 15;
+
+  const handleListScroll = (event: UIEvent<HTMLDivElement>) => {
+    // Collapse only in one direction. Expanding from this scroll event used to
+    // create a feedback loop because changing the header height also changes
+    // scrollTop, making the list jump up and down.
+    if (!isHeaderCompact && event.currentTarget.scrollTop >= 96) {
+      setIsHeaderCompact(true);
+    }
+  };
+
+  const handleListWheel = (event: WheelEvent<HTMLDivElement>) => {
+    // Restore the header only on an explicit upward gesture at the real top.
+    // A layout-induced scroll event can therefore never reopen it by itself.
+    if (isHeaderCompact && event.deltaY < 0 && event.currentTarget.scrollTop <= 2) {
+      setIsHeaderCompact(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch(status) {
@@ -232,7 +250,8 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     }
 
     if (searchTerm.trim()) {
-      const terms = normalizeSearchText(searchTerm).split(/\s+/).filter(Boolean);
+      const normalizedQuery = normalizeSearchText(searchTerm);
+      const terms = normalizedQuery.split(/\s+/).filter(Boolean);
       filtered = filtered.filter((r: any) => {
         const lineValues = (r.lines || []).flatMap((line: any) => [
           line.note,
@@ -242,7 +261,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
           line.replacementItem?.name,
           line.replacementItem?.mvpp,
         ]);
-        const haystack = normalizeSearchText([
+        const searchableFields = [
           r.id,
           r.requester?.fullName,
           r.requester?.username,
@@ -252,8 +271,15 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
           r.priority,
           r.status,
           ...lineValues,
-        ].join(' '));
-        return terms.every(term => haystack.includes(term));
+        ]
+          .filter(Boolean)
+          .map(value => normalizeSearchText(String(value)));
+        // All words must belong to the same field. Previously words could be
+        // scattered across requester, department and item names, so unrelated
+        // departments were incorrectly included.
+        return searchableFields.some(field =>
+          field.includes(normalizedQuery) || terms.every(term => field.includes(term))
+        );
       });
     }
 
@@ -334,6 +360,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   useEffect(() => {
     setSelectedIds([]);
     setSelectedMode('NONE');
+    setIsHeaderCompact(false);
   }, [statusFilters, searchTerm, deptFilter, priorityFilter, createdDateMode, createdDateFilter, createdDateRangeStart, createdDateRangeEnd]);
 
   const stats = useMemo(() => {
@@ -829,7 +856,17 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
 
   return (
     <div className="flex flex-col h-full p-4 md:p-8 relative print:p-0 print:h-auto print:block RequestsList">
-      <div className="no-print grid shrink-0 overflow-hidden">
+      <div
+        aria-hidden={isHeaderCompact}
+        className="no-print grid shrink-0 overflow-hidden"
+        style={{
+          gridTemplateRows: isHeaderCompact ? '0fr' : '1fr',
+          opacity: isHeaderCompact ? 0 : 1,
+          transform: isHeaderCompact ? 'translateY(-12px)' : 'translateY(0)',
+          pointerEvents: isHeaderCompact ? 'none' : 'auto',
+          transition: 'grid-template-rows 320ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease, transform 320ms cubic-bezier(0.22, 1, 0.36, 1)',
+        }}
+      >
       <div className="min-h-0 overflow-hidden">
       <div className="no-print flex justify-between items-center mb-6 shrink-0">
         <div>
@@ -1117,7 +1154,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             </div>
           )}
           {/* Table */}
-          <div className="flex-1 overflow-auto custom-scrollbar" style={{ overflowAnchor: 'none' }}>
+          <div onScroll={handleListScroll} onWheel={handleListWheel} className="flex-1 overflow-auto custom-scrollbar" style={{ overflowAnchor: 'none' }}>
               <table className="w-full text-left whitespace-nowrap">
                   <thead className="bg-white border-b border-slate-200 sticky top-0 z-10">
                       <tr className="text-[10px] uppercase font-bold text-slate-400 tracking-widest bg-slate-50/80">
