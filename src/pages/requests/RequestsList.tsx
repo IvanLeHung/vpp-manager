@@ -252,7 +252,16 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     if (searchTerm.trim()) {
       const normalizedQuery = normalizeSearchText(searchTerm);
       const terms = normalizedQuery.split(/\s+/).filter(Boolean);
+      const exactDepartmentSearch = requests.some((request: any) =>
+        normalizeSearchText(String(request.department || '')) === normalizedQuery
+      );
       filtered = filtered.filter((r: any) => {
+        // An exact department name is an unambiguous user intent. Do not let
+        // matching words in item names, notes, or purposes leak other
+        // departments into the result set.
+        if (exactDepartmentSearch) {
+          return normalizeSearchText(String(r.department || '')) === normalizedQuery;
+        }
         const lineValues = (r.lines || []).flatMap((line: any) => [
           line.note,
           line.issueNote,
