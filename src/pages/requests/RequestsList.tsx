@@ -66,11 +66,14 @@ function sortLinesForPrinting(lines: any[]) {
 
 function normalizeSearchText(value: any) {
   return String(value ?? '')
+    .replace(/[\u00A0\u2007\u202F]/g, ' ')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/đ/g, 'd')
     .replace(/Đ/g, 'D')
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 type RequestSupplyGroup = 'VPP' | 'VS' | 'VPP+VS';
