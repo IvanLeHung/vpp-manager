@@ -713,8 +713,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       className: 'border-x border-slate-100',
       render: (l: any) => (
         <MonthlyApprovalHistoryTooltip
-          itemId={l.itemId || l.item?.id}
-          itemName={l.item?.name || 'Vật tư'}
+          itemId={l.issue_item?.id || l.replacementItem?.id || l.replacementItemId || l.itemId || l.item?.id}
+          itemName={l.issue_item?.name || l.replacementItem?.name || l.item?.name || 'Vật tư'}
           department={data.department}
           departmentId={data.requester?.departmentId}
           requestId={data.id}
@@ -1739,8 +1739,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                         </td>
                                         <td className="p-4 text-center font-black text-indigo-600 bg-indigo-50/30 align-top pt-5">
                                           <MonthlyApprovalHistoryTooltip
-                                            itemId={l.itemId || l.item?.id}
-                                            itemName={l.item?.name || 'Vật tư'}
+                                            itemId={l.issue_item?.id || l.replacementItem?.id || l.replacementItemId || l.itemId || l.item?.id}
+                                            itemName={l.issue_item?.name || l.replacementItem?.name || l.item?.name || 'Vật tư'}
                                             department={data.department}
                                             departmentId={data.requester?.departmentId}
                                             requestId={data.id}
