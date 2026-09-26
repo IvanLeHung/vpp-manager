@@ -552,7 +552,7 @@ export default function RequestsCreate({
       await refreshData();
       setViewMode('LIST');
     } catch (e: any) {
-      if (e.response?.status === 403 && e.response?.data?.code === 'VPP_CREATION_WINDOW_CLOSED') {
+      if (e.response?.status === 403 && ['VPP_CREATION_WINDOW_CLOSED', 'VPP_HANDOVER_CONFIRMATION_REQUIRED'].includes(e.response?.data?.code)) {
         await creationPermission.check();
         setCreationLockOpen(true);
       }
