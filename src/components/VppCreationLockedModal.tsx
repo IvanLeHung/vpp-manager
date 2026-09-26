@@ -25,7 +25,7 @@ export default function VppCreationLockedModal({ open, permission, serverNow, er
   useEffect(() => {
     if (open && permission?.allowed) onClose();
   }, [open, permission?.allowed, onClose]);
-  const target = permission && !permission.allowed ? permission.nextOpenAt : undefined;
+  const target = permission && ['NOT_OPEN_YET', 'CLOSED'].includes(permission.status) ? permission.nextOpenAt : undefined;
   const remaining = target ? Math.max(0, Math.ceil((new Date(target).getTime() - now) / 1000)) : 0;
   return <Modal open={open} onCancel={onClose} footer={<button type="button" onClick={onClose} className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-bold text-white">Đóng</button>} title={null} centered destroyOnHidden>
     <div className="py-3 text-center"><span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-amber-100 text-amber-700"><LockKeyhole className="h-6 w-6" /></span>
@@ -33,6 +33,7 @@ export default function VppCreationLockedModal({ open, permission, serverNow, er
       <p className="mt-2 text-sm text-slate-600">{error || permission?.message}</p>
       {permission?.status === 'NOT_OPEN_YET' && <p className="mt-2 text-sm text-slate-600">Hệ thống sẽ mở vào <strong>{formatDateTime(permission.openAt)}</strong>.</p>}
       {permission?.status === 'CLOSED' && <p className="mt-2 text-sm text-slate-600">Kỳ vừa qua đã đóng lúc <strong>{formatDateTime(permission.closeAt)}</strong>.</p>}
+      {permission?.status === 'PENDING_HANDOVER_CONFIRMATION' && permission.pendingRequestId && <a href={`/requests/${encodeURIComponent(permission.pendingRequestId)}`} className="mt-4 inline-flex rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-700 hover:bg-indigo-100">Mở phiếu {permission.pendingRequestId}</a>}
       {target && <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-2 text-sm font-bold text-indigo-700"><Clock3 className="h-4 w-4" />{countdownText(remaining)}</p>}
     </div>
   </Modal>;
