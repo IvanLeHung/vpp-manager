@@ -24,7 +24,8 @@ interface Props {
   children: ReactNode;
 }
 
-const historyCache = new Map<string, ApprovalHistoryResponse>();
+const HISTORY_CACHE_TTL_MS = 60_000;
+const historyCache = new Map<string, { data: ApprovalHistoryResponse; cachedAt: number }>();
 
 export default function MonthlyApprovalHistoryTooltip({
   itemId,
@@ -46,12 +47,13 @@ export default function MonthlyApprovalHistoryTooltip({
     if (!open || !itemId) return;
 
     const cached = historyCache.get(cacheKey);
-    if (cached) {
-      setHistory(cached);
+    if (cached && Date.now() - cached.cachedAt < HISTORY_CACHE_TTL_MS) {
+      setHistory(cached.data);
       setLoading(false);
       setError('');
       return;
     }
+    if (cached) historyCache.delete(cacheKey);
 
     let cancelled = false;
     setLoading(true);
@@ -70,7 +72,7 @@ export default function MonthlyApprovalHistoryTooltip({
       .then(response => {
         if (cancelled) return;
         const data = response.data?.data || response.data;
-        historyCache.set(cacheKey, data);
+        historyCache.set(cacheKey, { data, cachedAt: Date.now() });
         setHistory(data);
       })
       .catch(err => {
