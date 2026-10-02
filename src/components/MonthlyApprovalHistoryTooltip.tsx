@@ -149,7 +149,7 @@ export default function MonthlyApprovalHistoryTooltip({
           <div className="mt-2.5 flex items-center justify-between rounded-xl bg-slate-900 px-3 py-2 text-white">
             <div>
               <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Cộng tất cả người đề xuất cùng phòng ban</p>
-              <p className="text-[10px] font-semibold text-slate-300">Tính theo ngày Hành chính duyệt</p>
+              <p className="text-[10px] font-semibold text-slate-300">Ngày lập 01–15: tháng hiện tại; từ ngày 16: tháng kế tiếp</p>
             </div>
             <div className="text-right">
               <p className="text-[9px] font-black uppercase text-slate-400">Tổng</p>
