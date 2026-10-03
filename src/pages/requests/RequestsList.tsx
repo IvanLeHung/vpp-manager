@@ -1515,14 +1515,15 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
             @page { size: A4 portrait; margin: 10mm; }
-            @page request-summary { size: A4 portrait; margin: 8mm; }
+            @page request-summary { size: A4 portrait; margin: 4mm; }
             * { background-color: transparent !important; color-adjust: exact; -webkit-print-color-adjust: exact; }
             .print-sheet { font-family: "Times New Roman", Times, serif; color: #000 !important; background: #fff !important; }
             .request-summary-print {
               page: request-summary;
-              width: 194mm !important;
-              min-height: 281mm !important;
-              margin: 0 auto !important;
+              width: 100% !important;
+              max-width: none !important;
+              min-height: 289mm !important;
+              margin: 0 !important;
               padding: 0 !important;
               box-sizing: border-box !important;
             }
