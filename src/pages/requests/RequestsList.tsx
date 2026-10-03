@@ -145,7 +145,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   const [selectedMode, setSelectedMode] = useState<'NONE' | 'MANUAL' | 'ALL_FILTERED'>('NONE');
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [selectedPrintType, setSelectedPrintType] = useState<'ALL' | 'VPP' | 'VE_SINH'>('ALL');
-  const [printMode, setPrintMode] = useState<'SUMMARY' | 'INDIVIDUAL' | 'DEPARTMENT' | 'ITEM_REPORT'>('SUMMARY');
+  const [printMode, setPrintMode] = useState<'SUMMARY' | 'FILTERED_SUMMARY' | 'INDIVIDUAL' | 'DEPARTMENT' | 'ITEM_REPORT'>('SUMMARY');
   const [departmentPrintGroup, setDepartmentPrintGroup] = useState<DepartmentSupplyGroup>('ALL');
   const [printRequests, setPrintRequests] = useState<PrintableRequest[]>([]);
   const [individualPrintType, setIndividualPrintType] = useState<'ALL' | 'VPP' | 'VS'>('ALL');
@@ -731,6 +731,77 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     };
   }, [requests, filteredRequests, selectedIds, masterItems]);
 
+  // Báo cáo theo đúng bộ lọc hiện tại là một nhánh độc lập với báo cáo tồn
+  // đọng phía trên: lấy toàn bộ trạng thái và không trừ số lượng đã giao.
+  const filteredSummaryGroups = useMemo(() => {
+    const groups = new Map<string, Map<string, any>>();
+
+    filteredRequests.forEach(request => {
+      request.lines?.forEach((line: any) => {
+        const effectiveItem = line.replacementItemId && line.replacementItem
+          ? line.replacementItem
+          : line.issue_item || line.item;
+        if (!effectiveItem) return;
+
+        const quantity = getRequestLineCorrectedQuantity(line);
+        if (quantity <= 0) return;
+
+        const supplyGroup = getItemSupplyGroup(effectiveItem) === 'VS' ? 'VE_SINH' : 'VPP';
+        if (!groups.has(supplyGroup)) groups.set(supplyGroup, new Map());
+        const itemMap = groups.get(supplyGroup)!;
+        const key = effectiveItem.mvpp || effectiveItem.id;
+        const masterItem = masterItems.find(item => item.mvpp === effectiveItem.mvpp);
+        const current = itemMap.get(key) || {
+          mvpp: effectiveItem.mvpp || '',
+          name: effectiveItem.name,
+          unit: effectiveItem.unit,
+          price: getRequestLineUnitPrice(line),
+          qtyRequested: 0,
+          qtyDelivered: 0,
+          originalTotal: 0,
+          actualTotal: 0,
+          deptBreakdown: new Map<string, { qty: number; notes: string[]; replacements: any[] }>(),
+          requestIds: new Set<string>(),
+          printSortGroup: (masterItem as any)?.printSortGroup || effectiveItem.printSortGroup,
+        };
+
+        const department = request.department || 'Khác';
+        const departmentData = current.deptBreakdown.get(department) || { qty: 0, notes: [], replacements: [] };
+        departmentData.qty += quantity;
+        if (line.note?.trim() && !departmentData.notes.includes(line.note)) departmentData.notes.push(line.note);
+        current.deptBreakdown.set(department, departmentData);
+        current.requestIds.add(request.id);
+        current.qtyRequested += quantity;
+        current.originalTotal += getRequestLineAmount(line, quantity);
+        current.actualTotal += getRequestLineAmount(line, quantity);
+        itemMap.set(key, current);
+      });
+    });
+
+    return {
+      groups: Array.from(groups.entries()).map(([type, itemsMap]) => {
+        const items = sortItemsForPrinting(Array.from(itemsMap.values()).map(item => ({
+          ...item,
+          deptEntries: (Array.from(item.deptBreakdown.entries()) as [string, any][]).map(([dept, data]) => ({
+            dept,
+            qty: data.qty,
+            note: data.notes.join('; '),
+            replacements: data.replacements,
+          })).sort((a: any, b: any) => b.qty - a.qty),
+        })));
+        const requestIds = new Set<string>();
+        items.forEach(item => item.requestIds.forEach((id: string) => requestIds.add(id)));
+        return {
+          type,
+          label: type === 'VPP' ? 'VĂN PHÒNG PHẨM' : 'VỆ SINH',
+          items,
+          requestCount: requestIds.size,
+        };
+      }).filter(group => group.items.length > 0),
+      unclassified: [] as string[],
+    };
+  }, [filteredRequests, masterItems]);
+
   const individualPrintSheets = useMemo(() => printRequests
     .flatMap(request => {
       if (individualPrintType === 'ALL') {
@@ -844,6 +915,23 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     window.print();
   };
 
+  const handlePrintFilteredSummary = async (type: 'ALL' | 'VPP' | 'VE_SINH' = 'ALL') => {
+    const printableGroups = filteredSummaryGroups.groups.filter(group => type === 'ALL' || group.type === type);
+    if (printableGroups.length === 0) {
+      const groupLabel = type === 'VPP' ? 'VPP' : type === 'VE_SINH' ? 'đồ vệ sinh' : 'VPP/đồ vệ sinh';
+      showToast(`Không có ${groupLabel} trong bộ lọc hiện tại để in.`, 'warning');
+      return;
+    }
+
+    flushSync(() => {
+      setPrintMode('FILTERED_SUMMARY');
+      setSelectedPrintType(type);
+    });
+    await document.fonts.ready;
+    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    window.print();
+  };
+
   const allocationSummaryPeriod = createdDateMode === 'RANGE' && createdDateRangeStart
     ? `Từ ngày ${createdDateRangeStart.split('-').reverse().join('/')} đến ngày ${(createdDateRangeEnd || createdDateRangeStart).split('-').reverse().join('/')}`
     : createdDateFilter
@@ -911,11 +999,24 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                   </button>
                    <Dropdown trigger={['click']} menu={{
                      items: [
-                       { key: 'VPP', label: 'In VPP' },
-                       { key: 'VE_SINH', label: 'In VS' },
-                       { key: 'ALL', label: 'In tổng hợp (VPP + VS)' },
+                       { key: 'OUTSTANDING', label: 'In tồn đọng (logic hiện tại)', children: [
+                         { key: 'OUTSTANDING_VPP', label: 'VPP' },
+                         { key: 'OUTSTANDING_VE_SINH', label: 'VS' },
+                         { key: 'OUTSTANDING_ALL', label: 'VPP + VS' },
+                       ] },
+                       { key: 'FILTERED', label: 'In theo bộ lọc đang chọn', children: [
+                         { key: 'FILTERED_VPP', label: 'VPP' },
+                         { key: 'FILTERED_VE_SINH', label: 'VS' },
+                         { key: 'FILTERED_ALL', label: 'VPP + VS' },
+                       ] },
                      ],
-                     onClick: ({ key }) => { void handlePrintSummary(key as 'ALL' | 'VPP' | 'VE_SINH'); },
+                     onClick: ({ key }) => {
+                       if (key.startsWith('FILTERED_')) {
+                         void handlePrintFilteredSummary(key.replace('FILTERED_', '') as 'ALL' | 'VPP' | 'VE_SINH');
+                       } else if (key.startsWith('OUTSTANDING_')) {
+                         void handlePrintSummary(key.replace('OUTSTANDING_', '') as 'ALL' | 'VPP' | 'VE_SINH');
+                       }
+                     },
                    }}>
                      <button type="button" className="flex items-center px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-indigo-700 hover:bg-indigo-50 transition font-bold shadow-sm">
                        <Printer className="w-5 h-5 mr-1.5 text-indigo-400"/> In Phiếu Đề xuất <ChevronDown className="w-4 h-4 ml-1"/>
@@ -1500,15 +1601,15 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             })}
             <p className="mt-5 text-xs italic">Báo cáo được tách thành từng bảng theo vật tư và phòng ban đã chọn.</p>
           </div>
-        ) : printMode === 'DEPARTMENT' ? <DepartmentAmountPrint requests={printRequests} supplyGroup={departmentPrintGroup} preparer={currentUser.fullName || currentUser.name} /> : printMode === 'SUMMARY' ? (
-          summaryGroups.groups
+        ) : printMode === 'DEPARTMENT' ? <DepartmentAmountPrint requests={printRequests} supplyGroup={departmentPrintGroup} preparer={currentUser.fullName || currentUser.name} /> : printMode === 'SUMMARY' || printMode === 'FILTERED_SUMMARY' ? (
+          (printMode === 'FILTERED_SUMMARY' ? filteredSummaryGroups : summaryGroups).groups
             .filter(g => selectedPrintType === 'ALL' || g.type === selectedPrintType)
             .map((group, gIdx) => (
             <div key={group.type} className={`print-sheet text-black leading-tight p-4 bg-white ${gIdx > 0 ? 'page-break' : ''}`}>
                 <div className="flex justify-between items-start mb-6 w-full print-header">
                     <div className="w-[40%] text-left">
                         <p className="font-bold text-[11pt] uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
-                        <p className="text-[9pt] italic mt-1 font-bold">Báo cáo tổng hợp tồn đọng cấp phát</p>
+                        <p className="text-[9pt] italic mt-1 font-bold">{printMode === 'FILTERED_SUMMARY' ? 'Báo cáo tổng hợp theo bộ lọc đang chọn' : 'Báo cáo tổng hợp tồn đọng cấp phát'}</p>
                         <p className="text-[8pt] text-black mt-1">Ban Hành chính Nhân sự</p>
                     </div>
                     <div className="w-[10%] flex flex-col items-center text-center">
@@ -1530,7 +1631,9 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                      PHIẾU TỔNG HỢP ĐỒ {group.label}
                  </h1>
                  <p className="text-[9pt] italic mt-1 text-black">
-                   ({selectedIds.length > 0 
+                   ({printMode === 'FILTERED_SUMMARY'
+                     ? `Tổng hợp từ ${group.requestCount || 0} phiếu theo bộ lọc`
+                     : selectedIds.length > 0
                      ? `Tổng hợp từ ${selectedIds.length} phiếu đã chọn` 
                      : `Tổng hợp từ ${filteredRequests.length} phiếu đang lọc`})
                  </p>
@@ -1549,7 +1652,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                           <th className="col-code text-center">Mã VT</th>
                           <th className="col-name text-center">Tên vật tư</th>
                           <th className="col-unit text-center">ĐVT</th>
-                          <th className="col-qty text-center">Cần xuất</th>
+                          <th className="col-qty text-center">{printMode === 'FILTERED_SUMMARY' ? 'SL duyệt' : 'Cần xuất'}</th>
                           <th className="col-price text-center">Đơn giá</th>
                           <th className="col-total text-center">Thành tiền</th>
                       </tr>
@@ -1607,12 +1710,12 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                             {group.items.reduce((s, i) => s + (i.price * (i.qtyRequested - i.qtyDelivered)), 0).toLocaleString('vi-VN')} đ
                           </td>
                       </tr>
-                      <tr className="font-bold text-[8pt] text-slate-600 bg-slate-50">
+                      {printMode !== 'FILTERED_SUMMARY' && <tr className="font-bold text-[8pt] text-slate-600 bg-slate-50">
                           <td colSpan={6} className="p-1 text-right border border-black">Tổng giá trị đề xuất ban đầu đã duyệt:</td>
                           <td className="p-1 text-right border border-black">
                             {group.items.reduce((s, i) => s + i.originalTotal, 0).toLocaleString('vi-VN')} đ
                           </td>
-                      </tr>
+                      </tr>}
                  </tbody>
              </table>
 
