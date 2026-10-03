@@ -1515,8 +1515,22 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
             @page { size: A4 portrait; margin: 10mm; }
+            @page request-summary { size: A4 portrait; margin: 8mm; }
             * { background-color: transparent !important; color-adjust: exact; -webkit-print-color-adjust: exact; }
             .print-sheet { font-family: "Times New Roman", Times, serif; color: #000 !important; background: #fff !important; }
+            .request-summary-print {
+              page: request-summary;
+              width: 194mm !important;
+              min-height: 281mm !important;
+              margin: 0 auto !important;
+              padding: 0 !important;
+              box-sizing: border-box !important;
+            }
+            .request-summary-print .print-header { margin-bottom: 5mm !important; }
+            .request-summary-print .summary-title { margin-bottom: 5mm !important; }
+            .request-summary-print .print-table { margin-top: 0 !important; margin-bottom: 5mm !important; }
+            .request-summary-print .print-table th,
+            .request-summary-print .print-table td { padding: 1.5mm 1.8mm !important; }
             .print-table { width: 100%; border-collapse: collapse; table-layout: fixed; background: #fff !important; }
             .print-table th, .print-table td { 
               border: 0.7px solid #000 !important; 
@@ -1605,7 +1619,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
           (printMode === 'FILTERED_SUMMARY' ? filteredSummaryGroups : summaryGroups).groups
             .filter(g => selectedPrintType === 'ALL' || g.type === selectedPrintType)
             .map((group, gIdx) => (
-            <div key={group.type} className={`print-sheet text-black leading-tight p-4 bg-white ${gIdx > 0 ? 'page-break' : ''}`}>
+            <div key={group.type} className={`print-sheet request-summary-print text-black leading-tight bg-white ${gIdx > 0 ? 'page-break' : ''}`}>
                 <div className="flex justify-between items-start mb-6 w-full print-header">
                     <div className="w-[40%] text-left">
                         <p className="font-bold text-[11pt] uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
@@ -1626,7 +1640,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                     </div>
                 </div>
 
-             <div className="text-center mb-8">
+             <div className="summary-title text-center mb-8">
                  <h1 className="text-[13pt] font-bold uppercase tracking-wide">
                      PHIẾU TỔNG HỢP ĐỒ {group.label}
                  </h1>
