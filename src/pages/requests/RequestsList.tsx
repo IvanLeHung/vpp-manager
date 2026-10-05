@@ -158,6 +158,8 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
   const [isSubmittingBatch, setIsSubmittingBatch] = useState(false);
   const [previewReq, setPreviewReq] = useState<VPPRequest | null>(null);
   const [creationLockOpen, setCreationLockOpen] = useState(false);
+  const [catalogPricePreview, setCatalogPricePreview] = useState<any | null>(null);
+  const [catalogPriceLoading, setCatalogPriceLoading] = useState(false);
   const creationPermission = useVppCreationPermission();
   useEffect(() => {
     setPreviewReq(previous => previous ? requests.find(request => request.id === previous.id) || null : null);
@@ -455,6 +457,46 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
       setCreatedDateRangeEnd(dateKey);
     }
     setShowDateCalendar(false);
+  };
+
+  const getActiveCreatedDateRange = () => createdDateMode === 'SINGLE'
+    ? { fromDate: createdDateFilter, toDate: createdDateFilter }
+    : { fromDate: createdDateRangeStart, toDate: createdDateRangeEnd || createdDateRangeStart };
+
+  const previewCatalogPriceUpdate = async () => {
+    const range = getActiveCreatedDateRange();
+    if (!range.fromDate || !range.toDate) {
+      showToast('Hãy chọn ngày hoặc khoảng ngày tạo phiếu trước.', 'warning');
+      return;
+    }
+    try {
+      setCatalogPriceLoading(true);
+      const response = await api.post('/requests/catalog-prices/preview', range);
+      setCatalogPricePreview(response.data);
+    } catch (error: any) {
+      showToast(error.response?.data?.error || 'Không thể xem trước giá danh mục.', 'error');
+    } finally {
+      setCatalogPriceLoading(false);
+    }
+  };
+
+  const applyCatalogPriceUpdate = async () => {
+    if (!catalogPricePreview || catalogPriceLoading) return;
+    try {
+      setCatalogPriceLoading(true);
+      const response = await api.post('/requests/catalog-prices/apply', {
+        fromDate: catalogPricePreview.fromDate,
+        toDate: catalogPricePreview.toDate,
+        confirmation: 'UPDATE_CATALOG_PRICES',
+      });
+      setCatalogPricePreview(null);
+      await refreshData();
+      showToast(`Đã cập nhật ${response.data.lineCount} dòng thuộc ${response.data.requestCount} phiếu theo Danh mục hàng hóa.`, 'success');
+    } catch (error: any) {
+      showToast(error.response?.data?.error || 'Không thể cập nhật giá danh mục.', 'error');
+    } finally {
+      setCatalogPriceLoading(false);
+    }
   };
 
 
@@ -1034,6 +1076,33 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         </div>
       </div>
       <VppCreationLockedModal open={creationLockOpen} permission={creationPermission.permission} serverNow={creationPermission.serverNow} error={creationPermission.error} onClose={() => setCreationLockOpen(false)} />
+      {catalogPricePreview && (
+        <div className="no-print fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+          <div role="dialog" aria-modal="true" aria-label="Xem trước cập nhật giá danh mục" className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Cập nhật giá theo Danh mục hàng hóa</h3>
+                <p className="mt-1 text-xs font-bold text-slate-500">{new Date(`${catalogPricePreview.fromDate}T00:00:00`).toLocaleDateString('vi-VN')} — {new Date(`${catalogPricePreview.toDate}T00:00:00`).toLocaleDateString('vi-VN')}</p>
+              </div>
+              <button type="button" disabled={catalogPriceLoading} onClick={() => setCatalogPricePreview(null)}><XCircle className="h-6 w-6 text-slate-400" /></button>
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-indigo-50 p-4"><p className="text-[10px] font-black uppercase text-indigo-500">Phiếu bị thay đổi</p><p className="mt-1 text-2xl font-black text-indigo-800">{catalogPricePreview.requestCount}</p></div>
+              <div className="rounded-2xl bg-amber-50 p-4"><p className="text-[10px] font-black uppercase text-amber-600">Dòng giá thay đổi</p><p className="mt-1 text-2xl font-black text-amber-800">{catalogPricePreview.lineCount}</p></div>
+            </div>
+            <div className="mt-3 rounded-2xl border border-slate-200 p-4 text-sm">
+              <div className="flex justify-between"><span className="font-bold text-slate-500">Tổng giá trị cũ</span><strong>{Number(catalogPricePreview.oldTotal || 0).toLocaleString('vi-VN')} đ</strong></div>
+              <div className="mt-2 flex justify-between"><span className="font-bold text-slate-500">Theo Danh mục hiện tại</span><strong className="text-indigo-700">{Number(catalogPricePreview.newTotal || 0).toLocaleString('vi-VN')} đ</strong></div>
+            </div>
+            <p className="mt-4 text-xs leading-5 text-slate-500">Chỉ cập nhật giá trên phiếu đề xuất và ghi lịch sử thay đổi. Giá mua thực tế trên PO, phiếu nhập và dữ liệu tồn kho không bị ghi đè.</p>
+            {catalogPricePreview.lineCount === 0 && <p className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-700">Tất cả các dòng đã khớp với Danh mục hàng hóa.</p>}
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" disabled={catalogPriceLoading} onClick={() => setCatalogPricePreview(null)} className="rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-black text-slate-600">Đóng</button>
+              {catalogPricePreview.lineCount > 0 && <button type="button" disabled={catalogPriceLoading} onClick={applyCatalogPriceUpdate} className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-black text-white disabled:opacity-50">{catalogPriceLoading ? 'Đang cập nhật…' : 'Xác nhận cập nhật'}</button>}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="no-print grid grid-cols-1 gap-3 mb-6 shrink-0 sm:grid-cols-2 xl:grid-cols-4">
         <button type="button" onClick={() => showStatusRequests()} className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-indigo-400 focus-visible:outline-2 focus-visible:outline-indigo-600">
@@ -1153,6 +1222,14 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                           )}
                         </div>
                     </div>
+                    {currentUser.role === 'ADMIN' && hasCreatedDateFilter && (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Giá danh mục</span>
+                        <button type="button" disabled={catalogPriceLoading} onClick={previewCatalogPriceUpdate} className="h-8 rounded-lg border border-amber-300 bg-amber-50 px-3 text-xs font-black text-amber-700 hover:bg-amber-100 disabled:opacity-50">
+                          {catalogPriceLoading ? 'Đang kiểm tra…' : 'Cập nhật theo khoảng ngày'}
+                        </button>
+                      </div>
+                    )}
                     <div className="flex items-end pb-0.5 ml-auto">
                         <button onClick={() => { setDeptFilter('ALL'); setPriorityFilter('ALL'); clearCreatedDateFilter(); setShowDateCalendar(false); setSearchTerm(''); setStatusFilters([]); }} className="text-[10px] font-black text-rose-500 uppercase hover:text-rose-600 flex items-center gap-1">
                           <RotateCcw className="w-3.5 h-3.5"/> Đặt lại tất cả
