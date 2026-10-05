@@ -204,6 +204,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
     qtyAdminApproved: number;
     qtyDelivered: number;
     reason: string;
+    cascadeCompletedChain: boolean;
   }>(null);
   const [savingQuantityCorrection, setSavingQuantityCorrection] = useState(false);
   const [correctionSearch, setCorrectionSearch] = useState('');
@@ -351,6 +352,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       if (quantityCorrection.mode === 'details') {
         await api.patch(`/requests/${requestId}/lines/${quantityCorrection.lineId}/correct-details`, {
           itemId: quantityCorrection.itemId, unitPrice: Number(quantityCorrection.unitPrice), rowVersion: quantityCorrection.rowVersion, reason: quantityCorrection.reason.trim(),
+          cascadeCompletedChain: quantityCorrection.cascadeCompletedChain,
         });
       } else await api.patch(`/requests/${requestId}/lines/${quantityCorrection.lineId}/correct-quantities`, {
         qtyAdminApproved: Number(quantityCorrection.qtyAdminApproved),
@@ -781,6 +783,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                   qtyAdminApproved: Number(l.qtyAdminApproved ?? l.qtyApproved ?? 0),
                   qtyDelivered: Number(l.qtyDelivered ?? 0),
                   reason: '',
+                  cascadeCompletedChain: false,
                 })}
                 className="rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase text-amber-700 hover:bg-amber-100"
               >
@@ -2904,7 +2907,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
              </div>
              <p className="mb-3 text-xs text-slate-500">Mỗi lần lưu chỉ áp dụng cho thẻ đang chọn.</p>
              {quantityCorrection.mode === 'details' ? <div className="space-y-3">
-               <p className="text-xs text-slate-500">Hiệu chỉnh trên phiếu đề xuất, không đổi giá danh mục, tồn kho hay chứng từ mua/giao hàng đã lập. Đổi vật tư chỉ khi chưa phát sinh mua sắm/giữ hàng/xuất kho, cùng nhóm và đơn vị tính.</p>
+               <p className="text-xs text-slate-500">Mặc định chỉ hiệu chỉnh phiếu đề xuất. Nếu dòng đã hoàn tất, Admin có thể chọn đồng bộ để sửa cùng lúc PĐX, phiếu mua sắm, phiếu nhập và bàn giao.</p>
                <label className="block text-xs font-bold text-slate-600">Tìm vật tư thay thế
                  <input value={correctionSearch} disabled={savingQuantityCorrection} onChange={e => setCorrectionSearch(e.target.value)} placeholder="Nhập mã hoặc tên vật tư…" className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2" />
                </label>
@@ -2913,6 +2916,10 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                <p className="text-xs font-semibold text-indigo-700">Đang chọn: {quantityCorrection.itemName}</p>
                <label className="block text-xs font-bold text-slate-600">Đơn giá trên phiếu (đ) *
                  <input type="number" min="0" step="0.01" disabled={savingQuantityCorrection} value={quantityCorrection.unitPrice} onChange={e => setQuantityCorrection({ ...quantityCorrection, unitPrice: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2" />
+               </label>
+               <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                 <input type="checkbox" className="mt-0.5 h-4 w-4" disabled={savingQuantityCorrection} checked={quantityCorrection.cascadeCompletedChain} onChange={e => setQuantityCorrection({ ...quantityCorrection, cascadeCompletedChain: e.target.checked })} />
+                 <span><strong>Đồng bộ chứng từ đã hoàn tất</strong><br/>Cập nhật vật tư và đơn giá trên PĐX, PO, phiếu nhập, lô kiểm kho và bàn giao. Không sửa sổ tồn kho lịch sử.</span>
                </label>
              </div> : <div className="grid grid-cols-2 gap-4">
                <label className="text-xs font-black text-slate-600">
