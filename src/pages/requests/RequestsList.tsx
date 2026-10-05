@@ -1572,6 +1572,8 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             .print-sheet { font-family: "Times New Roman", Times, serif; color: #000 !important; background: #fff !important; }
             .request-summary-print {
               page: request-summary;
+              font-family: "Times New Roman", Times, serif !important;
+              font-size: 11pt !important;
               width: 100% !important;
               max-width: none !important;
               min-height: 289mm !important;
@@ -1579,11 +1581,18 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
               padding: 0 !important;
               box-sizing: border-box !important;
             }
+            .request-summary-print p,
+            .request-summary-print td,
+            .request-summary-print th { font-family: "Times New Roman", Times, serif !important; font-size: 11pt !important; }
+            .request-summary-print h1 { font-family: "Times New Roman", Times, serif !important; font-size: 12pt !important; }
             .request-summary-print .print-header { margin-bottom: 5mm !important; }
             .request-summary-print .summary-title { margin-bottom: 5mm !important; }
             .request-summary-print .print-table { margin-top: 0 !important; margin-bottom: 5mm !important; }
             .request-summary-print .print-table th,
-            .request-summary-print .print-table td { padding: 1.5mm 1.8mm !important; }
+            .request-summary-print .print-table td { padding: 1.2mm 1.4mm !important; font-family: "Times New Roman", Times, serif !important; }
+            .request-summary-print .print-table th { font-size: 11pt !important; }
+            .request-summary-print img,
+            .request-summary-print svg { display: none !important; }
             .print-table { width: 100%; border-collapse: collapse; table-layout: fixed; background: #fff !important; }
             .print-table th, .print-table td { 
               border: 0.7px solid #000 !important; 
@@ -1593,26 +1602,26 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
               background: #fff !important;
               color: #000 !important;
             }
-            .item-main-row td { font-size: 7.8pt !important; }
+            .item-main-row td { font-size: 11pt !important; }
             .item-name { font-weight: 700 !important; }
             .item-bold { font-weight: 700 !important; }
             .item-regular { font-weight: 400 !important; }
             
             .allocation-header-row td {
-              font-size: 7.2pt !important;
+              font-size: 11pt !important;
               font-weight: 700 !important;
               font-style: italic !important;
               background-color: #fff !important;
               color: #000 !important;
             }
             .allocation-row td {
-              font-size: 7.5pt !important;
+              font-size: 11pt !important;
               font-weight: 400 !important;
               background-color: #fff !important;
               color: #000 !important;
             }
             .allocation-note {
-              font-size: 7.2pt !important;
+              font-size: 11pt !important;
               font-style: italic !important;
               color: #000 !important;
             }
@@ -1621,12 +1630,12 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
               white-space: nowrap !important;
               text-align: center !important;
             }
-            .col-code { width: 15% !important; }
-            .col-name { width: 30% !important; }
-            .col-unit { width: 7% !important; }
-            .col-qty { width: 9% !important; }
-            .col-price { width: 13% !important; }
-            .col-total { width: 20% !important; }
+            .col-code { width: 18% !important; }
+            .col-name { width: 26% !important; }
+            .col-unit { width: 6% !important; }
+            .col-qty { width: 11% !important; }
+            .col-price { width: 17% !important; }
+            .col-total { width: 16% !important; }
             
             .avoid-page-break {
               break-inside: avoid;
@@ -1674,19 +1683,12 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             .map((group, gIdx) => (
             <div key={group.type} className={`print-sheet request-summary-print text-black leading-tight bg-white ${gIdx > 0 ? 'page-break' : ''}`}>
                 <div className="flex justify-between items-start mb-6 w-full print-header">
-                    <div className="w-[40%] text-left">
+                    <div className="w-[45%] text-left">
                         <p className="font-bold text-[11pt] uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
                         <p className="text-[9pt] italic mt-1 font-bold">{printMode === 'FILTERED_SUMMARY' ? 'Báo cáo tổng hợp theo bộ lọc đang chọn' : 'Báo cáo tổng hợp tồn đọng cấp phát'}</p>
                         <p className="text-[8pt] text-black mt-1">Ban Hành chính Nhân sự</p>
                     </div>
-                    <div className="w-[10%] flex flex-col items-center text-center">
-                         <img 
-                             src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent('https://vpp.danko.vn/requests')}`} 
-                             alt="QR Code" 
-                             className="w-10 h-10 border border-slate-100"
-                         />
-                     </div>
-                    <div className="w-[50%] text-center">
+                    <div className="w-[55%] text-center">
                         <p className="text-[11pt] font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
                         <p className="text-[10pt] font-bold underline decoration-[1px] underline-offset-[4px] mt-1">Độc lập - Tự do - Hạnh phúc</p>
                         <p className="text-[9pt] mt-3 italic text-right mr-10">Hà Nội, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
@@ -1714,7 +1716,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
 
              <table className="print-table mb-8 bg-white">
                  <thead>
-                      <tr className="uppercase text-[7.8pt] font-bold text-center">
+                      <tr className="uppercase text-[11pt] font-bold text-center">
                           <th className="col-stt text-center">STT</th>
                           <th className="col-code text-center">Mã VT</th>
                           <th className="col-name text-center">Tên vật tư</th>
@@ -1754,11 +1756,11 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                             <td colSpan={2} className="allocation-note">
                               {de.note || '-'}
                               {de.replacements && de.replacements.length > 0 && (
-                                <div className="mt-1 text-[7.2pt] border-t border-dotted border-black/30 pt-1 text-black">
+                                <div className="mt-1 text-[11pt] border-t border-dotted border-black/30 pt-1 text-black">
                                   {de.replacements.map((r:any, ri:number) => (
                                     <div key={ri} className="flex flex-col">
                                       <p className="font-bold">↳ THAY CHO: {r.name} (SL cũ: {r.qty})</p>
-                                      <p className="font-normal text-[6.8pt] opacity-80 italic">Lý do: {r.reason} • {r.status === 'REPLACEMENT_PENDING_ADMIN' ? 'TRẠNG THÁI: CHỜ ADMIN DUYỆT' : 'TRẠNG THÁI: ĐÃ CHẤP THUẬN'}</p>
+                                      <p className="font-normal text-[11pt] italic">Lý do: {r.reason} • {r.status === 'REPLACEMENT_PENDING_ADMIN' ? 'TRẠNG THÁI: CHỜ ADMIN DUYỆT' : 'TRẠNG THÁI: ĐÃ CHẤP THUẬN'}</p>
                                     </div>
                                   ))}
                                 </div>
