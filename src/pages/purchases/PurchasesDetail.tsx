@@ -6,7 +6,7 @@ import {
   ShoppingCart, Send, Info, Printer,
   TrendingUp, Coins, FileText, AlertTriangle, Download, Trash2,
   ExternalLink, User as UserIcon, Building, Clock, Paperclip,
-  Truck, Package, Search, Plus, RotateCcw,
+  Truck, Package, Search, Plus, RotateCcw, RefreshCw,
   ChevronLeft, ChevronRight, Layers, CheckCircle2, Archive
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
