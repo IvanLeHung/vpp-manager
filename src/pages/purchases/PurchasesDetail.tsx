@@ -57,6 +57,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
   const { currentUser } = useApp();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [items, setItems] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -141,24 +142,35 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
   };
 
   const refreshData = async () => {
+    setLoading(true);
+    setLoadError('');
     try {
       const res = await api.get(`/purchases/${poId}`);
-      setData(res.data);
+      if (!res.data || typeof res.data !== 'object') {
+        throw new Error('INVALID_PURCHASE_DATA');
+      }
+      const purchase = {
+        ...res.data,
+        lines: Array.isArray(res.data.lines) ? res.data.lines : [],
+        auditLogs: Array.isArray(res.data.auditLogs) ? res.data.auditLogs : [],
+        attachments: Array.isArray(res.data.attachments) ? res.data.attachments : [],
+      };
+      setData(purchase);
       try {
         const chainRes = await api.get(`/procurement-chain/by-po/${poId}`);
         setChainData(chainRes.data);
       } catch (e) {
         console.error("Failed to load chain data", e);
       }
-      if (res.data) {
-          setApprovals(res.data.lines.map((l: any) => ({
+      if (purchase) {
+          setApprovals(purchase.lines.map((l: any) => ({
               lineId: l.id,
               itemId: l.itemId,
               item: l.item,
               qtyRequested: l.qtyRequested,
               qtyApproved: l.qtyApproved ?? l.qtyRequested,
               unitPrice: l.unitPrice,
-              supplier: l.supplier || res.data.supplier || '',
+              supplier: l.supplier || purchase.supplier || '',
               location: l.location || '',
               gender: l.gender || '',
               status: l.status || 'PENDING',
@@ -166,16 +178,19 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
               isDeleted: false,
               isNew: false
           })));
-          setOrderSupplier(res.data.supplier || '');
-          setOrderExpectedDate(res.data.expectedDate ? res.data.expectedDate.substring(0, 10) : '');
-          setVat(Number(res.data.vat || 0));
-          setDiscount(Number(res.data.discount || 0));
+          setOrderSupplier(purchase.supplier || '');
+          setOrderExpectedDate(purchase.expectedDate ? purchase.expectedDate.substring(0, 10) : '');
+          setVat(Number(purchase.vat || 0));
+          setDiscount(Number(purchase.discount || 0));
       }
     } catch(err: any) {
       console.error(err);
+      setData(null);
+      setLoadError(err.response?.data?.error || 'Không thể tải dữ liệu chi tiết của phiếu này.');
       showToast('Không thể tải chi tiết Phiếu', 'error');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -289,7 +304,20 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
   };
 
   if (!currentUser) return null;
-  if (loading || !data) return <div className="p-10 flex justify-center"><div className="w-8 h-8 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin"></div></div>;
+  if (loading) return <div className="p-10 flex justify-center"><div className="w-8 h-8 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin"></div></div>;
+  if (loadError || !data) return (
+    <div className="min-h-full bg-slate-50 p-6 flex items-center justify-center">
+      <div className="w-full max-w-lg rounded-2xl border border-rose-200 bg-white p-8 text-center shadow-sm">
+        <AlertTriangle className="mx-auto h-10 w-10 text-rose-500" />
+        <h2 className="mt-4 text-lg font-extrabold text-slate-900">Không thể tải chi tiết phiếu</h2>
+        <p className="mt-2 text-sm text-slate-500">{loadError || 'Không tìm thấy dữ liệu phiếu.'}</p>
+        <div className="mt-6 flex justify-center gap-3">
+          <button onClick={handleBack} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Quay lại</button>
+          <button onClick={refreshData} className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">Thử lại</button>
+        </div>
+      </div>
+    </div>
+  );
 
   const status = data.status;
   const isDRAFT = status === 'DRAFT';
@@ -301,7 +329,7 @@ const PurchasesDetail = ({ poId, navigationIds, onNavigate, onBack, showToast }:
   const isCANCELLED = status === 'CANCELLED' || status === 'REJECTED';
   const isRETURNED = status === 'RETURNED';
 
-  const isBackorderPO = data.source === 'AUTO' || data.id.startsWith('PO-BO');
+  const isBackorderPO = data.source === 'AUTO' || String(data.id || '').startsWith('PO-BO');
 
   const currentUid = currentUser.userId || currentUser.id;
   const isAdmin = currentUser.role === 'ADMIN';

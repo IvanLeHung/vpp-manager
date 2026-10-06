@@ -1,19 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import PurchasesList from './PurchasesList';
 import PurchasesCreate from './PurchasesCreate';
 import PurchasesDetail from './PurchasesDetail';
 import PurchaseReportHistory from './PurchaseReportHistory';
+import PageErrorBoundary from '../../components/PageErrorBoundary';
 
 export type ViewMode = 'LIST' | 'CREATE' | 'DETAIL' | 'REPORT_HISTORY';
 
 const Purchases: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>('LIST');
   const [selectedPoId, setSelectedPoId] = useState<string | null>(null);
   const [navigationIds, setNavigationIds] = useState<string[]>([]);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'warning'} | null>(null);
   const [recreateConfig, setRecreateConfig] = useState<any | null>(null);
+  const [detailRetryKey, setDetailRetryKey] = useState(0);
 
   useEffect(() => {
     if (id) {
@@ -33,9 +36,18 @@ const Purchases: React.FC = () => {
   };
 
   const handleViewDetail = (id: string, ids: string[] = []) => {
-    setSelectedPoId(id);
     setNavigationIds(ids);
-    setViewMode('DETAIL');
+    navigate(`/purchase-orders/${encodeURIComponent(id)}`);
+  };
+
+  const handleBackToList = () => {
+    setSelectedPoId(null);
+    setViewMode('LIST');
+    navigate('/purchase-orders');
+  };
+
+  const handleNavigateDetail = (nextId: string) => {
+    navigate(`/purchase-orders/${encodeURIComponent(nextId)}`);
   };
 
   const handleRecreateReport = (config: any) => {
@@ -74,13 +86,20 @@ const Purchases: React.FC = () => {
       )}
       
       {viewMode === 'DETAIL' && selectedPoId && (
-        <PurchasesDetail 
-          poId={selectedPoId}
-          navigationIds={navigationIds}
-          onNavigate={setSelectedPoId}
-          onBack={() => setViewMode('LIST')}
-          showToast={showToast}
-        />
+        <PageErrorBoundary
+          resetKey={`${selectedPoId}:${detailRetryKey}`}
+          onBack={handleBackToList}
+          onRetry={() => setDetailRetryKey(value => value + 1)}
+        >
+          <PurchasesDetail
+            key={`${selectedPoId}:${detailRetryKey}`}
+            poId={selectedPoId}
+            navigationIds={navigationIds}
+            onNavigate={handleNavigateDetail}
+            onBack={handleBackToList}
+            showToast={showToast}
+          />
+        </PageErrorBoundary>
       )}
 
       {viewMode === 'REPORT_HISTORY' && (
