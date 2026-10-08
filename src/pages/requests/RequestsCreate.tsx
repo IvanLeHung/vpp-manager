@@ -227,7 +227,10 @@ export default function RequestsCreate({
       return;
     }
     const controller = new AbortController();
-    api.post('/requests/recent-proposal-quantities', { itemIds }, { signal: controller.signal })
+    api.post('/requests/recent-proposal-quantities', {
+      itemIds,
+      warehouseCode: supplyType === 'VE_SINH' ? 'VE_SINH' : 'MAIN',
+    }, { signal: controller.signal })
       .then(response => {
         const quantities = response.data?.quantities || {};
         setRecentProposalQuantities(quantities);
