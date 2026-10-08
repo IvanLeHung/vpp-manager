@@ -77,6 +77,14 @@ function normalizeSearchText(value: any) {
     .trim();
 }
 
+function formatSnapshotSummary(entries: any[], field: 'recentProposalQty' | 'stockQty') {
+  const snapshots = entries.map(entry => entry[field]);
+  const values = snapshots.filter((value): value is number => Number.isInteger(value) && value >= 0);
+  if (values.length === 0) return '—';
+  if (values.length !== snapshots.length) return 'Theo chi tiết';
+  return values.every(value => value === values[0]) ? values[0].toLocaleString('vi-VN') : 'Theo chi tiết';
+}
+
 type RequestSupplyGroup = 'VPP' | 'VS' | 'VPP+VS';
 type PrintableRequest = VPPRequest & { approvalHistories: any[] };
 type RequestSortKey = 'id' | 'requester' | 'items' | 'supplyGroup' | 'status';
@@ -711,14 +719,23 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                 qtyDelivered: 0,
                 originalTotal: 0,
                 actualTotal: 0,
-                deptBreakdown: new Map<string, { qty: number, notes: string[], replacements: any[] }>(),
+                deptBreakdown: new Map<string, { dept: string, requestId: string, qty: number, notes: string[], replacements: any[], recentProposalQty: number | null, stockQty: number | null }>(),
                 printSortGroup: (masterItem as any)?.printSortGroup || (effectiveItem as any).printSortGroup
             };
             
             const pendingQty = effectiveQty - (line.qtyDelivered || 0);
             if (pendingQty > 0) {
               const deptName = req.department || 'Khác';
-              const existingDept = current.deptBreakdown.get(deptName) || { qty: 0, notes: [], replacements: [] };
+              const deptEntryKey = `${deptName}\u0000${req.id}`;
+              const existingDept = current.deptBreakdown.get(deptEntryKey) || {
+                dept: deptName,
+                requestId: req.id,
+                qty: 0,
+                notes: [],
+                replacements: [],
+                recentProposalQty: Number.isInteger(line.recentProposalQty) ? line.recentProposalQty : null,
+                stockQty: Number.isInteger(line.stockQty) ? line.stockQty : null,
+              };
               existingDept.qty += pendingQty;
               if (line.note && line.note.trim() && !existingDept.notes.includes(line.note)) {
                 existingDept.notes.push(line.note);
@@ -732,7 +749,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                   status: line.status
                 });
               }
-              current.deptBreakdown.set(deptName, existingDept);
+              current.deptBreakdown.set(deptEntryKey, existingDept);
             }
 
             const originalQtyForTotal = line.qtyApproved || line.qtyRequested;
@@ -761,11 +778,14 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                 .map(item => ({
                     ...item,
                     deptEntries: (Array.from(item.deptBreakdown.entries()) as [string, any][])
-                      .map(([dept, data]) => ({
-                        dept,
+                      .map(([, data]) => ({
+                        dept: data.dept,
+                        requestId: data.requestId,
                         qty: data.qty,
                         note: data.notes.join('; '),
-                        replacements: data.replacements
+                        replacements: data.replacements,
+                        recentProposalQty: data.recentProposalQty,
+                        stockQty: data.stockQty,
                       }))
                       .sort((a: any, b: any) => b.qty - a.qty)
                 })))
@@ -803,16 +823,25 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
           qtyDelivered: 0,
           originalTotal: 0,
           actualTotal: 0,
-          deptBreakdown: new Map<string, { qty: number; notes: string[]; replacements: any[] }>(),
+          deptBreakdown: new Map<string, { dept: string; requestId: string; qty: number; notes: string[]; replacements: any[]; recentProposalQty: number | null; stockQty: number | null }>(),
           requestIds: new Set<string>(),
           printSortGroup: (masterItem as any)?.printSortGroup || effectiveItem.printSortGroup,
         };
 
         const department = request.department || 'Khác';
-        const departmentData = current.deptBreakdown.get(department) || { qty: 0, notes: [], replacements: [] };
+        const departmentEntryKey = `${department}\u0000${request.id}`;
+        const departmentData = current.deptBreakdown.get(departmentEntryKey) || {
+          dept: department,
+          requestId: request.id,
+          qty: 0,
+          notes: [],
+          replacements: [],
+          recentProposalQty: Number.isInteger(line.recentProposalQty) ? line.recentProposalQty : null,
+          stockQty: Number.isInteger(line.stockQty) ? line.stockQty : null,
+        };
         departmentData.qty += quantity;
         if (line.note?.trim() && !departmentData.notes.includes(line.note)) departmentData.notes.push(line.note);
-        current.deptBreakdown.set(department, departmentData);
+        current.deptBreakdown.set(departmentEntryKey, departmentData);
         current.requestIds.add(request.id);
         current.qtyRequested += quantity;
         current.originalTotal += getRequestLineAmount(line, quantity);
@@ -825,11 +854,14 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
       groups: Array.from(groups.entries()).map(([type, itemsMap]) => {
         const items = sortItemsForPrinting(Array.from(itemsMap.values()).map(item => ({
           ...item,
-          deptEntries: (Array.from(item.deptBreakdown.entries()) as [string, any][]).map(([dept, data]) => ({
-            dept,
+          deptEntries: (Array.from(item.deptBreakdown.entries()) as [string, any][]).map(([, data]) => ({
+            dept: data.dept,
+            requestId: data.requestId,
             qty: data.qty,
             note: data.notes.join('; '),
             replacements: data.replacements,
+            recentProposalQty: data.recentProposalQty,
+            stockQty: data.stockQty,
           })).sort((a: any, b: any) => b.qty - a.qty),
         })));
         const requestIds = new Set<string>();
@@ -1567,7 +1599,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
             @page { size: A4 portrait; margin: 10mm; }
-            @page request-summary { size: A4 portrait; margin: 4mm; }
+            @page request-summary { size: A4 landscape; margin: 12mm 10mm; }
             * { background-color: transparent !important; color-adjust: exact; -webkit-print-color-adjust: exact; }
             .print-sheet { font-family: "Times New Roman", Times, serif; color: #000 !important; background: #fff !important; }
             .request-summary-print {
@@ -1576,7 +1608,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
               font-size: 11pt !important;
               width: 100% !important;
               max-width: none !important;
-              min-height: 289mm !important;
+              min-height: 186mm !important;
               margin: 0 !important;
               padding: 0 !important;
               box-sizing: border-box !important;
@@ -1589,8 +1621,8 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             .request-summary-print .summary-title { margin-bottom: 5mm !important; }
             .request-summary-print .print-table { margin-top: 0 !important; margin-bottom: 5mm !important; }
             .request-summary-print .print-table th,
-            .request-summary-print .print-table td { padding: 1.2mm 1.4mm !important; font-family: "Times New Roman", Times, serif !important; }
-            .request-summary-print .print-table th { font-size: 11pt !important; }
+            .request-summary-print .print-table td { padding: 1mm 1.1mm !important; font-family: "Times New Roman", Times, serif !important; }
+            .request-summary-print .print-table th { font-size: 10pt !important; }
             .request-summary-print img,
             .request-summary-print svg { display: none !important; }
             .print-table { width: 100%; border-collapse: collapse; table-layout: fixed; background: #fff !important; }
@@ -1602,39 +1634,43 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
               background: #fff !important;
               color: #000 !important;
             }
-            .item-main-row td { font-size: 11pt !important; }
+            .request-summary-print thead { display: table-header-group; }
+            .request-summary-print tbody { break-inside: avoid; page-break-inside: avoid; }
+            .item-main-row td { font-size: 10.5pt !important; }
             .item-name { font-weight: 700 !important; }
             .item-bold { font-weight: 700 !important; }
             .item-regular { font-weight: 400 !important; }
             
             .allocation-header-row td {
-              font-size: 11pt !important;
+              font-size: 9.5pt !important;
               font-weight: 700 !important;
               font-style: italic !important;
               background-color: #fff !important;
               color: #000 !important;
             }
             .allocation-row td {
-              font-size: 11pt !important;
+              font-size: 9.5pt !important;
               font-weight: 400 !important;
               background-color: #fff !important;
               color: #000 !important;
             }
             .allocation-note {
-              font-size: 11pt !important;
+              font-size: 9.5pt !important;
               font-style: italic !important;
               color: #000 !important;
             }
             .col-stt {
-              width: 6% !important;
+              width: 4% !important;
               white-space: nowrap !important;
               text-align: center !important;
             }
-            .col-code { width: 18% !important; }
-            .col-name { width: 26% !important; }
+            .col-code { width: 12% !important; }
+            .col-name { width: 24% !important; }
             .col-unit { width: 6% !important; }
-            .col-qty { width: 11% !important; }
-            .col-price { width: 17% !important; }
+            .col-recent { width: 10% !important; }
+            .col-stock { width: 7% !important; }
+            .col-qty { width: 8% !important; }
+            .col-price { width: 13% !important; }
             .col-total { width: 16% !important; }
             
             .avoid-page-break {
@@ -1721,6 +1757,8 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                           <th className="col-code text-center">Mã VT</th>
                           <th className="col-name text-center">Tên vật tư</th>
                           <th className="col-unit text-center">ĐVT</th>
+                          <th className="col-recent text-center">ĐX tháng gần nhất</th>
+                          <th className="col-stock text-center">SL Tồn</th>
                           <th className="col-qty text-center">{printMode === 'FILTERED_SUMMARY' ? 'SL duyệt' : 'Cần xuất'}</th>
                           <th className="col-price text-center">Đơn giá</th>
                           <th className="col-total text-center">Thành tiền</th>
@@ -1734,6 +1772,8 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                           <td className="col-code text-center item-bold">{item.mvpp}</td>
                           <td className="text-left item-name">{item.name}</td>
                           <td className="text-center item-regular">{item.unit}</td>
+                          <td className="text-center item-regular">{formatSnapshotSummary(item.deptEntries, 'recentProposalQty')}</td>
+                          <td className="text-center item-regular">{formatSnapshotSummary(item.deptEntries, 'stockQty')}</td>
                           <td className="text-center item-bold">{item.qtyRequested - item.qtyDelivered}</td>
                           <td className="text-right item-regular">{Number(item.price).toLocaleString('vi-VN')}</td>
                           <td className="text-right item-bold">{(Number(item.price) * (item.qtyRequested - item.qtyDelivered)).toLocaleString('vi-VN')}</td>
@@ -1741,7 +1781,9 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                       {/* Department Sub-header */}
                       <tr className="allocation-header-row">
                           <td className="border-r-0"></td>
-                          <td colSpan={3} className="text-left border-l-0">Phòng ban đề xuất</td>
+                          <td colSpan={3} className="text-left border-l-0">Phòng ban đề xuất / Phiếu</td>
+                          <td className="text-center">ĐX gần nhất</td>
+                          <td className="text-center">SL Tồn</td>
                           <td className="text-center">Sl</td>
                           <td colSpan={2} className="text-left">Ghi chú</td>
                       </tr>
@@ -1750,8 +1792,10 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                         <tr key={i} className="allocation-row">
                             <td className="border-r-0"></td>
                             <td colSpan={3} className="text-left border-l-0 pl-4 text-black">
-                              • {de.dept}
+                              • {de.dept} <span className="font-normal">({de.requestId})</span>
                             </td>
+                            <td className="text-center">{de.recentProposalQty ?? '—'}</td>
+                            <td className="text-center">{de.stockQty ?? '—'}</td>
                             <td className="text-center font-bold">{de.qty}</td>
                             <td colSpan={2} className="allocation-note">
                               {de.note || '-'}
@@ -1772,7 +1816,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                  ))}
                  <tbody>
                       <tr className="font-bold text-[9pt]">
-                          <td colSpan={4} className="p-1 text-right border border-black">Tổng cộng ({group.items.length} mặt hàng):</td>
+                          <td colSpan={6} className="p-1 text-right border border-black">Tổng cộng ({group.items.length} mặt hàng):</td>
                           <td className="p-1 text-center text-[11pt] border border-black">{group.items.reduce((s, i) => s + (i.qtyRequested - i.qtyDelivered), 0)}</td>
                           <td className="p-1 border border-black"></td>
                           <td className="p-1 text-right text-[11pt] border border-black">
@@ -1780,7 +1824,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                           </td>
                       </tr>
                       {printMode !== 'FILTERED_SUMMARY' && <tr className="font-bold text-[8pt] text-slate-600 bg-slate-50">
-                          <td colSpan={6} className="p-1 text-right border border-black">Tổng giá trị đề xuất ban đầu đã duyệt:</td>
+                          <td colSpan={8} className="p-1 text-right border border-black">Tổng giá trị đề xuất ban đầu đã duyệt:</td>
                           <td className="p-1 text-right border border-black">
                             {group.items.reduce((s, i) => s + i.originalTotal, 0).toLocaleString('vi-VN')} đ
                           </td>
