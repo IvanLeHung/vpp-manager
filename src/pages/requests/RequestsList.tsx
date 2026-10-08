@@ -132,6 +132,20 @@ function toLocalDateKey(value: string | Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
+function formatDateKey(value: string) {
+  const [year, month, day] = value.split('-');
+  return year && month && day ? `${day}/${month}/${year}` : '';
+}
+
+function getSummaryPeriodLabel(requests: VPPRequest[]) {
+  const dateKeys = requests
+    .map(request => toLocalDateKey(request.createdAt))
+    .filter(Boolean)
+    .sort();
+  if (dateKeys.length === 0) return 'Chưa xác định kỳ tổng hợp';
+  return `Từ ngày ${formatDateKey(dateKeys[0])} đến ngày ${formatDateKey(dateKeys[dateKeys.length - 1])}`;
+}
+
 export default function RequestsList({ requests, currentUser, setViewMode, setActiveRequest, setCreateSupplyType, setNavigationIds, refreshData, showToast }: Props) {
   const { items: masterItems } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
@@ -1007,11 +1021,21 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
     window.print();
   };
 
-  const allocationSummaryPeriod = createdDateMode === 'RANGE' && createdDateRangeStart
-    ? `Từ ngày ${createdDateRangeStart.split('-').reverse().join('/')} đến ngày ${(createdDateRangeEnd || createdDateRangeStart).split('-').reverse().join('/')}`
-    : createdDateFilter
-      ? `Ngày ${createdDateFilter.split('-').reverse().join('/')}`
-      : 'Toàn bộ thời gian đang lọc';
+  const allocationSummaryPeriod = useMemo(() => {
+    if (createdDateMode === 'RANGE' && createdDateRangeStart) {
+      return `Từ ngày ${formatDateKey(createdDateRangeStart)} đến ngày ${formatDateKey(createdDateRangeEnd || createdDateRangeStart)}`;
+    }
+    if (createdDateMode === 'SINGLE' && createdDateFilter) {
+      const date = formatDateKey(createdDateFilter);
+      return `Từ ngày ${date} đến ngày ${date}`;
+    }
+    const periodRequests = printMode === 'FILTERED_SUMMARY'
+      ? filteredRequests
+      : selectedIds.length > 0
+        ? requests.filter(request => selectedIds.includes(request.id))
+        : filteredRequests;
+    return getSummaryPeriodLabel(periodRequests);
+  }, [createdDateMode, createdDateRangeStart, createdDateRangeEnd, createdDateFilter, printMode, filteredRequests, selectedIds, requests]);
 
   const handleExportSummaryExcel = async () => {
     try {
@@ -1599,7 +1623,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
             @page { size: A4 portrait; margin: 10mm; }
-            @page request-summary { size: A4 portrait; margin: 8mm 5mm; }
+            @page request-summary { size: A4 portrait; margin: 12mm 8mm; }
             * { background-color: transparent !important; color-adjust: exact; -webkit-print-color-adjust: exact; }
             .print-sheet { font-family: "Times New Roman", Times, serif; color: #000 !important; background: #fff !important; }
             .request-summary-print {
@@ -1608,7 +1632,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
               font-size: 8pt !important;
               width: 100% !important;
               max-width: none !important;
-              min-height: 281mm !important;
+              min-height: 273mm !important;
               margin: 0 !important;
               padding: 0 !important;
               box-sizing: border-box !important;
@@ -1642,7 +1666,10 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
               background: #fff !important;
               color: #000 !important;
             }
+            .request-summary-print .summary-table { width: 100% !important; max-width: 100% !important; table-layout: fixed !important; border-collapse: collapse !important; }
+            .request-summary-print .summary-table :is(th, td) { box-sizing: border-box !important; min-width: 0 !important; max-width: none !important; }
             .request-summary-print thead { display: table-header-group; }
+            .request-summary-print tr { break-inside: avoid; page-break-inside: avoid; }
             .request-summary-print tbody { break-inside: avoid; page-break-inside: avoid; }
             .item-main-row td { font-size: 8.5pt !important; }
             .item-name { font-weight: 700 !important; }
@@ -1669,13 +1696,12 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             }
             .col-stt {
               width: 4% !important;
-              white-space: nowrap !important;
               text-align: center !important;
             }
-            .col-code { width: 11% !important; }
-            .col-name { width: 25% !important; }
+            .col-code { width: 12% !important; }
+            .col-name { width: 23% !important; }
             .col-unit { width: 5% !important; }
-            .col-recent { width: 10% !important; }
+            .col-recent { width: 11% !important; }
             .col-stock { width: 7% !important; }
             .col-qty { width: 8% !important; }
             .col-price { width: 14% !important; }
@@ -1725,7 +1751,7 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
           (printMode === 'FILTERED_SUMMARY' ? filteredSummaryGroups : summaryGroups).groups
             .filter(g => selectedPrintType === 'ALL' || g.type === selectedPrintType)
             .map((group, gIdx) => (
-            <div key={group.type} className={`print-sheet request-summary-print text-black leading-tight bg-white ${gIdx > 0 ? 'page-break' : ''}`}>
+            <div key={group.type} className={`print-sheet print-container request-summary-print text-black leading-tight bg-white ${gIdx > 0 ? 'page-break' : ''}`}>
                 <div className="flex justify-between items-start mb-6 w-full print-header">
                     <div className="w-[45%] text-left">
                         <p className="font-bold text-[11pt] uppercase">CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO</p>
@@ -1758,7 +1784,18 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
                  </div>
              </div>
 
-             <table className="print-table mb-8 bg-white">
+             <table className="print-table summary-table mb-8 bg-white">
+                 <colgroup>
+                   <col className="col-stt" />
+                   <col className="col-code" />
+                   <col className="col-name" />
+                   <col className="col-unit" />
+                   <col className="col-recent" />
+                   <col className="col-stock" />
+                   <col className="col-qty" />
+                   <col className="col-price" />
+                   <col className="col-total" />
+                 </colgroup>
                  <thead>
                       <tr className="uppercase text-[11pt] font-bold text-center">
                           <th className="col-stt text-center">STT</th>
