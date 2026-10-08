@@ -709,6 +709,18 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
       }
     },
     {
+      title: 'ĐX tháng gần nhất',
+      key: 'recentProposalQty',
+      align: 'center' as const,
+      render: (l: any) => <span className="font-black text-slate-600">{l.recentProposalQty ?? '—'}</span>,
+    },
+    {
+      title: 'SL Tồn',
+      key: 'stockQty',
+      align: 'center' as const,
+      render: (l: any) => <span className="font-black text-emerald-700">{l.stockQty ?? '—'}</span>,
+    },
+    {
       title: 'SL đề xuất',
       key: 'qtyRequested',
       align: 'center' as const,
@@ -1608,6 +1620,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                   <th className="p-4 rounded-tl-xl w-12 text-center">Chọn</th>
                                   <th className="p-4 min-w-[280px] max-w-[360px]">Hàng Hóa</th>
                                   <th className="p-4 text-center">Tồn Kho</th>
+                                  <th className="p-4 text-center">ĐX tháng gần nhất</th>
+                                  <th className="p-4 text-center">SL Tồn</th>
                                   <th className="p-4 text-center">SL đề xuất</th>
                                   <th className="p-4 text-center">SL Duyệt</th>
                                    <th className="p-4 text-right">Đơn giá</th>
@@ -1740,6 +1754,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                               {currentStock}
                                             </div>
                                         </td>
+                                        <td className="px-3 py-3 text-center align-top pt-5 font-black text-slate-600">{l.recentProposalQty ?? '—'}</td>
+                                        <td className="px-3 py-3 text-center align-top pt-5 font-black text-emerald-700">{l.stockQty ?? '—'}</td>
                                         <td className="p-4 text-center font-black text-indigo-600 bg-indigo-50/30 align-top pt-5">
                                           <MonthlyApprovalHistoryTooltip
                                             itemId={l.issue_item?.id || l.replacementItem?.id || l.replacementItemId || l.itemId || l.item?.id}
@@ -2544,13 +2560,15 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
           <table className="w-full border-collapse border border-black text-[13px] mb-2 print-table">
               <thead className="bg-slate-100">
                   <tr>
-                      <th className="border border-black p-2 text-center font-bold uppercase whitespace-nowrap" style={{width: '6%'}}>STT</th>
-                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '10%'}}>Mã VT</th>
-                      <th className="border border-black p-2 text-left font-bold uppercase" style={{width: '30%'}}>{effectivePrintType === 'VE_SINH' ? 'Tên Đồ Vệ Sinh' : effectivePrintType === 'VPP' ? 'Tên Văn Phòng Phẩm' : 'Tên Hàng Hóa'}</th>
-                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '7%'}}>ĐVT</th>
+                      <th className="border border-black p-2 text-center font-bold uppercase whitespace-nowrap" style={{width: '4%'}}>STT</th>
+                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '9%'}}>Mã VT</th>
+                      <th className="border border-black p-2 text-left font-bold uppercase" style={{width: '23%'}}>{effectivePrintType === 'VE_SINH' ? 'Tên Đồ Vệ Sinh' : effectivePrintType === 'VPP' ? 'Tên Văn Phòng Phẩm' : 'Tên Hàng Hóa'}</th>
+                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '5%'}}>ĐVT</th>
+                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '8%'}}>ĐX tháng gần nhất</th>
+                      <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '7%'}}>SL Tồn</th>
                       <th className="border border-black p-2 text-center font-bold uppercase" style={{width: '6%'}}>SL</th>
-                      <th className="border border-black p-2 text-right font-bold uppercase" style={{width: '12%'}}>Đơn giá</th>
-                      <th className="border border-black p-2 text-right font-bold uppercase" style={{width: '14%'}}>Thành tiền</th>
+                      <th className="border border-black p-2 text-right font-bold uppercase" style={{width: '11%'}}>Đơn giá</th>
+                      <th className="border border-black p-2 text-right font-bold uppercase" style={{width: '13%'}}>Thành tiền</th>
                       <th className="border border-black p-2 text-left font-bold uppercase" style={{width: '14%'}}>Ghi chú</th>
                   </tr>
               </thead>
@@ -2584,6 +2602,8 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                                    </div>
                                </td>
                                <td className="border border-black p-2 text-center">{displayItem.unit}</td>
+                               <td className="border border-black p-2 text-center font-semibold">{l.recentProposalQty ?? '—'}</td>
+                               <td className="border border-black p-2 text-center font-semibold">{l.stockQty ?? '—'}</td>
                                <td className="border border-black p-2 text-center font-black text-base">
                                    {displayQtyApproved !== null && (displayQtyApproved !== displayQtyRequested || l.qtyManagerApproved !== displayQtyRequested) ? (
                                        <div className="flex flex-col items-center leading-none">
@@ -2609,7 +2629,7 @@ export default function RequestsDetail({ requestId, navigationIds, onNavigate, s
                            </tr>
                          )})}
                         <tr className="bg-slate-50 h-10 font-black">
-                            <td colSpan={4} className="border border-black p-2 text-right uppercase text-xs">Tổng cộng:</td>
+                            <td colSpan={6} className="border border-black p-2 text-right uppercase text-xs">Tổng cộng:</td>
                             <td className="border border-black p-2 text-center text-lg">
                                 {filteredLines.reduce((sum: number, line: any) => sum + (line.replacementQty ?? line.qtyApproved ?? line.qtyRequested), 0)}
                             </td>

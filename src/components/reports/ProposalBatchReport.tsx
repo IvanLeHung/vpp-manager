@@ -14,6 +14,7 @@ type Department = { id: string; name: string; province?: string };
 type SummaryRow = {
   key: string; itemId: string; name: string; mvpp: string; unit: string;
   unitPrice: number | null; totalQuantity: number; totalAmount: number | null;
+  recentProposalQuantity: number | null; stockQuantity: number | null;
   departmentQuantities: Record<string, number>;
 };
 type SummaryReport = {
@@ -81,16 +82,19 @@ function ReportDocument({ report, period, reportDate, reporter, print = false }:
           <colgroup>
             <col className="proposal-item-column" /><col className="proposal-unit-column" />
             {departments.map(department => <col key={department.id} data-province={departmentProvince(department)} />)}
+            <col className="proposal-recent-column" /><col className="proposal-stock-column" />
             <col className="proposal-total-column" /><col className="proposal-price-column" /><col className="proposal-amount-column" />
           </colgroup>
           <thead><tr className="proposal-province-row">
             <th colSpan={2} />
             {provinceGroups.map(group => <th key={group.province} colSpan={group.count} className="proposal-province-column">{group.province}</th>)}
-            <th colSpan={3} />
+            <th colSpan={5} />
           </tr><tr>
             <th scope="col" className="proposal-item-column">Danh mục {report.itemType === 'VPP' ? 'VPP' : 'Vệ sinh'}</th>
             <th scope="col" className="proposal-unit-column">ĐVT</th>
             {departments.map(department => <th key={department.id} scope="col" data-province={departmentProvince(department)} className="proposal-department-column" title={department.name}>{department.label}</th>)}
+            <th scope="col" className="proposal-recent-column">ĐX tháng gần nhất</th>
+            <th scope="col" className="proposal-stock-column">SL Tồn</th>
             <th scope="col" className="proposal-total-column">Tổng số lượng</th>
             <th scope="col" className="proposal-price-column">Đơn giá<br /><span className="font-normal">(VNĐ)</span></th>
             <th scope="col" className="proposal-amount-column">Thành tiền<br /><span className="font-normal">(VNĐ)</span></th>
@@ -100,6 +104,8 @@ function ReportDocument({ report, period, reportDate, reporter, print = false }:
               <th scope="row" className="proposal-item-column"><span className="proposal-row-index mr-2 text-[10px] font-normal text-slate-400">{index + 1}.</span>{row.name}<span className="proposal-item-code mt-1 block text-[10px] font-normal text-slate-400">{row.mvpp}</span></th>
               <td className="text-center text-slate-500">{row.unit}</td>
               {departments.map(department => <td key={department.id} data-province={departmentProvince(department)} className="text-center tabular-nums">{row.departmentQuantities[department.id] ? formatNumber(row.departmentQuantities[department.id]) : <span className="text-slate-300">—</span>}</td>)}
+              <td className="proposal-recent-column text-center tabular-nums">{row.recentProposalQuantity === null ? '—' : formatNumber(row.recentProposalQuantity)}</td>
+              <td className="proposal-stock-column text-center tabular-nums">{row.stockQuantity === null ? '—' : formatNumber(row.stockQuantity)}</td>
               <td className="proposal-total-column text-center font-bold tabular-nums">{formatNumber(row.totalQuantity)}</td>
               <td className="proposal-price-column text-right tabular-nums">{row.unitPrice === null ? <span className="text-amber-700">Chưa có giá</span> : formatNumber(row.unitPrice)}</td>
               <td className="proposal-amount-column text-right font-semibold tabular-nums">{row.totalAmount === null ? '—' : formatNumber(row.totalAmount)}</td>
@@ -108,6 +114,8 @@ function ReportDocument({ report, period, reportDate, reporter, print = false }:
           <tfoot><tr>
             <th scope="row" className="proposal-item-column" colSpan={2}>TỔNG CỘNG</th>
             {departments.map(department => <td key={department.id} data-province={departmentProvince(department)} className="text-center tabular-nums">{formatNumber(report.totals.departmentQuantities[department.id] || 0)}</td>)}
+            <td className="proposal-recent-column text-center">—</td>
+            <td className="proposal-stock-column text-center">—</td>
             <td className="proposal-total-column text-center tabular-nums">{formatNumber(report.totals.totalQuantity)}</td>
             <td className="proposal-price-column text-center">—</td>
             <td className="proposal-amount-column text-right tabular-nums">{formatNumber(report.totals.totalAmount)}{report.totals.unpricedRowCount > 0 ? ' *' : ''}</td>
@@ -174,19 +182,19 @@ export default function ProposalBatchReport() {
     setExporting(true); setExportError('');
     try {
       const exportDepartments = [...report.departments].sort((a, b) => departmentProvince(a).localeCompare(departmentProvince(b), 'vi') || a.name.localeCompare(b.name, 'vi'));
-      const headings = [`Danh mục ${itemType === 'VPP' ? 'VPP' : 'Vệ sinh'}`, 'Mã hàng', 'ĐVT', ...exportDepartments.map(department => department.name), 'Tổng số lượng', 'Đơn giá (VNĐ)', 'Thành tiền (VNĐ)'];
+      const headings = [`Danh mục ${itemType === 'VPP' ? 'VPP' : 'Vệ sinh'}`, 'Mã hàng', 'ĐVT', ...exportDepartments.map(department => department.name), 'ĐX tháng gần nhất', 'SL Tồn', 'Tổng số lượng', 'Đơn giá (VNĐ)', 'Thành tiền (VNĐ)'];
       const data = [
         ['CÔNG TY CỔ PHẦN TẬP ĐOÀN DANKO'], ['MST: 3702070613'],
         ['CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM'], ['Độc lập - Tự do - Hạnh phúc'], [],
-        [reportTitle(itemType)], [`Kỳ tổng hợp: ${filter.label}`], [`Mã tổng hợp: THĐX-${reportDate.replace(/-/g, '')}-${itemType}`, `Người lập: ${reporter}`], [`Kho áp dụng: ${itemType === 'VPP' ? 'Kho Văn phòng phẩm' : 'Kho Vệ sinh'}`, `Ngày in: ${formatReportDate(reportDate)}`], ['Số lượng Hành chính duyệt'], [], ['Danh mục', 'Mã hàng', 'ĐVT', ...exportDepartments.map(departmentProvince), 'Tổng số lượng', 'Đơn giá (VNĐ)', 'Thành tiền (VNĐ)'], headings,
-        ...report.rows.map(row => [row.name, row.mvpp, row.unit, ...exportDepartments.map(department => row.departmentQuantities[department.id] || 0), row.totalQuantity, row.unitPrice, row.totalAmount]),
-        ['TỔNG CỘNG', '', '', ...exportDepartments.map(department => report.totals.departmentQuantities[department.id] || 0), report.totals.totalQuantity, '', report.totals.totalAmount],
+        [reportTitle(itemType)], [`Kỳ tổng hợp: ${filter.label}`], [`Mã tổng hợp: THĐX-${reportDate.replace(/-/g, '')}-${itemType}`, `Người lập: ${reporter}`], [`Kho áp dụng: ${itemType === 'VPP' ? 'Kho Văn phòng phẩm' : 'Kho Vệ sinh'}`, `Ngày in: ${formatReportDate(reportDate)}`], ['Số lượng Hành chính duyệt'], [], ['Danh mục', 'Mã hàng', 'ĐVT', ...exportDepartments.map(departmentProvince), 'ĐX tháng gần nhất', 'SL Tồn', 'Tổng số lượng', 'Đơn giá (VNĐ)', 'Thành tiền (VNĐ)'], headings,
+        ...report.rows.map(row => [row.name, row.mvpp, row.unit, ...exportDepartments.map(department => row.departmentQuantities[department.id] || 0), row.recentProposalQuantity, row.stockQuantity, row.totalQuantity, row.unitPrice, row.totalAmount]),
+        ['TỔNG CỘNG', '', '', ...exportDepartments.map(department => report.totals.departmentQuantities[department.id] || 0), '', '', report.totals.totalQuantity, '', report.totals.totalAmount],
         [], [`Ngày báo cáo: ${formatReportDate(reportDate)}`], [`Người lập bảng: ${reporter}`],
         ['Đơn giá lưu trên phiếu. Các mức giá khác nhau của cùng mặt hàng được tách dòng.'],
         ...(report.totals.unpricedRowCount ? [[`Tổng tiền chưa bao gồm ${report.totals.unpricedRowCount} dòng chưa lưu đơn giá.`]] : []),
       ];
       const sheet = XLSX.utils.aoa_to_sheet(data);
-      sheet['!cols'] = [{ wch: 36 }, { wch: 18 }, { wch: 9 }, ...exportDepartments.map(() => ({ wch: 22 })), { wch: 16 }, { wch: 18 }, { wch: 20 }];
+      sheet['!cols'] = [{ wch: 36 }, { wch: 18 }, { wch: 9 }, ...exportDepartments.map(() => ({ wch: 22 })), { wch: 18 }, { wch: 12 }, { wch: 16 }, { wch: 18 }, { wch: 20 }];
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, sheet, itemType === 'VPP' ? 'Tong hop VPP' : 'Tong hop Ve sinh');
       XLSX.writeFile(workbook, `Bao_cao_de_xuat_${itemType}_${reportDate}.xlsx`);

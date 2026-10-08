@@ -44,6 +44,8 @@ export type RequestLine = {
   itemId: string;
   item: { name: string, mvpp: string, unit: string, itemType?: string, price?: number, printSortGroup?: string | null };
   qtyRequested: number;
+  recentProposalQty?: number | null;
+  stockQty?: number | null;
   qtyManagerApproved: number | null;
   qtyAdminApproved: number | null;
   qtyApproved: number | null;

@@ -28,12 +28,13 @@ interface Props {
   activeRequest: VPPRequest | null;
   initialSupplyType: RequestSupplyType;
 }
-
 type TargetItem = {
   itemId: string;
   item: VPPItem;
   quantity: number;
   note: string;
+  recentProposalQty: number | null;
+  stockQty: number | null;
 };
 
 type ValidationErrors = {
@@ -120,6 +121,7 @@ export default function RequestsCreate({
   const [purpose, setPurpose] = useState('');
   const [neededByDate, setNeededByDate] = useState('');
   const [targetItems, setTargetItems] = useState<TargetItem[]>([]);
+  const [recentProposalQuantities, setRecentProposalQuantities] = useState<Record<string, number | null>>({});
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -217,6 +219,32 @@ export default function RequestsCreate({
   }, [currentUser?.departmentId, directDepartmentName]);
 
   useEffect(() => {
+    const itemIds = items
+      .filter(item => getItemSupplyType(item) === supplyType && item.isActive !== false)
+      .map(item => item.id);
+    if (!itemIds.length || !currentUser) {
+      setRecentProposalQuantities({});
+      return;
+    }
+    const controller = new AbortController();
+    api.post('/requests/recent-proposal-quantities', { itemIds }, { signal: controller.signal })
+      .then(response => {
+        const quantities = response.data?.quantities || {};
+        setRecentProposalQuantities(quantities);
+        if (!isEditingDraft) {
+          setTargetItems(previous => previous.map(target => ({
+            ...target,
+            recentProposalQty: quantities[target.itemId] ?? null,
+          })));
+        }
+      })
+      .catch(error => {
+        if (!controller.signal.aborted) console.error('Failed to load recent proposal quantities', error);
+      });
+    return () => controller.abort();
+  }, [items, supplyType, currentUser?.id, isEditingDraft]);
+
+  useEffect(() => {
     let cancelled = false;
 
     const hydrateDraft = async () => {
@@ -267,6 +295,8 @@ export default function RequestsCreate({
               },
               quantity: Number(line.qtyRequested || 1),
               note: line.note || '',
+              recentProposalQty: line.recentProposalQty ?? null,
+              stockQty: line.stockQty ?? null,
             };
           }
 
@@ -280,6 +310,8 @@ export default function RequestsCreate({
               },
               quantity: Number(line.qtyRequested || 1),
               note: line.note || '',
+              recentProposalQty: line.recentProposalQty ?? null,
+              stockQty: line.stockQty ?? null,
             };
           }
 
@@ -295,6 +327,8 @@ export default function RequestsCreate({
               },
               quantity: Number(line.qtyRequested || 1),
               note: line.note || '',
+              recentProposalQty: line.recentProposalQty ?? null,
+              stockQty: line.stockQty ?? null,
             };
           } catch {
             return {
@@ -302,6 +336,8 @@ export default function RequestsCreate({
               item: buildFallbackItem(line),
               quantity: Number(line.qtyRequested || 1),
               note: line.note || '',
+              recentProposalQty: line.recentProposalQty ?? null,
+              stockQty: line.stockQty ?? null,
             };
           }
         })
@@ -398,6 +434,8 @@ export default function RequestsCreate({
           item,
           quantity: 1,
           note: '',
+          recentProposalQty: recentProposalQuantities[item.id] ?? null,
+          stockQty: 0,
         },
       ];
     });
@@ -438,6 +476,13 @@ export default function RequestsCreate({
     setTargetItems((prev) =>
       prev.map((t) => (t.itemId === itemId ? { ...t, note: value } : t))
     );
+    setHasUserChanges(true);
+  };
+
+  const handleStockQtyChange = (itemId: string, value: string) => {
+    const digits = value.replace(/\D/g, '');
+    const stockQty = digits === '' ? null : Number(digits);
+    setTargetItems(prev => prev.map(item => item.itemId === itemId ? { ...item, stockQty } : item));
     setHasUserChanges(true);
   };
 
@@ -522,6 +567,7 @@ export default function RequestsCreate({
           return {
             itemId,
             qtyRequested,
+            ...(t.stockQty !== null ? { stockQty: t.stockQty } : {}),
             note: t.note || '',
           };
         }),
@@ -609,6 +655,7 @@ export default function RequestsCreate({
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-slate-800">{item.name}</p>
               <p className="mt-1 text-xs text-slate-500"><span className="font-semibold">{item.mvpp}</span> · {item.unit}</p>
+              <p className="mt-1 text-[11px] font-semibold text-indigo-600">ĐX tháng gần nhất: {recentProposalQuantities[item.id] ?? '—'}</p>
             </div>
             <button type="button" onClick={() => handleAddItem(item)} aria-label={`Thêm ${item.name} vào phiếu`} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50"><Plus className="h-5 w-5" /></button>
           </div>
@@ -699,7 +746,7 @@ export default function RequestsCreate({
               {targetItems.length === 0 ? <div className={`grid place-items-center p-8 text-center transition-[min-height] duration-700 ease-in-out ${isWorkspaceFocused ? 'min-h-[calc(100vh-15rem)]' : 'min-h-[300px]'}`}><div><PackageOpen className="mx-auto h-11 w-11 text-slate-300" /><p className="mt-3 font-bold text-slate-600">Chưa chọn vật tư</p><p className="mt-1 text-sm text-slate-500">Chọn vật tư từ danh mục bên trái để thêm vào phiếu.</p></div></div> : <>
                 <div className={`hidden overflow-auto transition-[max-height] duration-700 ease-in-out md:block ${isWorkspaceFocused ? 'max-h-[calc(100vh-15rem)]' : 'max-h-[520px]'}`}>
                   <table className="w-full min-w-[720px] text-left">
-                    <thead className="sticky top-0 z-20 bg-slate-50 text-xs uppercase tracking-wide text-slate-500 shadow-[0_1px_0_#e2e8f0]"><tr><th className="p-3">Vật tư</th><th className="p-3 text-center">Định mức</th><th className="p-3 text-center">SL đề xuất</th><th className="p-3 text-right">Thành tiền</th><th className="w-40 p-3 text-center">Thao tác</th></tr></thead>
+                    <thead className="sticky top-0 z-20 bg-slate-50 text-xs uppercase tracking-wide text-slate-500 shadow-[0_1px_0_#e2e8f0]"><tr><th className="p-3">Vật tư</th><th className="p-3 text-center">Định mức</th><th className="p-3 text-center">ĐX tháng gần nhất</th><th className="p-3 text-center">SL Tồn</th><th className="p-3 text-center">SL đề xuất</th><th className="p-3 text-right">Thành tiền</th><th className="w-40 p-3 text-center">Thao tác</th></tr></thead>
                     <tbody className="divide-y divide-slate-100">{targetItems.map((t) => {
                       const isOverQuota = Number(t.quantity) > Number(t.item.quota || 0);
                       const noteExpanded = expandedNoteIds.has(t.itemId);
@@ -707,11 +754,13 @@ export default function RequestsCreate({
                         <tr className={`transition-colors ${highlightedItemId === t.itemId ? 'bg-indigo-50' : ''}`}>
                           <td className="p-3"><p className="max-w-[260px] font-bold text-slate-800">{t.item.name}</p><p className="text-xs text-slate-500">{t.item.mvpp} · {t.item.unit}</p></td>
                           <td className="p-3 text-center text-sm font-semibold text-indigo-600">{t.item.quota}</td>
+                          <td className="p-3 text-center text-sm font-black text-slate-600">{t.recentProposalQty ?? '—'}</td>
+                          <td className="p-3"><input type="number" min="0" step="1" value={t.stockQty ?? ''} placeholder="—" onChange={(e) => handleStockQtyChange(t.itemId, e.target.value)} aria-label={`Số lượng tồn ${t.item.name}`} className="mx-auto block h-10 w-20 rounded-lg border border-slate-200 text-center font-black text-emerald-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" /></td>
                           <td className="p-3"><MonthlyApprovalHistoryTooltip itemId={t.itemId} itemName={t.item.name} department={requesterDepartment} departmentId={currentUser?.departmentId} requestId={activeRequest?.id}><div className="mx-auto flex w-32 items-center rounded-lg border border-slate-200"><button type="button" aria-label={`Giảm số lượng ${t.item.name}`} onClick={() => adjustQuantity(t.itemId, -1)} className="grid h-10 w-9 place-items-center text-slate-500 hover:bg-slate-50"><Minus className="h-4 w-4" /></button><input type="number" min="1" value={t.quantity || ''} onChange={(e) => handleQuantityChange(t.itemId, e.target.value)} aria-label={`Số lượng đề xuất ${t.item.name}`} className={`h-10 min-w-0 flex-1 border-x border-slate-200 text-center font-black outline-none ${isOverQuota ? 'text-rose-600' : 'text-indigo-700'}`} /><button type="button" aria-label={`Tăng số lượng ${t.item.name}`} onClick={() => adjustQuantity(t.itemId, 1)} className="grid h-10 w-9 place-items-center text-slate-500 hover:bg-slate-50"><Plus className="h-4 w-4" /></button></div></MonthlyApprovalHistoryTooltip>{isOverQuota && <div className="mt-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-amber-600"><span>Vượt định mức</span><button type="button" onClick={() => setNoteExpanded(t.itemId, true)} className="underline decoration-dotted underline-offset-2 hover:text-amber-700">Bổ sung lý do</button></div>}</td>
                           <td className="p-3 text-right text-sm font-black text-slate-800">{(Number(t.item.price || 0) * Number(t.quantity || 0)).toLocaleString('vi-VN')} đ</td>
                           <td className="p-3"><div className="flex items-center justify-end gap-1"><button type="button" aria-label={`Ghi chú ${t.item.name}`} onClick={() => setNoteExpanded(t.itemId, !noteExpanded)} className={`flex items-center gap-1 rounded-md px-2 py-2 text-xs font-bold ${noteExpanded || t.note.trim() ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-100'}`}><NotebookPen className="h-4 w-4" />Ghi chú</button><button type="button" aria-label={`Xóa ${t.item.name}`} onClick={() => handleRemoveItem(t.itemId)} className="rounded-md p-2 text-rose-500 hover:bg-rose-50"><Trash2 className="h-4 w-4" /></button></div></td>
                         </tr>
-                        {noteExpanded ? <tr className="bg-indigo-50/40"><td colSpan={5} className="px-3 pb-3 pt-2"><div className="rounded-lg border border-indigo-100 bg-white p-3"><div className="mb-2 flex items-center justify-between gap-3"><label htmlFor={`item-note-${t.itemId}`} className="text-xs font-bold text-slate-700">Ghi chú cho {t.item.name}</label><button type="button" onClick={() => setNoteExpanded(t.itemId, false)} className="text-xs font-bold text-indigo-700 hover:text-indigo-900">Xong</button></div><textarea id={`item-note-${t.itemId}`} rows={2} value={t.note} onChange={(e) => handleNoteChange(t.itemId, e.target.value)} placeholder={isOverQuota ? 'Nhập lý do đề xuất vượt định mức...' : 'Thêm ghi chú cho vật tư này...'} className="min-h-16 max-h-40 w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" /></div></td></tr> : t.note.trim() && <tr className="bg-slate-50/70"><td colSpan={5} className="px-3 py-2"><button type="button" onClick={() => setNoteExpanded(t.itemId, true)} className="block w-full truncate text-left text-xs text-slate-600 hover:text-indigo-700"><strong>Ghi chú:</strong> {t.note}</button></td></tr>}
+                        {noteExpanded ? <tr className="bg-indigo-50/40"><td colSpan={7} className="px-3 pb-3 pt-2"><div className="rounded-lg border border-indigo-100 bg-white p-3"><div className="mb-2 flex items-center justify-between gap-3"><label htmlFor={`item-note-${t.itemId}`} className="text-xs font-bold text-slate-700">Ghi chú cho {t.item.name}</label><button type="button" onClick={() => setNoteExpanded(t.itemId, false)} className="text-xs font-bold text-indigo-700 hover:text-indigo-900">Xong</button></div><textarea id={`item-note-${t.itemId}`} rows={2} value={t.note} onChange={(e) => handleNoteChange(t.itemId, e.target.value)} placeholder={isOverQuota ? 'Nhập lý do đề xuất vượt định mức...' : 'Thêm ghi chú cho vật tư này...'} className="min-h-16 max-h-40 w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" /></div></td></tr> : t.note.trim() && <tr className="bg-slate-50/70"><td colSpan={7} className="px-3 py-2"><button type="button" onClick={() => setNoteExpanded(t.itemId, true)} className="block w-full truncate text-left text-xs text-slate-600 hover:text-indigo-700"><strong>Ghi chú:</strong> {t.note}</button></td></tr>}
                       </Fragment>;
                     })}</tbody>
                   </table>
@@ -719,7 +768,7 @@ export default function RequestsCreate({
                 <div className={`divide-y divide-slate-100 overflow-y-auto transition-[max-height] duration-700 ease-in-out md:hidden ${isWorkspaceFocused ? 'max-h-[calc(100vh-15rem)]' : 'max-h-[520px]'}`}>{targetItems.map((t) => {
                   const isOverQuota = Number(t.quantity) > Number(t.item.quota || 0);
                   const noteExpanded = expandedNoteIds.has(t.itemId);
-                  return <article key={t.itemId} className={`p-4 transition-colors ${highlightedItemId === t.itemId ? 'bg-indigo-50' : ''}`}><div className="flex items-start justify-between gap-3"><div><h4 className="font-bold text-slate-800">{t.item.name}</h4><p className="mt-1 text-xs text-slate-500">{t.item.mvpp} · {t.item.unit} · Định mức {t.item.quota}</p></div><div className="flex items-center gap-1"><button type="button" aria-label={`Ghi chú ${t.item.name}`} onClick={() => setNoteExpanded(t.itemId, !noteExpanded)} className={`rounded-md p-2 ${noteExpanded || t.note.trim() ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500'}`}><NotebookPen className="h-4 w-4" /></button><button type="button" aria-label={`Xóa ${t.item.name}`} onClick={() => handleRemoveItem(t.itemId)} className="rounded-md p-2 text-rose-500"><Trash2 className="h-4 w-4" /></button></div></div><div className="mt-3 flex items-center justify-between gap-3"><div><div className="flex items-center rounded-lg border border-slate-200"><button type="button" aria-label={`Giảm số lượng ${t.item.name}`} onClick={() => adjustQuantity(t.itemId, -1)} className="p-2"><Minus className="h-4 w-4" /></button><input type="number" min="1" value={t.quantity || ''} onChange={(e) => handleQuantityChange(t.itemId, e.target.value)} aria-label={`Số lượng đề xuất ${t.item.name}`} className={`h-9 w-12 border-x border-slate-200 text-center font-black outline-none ${isOverQuota ? 'text-rose-600' : 'text-indigo-700'}`} /><button type="button" aria-label={`Tăng số lượng ${t.item.name}`} onClick={() => adjustQuantity(t.itemId, 1)} className="p-2"><Plus className="h-4 w-4" /></button></div>{isOverQuota && <div className="mt-1 flex items-center gap-1.5 text-[11px] font-semibold text-amber-600"><span>Vượt định mức</span><button type="button" onClick={() => setNoteExpanded(t.itemId, true)} className="underline decoration-dotted underline-offset-2">Bổ sung lý do</button></div>}</div><strong className="shrink-0">{(Number(t.item.price || 0) * Number(t.quantity || 0)).toLocaleString('vi-VN')} đ</strong></div>{noteExpanded ? <div className="mt-3 rounded-lg border border-indigo-100 bg-indigo-50/40 p-3"><div className="mb-2 flex items-center justify-between gap-3"><label htmlFor={`mobile-item-note-${t.itemId}`} className="text-xs font-bold text-slate-700">Ghi chú</label><button type="button" onClick={() => setNoteExpanded(t.itemId, false)} className="text-xs font-bold text-indigo-700">Xong</button></div><textarea id={`mobile-item-note-${t.itemId}`} rows={2} value={t.note} onChange={(e) => handleNoteChange(t.itemId, e.target.value)} placeholder={isOverQuota ? 'Nhập lý do đề xuất vượt định mức...' : 'Thêm ghi chú cho vật tư này...'} className="min-h-16 max-h-40 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500" /></div> : t.note.trim() && <button type="button" onClick={() => setNoteExpanded(t.itemId, true)} className="mt-3 block w-full truncate rounded-md bg-slate-50 px-3 py-2 text-left text-xs text-slate-600"><strong>Ghi chú:</strong> {t.note}</button>}</article>;
+                  return <article key={t.itemId} className={`p-4 transition-colors ${highlightedItemId === t.itemId ? 'bg-indigo-50' : ''}`}><div className="flex items-start justify-between gap-3"><div><h4 className="font-bold text-slate-800">{t.item.name}</h4><p className="mt-1 text-xs text-slate-500">{t.item.mvpp} · {t.item.unit} · Định mức {t.item.quota}</p><div className="mt-2 flex items-center gap-3 text-xs"><span className="font-bold text-indigo-600">ĐX gần nhất: {t.recentProposalQty ?? '—'}</span><label className="flex items-center gap-1 font-bold text-slate-500">SL Tồn<input type="number" min="0" step="1" value={t.stockQty ?? ''} placeholder="—" onChange={(e) => handleStockQtyChange(t.itemId, e.target.value)} className="h-8 w-16 rounded-md border border-slate-200 text-center font-black text-emerald-700" /></label></div></div><div className="flex items-center gap-1"><button type="button" aria-label={`Ghi chú ${t.item.name}`} onClick={() => setNoteExpanded(t.itemId, !noteExpanded)} className={`rounded-md p-2 ${noteExpanded || t.note.trim() ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500'}`}><NotebookPen className="h-4 w-4" /></button><button type="button" aria-label={`Xóa ${t.item.name}`} onClick={() => handleRemoveItem(t.itemId)} className="rounded-md p-2 text-rose-500"><Trash2 className="h-4 w-4" /></button></div></div><div className="mt-3 flex items-center justify-between gap-3"><div><div className="flex items-center rounded-lg border border-slate-200"><button type="button" aria-label={`Giảm số lượng ${t.item.name}`} onClick={() => adjustQuantity(t.itemId, -1)} className="p-2"><Minus className="h-4 w-4" /></button><input type="number" min="1" value={t.quantity || ''} onChange={(e) => handleQuantityChange(t.itemId, e.target.value)} aria-label={`Số lượng đề xuất ${t.item.name}`} className={`h-9 w-12 border-x border-slate-200 text-center font-black outline-none ${isOverQuota ? 'text-rose-600' : 'text-indigo-700'}`} /><button type="button" aria-label={`Tăng số lượng ${t.item.name}`} onClick={() => adjustQuantity(t.itemId, 1)} className="p-2"><Plus className="h-4 w-4" /></button></div>{isOverQuota && <div className="mt-1 flex items-center gap-1.5 text-[11px] font-semibold text-amber-600"><span>Vượt định mức</span><button type="button" onClick={() => setNoteExpanded(t.itemId, true)} className="underline decoration-dotted underline-offset-2">Bổ sung lý do</button></div>}</div><strong className="shrink-0">{(Number(t.item.price || 0) * Number(t.quantity || 0)).toLocaleString('vi-VN')} đ</strong></div>{noteExpanded ? <div className="mt-3 rounded-lg border border-indigo-100 bg-indigo-50/40 p-3"><div className="mb-2 flex items-center justify-between gap-3"><label htmlFor={`mobile-item-note-${t.itemId}`} className="text-xs font-bold text-slate-700">Ghi chú</label><button type="button" onClick={() => setNoteExpanded(t.itemId, false)} className="text-xs font-bold text-indigo-700">Xong</button></div><textarea id={`mobile-item-note-${t.itemId}`} rows={2} value={t.note} onChange={(e) => handleNoteChange(t.itemId, e.target.value)} placeholder={isOverQuota ? 'Nhập lý do đề xuất vượt định mức...' : 'Thêm ghi chú cho vật tư này...'} className="min-h-16 max-h-40 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500" /></div> : t.note.trim() && <button type="button" onClick={() => setNoteExpanded(t.itemId, true)} className="mt-3 block w-full truncate rounded-md bg-slate-50 px-3 py-2 text-left text-xs text-slate-600"><strong>Ghi chú:</strong> {t.note}</button>}</article>;
                 })}</div>
               </>}
               {warningsCount > 0 && <p className="flex items-center gap-2 border-t border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-700"><AlertTriangle className="h-4 w-4" />{warningsCount} mặt hàng đang vượt định mức.</p>}
