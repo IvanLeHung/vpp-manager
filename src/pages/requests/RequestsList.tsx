@@ -1599,30 +1599,38 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
             @page { size: A4 portrait; margin: 10mm; }
-            @page request-summary { size: A4 landscape; margin: 12mm 10mm; }
+            @page request-summary { size: A4 portrait; margin: 8mm 5mm; }
             * { background-color: transparent !important; color-adjust: exact; -webkit-print-color-adjust: exact; }
             .print-sheet { font-family: "Times New Roman", Times, serif; color: #000 !important; background: #fff !important; }
             .request-summary-print {
               page: request-summary;
               font-family: "Times New Roman", Times, serif !important;
-              font-size: 11pt !important;
+              font-size: 8pt !important;
               width: 100% !important;
               max-width: none !important;
-              min-height: 186mm !important;
+              min-height: 281mm !important;
               margin: 0 !important;
               padding: 0 !important;
               box-sizing: border-box !important;
             }
             .request-summary-print p,
             .request-summary-print td,
-            .request-summary-print th { font-family: "Times New Roman", Times, serif !important; font-size: 11pt !important; }
-            .request-summary-print h1 { font-family: "Times New Roman", Times, serif !important; font-size: 12pt !important; }
-            .request-summary-print .print-header { margin-bottom: 5mm !important; }
-            .request-summary-print .summary-title { margin-bottom: 5mm !important; }
-            .request-summary-print .print-table { margin-top: 0 !important; margin-bottom: 5mm !important; }
+            .request-summary-print th { font-family: "Times New Roman", Times, serif !important; font-size: 8pt !important; }
+            .request-summary-print h1 { font-family: "Times New Roman", Times, serif !important; font-size: 11pt !important; }
+            .request-summary-print .print-header { margin-bottom: 2.5mm !important; }
+            .request-summary-print .summary-title { margin-bottom: 3mm !important; }
+            .request-summary-print .summary-title > p { margin-top: 0.7mm !important; }
+            .request-summary-print .summary-title > div { margin-top: 1.5mm !important; gap: 0.5mm 4mm !important; }
+            .request-summary-print .print-table { margin-top: 0 !important; margin-bottom: 3mm !important; }
             .request-summary-print .print-table th,
-            .request-summary-print .print-table td { padding: 1mm 1.1mm !important; font-family: "Times New Roman", Times, serif !important; }
-            .request-summary-print .print-table th { font-size: 10pt !important; }
+            .request-summary-print .print-table td {
+              padding: 0.7mm 0.65mm !important;
+              font-family: "Times New Roman", Times, serif !important;
+              overflow-wrap: anywhere;
+              word-break: normal;
+              white-space: normal;
+            }
+            .request-summary-print .print-table th { font-size: 7.5pt !important; line-height: 1.05 !important; }
             .request-summary-print img,
             .request-summary-print svg { display: none !important; }
             .print-table { width: 100%; border-collapse: collapse; table-layout: fixed; background: #fff !important; }
@@ -1636,26 +1644,26 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
             }
             .request-summary-print thead { display: table-header-group; }
             .request-summary-print tbody { break-inside: avoid; page-break-inside: avoid; }
-            .item-main-row td { font-size: 10.5pt !important; }
+            .item-main-row td { font-size: 8.5pt !important; }
             .item-name { font-weight: 700 !important; }
             .item-bold { font-weight: 700 !important; }
             .item-regular { font-weight: 400 !important; }
             
             .allocation-header-row td {
-              font-size: 9.5pt !important;
+              font-size: 7.5pt !important;
               font-weight: 700 !important;
               font-style: italic !important;
               background-color: #fff !important;
               color: #000 !important;
             }
             .allocation-row td {
-              font-size: 9.5pt !important;
+              font-size: 7.5pt !important;
               font-weight: 400 !important;
               background-color: #fff !important;
               color: #000 !important;
             }
             .allocation-note {
-              font-size: 9.5pt !important;
+              font-size: 7.5pt !important;
               font-style: italic !important;
               color: #000 !important;
             }
@@ -1664,13 +1672,13 @@ export default function RequestsList({ requests, currentUser, setViewMode, setAc
               white-space: nowrap !important;
               text-align: center !important;
             }
-            .col-code { width: 12% !important; }
-            .col-name { width: 24% !important; }
-            .col-unit { width: 6% !important; }
+            .col-code { width: 11% !important; }
+            .col-name { width: 25% !important; }
+            .col-unit { width: 5% !important; }
             .col-recent { width: 10% !important; }
             .col-stock { width: 7% !important; }
             .col-qty { width: 8% !important; }
-            .col-price { width: 13% !important; }
+            .col-price { width: 14% !important; }
             .col-total { width: 16% !important; }
             
             .avoid-page-break {
