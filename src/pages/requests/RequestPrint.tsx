@@ -326,14 +326,16 @@ const RequestPrint: React.FC = () => {
         <table className="print-table">
           <thead>
             <tr>
-              <th style={{ width: '6%' }}>STT</th>
-              <th style={{ width: '10%' }}>Mã VT</th>
-              <th style={{ width: '30%' }}>{effectivePrintType === 'VE_SINH' ? 'Tên Đồ Vệ Sinh' : effectivePrintType === 'VPP' ? 'Tên Văn Phòng Phẩm' : 'Tên Hàng Hóa'}</th>
-              <th style={{ width: '7%' }}>ĐVT</th>
+              <th style={{ width: '4%' }}>STT</th>
+              <th style={{ width: '9%' }}>Mã VT</th>
+              <th style={{ width: '23%' }}>{effectivePrintType === 'VE_SINH' ? 'Tên Đồ Vệ Sinh' : effectivePrintType === 'VPP' ? 'Tên Văn Phòng Phẩm' : 'Tên Hàng Hóa'}</th>
+              <th style={{ width: '5%' }}>ĐVT</th>
+              <th style={{ width: '8%' }}>ĐX tháng gần nhất</th>
+              <th style={{ width: '7%' }}>SL Tồn</th>
               <th style={{ width: '6%' }}>SL</th>
-              <th style={{ width: '12%' }}>Đơn giá</th>
-              <th style={{ width: '14%' }}>Thành tiền</th>
-              <th style={{ width: '15%' }}>Ghi chú</th>
+              <th style={{ width: '11%' }}>Đơn giá</th>
+              <th style={{ width: '13%' }}>Thành tiền</th>
+              <th style={{ width: '14%' }}>Ghi chú</th>
             </tr>
           </thead>
           <tbody>
@@ -358,6 +360,8 @@ const RequestPrint: React.FC = () => {
                     </div>
                   </td>
                   <td className="text-center">{displayItem?.unit}</td>
+                  <td className="text-center font-semibold">{l.recentProposalQty ?? '—'}</td>
+                  <td className="text-center font-semibold">{l.stockQty ?? '—'}</td>
                   <td className="text-center font-black text-base">
                     {displayQtyApproved !== null && (displayQtyApproved !== displayQtyRequested || l.qtyManagerApproved !== displayQtyRequested) ? (
                       <div className="flex flex-col items-center leading-none">
@@ -384,7 +388,7 @@ const RequestPrint: React.FC = () => {
               );
             })}
             <tr className="bg-slate-50 h-10 font-black">
-              <td colSpan={4} className="text-right uppercase text-xs">Tổng cộng:</td>
+              <td colSpan={6} className="text-right uppercase text-xs">Tổng cộng:</td>
               <td className="text-center text-lg">
                 {filteredLines.reduce((sum: number, line: any) => sum + (line.replacementQty ?? line.qtyApproved ?? line.qtyRequested), 0)}
               </td>
